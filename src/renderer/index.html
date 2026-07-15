@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>NEXUS OS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <header class="top-hud">
+    <div class="identity"><span class="core-mark">N</span><strong>NEXUS AI</strong><small>COGNITIVE OS · V2</small><span class="online-dot"></span><span class="online-label">SYSTEM ALIVE</span></div>
+    <div class="global-tools">
+      <label class="universe-search"><span aria-hidden="true">⌕</span><input id="graphSearch" type="search" placeholder="Search the knowledge universe…" aria-label="Cerca nel knowledge graph"><kbd>/</kbd></label>
+      <button id="reindex" class="icon-control" aria-label="Reindicizza Nexus" title="Reindicizza Nexus">↻</button>
+      <button id="settingsButton" class="icon-control" aria-label="Apri impostazioni" title="Impostazioni">⚙</button>
+      <span id="clock" class="clock">--:--</span>
+    </div>
+  </header>
+
+  <main class="os-shell">
+    <section class="universe" aria-label="Knowledge universe interattivo">
+      <canvas id="knowledgeCanvas" role="img" aria-label="Grafo della conoscenza Nexus con nucleo e nodi collegati"></canvas>
+      <div class="universe-heading"><small>// PERSONAL KNOWLEDGE UNIVERSE</small><h1>Welcome back, <em id="displayName">User.</em></h1><p>Everything is connected.</p></div>
+      <div class="graph-metrics" aria-label="Statistiche del vault"><span><b id="metricNotes">—</b> NOTES</span><span><b id="metricChunks">—</b> CONNECTIONS</span><span><b id="modelState">LOCAL</b> INFERENCE</span></div>
+      <div class="viewport-tools" aria-label="Controlli del grafo">
+        <button id="zoomIn" aria-label="Aumenta zoom">＋</button><button id="zoomOut" aria-label="Riduci zoom">−</button><button id="resetGraph" aria-label="Centra grafo">◎</button>
+      </div>
+      <aside id="nodeInspector" class="node-inspector" aria-live="polite">
+        <small>SELECTED ENTITY</small><strong id="nodeTitle">NEXUS CORE</strong><span id="nodeMeta">Personal cognitive system</span><p id="nodeDescription">Seleziona un nodo per esplorare la tua conoscenza.</p><button id="openSelectedNote" class="signal-button" hidden>OPEN IN OBSIDIAN ↗</button>
+      </aside>
+      <div class="system-readout">
+        <strong>SYSTEM PULSE</strong><span>VAULT <i></i> CONNECTED</span><span>RAG <i></i> ACTIVE</span><span>STORAGE <i></i> LOCAL PC</span>
+      </div>
+      <nav class="system-dock" aria-label="Navigazione Nexus">
+        <button class="dock-item active" data-focus="core"><span>◉</span><small>CORE</small></button>
+        <button class="dock-item" data-focus="graph"><span>⌘</span><small>GRAPH</small></button>
+        <button class="dock-item" data-focus="vault"><span>◇</span><small>VAULT</small></button>
+        <button class="dock-item" data-focus="agents"><span>✦</span><small>AGENTS</small></button>
+        <button class="dock-item" data-focus="projects"><span>⬡</span><small>PROJECTS</small></button>
+        <button class="dock-item" data-focus="labs"><span>△</span><small>LABS</small></button>
+        <button class="dock-item" data-focus="university"><span>⌁</span><small>UNIVERSITY</small></button>
+        <button id="dockSettings" class="dock-item"><span>⚙</span><small>SETTINGS</small></button>
+      </nav>
+    </section>
+
+    <aside class="comms-panel" aria-label="Pannello di comunicazione Nexus">
+      <header class="comms-head"><div><span class="agent-avatar">N</span><div><strong>NEXUS CORE</strong><small><i></i> <span id="cognitiveState">COGNITIVE LINK ACTIVE</span></small></div></div><div class="agent-state"><span>AGENT</span><b id="agentState">READY</b><button id="newChat" class="icon-control" aria-label="Nuova conversazione">＋</button></div></header>
+      <div class="comms-tabs"><button class="active">DIALOGUE</button><button disabled>AGENT LOG</button><button disabled>SYSTEM</button></div>
+      <section id="messages" class="messages" aria-live="polite">
+        <div class="welcome-message">
+          <span class="message-sigil">N</span><div><small>NEXUS · NOW</small><p>Interfaccia cognitiva pronta. Posso esplorare il vault, collegare concetti e rispondere citando le tue note.</p><div class="suggestions"><button>Mostrami la struttura della mia conoscenza</button><button>Collega RAG, modelli locali e Nexus</button><button>Quali note dovrei completare?</button></div></div>
+        </div>
+      </section>
+      <form id="composer" class="comms-composer">
+        <div class="composer-mode"><select id="reasoningMode" aria-label="Modalità di ragionamento"><option value="fast">QUICK RAG</option><option value="deep">DEEP REASONING</option></select><select id="headerModel" aria-label="Modello attivo"><option>LOCAL MODEL</option></select></div>
+        <div id="thinkingIndicator" class="thinking-indicator" hidden><span></span><span></span><span></span><b>COGNITIVE PROCESS ACTIVE</b></div>
+        <div class="input-row"><textarea id="question" rows="1" placeholder="Communicate with Nexus…" aria-label="Messaggio a Nexus"></textarea><button id="voiceToggle" class="voice-control" type="button" aria-pressed="false" aria-label="Attiva stato voce">◉</button><button id="send" type="submit" aria-label="Invia messaggio">↑</button></div>
+        <small>ENTER TO SEND · SHIFT+ENTER NEW LINE · LOCAL ONLY</small>
+      </form>
+    </aside>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form id="settingsForm" method="dialog">
+      <header><div><small>SYSTEM CONFIGURATION</small><h2>Local intelligence</h2></div><button value="cancel" aria-label="Chiudi">×</button></header>
+      <label>LOCAL ENDPOINT<input id="baseUrl" placeholder="http://127.0.0.1:11434/v1" required></label>
+      <label>AI MODEL<input id="model" list="modelCatalog" placeholder="qwen3:8b" required><datalist id="modelCatalog"></datalist></label>
+      <button id="detectModels" class="secondary" type="button">SCAN LOCAL MODELS</button>
+      <label>TEMPERATURE<input id="temperature" type="number" min="0" max="1" step="0.1"></label>
+      <p>Solo motori locali. Nessun contenuto del vault viene inviato a Internet.</p><p id="settingsError" class="error" role="alert"></p>
+      <button class="signal-button" value="default">APPLY CONFIGURATION</button>
+    </form>
+  </dialog>
+  <script src="app.js"></script>
+</body>
+</html>
