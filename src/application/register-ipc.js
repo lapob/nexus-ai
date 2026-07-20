@@ -2,11 +2,26 @@ const { app, clipboard, ipcMain, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const { fileURLToPath } = require('node:url');
 const { assertLocalUrl, resolveVaultNotePath } = require('../security');
 const { localDataLayout } = require('../portable-paths');
 const { parsePlannerOutput, mergeSources } = require('../reasoning');
 const { validateSettings } = require('../core/config');
 const { CHANNELS, parseChatRequest, parseRelativeNotePath, parseClipboardText } = require('./ipc-contracts');
+
+function normalizeLocalFileUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== 'file:') throw new Error('Sono consentiti soltanto URL file locali.');
+  return path.resolve(fileURLToPath(url)).toLowerCase();
+}
+
+function isTrustedRendererUrl(senderUrl, trustedRendererUrl) {
+  try {
+    return normalizeLocalFileUrl(senderUrl) === normalizeLocalFileUrl(trustedRendererUrl);
+  } catch {
+    return false;
+  }
+}
 
 function buildSystemPrompt(sources) {
   const context = sources.map((source, index) => `[FONTE ${index + 1}] ${source.title} > ${source.heading}\nPercorso: ${source.relativePath}\nStato: ${source.status}\n${source.text}`).join('\n\n');
@@ -17,7 +32,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
   const activeRequests = new Map();
   const configPath = () => path.join(app.getPath('userData'), 'settings.json');
   const assertTrustedSender = (event) => {
-    if (event.senderFrame?.url !== trustedRendererUrl) throw new Error('Mittente IPC non autorizzato.');
+    if (!isTrustedRendererUrl(event.senderFrame?.url, trustedRendererUrl)) throw new Error('Mittente IPC non autorizzato.');
   };
   const getSettings = () => {
     try { return validateSettings(JSON.parse(fs.readFileSync(configPath(), 'utf8')), runtimeConfig.llm); }
@@ -132,4 +147,4 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
   });
 }
 
-module.exports = { buildSystemPrompt, registerIpcHandlers };
+module.exports = { buildSystemPrompt, isTrustedRendererUrl, normalizeLocalFileUrl, registerIpcHandlers };

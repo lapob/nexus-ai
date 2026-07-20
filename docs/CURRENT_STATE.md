@@ -4,13 +4,19 @@ NEXUS 0.1.0 è un'app Electron local-first integrata in una vault Obsidian.
 
 ## Implementato
 
-- renderer graph-first con chat permanente e dock inferiore;
+- renderer graph-first fullscreen con HUD, dock flottante, pannello contestuale temporaneo, command palette e chat overlay;
 - retrieval lessicale dei Markdown con provenienza delle sezioni;
 - modalità quick e deep con endpoint OpenAI-compatible locale;
 - impostazioni locali, cancellazione richieste e apertura sicura delle note;
 - sandbox Electron, CSP, validazione IPC e blocco degli endpoint remoti;
 - main process modulare con bootstrap, lifecycle, finestra e registry IPC separati;
 - test unitari, controllo sintattico, smoke test e doctor offline.
+
+Il bootstrap del renderer è operativo. Poiché il preload Electron è sandboxed e
+non può caricare moduli locali, la mappa minima dei canali IPC è dichiarata anche
+nel preload e verificata automaticamente contro il contratto autoritativo. Se il
+bootstrap riesce ma il modello locale non risponde, l'interfaccia resta utilizzabile
+e mostra lo stato `OFFLINE`; non simula `READY`.
 
 ## Prototipale
 
@@ -23,6 +29,9 @@ NEXUS 0.1.0 è un'app Electron local-first integrata in una vault Obsidian.
 
 Agenti, voce, automazioni, memoria persistente e tool execution non fanno parte
 della Foundation Phase.
+
+La ricostruzione UI è completata. La prossima fase è dedicata all'intelligenza
+locale: modelli, embeddings, RAG reale, memoria e orchestrazione degli agenti.
 
 ## Responsabilità del main process
 

@@ -1,5 +1,18 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const { CHANNELS } = require('./application/ipc-contracts');
+
+// Un preload sandboxed dispone del require limitato di Electron e non può
+// caricare moduli locali. Questi nomi rispecchiano il contratto autoritativo
+// validato nel main process da application/ipc-contracts.js.
+const CHANNELS = Object.freeze({
+  bootstrap: 'nexus:bootstrap',
+  settings: 'nexus:settings',
+  reindex: 'nexus:reindex',
+  listModels: 'nexus:list-models',
+  cancel: 'nexus:cancel',
+  copy: 'nexus:copy',
+  openNote: 'nexus:open-note',
+  chat: 'nexus:chat'
+});
 
 // API minima e intenzionale: il renderer non vede filesystem, shell o ipcRenderer.
 // Ogni argomento sarà nuovamente validato nel processo principale.
