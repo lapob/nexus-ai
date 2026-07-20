@@ -2,11 +2,17 @@
 
 ## Runtime attuale
 
-1. Electron main risolve la vault e costruisce `NexusIndex`.
-2. Il renderer isolato usa solo le operazioni esposte dal preload.
-3. Gli handler IPC validano mittente e payload.
-4. Il main contatta soltanto endpoint HTTP locali compatibili OpenAI.
-5. Settings e window state sono salvati in Electron `userData`.
+1. `src/main.js` abilita il sandbox e avvia il bootstrap applicativo.
+2. `application/bootstrap.js` risolve vault, configurazione e servizi.
+3. `infrastructure/electron/app-lifecycle.js` gestisce readiness, sessione e lifecycle.
+4. `infrastructure/electron/create-main-window.js` crea e protegge la finestra.
+5. `application/register-ipc.js` registra gli handler e coordina RAG e modello locale.
+6. Il renderer isolato usa solo le operazioni esposte dal preload.
+7. Settings e window state sono salvati in Electron `userData`.
+
+`main.js` non contiene più costruzione della finestra, handler IPC, retrieval o
+gestione del lifecycle. Rimane intenzionalmente il composition entry point che
+deve eseguire `app.enableSandbox()` prima di `app.whenReady()`.
 
 ## Confini target
 
@@ -22,6 +28,20 @@
 
 Il codice esistente non viene spostato finché il nuovo confine non dispone di
 test equivalenti. Questa strategia evita un refactoring big-bang.
+
+## Processo principale Electron
+
+```text
+main.js
+  -> application/bootstrap.js
+     -> infrastructure/electron/app-lifecycle.js
+     -> infrastructure/electron/create-main-window.js
+     -> application/register-ipc.js
+     -> NexusIndex + config + logger
+```
+
+La separazione è strutturale: nomi dei canali, preload, CSP, hardening della
+finestra, flusso RAG e protocollo del modello locale restano invariati.
 
 ## Configurazione
 
@@ -39,4 +59,3 @@ Gli endpoint non locali vengono sempre rifiutati.
 I nomi dei canali e la validazione dei payload privilegiati sono definiti in
 `src/application/ipc-contracts.js`. Il preload espone una API minima; il main
 resta l'autorità di validazione.
-
