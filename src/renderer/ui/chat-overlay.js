@@ -1,15 +1,20 @@
 import { $, escapeHtml, listen } from '../utils/dom.js';
 
-export function createChatOverlay({ api, status }) {
+export function createChatOverlay({ api, status, onStateChange }) {
   const overlay = $('#chatOverlay'); const messagesElement = $('#messages'); const question = $('#question'); const send = $('#send'); const cleanups = [];
   const initialWelcome = messagesElement.innerHTML; const history = []; let generating = false; let lastQuestion = ''; let active = null;
   const isOpen = () => overlay.dataset.state === 'open';
-  const setOpen = (open) => { overlay.dataset.state = open ? 'open' : 'closed'; $('#chatExpand').setAttribute('aria-expanded', String(open)); $('#chatExpand').textContent = open ? '⌄' : '⌃'; };
+  const setOpen = (open) => {
+    const expand = $('#chatExpand'); const active = document.activeElement;
+    overlay.dataset.state = open ? 'open' : 'closed'; expand.setAttribute('aria-expanded', String(open)); expand.textContent = open ? '⌄' : '⌃'; expand.title = open ? 'Riduci chat' : 'Espandi chat';
+    onStateChange?.(open);
+    if (!open && overlay.contains(active) && ![expand, question, send].includes(active)) requestAnimationFrame(() => expand.focus());
+  };
   const scroll = () => { messagesElement.scrollTop = messagesElement.scrollHeight; };
   const addMessage = (role, content) => { $('.welcome-message', messagesElement)?.remove(); const article = document.createElement('article'); article.className = `message ${role}`; article.innerHTML = `<div class="role">${role === 'user' ? 'YOU' : 'NEXUS'}</div><div class="bubble">${escapeHtml(content)}</div>`; messagesElement.append(article); scroll(); return article; };
   const addSources = (article, sources = []) => { if (!sources.length || $('.sources', article)) return; const row = document.createElement('div'); row.className = 'sources'; for (const [index, source] of sources.entries()) { const button = document.createElement('button'); button.type = 'button'; button.textContent = `Source ${index + 1} · ${source.title}`; button.addEventListener('click', () => api.openNote(source.relativePath)); row.append(button); } article.append(row); };
   const addActions = (article, content) => { if ($('.message-actions', article)) return; const actions = document.createElement('div'); actions.className = 'message-actions'; const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = 'Copy'; copy.onclick = async () => { await api.copyText(content); copy.textContent = 'Copied'; }; const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Regenerate'; retry.onclick = () => lastQuestion && !generating && ask(lastQuestion); actions.append(copy, retry); article.append(actions); };
-  const setWorking = (working) => { generating = working; $('#thinkingIndicator').hidden = !working; $('#cognitiveState').textContent = working ? 'THINKING' : 'IDLE'; send.textContent = working ? '■' : '↑'; send.setAttribute('aria-label', working ? 'Interrompi elaborazione' : 'Invia messaggio'); status.setActivity(working ? 'thinking' : 'idle'); };
+  const setWorking = (working) => { generating = working; $('#thinkingIndicator').hidden = !working; $('#cognitiveState').textContent = working ? 'THINKING' : 'IDLE'; send.textContent = working ? '■' : '↑'; send.setAttribute('aria-label', working ? 'Interrompi elaborazione' : 'Invia messaggio'); send.title = working ? 'Interrompi elaborazione' : 'Invia messaggio'; status.setActivity(working ? 'thinking' : 'idle'); };
   const unsubscribe = api.onStreamEvent((event) => {
     if (!active || event?.requestId !== active.requestId) return;
     if (event.type === 'sources') active.sources = event.sources || [];

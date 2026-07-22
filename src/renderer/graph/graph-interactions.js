@@ -1,10 +1,18 @@
 import { motionQuery } from '../utils/motion.js';
 import { listen } from '../utils/dom.js';
+import { graphNodes } from './graph-data.js';
 
 export function bindGraphInteractions(engine) {
   const cleanups = [];
   let drag = null;
   let resizeFrame = 0;
+  let keyboardIndex = graphNodes.findIndex((node) => node.id === 'core');
+  let dprQuery;
+
+  const selectForKeyboard = (index) => {
+    keyboardIndex = (index + graphNodes.length) % graphNodes.length;
+    engine.select(graphNodes[keyboardIndex], { chatOpen: engine.chatOpen });
+  };
 
   listen(engine.canvas, 'pointerdown', (event) => {
     const x = event.clientX - engine.metrics.left; const y = event.clientY - engine.metrics.top;
@@ -27,7 +35,10 @@ export function bindGraphInteractions(engine) {
 
   const release = (event) => {
     if (!drag) return;
-    if (!drag.moved && drag.node) engine.select(drag.node, { chatOpen: document.querySelector('#chatOverlay').dataset.state === 'open' });
+    if (!drag.moved && drag.node) {
+      keyboardIndex = graphNodes.findIndex((node) => node.id === drag.node.id);
+      engine.select(drag.node, { chatOpen: engine.chatOpen });
+    }
     else if (drag.moved) engine.camera.projectVelocity(drag.vx, drag.vy);
     if (engine.canvas.hasPointerCapture(event.pointerId)) engine.canvas.releasePointerCapture(event.pointerId);
     drag = null; engine.canvas.classList.remove('dragging');
@@ -36,7 +47,20 @@ export function bindGraphInteractions(engine) {
   listen(engine.canvas, 'pointercancel', release, undefined, cleanups);
   listen(engine.canvas, 'pointerleave', () => { engine.pointer.targetX = 0; engine.pointer.targetY = 0; engine.setHovered(null); }, undefined, cleanups);
   listen(engine.canvas, 'wheel', (event) => { event.preventDefault(); engine.camera.zoomBy(event.deltaY); if (motionQuery.matches) engine.draw(performance.now()); }, { passive: false }, cleanups);
+  listen(engine.canvas, 'keydown', (event) => {
+    if (['ArrowRight', 'ArrowDown'].includes(event.key)) { event.preventDefault(); selectForKeyboard(keyboardIndex + 1); }
+    else if (['ArrowLeft', 'ArrowUp'].includes(event.key)) { event.preventDefault(); selectForKeyboard(keyboardIndex - 1); }
+    else if (event.key === 'Home') { event.preventDefault(); selectForKeyboard(graphNodes.findIndex((node) => node.id === 'core')); }
+  }, undefined, cleanups);
   listen(window, 'resize', () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(() => engine.resize()); }, undefined, cleanups);
+  const watchDpr = () => {
+    dprQuery?.removeEventListener('change', watchDpr);
+    dprQuery = matchMedia(`(resolution: ${devicePixelRatio || 1}dppx)`);
+    dprQuery.addEventListener('change', watchDpr, { once: true });
+    engine.resize();
+  };
+  watchDpr();
+  cleanups.push(() => dprQuery?.removeEventListener('change', watchDpr));
   cleanups.push(() => cancelAnimationFrame(resizeFrame));
   return () => cleanups.splice(0).reverse().forEach((cleanup) => cleanup());
 }
