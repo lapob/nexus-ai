@@ -6,9 +6,10 @@
 2. `application/bootstrap.js` risolve vault, configurazione e servizi.
 3. `infrastructure/electron/app-lifecycle.js` gestisce readiness, sessione e lifecycle.
 4. `infrastructure/electron/create-main-window.js` crea e protegge la finestra.
-5. `application/register-ipc.js` registra gli handler e coordina RAG e modello locale.
+5. `application/register-ipc.js` registra gli handler e coordina RAG e runtime AI.
 6. Il renderer isolato usa solo le operazioni esposte dal preload.
 7. Settings e window state sono salvati in Electron `userData`.
+8. `ai/ai-runtime.js` seleziona un provider tramite registry; Ollama è un adapter infrastrutturale sostituibile.
 
 `main.js` non contiene più costruzione della finestra, handler IPC, retrieval o
 gestione del lifecycle. Rimane intenzionalmente il composition entry point che
@@ -40,8 +41,8 @@ main.js
      -> NexusIndex + config + logger
 ```
 
-La separazione è strutturale: nomi dei canali, preload, CSP, hardening della
-finestra, flusso RAG e protocollo del modello locale restano invariati.
+La policy RAG e Quick/Deep resta applicativa; HTTP, NDJSON, health, modelli ed
+embedding sono confinati nel provider. Il renderer vede soltanto capability IPC.
 
 ## Configurazione
 

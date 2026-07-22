@@ -1,24 +1,20 @@
-# Integrazioni future
+# Integrazioni
 
-## Ollama
+## Runtime AI e Ollama
 
-NEXUS supporta già endpoint OpenAI-compatible locali e discovery tramite
-`/models`. L'evoluzione prevista è un provider adapter che separi protocollo,
-capability detection, timeout e streaming dal caso d'uso chat.
+NEXUS usa un runtime indipendente dal provider. La prima implementazione è
+`OllamaProvider`, basata sulle API native locali `/api/version`, `/api/tags`,
+`/api/chat` e `/api/embed`. Il renderer non conosce endpoint e non può accedere
+alla rete: chat, health, modelli, streaming, cancellazione ed embedding passano
+da API preload esplicite e handler IPC validati.
 
-Non è responsabilità dell'app installare Ollama o scaricare modelli. Il doctor
-resta offline; un controllo di connettività futuro dovrà essere esplicito.
+Ollama non viene installato dall'app e nessun modello viene scaricato
+automaticamente. Il doctor resta offline; `CHECK RUNTIME` esegue un health check
+esplicito. La verifica con una installazione Ollama reale è ancora da eseguire.
+
+Documentazione ufficiale: https://docs.ollama.com/api/introduction
 
 ## Agents
 
-La futura integrazione richiederà prima:
-
-- manifest e capability per agente;
-- tool registry e permission scopes;
-- task/run state persistente;
-- approval umana per effetti esterni;
-- event log, cancellazione e audit.
-
-I nodi agent presenti nella UI sono rappresentazioni prototipali, non agenti
-operativi.
-
+Gli agenti restano fuori da questa fase. Serviranno manifest di capability,
+permission scope, stato persistente, approvazione umana, audit e tool registry.

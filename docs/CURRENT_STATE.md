@@ -6,7 +6,8 @@ NEXUS 0.1.0 è un'app Electron local-first integrata in una vault Obsidian.
 
 - renderer graph-first fullscreen con HUD, dock flottante, pannello contestuale temporaneo, command palette e chat overlay;
 - retrieval lessicale dei Markdown con provenienza delle sezioni;
-- modalità quick e deep con endpoint OpenAI-compatible locale;
+- modalità quick e deep collegate a un runtime AI indipendente dal provider;
+- OllamaProvider con health, modelli, chat, streaming, cancellazione ed embedding;
 - impostazioni locali, cancellazione richieste e apertura sicura delle note;
 - sandbox Electron, CSP, validazione IPC e blocco degli endpoint remoti;
 - main process modulare con bootstrap, lifecycle, finestra e registry IPC separati;
@@ -22,7 +23,7 @@ e mostra lo stato `OFFLINE`; non simula `READY`.
 
 - il knowledge graph è statico e non deriva dai wikilink;
 - la cronologia vive solo nel renderer;
-- il RAG è sincrono, in memoria e privo di embeddings;
+- il RAG è sincrono, in memoria e non usa ancora l'API embedding disponibile;
 - non esistono database, packaging, CI o release firmate.
 
 ## Non implementato
@@ -30,8 +31,9 @@ e mostra lo stato `OFFLINE`; non simula `READY`.
 Agenti, voce, automazioni, memoria persistente e tool execution non fanno parte
 della Foundation Phase.
 
-La ricostruzione UI è completata. La prossima fase è dedicata all'intelligenza
-locale: modelli, embeddings, RAG reale, memoria e orchestrazione degli agenti.
+La ricostruzione UI è completata. L'astrazione runtime è pronta, ma l'integrazione
+non è dichiarata validata finché non verrà provata con Ollama reale e un modello
+locale scelto esplicitamente.
 
 ## Responsabilità del main process
 

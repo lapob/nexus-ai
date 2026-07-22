@@ -18,7 +18,7 @@ check('Node.js', () => process.version);
 check('package.json', () => JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')).version);
 check('runtime configuration', () => {
   const config = loadRuntimeConfig();
-  return `${config.llm.baseUrl} · ${config.llm.model} · log=${config.logging.level}`;
+  return `${config.ai.provider} · ${config.ai.ollama.baseUrl} · model=${config.ai.chatModel || 'none'} · log=${config.logging.level}`;
 });
 check('portable configuration', () => {
   const config = JSON.parse(fs.readFileSync(path.join(appRoot, 'config', 'portable.json'), 'utf8'));
@@ -40,4 +40,3 @@ for (const item of checks) console.log(`${item.status.padEnd(4)} ${item.name}${i
 const failures = checks.filter((item) => item.status === 'FAIL').length;
 console.log(`\nNEXUS doctor: ${checks.length - failures}/${checks.length} controlli superati.`);
 if (failures) process.exitCode = 1;
-

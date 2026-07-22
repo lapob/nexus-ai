@@ -11,7 +11,12 @@ const CHANNELS = Object.freeze({
   cancel: 'nexus:cancel',
   copy: 'nexus:copy',
   openNote: 'nexus:open-note',
-  chat: 'nexus:chat'
+  chat: 'nexus:chat',
+  health: 'nexus:ai-health',
+  setModel: 'nexus:set-model',
+  streamChat: 'nexus:stream-chat',
+  streamEvent: 'nexus:stream-event',
+  embed: 'nexus:embed'
 });
 
 // API minima e intenzionale: il renderer non vede filesystem, shell o ipcRenderer.
@@ -24,5 +29,10 @@ contextBridge.exposeInMainWorld('nexus', {
   cancel: () => ipcRenderer.invoke(CHANNELS.cancel),
   copyText: (text) => ipcRenderer.invoke(CHANNELS.copy, text),
   saveSettings: (settings) => ipcRenderer.invoke(CHANNELS.settings, settings),
-  openNote: (relativePath) => ipcRenderer.invoke(CHANNELS.openNote, relativePath)
+  openNote: (relativePath) => ipcRenderer.invoke(CHANNELS.openNote, relativePath),
+  health: () => ipcRenderer.invoke(CHANNELS.health),
+  setModel: (model) => ipcRenderer.invoke(CHANNELS.setModel, model),
+  streamChat: (payload) => ipcRenderer.invoke(CHANNELS.streamChat, payload),
+  onStreamEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.streamEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.streamEvent, handler); },
+  embed: (input, options) => ipcRenderer.invoke(CHANNELS.embed, { input, ...options })
 });

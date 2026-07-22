@@ -16,7 +16,7 @@ const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mil
 const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
 
 async function findRendererTarget() {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     try {
       const targets = await fetch(`http://127.0.0.1:${debugPort}/json`).then((response) => response.json());
       const renderer = targets.find((target) => target.type === 'page' && target.url.endsWith('/src/renderer/index.html'));
@@ -45,7 +45,7 @@ async function inspectBridge(target) {
       method: 'Runtime.evaluate',
       params: {
         expression: `(async () => {
-          const required = ['bootstrap','chat','reindex','listModels','cancel','copyText','saveSettings','openNote'];
+          const required = ['bootstrap','chat','streamChat','onStreamEvent','health','reindex','listModels','setModel','cancel','copyText','saveSettings','openNote','embed'];
           const bridgeComplete = typeof window.nexus === 'object' && required.every((name) => typeof window.nexus[name] === 'function');
           const data = bridgeComplete ? await window.nexus.bootstrap() : null;
           return {

@@ -7,6 +7,9 @@ const { createLogger } = require('../services/logger');
 const { registerIpcHandlers } = require('./register-ipc');
 const { createMainWindow } = require('../infrastructure/electron/create-main-window');
 const { startAppLifecycle } = require('../infrastructure/electron/app-lifecycle');
+const { AIProviderRegistry } = require('../ai/ai-provider-registry');
+const { AIRuntime } = require('../ai/ai-runtime');
+const { OllamaProvider } = require('../ai/providers/ollama-provider');
 
 function bootstrapElectron({ env = process.env } = {}) {
   const appRoot = path.resolve(__dirname, '..', '..');
@@ -17,6 +20,9 @@ function bootstrapElectron({ env = process.env } = {}) {
   const smokeTest = env.NEXUS_SMOKE_TEST === '1';
   const screenshotPath = env.NEXUS_SCREENSHOT_PATH || '';
   let index;
+  const registry = new AIProviderRegistry().register('ollama', (config) => new OllamaProvider(config));
+  const aiRuntime = new AIRuntime({ registry, logger });
+  aiRuntime.initialize(runtimeConfig.ai);
 
   return startAppLifecycle({
     logger,
@@ -30,7 +36,8 @@ function bootstrapElectron({ env = process.env } = {}) {
         vaultLocation,
         runtimeConfig,
         logger,
-        getIndex: () => index
+        getIndex: () => index,
+        aiRuntime
       });
       logger.info('NEXUS avviato.', {
         vaultSource: vaultLocation.source,

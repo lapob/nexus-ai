@@ -10,7 +10,7 @@ import { createHud } from './ui/hud.js';
 import { createSearchPalette } from './ui/search-palette.js';
 import { createChatOverlay } from './ui/chat-overlay.js';
 
-const REQUIRED_API = ['bootstrap', 'chat', 'reindex', 'listModels', 'cancel', 'copyText', 'saveSettings', 'openNote'];
+const REQUIRED_API = ['bootstrap', 'chat', 'streamChat', 'onStreamEvent', 'health', 'reindex', 'listModels', 'setModel', 'cancel', 'copyText', 'saveSettings', 'openNote', 'embed'];
 const suggestedModels = ['qwen3:8b', 'qwen2.5:7b', 'llama3.2:3b', 'llama3.1:8b', 'mistral:7b', 'deepseek-r1:7b', 'gemma3:4b', 'phi4-mini'];
 const cleanups = [];
 let settings = null;
@@ -54,12 +54,12 @@ function configureSettings(api) {
     event.preventDefault(); $('#settingsError').textContent = '';
     try {
       settings = await api.saveSettings({ baseUrl: $('#baseUrl').value, model: $('#model').value, temperature: $('#temperature').value });
-      await chat.configureModels(settings); $('#settingsDialog').close(); $('#modelStatus').textContent = settings.model;
+      await chat.configureModels(settings); $('#settingsDialog').close(); $('#modelStatus').textContent = settings.model || 'NO MODEL';
     } catch (error) { $('#settingsError').textContent = error.message; }
   }, undefined, cleanups);
   listen($('#headerModel'), 'change', async () => {
     if (!settings) return;
-    try { settings = await api.saveSettings({ ...settings, model: $('#headerModel').value }); $('#model').value = settings.model; $('#modelStatus').textContent = settings.model; }
+    try { const selected = await api.setModel($('#headerModel').value); settings = selected.settings; $('#model').value = settings.model; $('#modelStatus').textContent = settings.model; }
     catch (error) { $('#fatalErrorRegion').textContent = `Model switch failed: ${error.message}`; $('#fatalErrorRegion').hidden = false; }
   }, undefined, cleanups);
 }
@@ -80,6 +80,7 @@ async function initialize() {
   }
 
   contextPanel = createContextPanel({ onOpenNote: (path) => api.openNote(path) });
+  listen($('#runtimeCheck'), 'click', async () => { status.setSystem('initializing', 'Checking local AI runtime.'); const health = await api.health(); status.setSystem(health.status, health.error?.message || 'Local AI runtime ready.'); }, undefined, cleanups);
   chat = createChatOverlay({ api, status });
   palette = createSearchPalette({
     nodes: graphNodes,
@@ -128,8 +129,8 @@ async function initialize() {
     $('#baseUrl').value = settings.baseUrl; $('#model').value = settings.model; $('#temperature').value = settings.temperature;
     $('#modelCatalog').replaceChildren(...suggestedModels.map((name) => Object.assign(document.createElement('option'), { value: name })));
     hud.applyBootstrap(data);
-    const installed = await chat.configureModels(settings);
-    status.setSystem(installed.length ? 'ready' : 'offline', installed.length ? 'Bootstrap complete.' : 'Local model endpoint is not reachable.');
+    const installed = await chat.configureModels(settings); const health = data.ai?.health;
+    status.setSystem(health?.status || 'error', health?.error?.message || 'Local AI runtime ready.');
     $('#modelPicker').hidden = false;
     configureSettings(api);
   } catch (error) {
