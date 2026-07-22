@@ -18,6 +18,7 @@ let palette;
 let chat;
 let contextPanel;
 let dock;
+let settingsTrigger = null;
 
 function validateBridge(api) {
   if (!api || typeof api !== 'object') throw new Error('Nexus bridge unavailable: preload did not expose window.nexus.');
@@ -35,16 +36,27 @@ cleanups.push(() => engine.destroy(), bindGraphInteractions(engine));
 function populateAccessibleNodes() {
   const list = $('#graphNodeList');
   list.replaceChildren(...graphNodes.map((node) => {
-    const button = document.createElement('button'); button.type = 'button'; button.setAttribute('role', 'listitem'); button.textContent = `${node.label}: ${node.description}`;
-    button.addEventListener('click', () => engine.select(node, { chatOpen: chat?.isOpen() }));
-    return button;
+    const item = document.createElement('span'); item.setAttribute('role', 'listitem'); item.textContent = `${node.label}: ${node.description}`;
+    return item;
   }));
 }
 populateAccessibleNodes();
 
-function openSettings() { $('#settingsDialog').showModal(); }
+function configurePlatformShortcut() {
+  const isMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
+  const shortcut = isMac ? '⌘K' : 'Ctrl K';
+  $('#searchShortcut').textContent = shortcut;
+  $('#searchTrigger').title = `Apri ricerca (${shortcut})`;
+}
+
+function openSettings() {
+  settingsTrigger = document.activeElement;
+  $('#settingsDialog').showModal();
+}
 
 function configureSettings(api) {
+  listen($('#settingsClose'), 'click', () => $('#settingsDialog').close(), undefined, cleanups);
+  listen($('#settingsDialog'), 'close', () => { settingsTrigger?.focus?.(); settingsTrigger = null; }, undefined, cleanups);
   listen($('#detectModels'), 'click', async () => {
     $('#settingsError').textContent = '';
     const installed = await api.listModels();
@@ -79,8 +91,18 @@ async function initialize() {
     status.setSystem('error', error.message); $('#fatalErrorRegion').textContent = error.message; $('#fatalErrorRegion').hidden = false; return;
   }
 
-  contextPanel = createContextPanel({ onOpenNote: (path) => api.openNote(path) });
-  chat = createChatOverlay({ api, status });
+  contextPanel = createContextPanel({
+    onOpenNote: (path) => api.openNote(path),
+    onClose: () => { engine.clearSelection(); dock?.setActive('core'); }
+  });
+  chat = createChatOverlay({
+    api,
+    status,
+    onStateChange: (open) => {
+      shell.dataset.chatState = open ? 'open' : 'closed';
+      engine.setChatOpen(open);
+    }
+  });
   palette = createSearchPalette({
     nodes: graphNodes,
     actions: [
@@ -114,7 +136,8 @@ async function initialize() {
 
   engine.addEventListener('selectionchange', (event) => {
     const node = event.detail;
-    if (!node) { contextPanel.close(); dock.setActive('core'); return; }
+    if (!node) { contextPanel.close({ notify: false }); dock.setActive('core'); return; }
+    if (window.matchMedia('(max-width: 999px)').matches && chat.isOpen()) chat.setOpen(false);
     const connections = graphEdges.filter((edge) => edge.includes(node.id)).length;
     contextPanel.open(node, connections);
   });
@@ -122,6 +145,7 @@ async function initialize() {
   listen(motionQuery, 'change', () => engine.start(), undefined, cleanups);
 
   try {
+    configurePlatformShortcut();
     const data = await api.bootstrap();
     if (!data?.settings || !data?.stats) throw new Error('Bootstrap response is incomplete.');
     settings = data.settings;

@@ -5,6 +5,9 @@ export class GraphCamera {
     this.current = { x: 0, y: 0, zoom: 1 };
     this.target = { x: 0, y: 0, zoom: 1 };
     this.previous = { ...this.target };
+    this.metrics = null;
+    this.focusedNode = null;
+    this.focusChatOpen = false;
   }
 
   update(deltaSeconds) {
@@ -14,8 +17,9 @@ export class GraphCamera {
   }
 
   pan(dx, dy) {
-    this.target.x = clamp(this.target.x + dx, -900, 900);
-    this.target.y = clamp(this.target.y + dy, -650, 650);
+    this.target.x += dx;
+    this.target.y += dy;
+    this.clampState(this.target);
   }
 
   projectVelocity(vx, vy) {
@@ -24,17 +28,63 @@ export class GraphCamera {
 
   zoomBy(delta) {
     this.target.zoom = clamp(this.target.zoom * Math.exp(-delta * .001), .62, 1.85);
+    this.clampState(this.target);
   }
 
-  focus(node, metrics, chatOpen = false) {
-    this.previous = { ...this.target };
+  contentHeight(metrics = this.metrics) {
+    return metrics?.contentHeight || metrics?.height || 1;
+  }
+
+  nodePoint(node, metrics = this.metrics, zoom = this.target.zoom) {
+    return {
+      x: node.x * metrics.width * zoom,
+      y: (metrics.safeTop || 0) + node.y * this.contentHeight(metrics) * zoom
+    };
+  }
+
+  clampState(state) {
+    if (!this.metrics) return state;
+    const { width, safeTop = 0 } = this.metrics; const height = this.contentHeight();
+    const core = this.nodePoint({ x: .44, y: .48 }, this.metrics, state.zoom);
+    const marginX = Math.min(150, width * .18); const marginY = Math.min(120, height * .2);
+    state.x = clamp(state.x, marginX - core.x, width - marginX - core.x);
+    state.y = clamp(state.y, safeTop + marginY - core.y, safeTop + height - marginY - core.y);
+    return state;
+  }
+
+  resize(metrics, { chatOpen = this.focusChatOpen } = {}) {
+    const previousMetrics = this.metrics;
+    this.metrics = metrics;
+    if (this.focusedNode) {
+      this.focus(this.focusedNode, metrics, chatOpen, { remember: false, immediate: true });
+      return;
+    }
+    if (previousMetrics) {
+      const scaleX = metrics.width / previousMetrics.width;
+      const scaleY = this.contentHeight(metrics) / this.contentHeight(previousMetrics);
+      for (const state of [this.current, this.target, this.previous]) { state.x *= scaleX; state.y *= scaleY; this.clampState(state); }
+    }
+  }
+
+  focus(node, metrics, chatOpen = false, { remember = true, immediate = false } = {}) {
+    this.metrics = metrics;
+    if (remember && !this.focusedNode) this.previous = { ...this.target };
+    this.focusedNode = node; this.focusChatOpen = chatOpen;
     const desiredX = metrics.width * (chatOpen ? .38 : .44);
-    const desiredY = metrics.height * .48;
+    const desiredY = (metrics.safeTop || 0) + this.contentHeight(metrics) * .48;
     this.target.zoom = node.id === 'core' ? 1 : 1.12;
-    this.target.x = desiredX - node.x * metrics.width * this.target.zoom;
-    this.target.y = desiredY - node.y * metrics.height * this.target.zoom;
+    const point = this.nodePoint(node, metrics, this.target.zoom);
+    this.target.x = desiredX - point.x;
+    this.target.y = desiredY - point.y;
+    this.clampState(this.target);
+    if (immediate || motionQuery.matches) Object.assign(this.current, this.target);
   }
 
-  restore() { Object.assign(this.target, this.previous); }
-  reset() { Object.assign(this.target, { x: 0, y: 0, zoom: 1 }); }
+  setChatOpen(open) {
+    this.focusChatOpen = open;
+    if (this.focusedNode && this.metrics) this.focus(this.focusedNode, this.metrics, open, { remember: false });
+  }
+
+  restore() { this.focusedNode = null; Object.assign(this.target, this.previous); this.clampState(this.target); }
+  reset() { this.focusedNode = null; Object.assign(this.target, { x: 0, y: 0, zoom: 1 }); this.clampState(this.target); }
 }

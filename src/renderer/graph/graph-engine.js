@@ -9,12 +9,14 @@ export class GraphEngine extends EventTarget {
     super();
     this.canvas = canvas;
     this.context = canvas.getContext('2d');
+    this.baseAriaLabel = canvas.getAttribute('aria-label');
     this.camera = new GraphCamera();
-    this.metrics = { width: 1, height: 1, left: 0, top: 0, dpr: 1 };
+    this.metrics = { width: 1, height: 1, contentHeight: 1, safeTop: 0, safeBottom: 0, left: 0, top: 0, dpr: 1 };
     this.frame = 0;
     this.lastTime = 0;
     this.selected = null;
     this.hovered = null;
+    this.chatOpen = false;
     this.pointer = { x: 0, y: 0, targetX: 0, targetY: 0 };
     this.stars = Array.from({ length: 150 }, (_, index) => ({ x: ((index * 73) % 997) / 997, y: ((index * 131) % 991) / 991, r: .2 + (index % 5) * .15, phase: index * .37, depth: .2 + (index % 7) / 8 }));
     this.coreParticles = Array.from({ length: 480 }, (_, index) => {
@@ -31,19 +33,32 @@ export class GraphEngine extends EventTarget {
   resize() {
     const bounds = this.canvas.getBoundingClientRect();
     const dpr = Math.min(devicePixelRatio || 1, 2);
-    this.metrics = { width: bounds.width, height: bounds.height, left: bounds.left, top: bounds.top, dpr };
+    const viewportStyle = getComputedStyle(this.canvas.parentElement);
+    const safeTop = Number.parseFloat(viewportStyle.paddingTop) || 0;
+    const safeBottom = Number.parseFloat(viewportStyle.paddingBottom) || 0;
+    this.metrics = {
+      width: bounds.width,
+      height: bounds.height,
+      contentHeight: Math.max(1, bounds.height - safeTop - safeBottom),
+      safeTop,
+      safeBottom,
+      left: bounds.left,
+      top: bounds.top,
+      dpr
+    };
     this.canvas.width = Math.max(1, Math.round(bounds.width * dpr));
     this.canvas.height = Math.max(1, Math.round(bounds.height * dpr));
     this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.camera.resize(this.metrics, { chatOpen: this.chatOpen });
     if (motionQuery.matches) this.draw(performance.now());
   }
 
   point(node, time = 0) {
-    const { width, height } = this.metrics;
+    const { width, contentHeight, safeTop } = this.metrics;
     const drift = motionQuery.matches || node.id === 'core' ? 0 : Math.sin(time * .0001 + node.x * 20) * 2.5;
     return {
       x: node.x * width * this.camera.current.zoom + this.camera.current.x + drift,
-      y: node.y * height * this.camera.current.zoom + this.camera.current.y + drift * .55,
+      y: safeTop + node.y * contentHeight * this.camera.current.zoom + this.camera.current.y + drift * .55,
       size: (node.id === 'core' ? clamp(width * .095, 130, 190) : 34 + node.importance * 30) * this.camera.current.zoom
     };
   }
@@ -51,12 +66,18 @@ export class GraphEngine extends EventTarget {
   pick(x, y) {
     return [...graphNodes].sort((a, b) => b.importance - a.importance).find((node) => {
       const point = this.point(node, performance.now());
-      return Math.hypot(x - point.x, y - point.y) <= Math.max(24, point.size * (node.id === 'core' ? .8 : .55));
+      const radiusHit = Math.hypot(x - point.x, y - point.y) <= Math.max(28, point.size * (node.id === 'core' ? .82 : .6));
+      const labelY = point.y + (node.id === 'core' ? 7 : point.size * .78);
+      const labelWidth = Math.max(72, node.label.length * (node.id === 'core' ? 15 : 8));
+      const labelHit = Math.abs(x - point.x) <= labelWidth / 2 && Math.abs(y - labelY) <= 22;
+      return radiusHit || labelHit;
     });
   }
 
   select(node, { chatOpen = false, focus = true } = {}) {
     this.selected = node;
+    this.chatOpen = chatOpen;
+    this.canvas.setAttribute('aria-label', `${this.baseAriaLabel} Nodo selezionato: ${node.label}. ${node.description}`);
     if (focus) this.camera.focus(node, this.metrics, chatOpen);
     this.dispatchEvent(new CustomEvent('selectionchange', { detail: node }));
     if (motionQuery.matches) this.draw(performance.now());
@@ -64,11 +85,18 @@ export class GraphEngine extends EventTarget {
 
   clearSelection() {
     this.selected = null;
+    this.canvas.setAttribute('aria-label', this.baseAriaLabel);
     this.camera.restore();
     this.dispatchEvent(new CustomEvent('selectionchange', { detail: null }));
   }
 
   setHovered(node) { this.hovered = node; }
+
+  setChatOpen(open) {
+    this.chatOpen = open;
+    this.camera.setChatOpen(open, this.metrics);
+    if (motionQuery.matches) this.draw(performance.now());
+  }
 
   draw(time) {
     const ctx = this.context;

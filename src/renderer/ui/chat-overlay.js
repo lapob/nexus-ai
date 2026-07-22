@@ -1,11 +1,16 @@
 import { $, escapeHtml, listen } from '../utils/dom.js';
 import { motionQuery } from '../utils/motion.js';
 
-export function createChatOverlay({ api, status }) {
+export function createChatOverlay({ api, status, onStateChange }) {
   const overlay = $('#chatOverlay'); const messagesElement = $('#messages'); const question = $('#question'); const send = $('#send'); const cleanups = [];
   const initialWelcome = messagesElement.innerHTML; const history = []; let generating = false; let lastQuestion = '';
   const isOpen = () => overlay.dataset.state === 'open';
-  const setOpen = (open) => { overlay.dataset.state = open ? 'open' : 'closed'; $('#chatExpand').setAttribute('aria-expanded', String(open)); $('#chatExpand').textContent = open ? '⌄' : '⌃'; };
+  const setOpen = (open) => {
+    const expand = $('#chatExpand'); const active = document.activeElement;
+    overlay.dataset.state = open ? 'open' : 'closed'; expand.setAttribute('aria-expanded', String(open)); expand.textContent = open ? '⌄' : '⌃'; expand.title = open ? 'Riduci chat' : 'Espandi chat';
+    onStateChange?.(open);
+    if (!open && overlay.contains(active) && ![expand, question, send].includes(active)) requestAnimationFrame(() => expand.focus());
+  };
   const scroll = () => { messagesElement.scrollTop = messagesElement.scrollHeight; };
   const addMessage = (role, content, sources = []) => {
     $('.welcome-message', messagesElement)?.remove(); const article = document.createElement('article'); article.className = `message ${role}`;
@@ -15,7 +20,7 @@ export function createChatOverlay({ api, status }) {
     messagesElement.append(article); scroll(); return article;
   };
   const reveal = async (article, content) => { if (motionQuery.matches) return; const bubble = $('.bubble', article); const chars = [...content]; bubble.textContent = ''; const step = Math.max(5, Math.ceil(chars.length / 70)); for (let index = 0; index < chars.length; index += step) { bubble.textContent = chars.slice(0, index + step).join(''); scroll(); await new Promise((resolve) => setTimeout(resolve, 18)); } };
-  const setWorking = (working) => { generating = working; $('#thinkingIndicator').hidden = !working; $('#cognitiveState').textContent = working ? 'THINKING' : 'IDLE'; send.textContent = working ? '■' : '↑'; send.setAttribute('aria-label', working ? 'Interrompi elaborazione' : 'Invia messaggio'); status.setActivity(working ? 'thinking' : 'idle'); };
+  const setWorking = (working) => { generating = working; $('#thinkingIndicator').hidden = !working; $('#cognitiveState').textContent = working ? 'THINKING' : 'IDLE'; send.textContent = working ? '■' : '↑'; send.setAttribute('aria-label', working ? 'Interrompi elaborazione' : 'Invia messaggio'); send.title = working ? 'Interrompi elaborazione' : 'Invia messaggio'; status.setActivity(working ? 'thinking' : 'idle'); };
   const ask = async (text) => {
     if (generating) return api.cancel(); setOpen(true); setWorking(true); lastQuestion = text; addMessage('user', text); const requestHistory = history.slice(-8); history.push({ role: 'user', content: text }); const pending = addMessage('assistant', 'Searching local knowledge…');
     try { const result = await api.chat({ question: text, history: requestHistory, mode: $('#reasoningMode').value }); pending.remove(); const content = result.answer || result.error || 'No response available.'; const article = addMessage('assistant', content, result.sources || []); await reveal(article, content); history.push({ role: 'assistant', content }); }

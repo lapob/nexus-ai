@@ -8,11 +8,11 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main id="nexusShell" class="nexus-shell" data-system-state="initializing" data-activity="idle">
+  <main id="nexusShell" class="nexus-shell" data-system-state="initializing" data-activity="idle" data-chat-state="closed" data-context-state="closed">
     <div class="ambient-layer" aria-hidden="true"></div>
 
     <section id="graphViewport" class="graph-viewport" aria-label="Desktop cognitivo Nexus">
-      <canvas id="knowledgeCanvas" class="graph-canvas" role="img" aria-label="Grafo interattivo con Nexus Core e domini della conoscenza"></canvas>
+      <canvas id="knowledgeCanvas" class="graph-canvas" role="application" tabindex="0" aria-label="Grafo interattivo. Usa le frecce per esplorare i nodi, Home per tornare al Core ed Escape per azzerare la vista." aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home Escape"></canvas>
       <div id="graphLabelLayer" class="graph-label-layer" aria-hidden="true"></div>
       <div id="graphFocusOverlay" class="graph-focus-overlay" aria-hidden="true"></div>
       <div id="graphNodeList" class="sr-only" role="list" aria-label="Nodi del grafo"></div>
@@ -24,11 +24,11 @@
     </header>
 
     <div id="topRightHud" class="top-right-hud">
-      <button id="searchTrigger" class="hud-action search-action" type="button" aria-label="Apri ricerca" aria-haspopup="dialog"><span aria-hidden="true">⌕</span><span>SEARCH</span><kbd>⌘K</kbd></button>
+      <button id="searchTrigger" class="hud-action search-action" type="button" aria-label="Apri ricerca" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" title="Apri ricerca"><span aria-hidden="true">⌕</span><span>SEARCH</span><kbd id="searchShortcut">Ctrl K</kbd></button>
       <span id="modelStatus" class="model-status" hidden></span>
       <time id="clock" class="clock">--:--</time>
       <button id="reindex" class="hud-action square-action" type="button" aria-label="Reindicizza Nexus" title="Reindicizza Nexus">↻</button>
-      <button id="settingsButton" class="hud-action square-action" type="button" aria-label="Apri impostazioni" title="Impostazioni">⚙</button>
+      <button id="settingsButton" class="hud-action square-action" type="button" aria-label="Apri impostazioni" title="Apri impostazioni">⚙</button>
     </div>
 
     <aside id="systemHud" class="system-hud" aria-label="Informazioni di sistema" hidden>
@@ -50,7 +50,7 @@
     <section id="chatOverlay" class="chat-overlay" data-state="closed" aria-label="Chat Nexus">
       <header id="chatHeader" class="chat-header">
         <div><span class="chat-mark" aria-hidden="true">N</span><div><strong>NEXUS</strong><span id="cognitiveState" role="status">IDLE</span></div></div>
-        <div><button id="newChat" type="button" aria-label="Nuova conversazione">＋</button><button id="chatMinimize" type="button" aria-label="Minimizza chat">—</button></div>
+        <div><button id="newChat" type="button" aria-label="Nuova conversazione" title="Nuova conversazione">＋</button><button id="chatMinimize" type="button" aria-label="Minimizza chat" title="Minimizza chat">—</button></div>
       </header>
       <section id="messages" class="messages" aria-live="polite">
         <div class="welcome-message"><span>N</span><p>Canale cognitivo pronto. Scrivi una domanda per esplorare la conoscenza locale.</p></div>
@@ -62,9 +62,9 @@
           <span id="thinkingIndicator" class="thinking-indicator" hidden><i></i> PROCESSING</span>
         </div>
         <div class="composer-input">
-          <button id="chatExpand" type="button" aria-label="Espandi chat" aria-expanded="false">⌃</button>
+          <button id="chatExpand" type="button" aria-label="Espandi chat" aria-expanded="false" title="Espandi chat">⌃</button>
           <textarea id="question" rows="1" placeholder="Ask Nexus…" aria-label="Messaggio a Nexus"></textarea>
-          <button id="send" class="send-action" type="submit" aria-label="Invia messaggio">↑</button>
+          <button id="send" class="send-action" type="submit" aria-label="Invia messaggio" title="Invia messaggio">↑</button>
         </div>
       </form>
     </section>
@@ -78,18 +78,18 @@
     </section>
 
     <nav id="floatingDock" class="floating-dock" aria-label="Navigazione Nexus">
-      <button class="dock-item active" type="button" data-action="core" data-label="Core" aria-label="Core"><span>◉</span></button>
-      <button class="dock-item" type="button" data-action="memory" data-label="Memory · non disponibile" aria-label="Memory, non disponibile" disabled><span>◌</span></button>
-      <button class="dock-item" type="button" data-action="search" data-label="Search" aria-label="Search"><span>⌕</span></button>
-      <button class="dock-item" type="button" data-action="agents" data-label="Agents · non disponibile" aria-label="Agents, non disponibile" disabled><span>✦</span></button>
-      <button class="dock-item" type="button" data-action="projects" data-label="Projects" aria-label="Projects"><span>⬡</span></button>
-      <button class="dock-item" type="button" data-action="models" data-label="Models" aria-label="Models"><span>◇</span></button>
-      <button id="dockSettings" class="dock-item" type="button" data-action="settings" data-label="Settings" aria-label="Settings"><span>⚙</span></button>
+      <button class="dock-item active" type="button" data-action="core" data-label="Core" aria-label="Core" title="Core"><span>◉</span></button>
+      <button class="dock-item" type="button" data-action="memory" data-label="Memory · non disponibile" aria-label="Memory, non disponibile" title="Memory · non disponibile" disabled><span>◌</span></button>
+      <button class="dock-item" type="button" data-action="search" data-label="Search" aria-label="Search" title="Search"><span>⌕</span></button>
+      <button class="dock-item" type="button" data-action="agents" data-label="Agents · non disponibile" aria-label="Agents, non disponibile" title="Agents · non disponibile" disabled><span>✦</span></button>
+      <button class="dock-item" type="button" data-action="projects" data-label="Projects" aria-label="Projects" title="Projects"><span>⬡</span></button>
+      <button class="dock-item" type="button" data-action="models" data-label="Models" aria-label="Models" title="Models"><span>◇</span></button>
+      <button id="dockSettings" class="dock-item" type="button" data-action="settings" data-label="Settings" aria-label="Settings" title="Settings"><span>⚙</span></button>
     </nav>
 
     <dialog id="settingsDialog" aria-labelledby="settingsTitle">
       <form id="settingsForm" method="dialog">
-        <header><div><span class="eyebrow">SYSTEM CONFIGURATION</span><h2 id="settingsTitle">Local intelligence</h2></div><button value="cancel" aria-label="Chiudi">×</button></header>
+        <header><div><span class="eyebrow">SYSTEM CONFIGURATION</span><h2 id="settingsTitle">Local intelligence</h2></div><button id="settingsClose" type="button" aria-label="Chiudi" title="Chiudi impostazioni">×</button></header>
         <label>LOCAL ENDPOINT<input id="baseUrl" placeholder="http://127.0.0.1:11434/v1" required></label>
         <label>AI MODEL<input id="model" list="modelCatalog" placeholder="qwen3:8b" required><datalist id="modelCatalog"></datalist></label>
         <button id="detectModels" class="secondary-action" type="button">Scan local models</button>
