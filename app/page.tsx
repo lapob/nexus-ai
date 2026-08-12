@@ -56,9 +56,10 @@ export default function Home() {
       </nav>
 
       <section className="hero shell" id="home">
-        <div className="eyebrow reveal"><span /> INTELLIGENZA PERSONALE, EVOLUTA</div>
-        <h1 className="reveal delay-1">Non è un assistente.<br /><em>È il tuo Nexus.</em></h1>
-        <p className="hero-copy reveal delay-2">Una presenza intelligente che comprende il tuo mondo, connette le tue idee e lavora al tuo fianco. Ovunque tu sia.</p>
+        <div className="hero-index">N / 01</div>
+        <div className="eyebrow reveal"><span /> AI LOCALE · PRIVATA · TUA</div>
+        <h1 className="reveal delay-1">La tua mente,<br /><em>amplificata.</em></h1>
+        <p className="hero-copy reveal delay-2">Nexus vive sul tuo dispositivo, comprende il tuo mondo e trasforma idee, conoscenza e intenzioni in azioni concrete.</p>
         <div className="hero-actions reveal delay-3">
           <button className="primary" onClick={() => scrollTo("download")}>Scarica per {platform}<span>↓</span></button>
           <button className="secondary" onClick={() => scrollTo("experience")}><span className="play">▶</span> Scopri Nexus</button>
@@ -73,8 +74,11 @@ export default function Home() {
           <span className="core-label label-a">CONTESTO <b>ATTIVO</b></span>
           <span className="core-label label-b">PRIVACY <b>PROTETTA</b></span>
         </div>
+        <div className="hero-stamp"><span>100%</span> LOCAL<br/>INTELLIGENCE</div>
         <div className="scroll-cue">SCOPRI <span>↓</span></div>
       </section>
+
+      <section className="ticker" aria-label="Caratteristiche Nexus"><div>PRIVATA <i>✦</i> LOCALE <i>✦</i> PERSONALE <i>✦</i> SEMPRE CON TE <i>✦</i> PRIVATA <i>✦</i> LOCALE <i>✦</i></div></section>
 
       <section className="statement shell" id="experience">
         <p className="section-kicker">02 — UNA NUOVA RELAZIONE</p>
@@ -85,6 +89,13 @@ export default function Home() {
             <div className="signal-top"><span>SESSIONE LIVE</span><span className="live-dot" /> ONLINE</div>
             <div className="wave" aria-hidden="true">{Array.from({length: 34}).map((_, i) => <i key={i} style={{height: `${12 + ((i * 17) % 48)}px`}} />)}</div>
             <div className="transcript"><span>NEXUS / 09:41</span><p>Ho collegato le tue note al progetto. Vuoi che prepari la prossima mossa?</p></div>
+          </div>
+        </div>
+        <div className="product-stage">
+          <div className="stage-copy"><span>IL TUO SPAZIO COGNITIVO</span><strong>Tutto ciò che sai.<br/>Pronto quando serve.</strong><p>Conversazioni, appunti e progetti diventano una memoria connessa. Nexus trova relazioni, recupera contesto e ti aiuta a proseguire.</p></div>
+          <div className="app-window">
+            <div className="window-bar"><b>N</b><span>NEXUS</span><i></i><i></i><i></i></div>
+            <div className="app-body"><aside><span className="active">⌁</span><span>◫</span><span>◇</span><span>⚙</span></aside><div className="app-chat"><small>BUONGIORNO</small><h3>Da dove riprendiamo?</h3><div className="context-row"><span>◌</span><p><b>Progetto Nexus</b><br/>Ultima attività · 2 min fa</p><i>↗</i></div><div className="context-row"><span>✦</span><p><b>Knowledge personale</b><br/>1.657 frammenti connessi</p><i>↗</i></div><div className="prompt-bar">Chiedi qualsiasi cosa… <b>↑</b></div></div><div className="memory-panel"><small>MEMORIA ATTIVA</small><div className="memory-orb">N</div><strong>Contesto pronto</strong><span>Locale · Protetto</span></div></div>
           </div>
         </div>
       </section>
