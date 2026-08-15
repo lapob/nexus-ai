@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    icons: { icon: "/nexus-icon.png", shortcut: "/nexus-icon.png", apple: "/nexus-icon.png" },
     openGraph: { title, description, type: "website", images: [{ url: `${origin}/og.png`, width: 1733, height: 908, alt: "Nexus — Software per menti libere" }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
   };
@@ -37,7 +38,7 @@ export default function RootLayout({
   return (
     <html lang="it">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${manrope.variable} ${cormorant.variable} antialiased`}
       >
         {children}
       </body>
