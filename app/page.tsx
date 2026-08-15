@@ -7,7 +7,6 @@ import { ProductMockup, SiteFooter, SiteHeader } from "./components/SiteChrome";
 const apps = [
   { index: "01", name: "Nexus Desktop", platform: "Windows · AI locale", description: "Un ambiente intelligente e privato che porta modelli, strumenti e automazioni dentro il tuo computer.", accent: "violet", href: "/desktop", Icon: Workflow },
   { index: "02", name: "Nexus AI", platform: "Android · Continuità", description: "La tua esperienza Nexus sempre con te, con conversazioni sincronizzate e controllo trasparente.", accent: "cyan", href: "/android", Icon: KeyRound },
-  { index: "03", name: "Nexus Console", platform: "Android · Operations", description: "Controllo sicuro dell’istanza, stato dei servizi e accesso riservato alla tua rete privata.", accent: "coral", href: "/console", Icon: Orbit },
 ];
 
 export default function Home() {
@@ -34,7 +33,7 @@ export default function Home() {
         <div className="app-grid">{apps.map((app) => <article className={`app-card reveal ${app.accent}`} key={app.name}><div className="card-top"><span>{app.index}</span><span className="status"><i /> IN SVILUPPO</span></div><div className="app-orb" aria-hidden="true"><span><app.Icon size={46} strokeWidth={1.15} /></span></div><p className="platform">{app.platform}</p><h3>{app.name}</h3><p>{app.description}</p><a href={app.href} aria-label={`Scopri di più su ${app.name}`}>SCOPRI DI PIÙ <ArrowUpRight size={14} /></a></article>)}</div>
       </section>
       <section className="one-nexus reveal">
-        <div className="one-nexus-copy"><p className="section-label">/ 03 — One Nexus</p><h2>Tre esperienze.<br /><em>Una sola istanza.</em></h2><p>Desktop, Android e web convergono sulla stessa infrastruttura privata. La continuità è reale, senza trasformare i tuoi dati in un prodotto.</p><a className="text-link" href="/status">VEDI LO STATO DELLA RETE <span>→</span></a></div>
+        <div className="one-nexus-copy"><p className="section-label">/ 03 — One Nexus</p><h2>Due applicazioni.<br /><em>Una sola esperienza.</em></h2><p>Nexus AI per PC e Android lavorano insieme sulla stessa infrastruttura. La continuità è reale, senza trasformare i tuoi dati in un prodotto.</p><a className="text-link" href="/status">VEDI LO STATO DELLA RETE <span>→</span></a></div>
         <div className="nexus-stage"><ProductMockup type="desktop"/><ProductMockup type="android"/><span className="orbit-line one"/><span className="orbit-line two"/></div>
       </section>
       <section className="security reveal" id="security">

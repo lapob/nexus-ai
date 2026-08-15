@@ -3,7 +3,7 @@ import { ProductMockup, SiteFooter, SiteHeader } from "./SiteChrome";
 
 const featureIcons = [Sparkles, ShieldCheck, Workflow, Layers3];
 
-export function ProductPage({ label, title, italic, description, type, platform, features }: { label: string; title: string; italic: string; description: string; type: "desktop" | "android" | "console"; platform: string; features: { title: string; text: string }[] }) {
+export function ProductPage({ label, title, italic, description, type, platform, features }: { label: string; title: string; italic: string; description: string; type: "desktop" | "android"; platform: string; features: { title: string; text: string }[] }) {
   return <main className="inner-page"><SiteHeader />
     <section className="product-hero"><div className="product-copy"><p className="eyebrow"><Sparkles size={13} /> {label}</p><h1>{title}<br /><em>{italic}</em></h1><p>{description}</p><div className="hero-actions"><a className="primary-button" href="/downloads">Disponibilità <ArrowRight size={15} /></a><span className="platform-chip">{platform}</span></div></div><ProductMockup type={type} /></section>
     <section className="product-facts"><div><span>01</span><strong>Privato per impostazione</strong><p>I tuoi dati restano sotto il tuo controllo.</p></div><div><span>02</span><strong>Continuità reale</strong><p>Stessa sessione, contesto e progetti.</p></div><div><span>03</span><strong>Sicurezza verificabile</strong><p>Canali cifrati e accessi revocabili.</p></div></section>

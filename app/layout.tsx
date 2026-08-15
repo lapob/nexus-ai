@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-});
-
-const cormorant = Cormorant_Garamond({
-  variable: "--font-cormorant",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -38,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="it">
       <body
-        className={`${manrope.variable} ${cormorant.variable} antialiased`}
+        className={`${inter.variable} antialiased`}
       >
         {children}
       </body>
