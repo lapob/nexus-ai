@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Menu, X } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -10,7 +12,7 @@ export function SiteHeader() {
     fetch("/api/status", { cache: "no-store" }).then((r) => r.json()).then((v) => setOnline(v.online === true)).catch(() => setOnline(false));
   }, []);
   return <header className="site-header">
-    <a className="brand" href="/" aria-label="Nexus Software, homepage"><img className="brand-icon" src="/nexus-icon.png" alt="Logo Nexus" /><span>NEXUS SOFTWARE</span></a>
+    <Link className="brand" href="/" aria-label="Nexus Software, homepage"><Image className="brand-icon" src="/nexus-icon.png" alt="Logo Nexus" width={48} height={48} priority /><span>NEXUS SOFTWARE</span></Link>
     <button className="mobile-toggle" onClick={() => setOpen(!open)} aria-label={open ? "Chiudi menu" : "Apri menu"}>{open ? <X /> : <Menu />}</button>
     <nav className={open ? "chrome-nav open" : "chrome-nav"} aria-label="Navigazione principale">
       <a href="/desktop">PC</a><a href="/android">Android</a><a href="/security">Sicurezza</a><a href="/downloads">Download</a>
@@ -21,7 +23,7 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return <footer className="premium-footer">
-    <div className="footer-callout"><img src="/nexus-icon.png" alt="" /><h2>Un solo Nexus.<br /><em>Ovunque tu sia.</em></h2><a className="primary-button" href="/downloads">Esplora Nexus <ArrowUpRight size={15} /></a></div>
+    <div className="footer-callout"><Image src="/nexus-icon.png" alt="" width={72} height={72} /><h2>Un solo Nexus.<br /><em>Ovunque tu sia.</em></h2><a className="primary-button" href="/downloads">Esplora Nexus <ArrowUpRight size={15} /></a></div>
     <div className="footer-links"><div><strong>Prodotti</strong><a href="/desktop">Nexus AI per PC</a><a href="/android">Nexus AI per Android</a></div><div><strong>Fiducia</strong><a href="/security">Trust Center</a><a href="/status">Stato servizi</a><a href="/downloads">Download verificati</a></div><div><strong>Nexus</strong><a href="mailto:hello@nexusnxs.com">Contatti</a><a href="https://github.com/lapob/nexus-ai">GitHub</a><a href="/security#privacy">Privacy</a></div></div>
     <div className="footer-bottom"><span>© 2026 NEXUS SOFTWARE STUDIO</span><span>PRIVACY-FIRST · MADE IN ITALY</span></div>
   </footer>;

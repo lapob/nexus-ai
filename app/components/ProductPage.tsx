@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Cpu, Fingerprint, Layers3, LockKeyhole, Radio, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { ArrowRight, Cpu, Fingerprint, Layers3, LockKeyhole, Radio, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import { ProductMockup, SiteFooter, SiteHeader } from "./SiteChrome";
 
 const featureIcons = [Sparkles, ShieldCheck, Workflow, Layers3];
