@@ -11,11 +11,15 @@ export function SiteHeader() {
   useEffect(() => {
     fetch("/api/status", { cache: "no-store" }).then((r) => r.json()).then((v) => setOnline(v.online === true)).catch(() => setOnline(false));
   }, []);
+  useEffect(() => {
+    document.body.classList.toggle("menu-open", open);
+    return () => document.body.classList.remove("menu-open");
+  }, [open]);
   return <header className="site-header">
     <Link className="brand" href="/" aria-label="Nexus Software, homepage"><Image className="brand-icon" src="/nexus-icon.png" alt="Logo Nexus" width={48} height={48} priority /><span>NEXUS SOFTWARE</span></Link>
-    <button className="mobile-toggle" onClick={() => setOpen(!open)} aria-label={open ? "Chiudi menu" : "Apri menu"}>{open ? <X /> : <Menu />}</button>
-    <nav className={open ? "chrome-nav open" : "chrome-nav"} aria-label="Navigazione principale">
-      <a href="/desktop">PC</a><a href="/android">Android</a><a href="/security">Sicurezza</a><a href="/downloads">Download</a>
+    <button className="mobile-toggle" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="main-navigation" aria-label={open ? "Chiudi menu" : "Apri menu"}>{open ? <X /> : <Menu />}</button>
+    <nav id="main-navigation" className={open ? "chrome-nav open" : "chrome-nav"} aria-label="Navigazione principale">
+      <a href="/desktop" onClick={()=>setOpen(false)}>PC</a><a href="/android" onClick={()=>setOpen(false)}>Android</a><a href="/security" onClick={()=>setOpen(false)}>Sicurezza</a><a href="/status" onClick={()=>setOpen(false)}>Stato</a><a className="chrome-download" href="/downloads" onClick={()=>setOpen(false)}>Download</a>
     </nav>
     <a className={`network-pill ${online === false ? "offline" : ""}`} href="/status"><i /> {online === null ? "VERIFICA RETE" : online ? "NEXUS NETWORK · ONLINE" : "STATO RETE"}</a>
   </header>;
