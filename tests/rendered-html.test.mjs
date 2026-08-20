@@ -13,17 +13,18 @@ async function render(pathname = "/") {
   );
 }
 
-test("server-renders the Nexus public homepage", async () => {
+test("server-renders the NexusNXS public homepage", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<html lang="it">/i);
-  assert.match(html, /NEXUS SOFTWARE/);
+  assert.match(html, /NEXUSNXS/);
   assert.match(html, /Strumenti digitali/);
   assert.match(html, /Trust Center/);
-  assert.match(html, /Nexus Desktop/);
-  assert.match(html, /Nexus AI/);
+  assert.match(html, /NexusNXS per PC/);
+  assert.match(html, /NexusNXS per Android/);
+  assert.match(html, /application\/ld\+json/);
   assert.doesNotMatch(html, /codex-preview|starter loading skeleton|Your site is taking shape/i);
 });
 
@@ -33,7 +34,8 @@ test("keeps production metadata and portable scripts", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(layout, /Nexus — Software per menti libere/);
+  assert.match(layout, /NexusNXS — Software per menti libere/);
+  assert.match(layout, /manifest\.webmanifest/);
   assert.match(layout, /<html lang="it">/);
   assert.match(packageJson, /cross-env WRANGLER_LOG_PATH=/);
   assert.match(chrome, /next\/image/);

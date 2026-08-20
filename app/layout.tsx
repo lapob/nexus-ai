@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -17,14 +10,21 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = "NexusNXS — Software per menti libere";
   const description = "App Android e desktop potenti, eleganti e progettate intorno alla tua privacy.";
   return {
+    metadataBase: new URL("https://nexusnxs.com"),
     title,
     description,
+    applicationName: "NexusNXS",
+    creator: "NexusNXS",
+    publisher: "NexusNXS",
+    category: "technology",
+    alternates: { canonical: origin },
+    manifest: "/manifest.webmanifest",
     icons: {
       icon: [{ url: "/nexus-icon.png?v=nexusnxs-2", type: "image/png", sizes: "1024x1024" }],
       shortcut: "/nexus-icon.png?v=nexusnxs-2",
       apple: [{ url: "/nexus-icon.png?v=nexusnxs-2", sizes: "1024x1024", type: "image/png" }],
     },
-    openGraph: { title, description, type: "website", images: [{ url: `${origin}/og.png`, width: 1732, height: 908, alt: "NexusNXS — Software per menti libere" }] },
+    openGraph: { title, description, type: "website", url: origin, siteName: "NexusNXS", locale: "it_IT", images: [{ url: `${origin}/og.png`, width: 1732, height: 908, alt: "NexusNXS — Software per menti libere" }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
   };
 }
@@ -36,9 +36,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
-      <body
-        className={`${inter.variable} antialiased`}
-      >
+      <body>
+        <a className="skip-link" href="#main-content">Vai al contenuto</a>
         {children}
       </body>
     </html>

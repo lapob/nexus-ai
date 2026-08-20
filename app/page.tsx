@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { ArrowUpRight, Blocks, Fingerprint, KeyRound, LockKeyhole, Orbit, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import { ProductMockup, SiteFooter, SiteHeader } from "./components/SiteChrome";
+import { StructuredData } from "./components/StructuredData";
 
 const apps = [
   { index: "01", name: "NexusNXS per PC", platform: "Windows · AI locale", description: "Un ambiente intelligente e privato che porta modelli, strumenti e automazioni dentro il tuo computer.", accent: "violet", href: "/desktop", Icon: Workflow },
@@ -16,7 +17,8 @@ export default function Home() {
     return () => reveal.disconnect();
   }, []);
   return (
-    <main>
+    <main id="main-content">
+      <StructuredData data={[{"@context":"https://schema.org","@type":"WebSite",name:"NexusNXS",url:"https://nexusnxs.com",inLanguage:"it-IT"},{"@context":"https://schema.org","@type":"Organization",name:"NexusNXS",url:"https://nexusnxs.com",logo:"https://nexusnxs.com/nexus-icon.png",email:"hello@nexusnxs.com"}]} />
       <SiteHeader />
       <section className="hero" id="top">
         <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
@@ -38,7 +40,7 @@ export default function Home() {
       </section>
       <section className="security reveal" id="security">
         <div className="security-copy"><p className="section-label">/ 04 — Sicurezza radicale</p><h2>La fiducia non si chiede.<br /><em>Si dimostra.</em></h2><p>Riduciamo i dati raccolti, proteggiamo ogni distribuzione e rendiamo verificabile l’integrità del software. La sicurezza è un processo continuo, non un badge.</p><a className="primary-button light" href="/security">Apri il Trust Center <span>→</span></a></div>
-        <div className="security-panel" id="principles"><div className="scanline" /><p>SECURITY STATUS <span>ALL SYSTEMS PROTECTED</span></p><div className="shield" aria-hidden="true"><ShieldCheck size={72} strokeWidth={1} /></div><dl><div><dt><LockKeyhole size={14} /> Distribuzione</dt><dd>Pacchetti firmati</dd></div><div><dt><Fingerprint size={14} /> Dati</dt><dd>Cifratura in transito</dd></div><div><dt><Orbit size={14} /> Telemetria</dt><dd>Minima &amp; trasparente</dd></div><div><dt><Blocks size={14} /> Aggiornamenti</dt><dd>Canale verificato</dd></div></dl></div>
+        <div className="security-panel" id="principles"><div className="scanline" /><p>SECURITY POSTURE <span>CONTROLLI DOCUMENTATI</span></p><div className="shield" aria-hidden="true"><ShieldCheck size={72} strokeWidth={1} /></div><dl><div><dt><LockKeyhole size={14} /> Distribuzione</dt><dd>Firma richiesta</dd></div><div><dt><Fingerprint size={14} /> Dati</dt><dd>Cifratura in transito</dd></div><div><dt><Orbit size={14} /> Telemetria</dt><dd>Minima &amp; trasparente</dd></div><div><dt><Blocks size={14} /> Aggiornamenti</dt><dd>Integrità verificabile</dd></div></dl></div>
       </section>
       <SiteFooter />
     </main>
