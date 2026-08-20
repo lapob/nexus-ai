@@ -51,7 +51,11 @@ test("keeps production metadata and portable scripts", async () => {
 });
 
 test("redirects every known production alias to nexusnxs.com", async () => {
-  for (const hostname of ["www.nexusnxs.com", "nexus-software-studio.nexuspers.chatgpt.site"]) {
+  for (const hostname of [
+    "www.nexusnxs.com",
+    "nexus-software-studio.nexuspers.chatgpt.site",
+    "nexus-ai-personale.nexuswork.chatgpt.site",
+  ]) {
     const response = await fetchWorker(`https://${hostname}/downloads?source=legacy`);
     assert.equal(response.status, 308);
     assert.equal(response.headers.get("location"), "https://nexusnxs.com/downloads?source=legacy");

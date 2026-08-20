@@ -22,6 +22,7 @@ const CANONICAL_HOSTNAME = "nexusnxs.com";
 const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
   "www.nexusnxs.com",
   "nexus-software-studio.nexuspers.chatgpt.site",
+  "nexus-ai-personale.nexuswork.chatgpt.site",
 ]);
 
 // Image security config. SVG sources with .svg extension auto-skip the
