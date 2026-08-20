@@ -18,6 +18,12 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+const CANONICAL_HOSTNAME = "nexusnxs.com";
+const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
+  "www.nexusnxs.com",
+  "nexus-software-studio.nexuspers.chatgpt.site",
+]);
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -28,8 +34,8 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.hostname === "www.nexusnxs.com") {
-      url.hostname = "nexusnxs.com";
+    if (NON_CANONICAL_PRODUCTION_HOSTNAMES.has(url.hostname)) {
+      url.hostname = CANONICAL_HOSTNAME;
       url.protocol = "https:";
       return Response.redirect(url, 308);
     }

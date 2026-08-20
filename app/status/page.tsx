@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { Activity, CheckCircle2, Cloud, DatabaseZap, History, Radio, Server } from "lucide-react";
 import { SiteFooter, SiteHeader } from "../components/SiteChrome";
+import { NEXUSNXS_AI_HEALTH_URL, NEXUSNXS_AI_ORIGIN } from "../lib/service-endpoints";
 
 export const metadata: Metadata = { title: "NexusNXS Status — Stato dei servizi", description: "Disponibilità in tempo reale dell’infrastruttura pubblica NexusNXS.", alternates:{canonical:"/status"}, openGraph: { title: "NexusNXS Status", description: "Stato dei servizi NexusNXS.", images: [] }, twitter: { title: "NexusNXS Status", description: "Stato dei servizi NexusNXS.", images: [] } };
 
 async function getStatus() {
   const started = Date.now();
-  try { const response = await fetch("https://ai.nexusnxs.com/healthz", { cache: "no-store", signal: AbortSignal.timeout(4000) }); return { online: response.ok, latency: Date.now() - started, checkedAt: new Date() }; }
+  try { const response = await fetch(NEXUSNXS_AI_HEALTH_URL, { cache: "no-store", signal: AbortSignal.timeout(4000) }); return { online: response.ok, latency: Date.now() - started, checkedAt: new Date() }; }
   catch { return { online: false, latency: null, checkedAt: new Date() }; }
 }
 
@@ -14,7 +15,7 @@ export default async function Status() {
   const status = await getStatus();
   const checkedAt = status.checkedAt.toLocaleString("it-IT", { timeZone: "Europe/Rome", dateStyle: "medium", timeStyle: "medium" });
   const services = [
-    { Icon: Server, name: "NexusNXS Public API", detail: "ai.nexusnxs.com", ok: status.online, note: status.latency ? `${status.latency} ms` : "Nessuna risposta" },
+    { Icon: Server, name: "NexusNXS AI", detail: new URL(NEXUSNXS_AI_ORIGIN).hostname, ok: status.online, note: status.latency ? `${status.latency} ms` : "Nessuna risposta" },
     { Icon: Cloud, name: "Sito pubblico", detail: "nexusnxs.com", ok: true, note: "Pagina disponibile" },
     { Icon: Radio, name: "Canale cifrato", detail: "Tunnel pubblico", ok: status.online, note: status.online ? "Raggiungibile" : "In verifica" },
     { Icon: DatabaseZap, name: "Servizi privati", detail: "Non esposti pubblicamente", ok: true, note: "Confine preservato" },

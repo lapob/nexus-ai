@@ -1,7 +1,9 @@
+import { NEXUSNXS_AI_HEALTH_URL } from "../../lib/service-endpoints";
+
 export async function GET() {
   const started = Date.now();
   try {
-    const response = await fetch("https://ai.nexusnxs.com/healthz", { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    const response = await fetch(NEXUSNXS_AI_HEALTH_URL, { cache: "no-store", signal: AbortSignal.timeout(4000) });
     const data = response.ok ? await response.json() as { status?: string } : {};
     return Response.json({ online: response.ok && data.status === "ok", checkedAt: new Date().toISOString(), latencyMs: Date.now() - started }, { headers: { "Cache-Control": "no-store" } });
   } catch {
