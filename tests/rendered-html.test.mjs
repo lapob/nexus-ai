@@ -20,7 +20,9 @@ test("server-renders the NexusNXS public homepage", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="it">/i);
   assert.match(html, /NEXUSNXS/);
-  assert.match(html, /Strumenti digitali/);
+  assert.match(html, /La tua intelligenza/);
+  assert.match(html, /AI LOCALE, PRIVATA, CONNESSA/);
+  assert.match(html, /STATI COMPRENSIBILI/);
   assert.match(html, /Trust Center/);
   assert.match(html, /NexusNXS per PC/);
   assert.match(html, /NexusNXS per Android/);

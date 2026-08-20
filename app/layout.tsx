@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
+
+export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -8,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
   const title = "NexusNXS — Software per menti libere";
-  const description = "App Android e desktop potenti, eleganti e progettate intorno alla tua privacy.";
+  const description = "AI locale per PC e Android, con una sola istanza privata, accessi revocabili e continuità cifrata.";
   return {
     metadataBase: new URL("https://nexusnxs.com"),
     title,
@@ -24,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
       shortcut: "/nexus-icon.png?v=nexusnxs-2",
       apple: [{ url: "/nexus-icon.png?v=nexusnxs-2", sizes: "1024x1024", type: "image/png" }],
     },
-    openGraph: { title, description, type: "website", url: origin, siteName: "NexusNXS", locale: "it_IT", images: [{ url: `${origin}/og.png`, width: 1732, height: 908, alt: "NexusNXS — Software per menti libere" }] },
+    openGraph: { title, description, type: "website", url: origin, siteName: "NexusNXS", locale: "it_IT", images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "NexusNXS — AI locale, privata e connessa" }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
   };
 }
