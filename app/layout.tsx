@@ -1,15 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 
 export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" };
 
-export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
-  const title = "NexusNXS — Software per menti libere";
+export function generateMetadata(): Metadata {
+  const origin = "https://nexusnxs.com";
+  const title = "NexusNXS — AI locale, privata e connessa";
   const description = "AI locale per PC e Android, con una sola istanza privata, accessi revocabili e continuità cifrata.";
   return {
     metadataBase: new URL("https://nexusnxs.com"),
@@ -19,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     creator: "NexusNXS",
     publisher: "NexusNXS",
     category: "technology",
-    alternates: { canonical: origin },
+    alternates: { canonical: `${origin}/` },
     manifest: "/manifest.webmanifest",
     icons: {
       icon: [{ url: "/nexus-icon.png?v=nexusnxs-2", type: "image/png", sizes: "1024x1024" }],

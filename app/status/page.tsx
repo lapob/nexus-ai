@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "NexusNXS Status — Stato dei serviz
 
 async function getStatus() {
   const started = Date.now();
-  try { const response = await fetch("https://api.nexusnxs.com/healthz", { cache: "no-store", signal: AbortSignal.timeout(4000) }); return { online: response.ok, latency: Date.now() - started, checkedAt: new Date() }; }
+  try { const response = await fetch("https://ai.nexusnxs.com/healthz", { cache: "no-store", signal: AbortSignal.timeout(4000) }); return { online: response.ok, latency: Date.now() - started, checkedAt: new Date() }; }
   catch { return { online: false, latency: null, checkedAt: new Date() }; }
 }
 
@@ -14,7 +14,7 @@ export default async function Status() {
   const status = await getStatus();
   const checkedAt = status.checkedAt.toLocaleString("it-IT", { timeZone: "Europe/Rome", dateStyle: "medium", timeStyle: "medium" });
   const services = [
-    { Icon: Server, name: "NexusNXS Public API", detail: "api.nexusnxs.com", ok: status.online, note: status.latency ? `${status.latency} ms` : "Nessuna risposta" },
+    { Icon: Server, name: "NexusNXS Public API", detail: "ai.nexusnxs.com", ok: status.online, note: status.latency ? `${status.latency} ms` : "Nessuna risposta" },
     { Icon: Cloud, name: "Sito pubblico", detail: "nexusnxs.com", ok: true, note: "Pagina disponibile" },
     { Icon: Radio, name: "Canale cifrato", detail: "Tunnel pubblico", ok: status.online, note: status.online ? "Raggiungibile" : "In verifica" },
     { Icon: DatabaseZap, name: "Servizi privati", detail: "Non esposti pubblicamente", ok: true, note: "Confine preservato" },

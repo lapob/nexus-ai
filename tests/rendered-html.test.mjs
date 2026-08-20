@@ -36,7 +36,8 @@ test("keeps production metadata and portable scripts", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(layout, /NexusNXS — Software per menti libere/);
+  assert.match(layout, /NexusNXS — AI locale, privata e connessa/);
+  assert.match(layout, /https:\/\/nexusnxs\.com/);
   assert.match(layout, /manifest\.webmanifest/);
   assert.match(layout, /<html lang="it">/);
   assert.match(packageJson, /cross-env WRANGLER_LOG_PATH=/);
