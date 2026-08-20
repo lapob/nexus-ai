@@ -19,7 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    icons: { icon: "/nexus-icon.png", shortcut: "/nexus-icon.png", apple: "/nexus-icon.png" },
+    icons: {
+      icon: [{ url: "/nexus-icon.png?v=nexusnxs-2", type: "image/png", sizes: "1024x1024" }],
+      shortcut: "/nexus-icon.png?v=nexusnxs-2",
+      apple: [{ url: "/nexus-icon.png?v=nexusnxs-2", sizes: "1024x1024", type: "image/png" }],
+    },
     openGraph: { title, description, type: "website", images: [{ url: `${origin}/og.png`, width: 1732, height: 908, alt: "NexusNXS — Software per menti libere" }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
   };
