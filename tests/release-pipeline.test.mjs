@@ -82,5 +82,9 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   assert.equal(config.workers_dev, false);
   assert.equal(config.preview_urls, true);
   assert.equal(config.version_metadata.binding, "CF_VERSION_METADATA");
-  assert.equal(config.routes, undefined, "the checked-in configuration must stay route-free until bootstrap completes");
+  assert.deepEqual(config.routes, [
+    { pattern: "nexusnxs.com", custom_domain: true },
+    { pattern: "www.nexusnxs.com", custom_domain: true },
+  ]);
+  assert.match(releaseScript, /routes\.length !== 0/);
 });

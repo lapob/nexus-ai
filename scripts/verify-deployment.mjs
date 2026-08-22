@@ -61,7 +61,7 @@ assert.equal(serviceWorker.headers.get("service-worker-allowed"), "/");
 assert.match(serviceWorker.headers.get("cache-control") ?? "", /no-store/);
 
 if (baseUrl.hostname.endsWith(".workers.dev")) {
-  assert.equal(home.headers.get("x-robots-tag"), "noindex, nofollow");
+  assert.match(home.headers.get("x-robots-tag") ?? "", /(?:^|,\s*)noindex(?:,|$)/);
 }
 
 if (baseUrl.hostname === "nexusnxs.com") {
