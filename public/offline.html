@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#020405" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>NexusNXS — Offline</title>
+    <link rel="icon" href="/nexus-icon.png" />
+    <link rel="stylesheet" href="/nexus-operational.css" />
+    <script src="/nexus-presence.js" defer></script>
+  </head>
+  <body style="margin:0">
+    <main class="nexus-operational-page" id="main-content">
+      <section class="nexus-operational" data-nexus-state="offline" role="status" aria-live="polite">
+        <div class="nexus-presence" data-nexus-presence data-state="offline" role="img" aria-label="Presenza NexusNXS · NexusNXS non è raggiungibile">
+          <canvas aria-hidden="true"></canvas>
+          <span class="nexus-presence__core" aria-hidden="true"><img src="/nexus-icon.png" alt="" width="88" height="88" /></span>
+          <span class="nexus-presence__phase" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        </div>
+        <div class="nexus-operational__copy">
+          <p class="nexus-operational__eyebrow"><i aria-hidden="true"></i> NEXUSNXS · OFFLINE</p>
+          <h1>Server NexusNXS<br /><em>non raggiungibili.</em></h1>
+          <p>Riconnessione automatica in background. Questa presenza resta disponibile perché hai già visitato nexusnxs.com.</p>
+          <div class="nexus-operational__actions">
+            <button class="nexus-operational__primary" type="button" data-nexus-retry>Riprova</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

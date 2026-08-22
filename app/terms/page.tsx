@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { FileText, Scale, ShieldAlert, Wrench } from "lucide-react";
-import { SiteFooter, SiteHeader } from "../components/SiteChrome";
+import { SiteFooter } from "../components/SiteChrome";
 
 export const metadata: Metadata = { title: "Termini d’uso — NexusNXS", description: "Condizioni per l’utilizzo del sito e delle versioni preliminari NexusNXS.", alternates: { canonical: "/terms" }, openGraph:{title:"Termini d’uso — NexusNXS",description:"Condizioni d’uso del sito e dei prodotti NexusNXS.",images:[]}, twitter:{title:"Termini d’uso — NexusNXS",description:"Condizioni d’uso del sito e dei prodotti NexusNXS.",images:[]} };
 
-export default function Terms() { return <main className="inner-page legal-page" id="main-content"><SiteHeader />
+export default function Terms() { return <main className="inner-page legal-page" id="main-content">
   <header className="legal-hero"><p className="eyebrow"><Scale size={14} /> TERMINI D’USO</p><h1>Regole chiare.<br /><em>Software responsabile.</em></h1><p>Ultimo aggiornamento: 20 agosto 2026</p></header>
   <section className="legal-layout"><aside><a href="#scope">Ambito</a><a href="#preview">Versioni preliminari</a><a href="#security">Uso corretto</a><a href="#availability">Disponibilità</a></aside><article>
     <section id="scope"><FileText /><h2>Ambito</h2><p>Il sito presenta NexusNXS per PC e NexusNXS per Android, la relativa documentazione e lo stato delle release. Le condizioni specifiche e la licenza incluse in ciascuna distribuzione prevalgono per l’uso del software.</p></section>

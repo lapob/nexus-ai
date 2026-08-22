@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert, Smartphone } from "lucide-react";
 import Image from "next/image";
-import { SiteFooter, SiteHeader } from "../components/SiteChrome";
+import { SiteFooter } from "../components/SiteChrome";
 
 export const metadata: Metadata = {
   title: "Download NexusNXS — Release e verifiche",
@@ -17,9 +17,9 @@ const releases = [
 ];
 
 export default function Downloads() {
-  return <main className="inner-page" id="main-content"><SiteHeader />
+  return <main className="inner-page" id="main-content">
     <section className="download-hero">
-      <div className="download-brand"><Image src="/nexus-icon.png" alt="Logo NexusNXS" width={92} height={92} priority /><span>NEXUSNXS</span></div>
+      <div className="download-brand"><Image src="/nexus-icon.png" alt="Logo NexusNXS" width={92} height={92} priority unoptimized /><span>NEXUSNXS</span></div>
       <p className="eyebrow"><Download size={14} /> DOWNLOAD CENTER</p>
       <h1>Software autentico.<br /><em>Origine verificabile.</em></h1>
       <p>Ogni file pubblico dovrà superare firma, controllo dell’integrità e verifica del canale di distribuzione. Nessuna build interna viene presentata come release.</p>

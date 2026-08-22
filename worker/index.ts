@@ -1,16 +1,9 @@
 /** Cloudflare Worker entry point for the NexusNXS public site. */
-import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
 interface Env {
-  ASSETS: Fetcher;
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: { format: string; quality: number }): Promise<{ response(): Response }>;
-      };
-    };
-  };
+  ASSETS: { fetch(request: Request): Promise<Response> };
+  NEXUSNXS_SITE_MODE?: "live" | "maintenance";
 }
 
 interface ExecutionContext {
@@ -25,11 +18,24 @@ const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
   "nexus-ai-personale.nexuswork.chatgpt.site",
 ]);
 
-// Image security config. SVG sources with .svg extension auto-skip the
-// optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
+function secureResponse(response: Response, pathname: string): Response {
+  const secured = new Response(response.body, response);
+  secured.headers.set("X-Content-Type-Options", "nosniff");
+  secured.headers.set("X-Frame-Options", "DENY");
+  secured.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  secured.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  secured.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  secured.headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  secured.headers.set("Origin-Agent-Cluster", "?1");
+  secured.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  secured.headers.set("X-Permitted-Cross-Domain-Policies", "none");
+  secured.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests");
+  if (pathname === "/sw.js") {
+    secured.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    secured.headers.set("Service-Worker-Allowed", "/");
+  }
+  return secured;
+}
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -41,30 +47,23 @@ const worker = {
       return Response.redirect(url, 308);
     }
 
-    if (url.pathname === "/_vinext/image") {
-      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
-        transformImage: async (body, { width, format, quality }) => {
-          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
-          return result.response();
-        },
-      }, allowedWidths);
+    const accept = request.headers.get("accept") ?? "";
+    const isHtmlNavigation = request.method === "GET" && accept.includes("text/html");
+    const isRscNavigation = request.method === "GET" && (accept.includes("text/x-component") || request.headers.has("rsc") || url.searchParams.has("_rsc"));
+    const isPageNavigation = isHtmlNavigation || isRscNavigation;
+    const isOperationalPath = url.pathname === "/status" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/.well-known/");
+    if (env.NEXUSNXS_SITE_MODE === "maintenance" && isPageNavigation && !isOperationalPath && url.pathname !== "/maintenance") {
+      const maintenanceUrl = new URL("/maintenance", request.url);
+      const rendered = await handler.fetch(new Request(maintenanceUrl, request), env, ctx);
+      const maintenance = new Response(rendered.body, { status: 503, headers: rendered.headers });
+      maintenance.headers.set("Cache-Control", "no-store");
+      maintenance.headers.set("Retry-After", "300");
+      maintenance.headers.set("X-NexusNXS-State", "maintenance");
+      maintenance.headers.set("X-Robots-Tag", "noindex, nofollow");
+      return secureResponse(maintenance, url.pathname);
     }
 
-    const response = await handler.fetch(request, env, ctx);
-    const secured = new Response(response.body, response);
-    secured.headers.set("X-Content-Type-Options", "nosniff");
-    secured.headers.set("X-Frame-Options", "DENY");
-    secured.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-    secured.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-    secured.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-    secured.headers.set("Cross-Origin-Resource-Policy", "same-origin");
-    secured.headers.set("Origin-Agent-Cluster", "?1");
-    secured.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-    secured.headers.set("X-Permitted-Cross-Domain-Policies", "none");
-    secured.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests");
-    return secured;
+    return secureResponse(await handler.fetch(request, env, ctx), url.pathname);
   },
 };
 

@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ConnectivityPresence } from "./components/ConnectivityPresence";
+import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";
+import { SiteHeader } from "./components/SiteChrome";
 
 export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" };
 
@@ -34,9 +37,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
+      <head>
+        {/* This stylesheet is also consumed by the static offline shell. */}
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link rel="stylesheet" href="/nexus-operational.css" />
+        <script src="/register-sw.js" defer />
+      </head>
       <body>
         <a className="skip-link" href="#main-content">Vai al contenuto</a>
+        <SiteHeader />
         {children}
+        <ConnectivityPresence />
+        <NexusPresenceRuntime />
       </body>
     </html>
   );
