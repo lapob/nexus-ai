@@ -6,7 +6,7 @@ type NexusNxsAiStatus = {
   checkedAt: Date;
 };
 
-const STATUS_TTL_MS = 2_000;
+const STATUS_TTL_MS = 10_000;
 let cachedStatus: NexusNxsAiStatus | null = null;
 let cachedUntil = 0;
 let pendingCheck: Promise<NexusNxsAiStatus> | null = null;
@@ -21,12 +21,14 @@ async function probeNexusNxsAi(): Promise<NexusNxsAiStatus> {
       signal: AbortSignal.timeout(4000),
     });
     const data = response.ok ? await response.json() as { status?: string } : {};
+    if (!response.ok) console.warn("NEXUSNXS_AI_HEALTH_CHECK_UNAVAILABLE", response.status);
     return {
       online: response.ok && data.status === "ok",
       latencyMs: Date.now() - started,
       checkedAt,
     };
   } catch {
+    console.warn("NEXUSNXS_AI_HEALTH_CHECK_FAILED");
     return { online: false, latencyMs: null, checkedAt };
   }
 }

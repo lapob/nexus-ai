@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import "./navigation.css";
+import { CspNonceProvider } from "./components/CspNonceContext";
 import { ConnectivityPresence } from "./components/ConnectivityPresence";
 import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";
 import { HardNavigationLink } from "./components/HardNavigationLink";
@@ -33,35 +35,42 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get("x-nexusnxs-csp-nonce") ?? undefined;
+
   return (
     <html lang="it">
       <head>
         {/* This stylesheet is also consumed by the static offline shell. */}
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/nexus-operational.css" />
-        <script src="/register-sw.js" defer />
+        <noscript>
+          {/* eslint-disable-next-line @next/next/no-css-tags */}
+          <link rel="stylesheet" href="/noscript.css" />
+        </noscript>
+        <script nonce={nonce} src="/register-sw.js" defer />
       </head>
       <body>
-        <a className="skip-link" href="#site-content">Vai al contenuto</a>
-        <SiteHeader />
-        <noscript>
-          <style>{`.nxs-header,.nexus-connectivity{display:none!important}.reveal{opacity:1!important;transform:none!important}`}</style>
-          <nav className="nxs-noscript" aria-label="Navigazione principale senza JavaScript">
-            <HardNavigationLink className="nxs-noscript__brand" href="/">NEXUSNXS</HardNavigationLink>
-            <div>
-              {PRIMARY_NAV_ITEMS.map(({ href, label }) => <HardNavigationLink key={href} href={href}>{label}</HardNavigationLink>)}
-              <HardNavigationLink href="/downloads">Download</HardNavigationLink>
-            </div>
-          </nav>
-        </noscript>
-        <div id="site-content" tabIndex={-1}>{children}</div>
-        <ConnectivityPresence />
-        <NexusPresenceRuntime />
+        <CspNonceProvider nonce={nonce}>
+          <a className="skip-link" href="#site-content">Vai al contenuto</a>
+          <SiteHeader />
+          <noscript>
+            <nav className="nxs-noscript" aria-label="Navigazione principale senza JavaScript">
+              <HardNavigationLink className="nxs-noscript__brand" href="/">NEXUSNXS</HardNavigationLink>
+              <div>
+                {PRIMARY_NAV_ITEMS.map(({ href, label }) => <HardNavigationLink key={href} href={href}>{label}</HardNavigationLink>)}
+                <HardNavigationLink href="/downloads">Download</HardNavigationLink>
+              </div>
+            </nav>
+          </noscript>
+          <div id="site-content" tabIndex={-1}>{children}</div>
+          <ConnectivityPresence />
+          <NexusPresenceRuntime />
+        </CspNonceProvider>
       </body>
     </html>
   );

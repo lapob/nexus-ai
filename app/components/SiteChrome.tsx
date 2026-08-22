@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { PRIMARY_NAV_ITEMS } from "../lib/site-navigation";
@@ -16,16 +16,14 @@ export function SiteHeader() {
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
 
-    fetch("/api/status", { cache: "no-store", signal: controller.signal })
+    fetch("/api/status", { cache: "no-store", keepalive: true })
       .then((response) => response.json())
-      .then((value) => setOnline(value.online === true))
-      .catch((error: Error) => {
-        if (error.name !== "AbortError") setOnline(false);
-      });
+      .then((value) => active && setOnline(value.online === true))
+      .catch(() => active && setOnline(false));
 
-    return () => controller.abort();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -115,10 +113,9 @@ export function SiteHeader() {
       }}
       aria-expanded={open}
       aria-controls="main-navigation"
-      aria-label={open ? "Chiudi menu" : "Apri menu"}
+      aria-label={open ? "Chiudi navigazione" : "Apri navigazione"}
     >
-      <span aria-hidden="true">{open ? "CHIUDI" : "MENU"}</span>
-      {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+      <span className="nxs-menu-glyph" aria-hidden="true"><i /><i /><i /></span>
     </button>
 
     <nav
@@ -128,10 +125,6 @@ export function SiteHeader() {
       aria-label="Navigazione principale"
       aria-busy={navigating}
     >
-      <div className="nxs-nav__intro" aria-hidden="true">
-        <span>NAVIGAZIONE</span>
-        <span>05 SEZIONI</span>
-      </div>
       <div className="nxs-nav__links">
         {navigationItems.map(({ href, label }, index) => <HardNavigationLink
           className={href === "/downloads" ? "nxs-nav__link nxs-nav__link--download" : "nxs-nav__link"}
@@ -159,7 +152,7 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return <footer className="premium-footer">
-    <div className="footer-callout"><Image src="/nexus-icon.png" alt="Logo NexusNXS" width={72} height={72} unoptimized /><h2>Un solo NexusNXS.<br /><em>Ovunque tu sia.</em></h2><HardNavigationLink className="primary-button" href="/downloads">Esplora NexusNXS <ArrowUpRight size={15} /></HardNavigationLink></div>
+    <div className="footer-callout"><Image src="/nexus-icon.png" alt="" width={72} height={72} unoptimized /><h2>Un solo NexusNXS.<br /><em>Ovunque tu sia.</em></h2><HardNavigationLink className="primary-button" href="/downloads">Esplora NexusNXS <ArrowUpRight size={15} /></HardNavigationLink></div>
     <div className="footer-links"><div><strong>Prodotti</strong><HardNavigationLink href="/desktop">NexusNXS per PC</HardNavigationLink><HardNavigationLink href="/android">NexusNXS per Android</HardNavigationLink><HardNavigationLink href="/downloads">Download verificati</HardNavigationLink></div><div><strong>Fiducia</strong><HardNavigationLink href="/security">Trust Center</HardNavigationLink><HardNavigationLink href="/status">Stato servizi</HardNavigationLink><a href="mailto:security@nexusnxs.com">Segnala una vulnerabilità</a></div><div><strong>Informazioni</strong><HardNavigationLink href="/privacy">Privacy</HardNavigationLink><HardNavigationLink href="/terms">Termini d’uso</HardNavigationLink><a href="mailto:hello@nexusnxs.com">Contatti</a></div></div>
     <div className="footer-bottom"><span>© 2026 NEXUSNXS</span><span>PRIVACY-FIRST · MADE IN ITALY</span></div>
   </footer>;

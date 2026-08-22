@@ -20,9 +20,23 @@ const presenceStates = [
 
 export default function Home() {
   useEffect(() => {
-    const reveal = new IntersectionObserver((entries) => entries.forEach((entry) => entry.isIntersecting && entry.target.classList.add("is-visible")), { threshold: 0.16 });
-    document.querySelectorAll(".reveal").forEach((el) => reveal.observe(el));
-    return () => reveal.disconnect();
+    const elements = Array.from(document.querySelectorAll<HTMLElement>(".reveal"));
+    const reveal = new IntersectionObserver((entries, observer) => entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("is-visible");
+      observer.unobserve(entry.target);
+    }), { threshold: 0.12 });
+
+    elements.forEach((element) => {
+      if (element.getBoundingClientRect().top < window.innerHeight * .92) element.classList.add("is-visible");
+      else reveal.observe(element);
+    });
+    document.documentElement.classList.add("reveal-ready");
+
+    return () => {
+      reveal.disconnect();
+      document.documentElement.classList.remove("reveal-ready");
+    };
   }, []);
   return (
     <main id="main-content">

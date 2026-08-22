@@ -37,11 +37,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
 
-      - name: Verify registry signatures
-        run: npm audit signatures
+      - name: Install browser for accessibility and interaction tests
+        run: npx playwright install --with-deps chromium
 
-      - name: Audit dependencies
-        run: npm audit --audit-level=high --omit=optional
-
-      - name: Lint, type-check, build and test
-        run: npm test
+      - name: Run the complete release gate
+        run: npm run verify:release

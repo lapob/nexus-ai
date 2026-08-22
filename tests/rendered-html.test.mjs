@@ -88,7 +88,7 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
   assert.match(endpoints, /\/healthz/);
   assert.doesNotMatch(publicStatusSources, /api\.nexusnxs\.com/i);
   assert.match(statusHelper, /NEXUSNXS_AI_HEALTH_URL/);
-  assert.match(statusHelper, /STATUS_TTL_MS = 2_000/);
+  assert.match(statusHelper, /STATUS_TTL_MS = 10_000/);
   assert.match(statusHelper, /if \(pendingCheck\) return pendingCheck/);
   assert.match(statusHelper, /data\.status === "ok"/);
   assert.match(statusRoute, /checkNexusNxsAi/);
@@ -121,6 +121,9 @@ test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", asyn
 
   assert.match(chrome, /aria-expanded=\{open\}/);
   assert.match(chrome, /aria-controls="main-navigation"/);
+  assert.match(chrome, /aria-label=\{open \? "Chiudi navigazione" : "Apri navigazione"\}/);
+  assert.match(chrome, /className="nxs-menu-glyph"/);
+  assert.doesNotMatch(chrome, />\{open \? "CHIUDI" : "MENU"\}</);
   assert.match(chrome, /aria-busy=\{navigating\}/);
   assert.match(chrome, /event\.key === "Escape"/);
   assert.match(chrome, /setAttribute\("inert", ""\)/);
@@ -132,11 +135,15 @@ test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", asyn
   assert.match(layout, /id="site-content" tabIndex=\{-1\}/);
   assert.match(layout, /<noscript>/);
   assert.match(layout, /Navigazione principale senza JavaScript/);
-  assert.match(layout, /\.reveal\{opacity:1!important/);
+  assert.match(layout, /href="\/noscript\.css"/);
+  assert.doesNotMatch(layout, /<style>/);
   assert.match(navigationStyles, /@media \(max-width: 1024px\)/);
   assert.match(navigationStyles, /position: fixed;[\s\S]*inset: 0;[\s\S]*height: 100dvh/);
   assert.match(navigationStyles, /overflow-y: auto/);
   assert.match(navigationStyles, /env\(safe-area-inset-bottom\)/);
+  assert.match(navigationStyles, /width: 44px;[\s\S]*height: 44px;/);
+  assert.match(navigationStyles, /\.nxs-menu-toggle\[aria-expanded="true"\]/);
+  assert.match(navigationStyles, /font-size: clamp\(1\.3rem, 4\.8vw, 2\.1rem\)/);
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
   assert.match(globalStyles, /--font-geist-mono:ui-monospace,SFMono-Regular,Consolas/);
   assert.match(globalStyles, /\.card-top,\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);
@@ -254,6 +261,7 @@ test("ships a restrictive content security policy", async () => {
   const policy = response.headers.get("content-security-policy") ?? "";
   for (const directive of [
     "script-src-attr 'none'",
+    "style-src-attr 'none'",
     "worker-src 'self'",
     "manifest-src 'self'",
     "frame-src 'none'",
@@ -262,6 +270,19 @@ test("ships a restrictive content security policy", async () => {
     "frame-ancestors 'none'",
   ]) {
     assert.match(policy, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  assert.doesNotMatch(policy, /'unsafe-inline'/);
+  const scriptNonce = policy.match(/script-src 'self' 'nonce-([^']+)'/)?.[1];
+  const styleNonce = policy.match(/style-src 'self' 'nonce-([^']+)'/)?.[1];
+  assert.ok(scriptNonce);
+  assert.equal(styleNonce, scriptNonce);
+
+  const html = await response.text();
+  const executableTags = [...html.matchAll(/<(script|style)\b([^>]*)>/gi)];
+  assert.ok(executableTags.length > 0);
+  for (const [, tag, attributes] of executableTags) {
+    assert.match(attributes, new RegExp(`\\bnonce="${scriptNonce}"`), `${tag} must carry the response nonce`);
   }
 });
 

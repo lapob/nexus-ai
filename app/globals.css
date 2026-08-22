@@ -177,3 +177,236 @@ h1 em,h2 em{color:var(--cyan,#52eef0)}
     max-width: 100%;
   }
 }
+
+/* Modern minimal interface — compact scale, resilient reveal, NexusNXS identity */
+:root {
+  --nxs-display-size: clamp(3rem, 5.5vw, 4.5rem);
+  --nxs-page-title-size: clamp(2.625rem, 4.8vw, 4rem);
+  --nxs-section-title-size: clamp(2rem, 3.8vw, 3.25rem);
+  --nxs-copy-size: clamp(.9375rem, 1.2vw, 1.0625rem);
+  --nxs-section-space: clamp(4rem, 7vw, 6rem);
+}
+
+body {
+  font-size: 16px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.hero {
+  min-height: min(100svh, 52rem);
+  padding-top: clamp(8.5rem, 15vh, 10.5rem);
+  padding-bottom: 4rem;
+}
+
+.hero h1 {
+  width: min(100%, 13ch) !important;
+  margin-block: 1.25rem 1.5rem;
+  font-size: var(--nxs-display-size);
+  line-height: .96;
+  letter-spacing: -.052em;
+}
+
+.product-copy h1,
+.trust-hero h1,
+.download-hero h1,
+.status-hero h1,
+.legal-hero h1,
+.nexus-operational h1 {
+  font-size: var(--nxs-page-title-size);
+  line-height: .98;
+  letter-spacing: -.045em;
+}
+
+.manifesto-text {
+  font-size: clamp(2.25rem, 4vw, 3.75rem);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+}
+
+.section-heading h2,
+.security h2,
+.premium-footer h2,
+.presence-copy h2,
+.one-nexus-copy h2,
+.architecture-band h2,
+.data-flow h2,
+.release-notes h2,
+.uptime-panel h2,
+.verify-guide h2,
+.report-band h2,
+.status-note h2 {
+  font-size: var(--nxs-section-title-size);
+  line-height: 1.04;
+  letter-spacing: -.04em;
+}
+
+.hero-copy,
+.section-heading > p,
+.security-copy > p:not(.section-label),
+.presence-copy > p:last-child,
+.one-nexus-copy > p:not(.section-label),
+.product-copy > p,
+.trust-hero > div > p,
+.download-hero > p,
+.release-notes > p,
+.legal-layout p {
+  font-size: var(--nxs-copy-size);
+  line-height: 1.65;
+}
+
+.eyebrow,
+.section-label {
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: .14em;
+}
+
+.card-top,
+.platform,
+.app-card > a,
+.footer-bottom,
+.trust-line {
+  font-size: 10px !important;
+}
+
+.product-facts span,
+.feature-grid span,
+.control-grid > article > span {
+  color: #8d8794;
+  font-size: 10px;
+}
+
+.data-flow .section-label,
+.manifesto .section-label {
+  color: rgba(168, 200, 202, .74);
+}
+
+.service-list span,
+.service-list small {
+  color: #8d8794;
+  font-size: 10px;
+}
+
+.service-list b,
+.service-list .neutral {
+  color: #879a9d;
+  font-size: 10px;
+}
+
+.primary-button {
+  min-height: 48px;
+  gap: 14px;
+  padding: 0 18px;
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(39, 207, 210, .1);
+  transition: transform .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+.app-grid {
+  gap: clamp(14px, 2vw, 22px);
+  border: 0;
+  background: transparent;
+}
+
+.app-card {
+  min-height: 30rem;
+  border: 1px solid rgba(125, 224, 228, .09);
+  border-radius: 14px;
+  transition: transform .22s ease, border-color .22s ease, background-color .22s ease;
+}
+
+.app-card:hover {
+  border-color: rgba(82, 238, 240, .2);
+  transform: translateY(-3px);
+}
+
+.apps-section,
+.manifesto,
+.feature-section {
+  padding-top: var(--nxs-section-space);
+  padding-bottom: var(--nxs-section-space);
+}
+
+.presence-system,
+.one-nexus,
+.security,
+.release-list,
+.security-policies,
+.uptime-panel,
+.report-band,
+.status-note {
+  margin-bottom: var(--nxs-section-space);
+}
+
+.reveal {
+  opacity: 1;
+  transform: none;
+}
+
+html.reveal-ready .reveal:not(.is-visible) {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .55s ease, transform .55s cubic-bezier(.22, 1, .36, 1);
+}
+
+@media (hover: hover) {
+  .primary-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 15px 38px rgba(39, 207, 210, .14);
+  }
+}
+
+@media (max-width: 820px) {
+  :root {
+    --nxs-display-size: clamp(2.625rem, 12vw, 3.625rem);
+    --nxs-page-title-size: clamp(2.375rem, 10vw, 3.375rem);
+    --nxs-section-title-size: clamp(1.875rem, 8vw, 2.75rem);
+    --nxs-section-space: 4rem;
+  }
+
+  .hero {
+    min-height: auto;
+    padding-top: 7.5rem;
+    padding-bottom: 3.75rem;
+  }
+
+  .hero h1 {
+    width: min(100%, 12ch) !important;
+  }
+
+  .manifesto-text {
+    font-size: clamp(2rem, 8.8vw, 3rem);
+  }
+
+  .app-card {
+    min-height: 28rem;
+  }
+
+  .footer-callout {
+    gap: 22px;
+    padding-bottom: 3.75rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero-actions {
+    gap: 12px;
+  }
+
+  .product-copy h1,
+  .trust-hero h1,
+  .download-hero h1,
+  .status-hero h1,
+  .legal-hero h1,
+  .nexus-operational h1 {
+    overflow-wrap: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.reveal-ready .reveal:not(.is-visible) {
+    opacity: 1;
+    transform: none;
+  }
+}

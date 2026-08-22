@@ -1,0 +1,9 @@
+.nxs-header,
+.nexus-connectivity {
+  display: none !important;
+}
+
+.reveal {
+  opacity: 1 !important;
+  transform: none !important;
+}

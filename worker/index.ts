@@ -21,7 +21,22 @@ const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
   "www.nexusnxs.com",
 ]);
 
-function secureResponse(response: Response, url: URL, versionId?: string): Response {
+function createCspNonce(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+function contentSecurityPolicy(nonce: string): string {
+  return `default-src 'self'; script-src 'self' 'nonce-${nonce}'; script-src-attr 'none'; style-src 'self' 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
+}
+
+function requestWithSecurityPolicy(request: Request, nonce: string): Request {
+  const headers = new Headers(request.headers);
+  headers.set("Content-Security-Policy", contentSecurityPolicy(nonce));
+  headers.set("X-NexusNXS-CSP-Nonce", nonce);
+  return new Request(request, { headers });
+}
+
+function secureResponse(response: Response, url: URL, nonce: string, versionId?: string): Response {
   const secured = new Response(response.body, response);
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("X-Frame-Options", "DENY");
@@ -35,7 +50,7 @@ function secureResponse(response: Response, url: URL, versionId?: string): Respo
   if (versionId) {
     secured.headers.set("X-NexusNXS-Worker-Version", versionId);
   }
-  secured.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests");
+  secured.headers.set("Content-Security-Policy", contentSecurityPolicy(nonce));
   if (url.pathname === "/sw.js") {
     secured.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
     secured.headers.set("Service-Worker-Allowed", "/");
@@ -49,12 +64,15 @@ function secureResponse(response: Response, url: URL, versionId?: string): Respo
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const nonce = createCspNonce();
 
     if (NON_CANONICAL_PRODUCTION_HOSTNAMES.has(url.hostname)) {
       url.hostname = CANONICAL_HOSTNAME;
       url.protocol = "https:";
-      return secureResponse(Response.redirect(url, 308), url, env.CF_VERSION_METADATA?.id);
+      return secureResponse(Response.redirect(url, 308), url, nonce, env.CF_VERSION_METADATA?.id);
     }
+
+    const securedRequest = requestWithSecurityPolicy(request, nonce);
 
     const accept = request.headers.get("accept") ?? "";
     const isHtmlNavigation = request.method === "GET" && accept.includes("text/html");
@@ -63,16 +81,16 @@ const worker = {
     const isOperationalPath = url.pathname === "/status" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/.well-known/");
     if (env.NEXUSNXS_SITE_MODE === "maintenance" && isPageNavigation && !isOperationalPath && url.pathname !== "/maintenance") {
       const maintenanceUrl = new URL("/maintenance", request.url);
-      const rendered = await handler.fetch(new Request(maintenanceUrl, request), env, ctx);
+      const rendered = await handler.fetch(new Request(maintenanceUrl, securedRequest), env, ctx);
       const maintenance = new Response(rendered.body, { status: 503, headers: rendered.headers });
       maintenance.headers.set("Cache-Control", "no-store");
       maintenance.headers.set("Retry-After", "300");
       maintenance.headers.set("X-NexusNXS-State", "maintenance");
       maintenance.headers.set("X-Robots-Tag", "noindex, nofollow");
-      return secureResponse(maintenance, url, env.CF_VERSION_METADATA?.id);
+      return secureResponse(maintenance, url, nonce, env.CF_VERSION_METADATA?.id);
     }
 
-    return secureResponse(await handler.fetch(request, env, ctx), url, env.CF_VERSION_METADATA?.id);
+    return secureResponse(await handler.fetch(securedRequest, env, ctx), url, nonce, env.CF_VERSION_METADATA?.id);
   },
 };
 
