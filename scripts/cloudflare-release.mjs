@@ -110,7 +110,7 @@ function assertCleanSource() {
 }
 
 function verifyRelease() {
-  runNpm(["ci", "--ignore-scripts"]);
+  runNpm(["ls", "--depth=0"]);
   runNpm(["run", "verify:release"]);
 }
 

@@ -47,6 +47,10 @@ vulnerabilità delle dipendenze, lint, TypeScript, build pulita, test del Worker
 dry-run dell'artefatto Cloudflare. Ogni build elimina prima `dist`, così nessun
 metadato di hosting obsoleto può sopravvivere.
 
+`npm ci --ignore-scripts` appartiene alla preparazione dell'ambiente o alla CI,
+non alla promozione: la release valida l'albero installato con `npm ls` senza
+sostituire moduli mentre un server locale può essere in esecuzione.
+
 ## Rilascio controllato
 
 Il primo trasferimento usa fasi separate. Il bootstrap si esegue una sola volta,

@@ -63,6 +63,8 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
 
   assert.doesNotMatch(releaseScript, /spawnSync\(["'](?:npm|npx)\.cmd|shell:\s*true/);
   assert.match(releaseScript, /process\.env\.npm_execpath/);
+  assert.match(releaseScript, /runNpm\(\["ls", "--depth=0"\]\)/);
+  assert.doesNotMatch(releaseScript, /runNpm\(\["ci"/);
   assert.match(releaseScript, /node_modules["'], "wrangler["'], "bin["'], "wrangler\.js/);
   assert.match(releaseScript, /delete environment\.CLOUDFLARE_API_TOKEN/);
   assert.match(releaseScript, /await rm\(outputPath, \{ force: true \}\)/);
