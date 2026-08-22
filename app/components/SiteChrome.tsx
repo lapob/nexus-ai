@@ -150,9 +150,9 @@ export function SiteHeader() {
   </header>;
 }
 
-export function SiteFooter() {
+export function SiteFooter({ ctaHref = "/downloads", ctaLabel = "Esplora NexusNXS" }: { ctaHref?: string; ctaLabel?: string } = {}) {
   return <footer className="premium-footer">
-    <div className="footer-callout"><Image src="/nexus-icon.png" alt="" width={72} height={72} unoptimized /><h2>Un solo NexusNXS.<br /><em>Ovunque tu sia.</em></h2><HardNavigationLink className="primary-button" href="/downloads">Esplora NexusNXS <ArrowUpRight size={15} /></HardNavigationLink></div>
+    <div className="footer-callout"><Image src="/nexus-icon.png" alt="" width={72} height={72} unoptimized /><h2>Un solo NexusNXS.<br /><em>Ovunque tu sia.</em></h2><HardNavigationLink className="primary-button" href={ctaHref}>{ctaLabel} <ArrowUpRight size={15} /></HardNavigationLink></div>
     <div className="footer-links"><div><strong>Prodotti</strong><HardNavigationLink href="/desktop">NexusNXS per PC</HardNavigationLink><HardNavigationLink href="/android">NexusNXS per Android</HardNavigationLink><HardNavigationLink href="/downloads">Download verificati</HardNavigationLink></div><div><strong>Fiducia</strong><HardNavigationLink href="/security">Trust Center</HardNavigationLink><HardNavigationLink href="/status">Stato servizi</HardNavigationLink><a href="mailto:security@nexusnxs.com">Segnala una vulnerabilità</a></div><div><strong>Informazioni</strong><HardNavigationLink href="/privacy">Privacy</HardNavigationLink><HardNavigationLink href="/terms">Termini d’uso</HardNavigationLink><a href="mailto:hello@nexusnxs.com">Contatti</a></div></div>
     <div className="footer-bottom"><span>© 2026 NEXUSNXS</span><span>PRIVACY-FIRST · MADE IN ITALY</span></div>
   </footer>;

@@ -12,8 +12,36 @@ export const metadata: Metadata = {
 };
 
 const releases = [
-  { Icon: Laptop, name: "NexusNXS per PC", version: "0.3.5", platform: "Windows 11 · x64", size: "CON LA RELEASE", date: "Release candidate", state: "FIRMA RICHIESTA", text: "Assistente AI connesso per Windows con voce e strumenti locali.", requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati." },
-  { Icon: Smartphone, name: "NexusNXS per Android", version: "5.24.0", platform: "Android 10+", size: "CON LA RELEASE", date: "Release candidate", state: "VALIDAZIONE IN CORSO", text: "Esperienza mobile nativa per conversazioni e continuità.", requirements: "Android 10 o successivo e connessione ai servizi NexusNXS." },
+  {
+    Icon: Laptop,
+    name: "NexusNXS per PC",
+    version: "0.3.5",
+    platform: "Windows 11 · x64",
+    size: "868,81 MiB · 911.011.136 byte",
+    date: "22 agosto 2026",
+    state: "PREVIEW · NON FIRMATA",
+    text: "Assistente AI connesso per Windows con voce e strumenti locali.",
+    requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
+    warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
+    action: "Scarica per Windows",
+    sha256: "FCDC7F24B8FA717523054EF18E04644DC12FDD01E13DD4E981693641D32B1657",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.5-preview.1/NexusNXS-0.3.5-Setup.exe",
+  },
+  {
+    Icon: Smartphone,
+    name: "NexusNXS per Android",
+    version: "5.24.0",
+    platform: "Android 10+",
+    size: "1,58 MiB · 1.660.988 byte",
+    date: "22 agosto 2026",
+    state: "PREVIEW · FIRMA DEBUG",
+    text: "Esperienza mobile nativa per conversazioni e continuità.",
+    requirements: "Android 10 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
+    warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
+    action: "Scarica per Android",
+    sha256: "99E14662DC7C063CB7CDD89F30B1C60997612B64F835061478597ED175A7BF1E",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.5-preview.1/NexusNXS-Android-5.24.0.apk",
+  },
 ];
 
 export default function Downloads() {
@@ -22,8 +50,8 @@ export default function Downloads() {
       <div className="download-brand"><Image src="/nexus-icon.png" alt="Logo NexusNXS" width={92} height={92} priority unoptimized /><span>NEXUSNXS</span></div>
       <p className="eyebrow"><Download size={14} /> DOWNLOAD CENTER</p>
       <h1>Software autentico.<br /><em>Origine verificabile.</em></h1>
-      <p>Ogni file pubblico dovrà superare firma, controllo dell’integrità e verifica del canale di distribuzione. Nessuna build interna viene presentata come release.</p>
-      <div className="release-policy"><ShieldAlert size={18} /><span><strong>Canale pubblico protetto</strong> — i download restano disattivati finché firma e impronta non sono disponibili.</span></div>
+      <p>Ogni file pubblico espone versione, dimensione, stato della firma e impronta crittografica. Queste build sono anteprime autorizzate e non vengono presentate come release firmate.</p>
+      <div className="release-policy"><ShieldAlert size={18} /><span><strong>Preview non firmate</strong> — verifica sempre l’impronta SHA-256 prima dell’installazione. Le firme di produzione arriveranno in una release successiva.</span></div>
     </section>
     <section className="release-list" aria-label="Release NexusNXS">
       {releases.map(({ Icon, ...release }) => <article key={release.name}>
@@ -36,17 +64,20 @@ export default function Downloads() {
           <div><dt>Build</dt><dd>{release.date}</dd></div>
         </dl>
         <p className="release-requirements"><HardDrive size={15} /> {release.requirements}</p>
-        <button disabled aria-describedby={`${release.version}-reason`}>Download non ancora pubblico</button>
-        <small id={`${release.version}-reason`}>Firma e SHA-256 saranno pubblicati insieme al file.</small>
+        <p className="release-hash"><span>SHA-256</span><code>{release.sha256}</code></p>
+        <div className="release-actions">
+          <a className="release-download" href={release.url} rel="noreferrer" aria-describedby={`${release.version}-reason`}>{release.action} <Download size={15} /></a>
+          <small id={`${release.version}-reason`}>{release.warning}</small>
+        </div>
       </article>)}
     </section>
     <section className="verify-guide">
       <div><FileCheck2 /><h2>Come verificare una release</h2></div>
-      <ol><li><span>01</span>Scarica soltanto da <strong>nexusnxs.com</strong>.</li><li><span>02</span>Controlla editore e firma digitale.</li><li><span>03</span>Confronta l’impronta SHA-256 pubblicata.</li></ol>
-      <div className="hash-preview"><Copy size={16} /><code>SHA-256 · PUBBLICATO CON LA RELEASE</code></div>
-      <p><BadgeCheck /> Le release pubbliche non utilizzeranno certificati Debug.</p>
+      <ol><li><span>01</span>Avvia il download da <strong>nexusnxs.com</strong>; il file è ospitato nella release GitHub ufficiale.</li><li><span>02</span>Leggi lo stato della firma e gli avvisi della piattaforma.</li><li><span>03</span>Confronta l’impronta SHA-256 completa prima di eseguire il file.</li></ol>
+      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.5-Setup.exe -Algorithm SHA256</code></div>
+      <p><BadgeCheck /> Versioni, avvisi e impronte sono pubblicati insieme ai file.</p>
     </section>
-    <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>Changelog, problemi noti e versioni supportate compariranno qui insieme alla prima release pubblica verificata. Fino ad allora, lo stato resta deliberatamente trasparente.</p></section>
-    <SiteFooter />
+    <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili i client PC e Android con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>
+    <SiteFooter ctaHref="/#apps" ctaLabel="Scopri le applicazioni" />
   </main>;
 }
