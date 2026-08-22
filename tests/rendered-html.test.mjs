@@ -51,11 +51,7 @@ test("keeps production metadata and portable scripts", async () => {
 });
 
 test("redirects every known production alias to nexusnxs.com", async () => {
-  for (const hostname of [
-    "www.nexusnxs.com",
-    "nexus-software-studio.nexuspers.chatgpt.site",
-    "nexus-ai-personale.nexuswork.chatgpt.site",
-  ]) {
+  for (const hostname of ["www.nexusnxs.com"]) {
     const response = await fetchWorker(`https://${hostname}/downloads?source=legacy`);
     assert.equal(response.status, 308);
     assert.equal(response.headers.get("location"), "https://nexusnxs.com/downloads?source=legacy");
@@ -74,6 +70,8 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
   assert.match(endpoints, /\/healthz/);
   assert.doesNotMatch(publicStatusSources, /api\.nexusnxs\.com/i);
   assert.match(statusHelper, /NEXUSNXS_AI_HEALTH_URL/);
+  assert.match(statusHelper, /STATUS_TTL_MS = 2_000/);
+  assert.match(statusHelper, /if \(pendingCheck\) return pendingCheck/);
   assert.match(statusHelper, /data\.status === "ok"/);
   assert.match(statusRoute, /checkNexusNxsAi/);
   assert.match(statusPage, /checkNexusNxsAi/);
@@ -160,6 +158,9 @@ test("switches HTML navigations to maintenance without hiding operational routes
   });
   assert.equal(legacy.status, 308);
   assert.equal(legacy.headers.get("location"), "https://nexusnxs.com/downloads");
+  assert.equal(legacy.headers.get("strict-transport-security"), "max-age=63072000; includeSubDomains; preload");
+  assert.equal(legacy.headers.get("x-content-type-options"), "nosniff");
+  assert.match(legacy.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
 
   const rscNavigation = await fetchWorker("https://nexusnxs.com/android?_rsc=maintenance-check", {
     env: { NEXUSNXS_SITE_MODE: "maintenance" },
@@ -191,8 +192,11 @@ test("ports the deterministic NexusNXS presence and caches only its offline shel
   assert.match(component, /data-nexus-presence/);
   assert.match(runtime, /useEffect/);
   assert.match(offline, /Server NexusNXS[\s\S]*non raggiungibili/);
+  assert.match(offline, /<body class="nexus-operational-body">/);
+  assert.doesNotMatch(offline, /<body[^>]+style=/);
   assert.match(serviceWorker, /OFFLINE_RESOURCES/);
   assert.match(serviceWorker, /request\.mode !== "navigate"/);
+  assert.match(serviceWorker, /key\.startsWith\("nexusnxs-operational-"\)/);
   assert.doesNotMatch(serviceWorker, /cache\.put\(request/);
 });
 
@@ -204,5 +208,30 @@ test("prevents service-worker staleness", async () => {
   const registration = await readFile(new URL("../public/register-sw.js", import.meta.url), "utf8");
   assert.match(registration, /hostname === "nexusnxs\.com"/);
   assert.match(registration, /getRegistrations\(\)/);
+  assert.match(registration, /key\.startsWith\("nexusnxs-operational-"\)/);
   assert.doesNotMatch(registration, /hostname === "localhost"/);
+});
+
+test("ships a restrictive content security policy", async () => {
+  const response = await fetchWorker("https://nexusnxs.com/", { headers: { accept: "text/html" } });
+  const policy = response.headers.get("content-security-policy") ?? "";
+  for (const directive of [
+    "script-src-attr 'none'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "frame-src 'none'",
+    "media-src 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+  ]) {
+    assert.match(policy, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("keeps Cloudflare previews out of search indexes", async () => {
+  const response = await fetchWorker("https://candidate-nexusnxs-site.example.workers.dev/", {
+    headers: { accept: "text/html" },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 });

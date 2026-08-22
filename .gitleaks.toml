@@ -1,0 +1,13 @@
+title = "NexusNXS site secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated site output and dependencies"
+paths = [
+  '''(^|[\\/])node_modules([\\/]|$)''',
+  '''(^|[\\/])dist([\\/]|$)''',
+  '''(^|[\\/])\.vinext([\\/]|$)''',
+  '''(^|[\\/])\.wrangler([\\/]|$)'''
+]

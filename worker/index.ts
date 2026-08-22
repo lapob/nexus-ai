@@ -14,11 +14,9 @@ interface ExecutionContext {
 const CANONICAL_HOSTNAME = "nexusnxs.com";
 const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
   "www.nexusnxs.com",
-  "nexus-software-studio.nexuspers.chatgpt.site",
-  "nexus-ai-personale.nexuswork.chatgpt.site",
 ]);
 
-function secureResponse(response: Response, pathname: string): Response {
+function secureResponse(response: Response, url: URL): Response {
   const secured = new Response(response.body, response);
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("X-Frame-Options", "DENY");
@@ -29,10 +27,13 @@ function secureResponse(response: Response, pathname: string): Response {
   secured.headers.set("Origin-Agent-Cluster", "?1");
   secured.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   secured.headers.set("X-Permitted-Cross-Domain-Policies", "none");
-  secured.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests");
-  if (pathname === "/sw.js") {
+  secured.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests");
+  if (url.pathname === "/sw.js") {
     secured.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
     secured.headers.set("Service-Worker-Allowed", "/");
+  }
+  if (url.hostname.endsWith(".workers.dev")) {
+    secured.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   return secured;
 }
@@ -44,7 +45,7 @@ const worker = {
     if (NON_CANONICAL_PRODUCTION_HOSTNAMES.has(url.hostname)) {
       url.hostname = CANONICAL_HOSTNAME;
       url.protocol = "https:";
-      return Response.redirect(url, 308);
+      return secureResponse(Response.redirect(url, 308), url);
     }
 
     const accept = request.headers.get("accept") ?? "";
@@ -60,10 +61,10 @@ const worker = {
       maintenance.headers.set("Retry-After", "300");
       maintenance.headers.set("X-NexusNXS-State", "maintenance");
       maintenance.headers.set("X-Robots-Tag", "noindex, nofollow");
-      return secureResponse(maintenance, url.pathname);
+      return secureResponse(maintenance, url);
     }
 
-    return secureResponse(await handler.fetch(request, env, ctx), url.pathname);
+    return secureResponse(await handler.fetch(request, env, ctx), url);
   },
 };
 

@@ -1,14 +1,8 @@
-import { sites } from "@openai/sites-vite-plugin";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 
-// macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
-const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
-
-const localBindingConfig = {
-  main: "./worker/index.ts",
-  compatibility_flags: ["nodejs_compat"],
-};
+// Restricted macOS preview sandboxes block FSEvents, so HMR uses polling.
+const isRestrictedPreviewSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
 export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
@@ -21,15 +15,13 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    server: isCodexSeatbeltSandbox
+    server: isRestrictedPreviewSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
     plugins: [
       vinext(),
-      sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
       }),
     ],
   };

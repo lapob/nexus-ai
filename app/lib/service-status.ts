@@ -1,6 +1,17 @@
 import { NEXUSNXS_AI_HEALTH_URL } from "./service-endpoints";
 
-export async function checkNexusNxsAi() {
+type NexusNxsAiStatus = {
+  online: boolean;
+  latencyMs: number | null;
+  checkedAt: Date;
+};
+
+const STATUS_TTL_MS = 2_000;
+let cachedStatus: NexusNxsAiStatus | null = null;
+let cachedUntil = 0;
+let pendingCheck: Promise<NexusNxsAiStatus> | null = null;
+
+async function probeNexusNxsAi(): Promise<NexusNxsAiStatus> {
   const started = Date.now();
   const checkedAt = new Date();
 
@@ -18,4 +29,21 @@ export async function checkNexusNxsAi() {
   } catch {
     return { online: false, latencyMs: null, checkedAt };
   }
+}
+
+export async function checkNexusNxsAi(): Promise<NexusNxsAiStatus> {
+  if (cachedStatus && Date.now() < cachedUntil) return cachedStatus;
+  if (pendingCheck) return pendingCheck;
+
+  pendingCheck = probeNexusNxsAi()
+    .then((status) => {
+      cachedStatus = status;
+      cachedUntil = Date.now() + STATUS_TTL_MS;
+      return status;
+    })
+    .finally(() => {
+      pendingCheck = null;
+    });
+
+  return pendingCheck;
 }

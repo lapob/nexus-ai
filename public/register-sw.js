@@ -13,7 +13,12 @@
           .some((worker) => worker?.scriptURL.endsWith("/sw.js")),
       );
       await Promise.all(nexusRegistrations.map((registration) => registration.unregister()));
-      await globalThis.caches?.delete("nexusnxs-operational-v1");
+      const cacheKeys = await globalThis.caches?.keys?.() ?? [];
+      await Promise.all(
+        cacheKeys
+          .filter((key) => key.startsWith("nexusnxs-operational-"))
+          .map((key) => globalThis.caches.delete(key)),
+      );
     });
     return;
   }
