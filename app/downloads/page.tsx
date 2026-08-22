@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 };
 
 const releases = [
-  { Icon: Laptop, name: "NexusNXS per PC", version: "0.3.5", platform: "Windows 11 · x64", size: "1,02 GB", date: "12 agosto 2026", state: "FIRMA RICHIESTA", text: "Assistente AI locale completo per Windows.", requirements: "Windows 11, 16 GB RAM consigliati, 8 GB di spazio libero." },
-  { Icon: Smartphone, name: "NexusNXS per Android", version: "5.24.0", platform: "Android 10+", size: "12,0 MB", date: "20 agosto 2026", state: "VALIDAZIONE IN CORSO", text: "Esperienza mobile nativa per conversazioni e continuità.", requirements: "Android 10 o successivo e connessione alla propria istanza NexusNXS." },
+  { Icon: Laptop, name: "NexusNXS per PC", version: "0.3.5", platform: "Windows 11 · x64", size: "CON LA RELEASE", date: "Release candidate", state: "FIRMA RICHIESTA", text: "Assistente AI connesso per Windows con voce e strumenti locali.", requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero." },
+  { Icon: Smartphone, name: "NexusNXS per Android", version: "5.24.0", platform: "Android 10+", size: "CON LA RELEASE", date: "Release candidate", state: "VALIDAZIONE IN CORSO", text: "Esperienza mobile nativa per conversazioni e continuità.", requirements: "Android 10 o successivo e connessione ai servizi NexusNXS." },
 ];
 
 export default function Downloads() {

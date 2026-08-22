@@ -11,8 +11,8 @@ export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" }
 
 export function generateMetadata(): Metadata {
   const origin = "https://nexusnxs.com";
-  const title = "NexusNXS — AI locale, privata e connessa";
-  const description = "AI locale per PC e Android, con una sola istanza privata, accessi revocabili e continuità cifrata.";
+  const title = "NexusNXS — AI privata, protetta e connessa";
+  const description = "AI per PC e Android, con NexusNXS Core, accessi revocabili e continuità protetta tra dispositivi.";
   return {
     metadataBase: new URL("https://nexusnxs.com"),
     title,
@@ -28,7 +28,7 @@ export function generateMetadata(): Metadata {
       shortcut: "/nexus-icon.png?v=nexusnxs-2",
       apple: [{ url: "/nexus-icon.png?v=nexusnxs-2", sizes: "1024x1024", type: "image/png" }],
     },
-    openGraph: { title, description, type: "website", url: origin, siteName: "NexusNXS", locale: "it_IT", images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "NexusNXS — AI locale, privata e connessa" }] },
+    openGraph: { title, description, type: "website", url: origin, siteName: "NexusNXS", locale: "it_IT", images: [{ url: `${origin}/og.png`, width: 1672, height: 941, alt: "NexusNXS — AI privata, protetta e connessa" }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
   };
 }

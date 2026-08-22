@@ -7,7 +7,7 @@ import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
 
 const apps = [
-  { index: "01", name: "NexusNXS per PC", platform: "Windows · AI locale", description: "Il centro intelligente della tua istanza: modelli locali, voce, progetti e azioni approvate sul computer.", accent: "cyan", href: "/desktop", Icon: Workflow },
+  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", href: "/desktop", Icon: Workflow },
   { index: "02", name: "NexusNXS per Android", platform: "Android · Continuità cifrata", description: "La stessa presenza NexusNXS in movimento, con sessioni protette, pairing revocabile e continuità reale.", accent: "teal", href: "/android", Icon: KeyRound },
 ];
 
@@ -29,11 +29,11 @@ export default function Home() {
       <StructuredData data={[{"@context":"https://schema.org","@type":"WebSite",name:"NexusNXS",url:"https://nexusnxs.com",inLanguage:"it-IT"},{"@context":"https://schema.org","@type":"Organization",name:"NexusNXS",url:"https://nexusnxs.com",logo:"https://nexusnxs.com/nexus-icon.png",email:"hello@nexusnxs.com"}]} />
       <section className="hero" id="top">
         <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
-        <p className="eyebrow"><Sparkles size={13} strokeWidth={1.5} /> NEXUSNXS · AI LOCALE, PRIVATA, CONNESSA</p>
+        <p className="eyebrow"><Sparkles size={13} strokeWidth={1.5} /> NEXUSNXS · AI PRIVATA, PROTETTA, CONNESSA</p>
         <h1>La tua intelligenza.<br /><em>Un solo NexusNXS.</em></h1>
-        <p className="hero-copy">Un’unica istanza intelligente tra PC e Android. Modelli locali, voce, progetti e continuità cifrata, con i tuoi dati sotto il tuo controllo.</p>
+        <p className="hero-copy">Un’unica intelligenza tra PC e Android. NexusNXS Core, voce, progetti e continuità protetta, con impostazioni e cronologia sotto il tuo controllo.</p>
         <div className="hero-actions"><a className="primary-button" href="#apps">Esplora NexusNXS <ArrowUpRight size={15} /></a><HardNavigationLink className="text-link" href="/security">Apri il Trust Center <span>→</span></HardNavigationLink></div>
-        <div className="trust-line"><span><Fingerprint size={13} /> AI LOCALE</span><span><ShieldCheck size={13} /> ACCESSI REVOCABILI</span><span><Blocks size={13} /> CONTINUITÀ CIFRATA</span></div>
+        <div className="trust-line"><span><Fingerprint size={13} /> AI CONNESSA</span><span><ShieldCheck size={13} /> ACCESSI REVOCABILI</span><span><Blocks size={13} /> CONTINUITÀ PROTETTA</span></div>
         <div className="scroll-cue" aria-hidden="true">SCORRI <i /></div>
       </section>
       <section className="manifesto reveal" id="vision"><p className="section-label">/ 01 — LA PRESENZA</p><p className="manifesto-text">NexusNXS non è un insieme di app separate. È <strong>una sola intelligenza privata</strong> che continua tra i tuoi dispositivi.</p></section>

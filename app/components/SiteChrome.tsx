@@ -147,7 +147,7 @@ export function SiteHeader() {
       </div>
       <div className="nxs-nav__footer">
         <span className={online === false ? "nxs-nav__status is-offline" : "nxs-nav__status"} aria-live="polite"><i aria-hidden="true" />{navigating ? "APERTURA PAGINA" : networkLabel}</span>
-        <span>AI LOCALE · PRIVATA · CONNESSA</span>
+        <span>AI PRIVATA · PROTETTA · CONNESSA</span>
       </div>
     </nav>
 
@@ -166,5 +166,5 @@ export function SiteFooter() {
 }
 
 export function ProductMockup({ type }: { type: "desktop" | "android" }) {
-  return <div className={`product-mockup ${type}`} aria-hidden="true"><div className="mockup-glow" /><div className="device-frame"><div className="device-bar"><i /><i /><i /><span>NEXUSNXS / {type.toUpperCase()}</span></div><div className="device-content"><div className="mini-sidebar"><b>N</b><i /><i /><i /></div><div className="mini-main"><div className="mini-orb"><i/><i/><i/><span/></div><small>NEXUSNXS CORE · PRONTO</small><p>Come posso aiutarti?</p><span>AI locale, privata e connessa alla tua istanza.</span><div className="mini-input"><span>Chiedi a NexusNXS</span><i/></div></div></div></div></div>;
+  return <div className={`product-mockup ${type}`} aria-hidden="true"><div className="mockup-glow" /><div className="device-frame"><div className="device-bar"><i /><i /><i /><span>NEXUSNXS / {type.toUpperCase()}</span></div><div className="device-content"><div className="mini-sidebar"><b>N</b><i /><i /><i /></div><div className="mini-main"><div className="mini-orb"><i/><i/><i/><span/></div><small>NEXUSNXS CORE · PRONTO</small><p>Come posso aiutarti?</p><span>AI privata, protetta e connessa al Core.</span><div className="mini-input"><span>Chiedi a NexusNXS</span><i/></div></div></div></div></div>;
 }

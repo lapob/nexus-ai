@@ -1,4 +1,4 @@
-const CACHE_NAME = "nexusnxs-operational-v1";
+const CACHE_NAME = "nexusnxs-operational-v2";
 const OFFLINE_RESOURCES = [
   "/offline.html",
   "/nexus-operational.css",

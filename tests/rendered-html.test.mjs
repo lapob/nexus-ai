@@ -25,7 +25,7 @@ test("server-renders the NexusNXS public homepage", async () => {
   assert.match(html, /<html lang="it">/i);
   assert.match(html, /NEXUSNXS/);
   assert.match(html, /La tua intelligenza/);
-  assert.match(html, /AI LOCALE, PRIVATA, CONNESSA/);
+  assert.match(html, /AI PRIVATA, PROTETTA, CONNESSA/);
   assert.match(html, /STATI COMPRENSIBILI/);
   assert.match(html, /Trust Center/);
   assert.match(html, /NexusNXS per PC/);
@@ -40,7 +40,7 @@ test("keeps production metadata and portable scripts", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(layout, /NexusNXS — AI locale, privata e connessa/);
+  assert.match(layout, /NexusNXS — AI privata, protetta e connessa/);
   assert.match(layout, /https:\/\/nexusnxs\.com/);
   assert.match(layout, /manifest\.webmanifest/);
   assert.match(layout, /<html lang="it">/);
@@ -213,6 +213,7 @@ test("ports the deterministic NexusNXS presence and caches only its offline shel
   assert.match(offline, /<body class="nexus-operational-body">/);
   assert.doesNotMatch(offline, /<body[^>]+style=/);
   assert.match(serviceWorker, /OFFLINE_RESOURCES/);
+  assert.match(serviceWorker, /nexusnxs-operational-v2/);
   assert.match(serviceWorker, /request\.mode !== "navigate"/);
   assert.match(serviceWorker, /key\.startsWith\("nexusnxs-operational-"\)/);
   assert.doesNotMatch(serviceWorker, /cache\.put\(request/);
