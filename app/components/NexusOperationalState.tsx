@@ -81,7 +81,7 @@ export function NexusOperationalState({
       data-nexus-state={state}
       role={urgent ? "alert" : "status"}
       aria-live={urgent ? "assertive" : "polite"}
-      aria-busy={state === "loading" || state === "reconnecting" || state === "maintenance"}
+      aria-busy={state === "loading" || state === "reconnecting"}
     >
       <NexusPresence state={state} />
       <div className="nexus-operational__copy">

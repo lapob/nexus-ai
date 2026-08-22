@@ -283,9 +283,24 @@
 @keyframes nexus-phase-breathe { 50% { opacity: .58; box-shadow: 0 0 .35rem color-mix(in srgb, var(--nexus-state-accent) 18%, transparent); } }
 
 @media (max-width: 760px) {
-  .nexus-operational { grid-template-columns: 1fr; gap: 1.5rem; }
+  .nexus-operational {
+    min-width: 0;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
   .nexus-presence { min-height: clamp(16rem, 66vw, 23rem); }
-  .nexus-operational__copy { text-align: center; margin-inline: auto; }
+  .nexus-operational__copy {
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+    margin-inline: auto;
+  }
+  .nexus-operational h1 {
+    max-width: 100%;
+    font-size: clamp(2rem, 10vw, 3.25rem);
+    overflow-wrap: anywhere;
+  }
   .nexus-operational__eyebrow, .nexus-operational__actions { justify-content: center; }
   .nexus-operational__copy > p:not(.nexus-operational__eyebrow) { margin-inline: auto; }
   .status-hero .status-presence { position: relative; inset: auto; margin: 0 0 1rem auto; }

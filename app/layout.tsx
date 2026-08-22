@@ -47,7 +47,7 @@ export default function RootLayout({
         <script src="/register-sw.js" defer />
       </head>
       <body>
-        <a className="skip-link" href="#main-content">Vai al contenuto</a>
+        <a className="skip-link" href="#site-content">Vai al contenuto</a>
         <SiteHeader />
         <noscript>
           <style>{`.nxs-header,.nexus-connectivity{display:none!important}.reveal{opacity:1!important;transform:none!important}`}</style>
@@ -59,7 +59,7 @@ export default function RootLayout({
             </div>
           </nav>
         </noscript>
-        <div id="site-content">{children}</div>
+        <div id="site-content" tabIndex={-1}>{children}</div>
         <ConnectivityPresence />
         <NexusPresenceRuntime />
       </body>

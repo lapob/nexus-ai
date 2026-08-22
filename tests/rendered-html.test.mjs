@@ -94,10 +94,11 @@ test("renders every public route with one shared, complete navigation", async ()
 });
 
 test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", async () => {
-  const [chrome, navigationStyles, layout] = await Promise.all([
+  const [chrome, navigationStyles, layout, globalStyles] = await Promise.all([
     readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/navigation.css", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(chrome, /aria-expanded=\{open\}/);
@@ -109,6 +110,8 @@ test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", asyn
   assert.match(chrome, /\[aria-current="page"\]/);
   assert.match(chrome, /matchMedia\("\(min-width: 1025px\)"\)/);
   assert.match(layout, /id="site-content"/);
+  assert.match(layout, /href="#site-content"/);
+  assert.match(layout, /id="site-content" tabIndex=\{-1\}/);
   assert.match(layout, /<noscript>/);
   assert.match(layout, /Navigazione principale senza JavaScript/);
   assert.match(layout, /\.reveal\{opacity:1!important/);
@@ -117,6 +120,12 @@ test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", asyn
   assert.match(navigationStyles, /overflow-y: auto/);
   assert.match(navigationStyles, /env\(safe-area-inset-bottom\)/);
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
+  assert.match(globalStyles, /--font-geist-mono:ui-monospace,SFMono-Regular,Consolas/);
+  assert.match(globalStyles, /\.card-top,\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);
+  assert.match(globalStyles, /\.presence-grid small\{color:rgba\(176,210,214,\.60\)\}/);
+  assert.match(globalStyles, /\.trust-hero > \*,[\s\S]*\.data-flow > \*[\s\S]*min-width: 0/);
+  assert.match(globalStyles, /\.trust-hero h1,[\s\S]*\.data-flow h2[\s\S]*overflow-wrap: anywhere/);
+  assert.match(globalStyles, /\.trust-seal \{[\s\S]*width: min\(100%, 18rem\)/);
 });
 
 test("renders NexusNXS-owned maintenance and not-found states", async () => {
@@ -127,6 +136,7 @@ test("renders NexusNXS-owned maintenance and not-found states", async () => {
   assert.equal(maintenance.status, 200);
   const maintenanceHtml = await maintenance.text();
   assert.match(maintenanceHtml, /data-nexus-state="maintenance"/);
+  assert.match(maintenanceHtml, /aria-busy="false"/);
   assert.match(maintenanceHtml, /WORK IN CORSO/);
   assert.match(maintenanceHtml, /Sto lavorando/);
 
@@ -134,6 +144,11 @@ test("renders NexusNXS-owned maintenance and not-found states", async () => {
   const missingHtml = await missing.text();
   assert.match(missingHtml, /data-nexus-state="not-found"/);
   assert.match(missingHtml, /NEXUSNXS · 404/);
+  assert.match(missingHtml, /<title>Pagina non trovata — NexusNXS<\/title>/);
+  assert.match(missingHtml, /<meta name="robots" content="noindex"\s*\/?>/);
+  assert.equal((missingHtml.match(/rel="canonical"/g) ?? []).length, 1);
+  assert.match(missingHtml, /<link rel="canonical" href="https:\/\/nexusnxs\.com\/404"\s*\/?>/);
+  assert.doesNotMatch(missingHtml, /<link rel="canonical" href="https:\/\/nexusnxs\.com\/"\s*\/?>/);
 });
 
 test("switches HTML navigations to maintenance without hiding operational routes", async () => {
@@ -189,6 +204,9 @@ test("ports the deterministic NexusNXS presence and caches only its offline shel
   }
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /nexus-presence-orbit 5\.2s/);
+  assert.match(styles, /grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(styles, /font-size: clamp\(2rem, 10vw, 3\.25rem\)/);
+  assert.match(styles, /overflow-wrap: anywhere/);
   assert.match(component, /data-nexus-presence/);
   assert.match(runtime, /useEffect/);
   assert.match(offline, /Server NexusNXS[\s\S]*non raggiungibili/);

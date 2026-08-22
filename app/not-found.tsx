@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { NexusOperationalState } from "./components/NexusOperationalState";
 import { HardNavigationLink } from "./components/HardNavigationLink";
+
+export const metadata: Metadata = {
+  title: "Pagina non trovata — NexusNXS",
+  description: "La pagina richiesta non appartiene al percorso pubblico NexusNXS oppure è stata spostata.",
+  alternates: { canonical: "/404" },
+};
 
 export default function NotFound() {
   return (
