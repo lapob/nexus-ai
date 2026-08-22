@@ -1,19 +1,35 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  CLOUDFLARE_ACCOUNT_ID,
+  resolveAccountToken,
+} from "./cloudflare-credential.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const statePath = resolve(root, ".wrangler", "release-candidate.json");
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 const git = process.platform === "win32" ? "git.exe" : "git";
+const npmCli = process.env.npm_execpath;
+const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const workerName = "nexusnxs-site";
+const productionHostnames = ["www.nexusnxs.com", "nexusnxs.com"];
+let accountToken;
+
+function childEnvironment(extra = {}) {
+  const environment = { ...process.env, NO_COLOR: "1", ...extra };
+  delete environment.CLOUDFLARE_API_TOKEN;
+  if (extra.CLOUDFLARE_API_TOKEN) {
+    environment.CLOUDFLARE_API_TOKEN = extra.CLOUDFLARE_API_TOKEN;
+  }
+  return environment;
+}
 
 function run(command, args, { capture = false, allowFailure = false, env = {} } = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1", ...env },
+    env: childEnvironment(env),
     stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
   });
   if (result.error) throw result.error;
@@ -28,6 +44,65 @@ function output(command, args) {
   return run(command, args, { capture: true }).stdout.trim();
 }
 
+function runNpm(args, options) {
+  if (!npmCli) {
+    throw new Error("Run release actions through the npm scripts so npm_execpath is available.");
+  }
+  return run(process.execPath, [npmCli, ...args], options);
+}
+
+function runWrangler(args, { artifact = false, ...options } = {}) {
+  if (!accountToken) throw new Error("Cloudflare account credential was not loaded.");
+  const config = artifact ? "dist/server/wrangler.json" : "wrangler.jsonc";
+  return run(process.execPath, [wranglerCli, ...args, "--config", config], {
+    ...options,
+    env: { ...options.env, CLOUDFLARE_API_TOKEN: accountToken },
+  });
+}
+
+function outputWrangler(...args) {
+  return runWrangler(args, { capture: true }).stdout.trim();
+}
+
+async function ensureAccountToken() {
+  accountToken ??= await resolveAccountToken();
+}
+
+const delay = (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+
+async function verifySite(url, versionId, { attempts = 1 } = {}) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = run(
+      process.execPath,
+      ["scripts/verify-deployment.mjs", url, versionId, "--skip-ai"],
+      { allowFailure: true },
+    );
+    if (result.status === 0) return;
+    if (attempt < attempts) {
+      console.warn(`Site verification attempt ${attempt}/${attempts} failed; retrying.`);
+      await delay(5_000);
+    }
+  }
+  throw new Error(`Site verification failed after ${attempts} attempt(s): ${url}`);
+}
+
+async function verifyAiHealth() {
+  const response = await fetch("https://ai.nexusnxs.com/healthz", {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (response.status !== 200 || payload?.status !== "ok") {
+    throw new Error(`ai.nexusnxs.com health gate failed with status ${response.status}; the site version was not rolled back.`);
+  }
+  console.log("AI service verified independently: https://ai.nexusnxs.com/healthz");
+}
+
 function assertCleanSource() {
   if (output(git, ["status", "--porcelain"])) {
     throw new Error("Commit or intentionally discard every source change before releasing.");
@@ -35,12 +110,24 @@ function assertCleanSource() {
 }
 
 function verifyRelease() {
-  run(npm, ["ci", "--ignore-scripts"]);
-  run(npm, ["run", "verify:release"]);
+  runNpm(["ci", "--ignore-scripts"]);
+  runNpm(["run", "verify:release"]);
 }
 
-function wranglerArgs(...args) {
-  return ["wrangler", ...args, "--config", "dist/server/wrangler.json"];
+async function assertBootstrapConfiguration(pathname) {
+  const config = JSON.parse(await readFile(pathname, "utf8"));
+  const routes = Array.isArray(config.routes) ? config.routes : config.routes ? [config.routes] : [];
+  if (config.name !== workerName || config.account_id !== CLOUDFLARE_ACCOUNT_ID) {
+    throw new Error(`Bootstrap configuration ${pathname} targets the wrong Worker or Cloudflare account.`);
+  }
+  if (
+    config.workers_dev !== false ||
+    config.preview_urls !== true ||
+    routes.length !== 0 ||
+    config.version_metadata?.binding !== "CF_VERSION_METADATA"
+  ) {
+    throw new Error(`Bootstrap configuration ${pathname} must use version metadata, versioned previews, no workers.dev alias, and no production routes.`);
+  }
 }
 
 async function parseUploadEvent(pathname) {
@@ -48,8 +135,72 @@ async function parseUploadEvent(pathname) {
   return lines.map((line) => JSON.parse(line)).findLast((event) => event.type === "version-upload");
 }
 
+async function cloudflareRequest(pathname, init = {}) {
+  if (!accountToken) throw new Error("Cloudflare account credential was not loaded.");
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}${pathname}`, {
+    ...init,
+    headers: {
+      authorization: `Bearer ${accountToken}`,
+      "content-type": "application/json",
+      ...init.headers,
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { errors: [{ message: text.slice(0, 300) }] };
+  }
+  return { response, payload };
+}
+
+async function assertWorkerDoesNotExist() {
+  const { response, payload } = await cloudflareRequest(`/workers/scripts/${workerName}/settings`);
+  if (response.status === 404) return;
+  if (response.ok && payload.success !== false) {
+    throw new Error(`${workerName} already exists; bootstrap is intentionally one-time only.`);
+  }
+  throw new Error(`Unable to verify Worker bootstrap state (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
+}
+
+async function workerDomains() {
+  const { response, payload } = await cloudflareRequest("/workers/domains");
+  if (!response.ok || payload.success === false || !Array.isArray(payload.result)) {
+    throw new Error(`Unable to read Worker custom domains (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
+  }
+  return payload.result;
+}
+
+async function assertProductionDomainsAttached() {
+  const domains = await workerDomains();
+  for (const hostname of productionHostnames) {
+    const match = domains.find((domain) => domain.hostname === hostname);
+    if (!match || match.service !== workerName) {
+      throw new Error(`${hostname} is not attached to ${workerName}; use the one-time cutover flow first.`);
+    }
+  }
+}
+
+async function loadCandidate() {
+  const candidate = JSON.parse(await readFile(statePath, "utf8"));
+  if (!/^[0-9a-f-]{32,36}$/i.test(candidate.version_id ?? "")) {
+    throw new Error("The release candidate state has no valid Cloudflare version ID.");
+  }
+  const preview = new URL(candidate.preview_url);
+  if (preview.protocol !== "https:" || !preview.hostname.endsWith(".workers.dev")) {
+    throw new Error("The release candidate state has no valid Cloudflare Preview URL.");
+  }
+  const sha = output(git, ["rev-parse", "HEAD"]);
+  if (candidate.source_commit !== sha) {
+    throw new Error("Candidate and current Git commit differ; prepare a new candidate.");
+  }
+  return { candidate, sha };
+}
+
 async function currentVersion() {
-  const deployments = JSON.parse(output(npx, wranglerArgs("deployments", "list", "--json")));
+  const deployments = JSON.parse(outputWrangler("deployments", "list", "--json"));
   const current = [...deployments].sort((left, right) =>
     Date.parse(right.created_on ?? right.created_at ?? 0) - Date.parse(left.created_on ?? left.created_at ?? 0)
   )[0];
@@ -62,30 +213,32 @@ async function currentVersion() {
 
 async function bootstrap() {
   assertCleanSource();
+  await assertBootstrapConfiguration(resolve(root, "wrangler.jsonc"));
   verifyRelease();
-  const existing = run(npx, wranglerArgs("versions", "list", "--json"), { capture: true, allowFailure: true });
-  if (existing.status === 0 && JSON.parse(existing.stdout).length > 0) {
-    throw new Error("nexusnxs-site already exists; bootstrap is intentionally one-time only.");
-  }
+  await assertBootstrapConfiguration(resolve(root, "dist", "server", "wrangler.json"));
+  await ensureAccountToken();
+  await assertWorkerDoesNotExist();
   const sha = output(git, ["rev-parse", "--short=12", "HEAD"]);
-  run(npx, wranglerArgs("deploy", "--strict", "--message", `bootstrap ${sha}`));
+  runWrangler(["deploy", "--strict", "--message", `bootstrap ${sha}`], { artifact: true });
   console.log("Worker bootstrap complete. Upload a tested candidate before attaching domains.");
 }
 
 async function prepare() {
   assertCleanSource();
   verifyRelease();
+  await ensureAccountToken();
   const sha = output(git, ["rev-parse", "HEAD"]);
   const shortSha = sha.slice(0, 12);
   const outputPath = resolve(root, ".wrangler", `version-upload-${shortSha}.ndjson`);
   await mkdir(dirname(outputPath), { recursive: true });
-  run(npx, wranglerArgs(
+  await rm(outputPath, { force: true });
+  runWrangler([
     "versions", "upload",
     "--strict",
     "--preview-alias", "candidate",
     "--tag", `site-${shortSha}`,
     "--message", `candidate ${shortSha}`,
-  ), { env: { WRANGLER_OUTPUT_FILE_PATH: outputPath } });
+  ], { artifact: true, env: { WRANGLER_OUTPUT_FILE_PATH: outputPath } });
   const event = await parseUploadEvent(outputPath);
   const previewUrl = event?.preview_alias_url ?? event?.preview_url;
   if (!event?.version_id || !previewUrl) throw new Error("Wrangler did not return a version ID and Preview URL.");
@@ -100,25 +253,85 @@ async function prepare() {
   console.log(`Version: ${candidate.version_id}`);
 }
 
+async function activateInitial() {
+  assertCleanSource();
+  await ensureAccountToken();
+  const { candidate, sha } = await loadCandidate();
+  const domains = await workerDomains();
+  if (domains.some((domain) => productionHostnames.includes(domain.hostname))) {
+    throw new Error("A NexusNXS production hostname is already attached; use release:promote instead.");
+  }
+  await verifySite(candidate.preview_url, candidate.version_id);
+  await verifyAiHealth();
+  const previous = await currentVersion();
+  runWrangler([
+    "versions", "deploy", `${candidate.version_id}@100%`,
+    "--yes", "--message", `initial production ${sha.slice(0, 12)}`,
+  ]);
+  await writeFile(statePath, `${JSON.stringify({ ...candidate, previous_version: previous, activated_at: new Date().toISOString() }, null, 2)}\n`, { mode: 0o600 });
+  console.log(`Initial candidate activated without domain traffic: ${candidate.version_id}`);
+}
+
+async function attachDomain(hostname) {
+  const { response, payload } = await cloudflareRequest("/workers/domains", {
+    method: "PUT",
+    body: JSON.stringify({ hostname, service: workerName, zone_name: "nexusnxs.com" }),
+  });
+  if (!response.ok || payload.success === false) {
+    throw new Error(`Unable to attach ${hostname} (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
+  }
+}
+
+async function cutover() {
+  if (!process.argv.includes("--confirm-domain-cutover")) {
+    throw new Error("Cutover changes public routing. Re-run with --confirm-domain-cutover after the old apex/www DNS records are removed.");
+  }
+  assertCleanSource();
+  await ensureAccountToken();
+  const { candidate } = await loadCandidate();
+  if (await currentVersion() !== candidate.version_id) {
+    throw new Error("The tested candidate is not the active Worker version; run release:activate-initial first.");
+  }
+  const existing = await workerDomains();
+  for (const hostname of productionHostnames) {
+    const match = existing.find((domain) => domain.hostname === hostname);
+    if (match && match.service !== workerName) {
+      throw new Error(`${hostname} is already attached to another Worker service.`);
+    }
+    if (!match) await attachDomain(hostname);
+  }
+  await assertProductionDomainsAttached();
+  await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 6 });
+  await verifyAiHealth();
+  console.log(`Domain cutover complete: ${productionHostnames.join(", ")} -> ${workerName}.`);
+}
+
 async function promote() {
   assertCleanSource();
-  const candidate = JSON.parse(await readFile(statePath, "utf8"));
-  const sha = output(git, ["rev-parse", "HEAD"]);
-  if (candidate.source_commit !== sha) throw new Error("Candidate and current Git commit differ; prepare a new candidate.");
-  run(process.execPath, ["scripts/verify-deployment.mjs", candidate.preview_url]);
+  await ensureAccountToken();
+  const { candidate, sha } = await loadCandidate();
+  await assertProductionDomainsAttached();
+  await verifySite(candidate.preview_url, candidate.version_id);
+  await verifyAiHealth();
   const previous = await currentVersion();
-  run(npx, wranglerArgs(
+  runWrangler([
     "versions", "deploy", `${candidate.version_id}@100%`,
     "--yes", "--message", `production ${sha.slice(0, 12)}`,
-  ));
+  ]);
   try {
-    run(process.execPath, ["scripts/verify-deployment.mjs", "https://nexusnxs.com"]);
-  } catch (error) {
+    await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 3 });
+  } catch (releaseError) {
     if (previous && previous !== candidate.version_id) {
-      run(npx, wranglerArgs("rollback", previous, "--yes", "--message", `automatic rollback ${sha.slice(0, 12)}`));
+      runWrangler(["rollback", previous, "--yes", "--message", `automatic rollback ${sha.slice(0, 12)}`]);
+      try {
+        await verifySite("https://nexusnxs.com", previous, { attempts: 3 });
+      } catch (rollbackError) {
+        throw new AggregateError([releaseError, rollbackError], "Production gate and rollback verification both failed.");
+      }
     }
-    throw error;
+    throw releaseError;
   }
+  await verifyAiHealth();
   console.log(`Production release complete: ${candidate.version_id}`);
 }
 
@@ -127,13 +340,18 @@ async function rollback() {
   if (!/^[0-9a-f-]{32,36}$/i.test(versionId ?? "")) {
     throw new Error("Usage: npm run release:rollback -- <version-id>");
   }
-  run(npx, wranglerArgs("rollback", versionId, "--yes", "--message", "operator-requested rollback"));
-  run(process.execPath, ["scripts/verify-deployment.mjs", "https://nexusnxs.com"]);
+  await ensureAccountToken();
+  await assertProductionDomainsAttached();
+  runWrangler(["rollback", versionId, "--yes", "--message", "operator-requested rollback"]);
+  await verifySite("https://nexusnxs.com", versionId, { attempts: 3 });
+  await verifyAiHealth();
 }
 
 const action = process.argv[2];
 if (action === "bootstrap") await bootstrap();
 else if (action === "prepare") await prepare();
+else if (action === "activate-initial") await activateInitial();
+else if (action === "cutover") await cutover();
 else if (action === "promote") await promote();
 else if (action === "rollback") await rollback();
-else throw new Error("Use bootstrap, prepare, promote, or rollback.");
+else throw new Error("Use bootstrap, prepare, activate-initial, cutover, promote, or rollback.");

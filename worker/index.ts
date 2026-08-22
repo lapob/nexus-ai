@@ -4,6 +4,11 @@ import handler from "vinext/server/app-router-entry";
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   NEXUSNXS_SITE_MODE?: "live" | "maintenance";
+  CF_VERSION_METADATA?: {
+    id: string;
+    tag: string;
+    timestamp: string;
+  };
 }
 
 interface ExecutionContext {
@@ -16,7 +21,7 @@ const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
   "www.nexusnxs.com",
 ]);
 
-function secureResponse(response: Response, url: URL): Response {
+function secureResponse(response: Response, url: URL, versionId?: string): Response {
   const secured = new Response(response.body, response);
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("X-Frame-Options", "DENY");
@@ -27,6 +32,9 @@ function secureResponse(response: Response, url: URL): Response {
   secured.headers.set("Origin-Agent-Cluster", "?1");
   secured.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   secured.headers.set("X-Permitted-Cross-Domain-Policies", "none");
+  if (versionId) {
+    secured.headers.set("X-NexusNXS-Worker-Version", versionId);
+  }
   secured.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests");
   if (url.pathname === "/sw.js") {
     secured.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -45,7 +53,7 @@ const worker = {
     if (NON_CANONICAL_PRODUCTION_HOSTNAMES.has(url.hostname)) {
       url.hostname = CANONICAL_HOSTNAME;
       url.protocol = "https:";
-      return secureResponse(Response.redirect(url, 308), url);
+      return secureResponse(Response.redirect(url, 308), url, env.CF_VERSION_METADATA?.id);
     }
 
     const accept = request.headers.get("accept") ?? "";
@@ -61,10 +69,10 @@ const worker = {
       maintenance.headers.set("Retry-After", "300");
       maintenance.headers.set("X-NexusNXS-State", "maintenance");
       maintenance.headers.set("X-Robots-Tag", "noindex, nofollow");
-      return secureResponse(maintenance, url);
+      return secureResponse(maintenance, url, env.CF_VERSION_METADATA?.id);
     }
 
-    return secureResponse(await handler.fetch(request, env, ctx), url);
+    return secureResponse(await handler.fetch(request, env, ctx), url, env.CF_VERSION_METADATA?.id);
   },
 };
 

@@ -17,6 +17,8 @@ test("uses one account-owned Cloudflare Worker and no OpenAI Sites runtime", asy
   assert.equal(wrangler.main, "./worker/index.ts");
   assert.equal(wrangler.workers_dev, false);
   assert.equal(wrangler.preview_urls, true);
+  assert.equal(wrangler.version_metadata.binding, "CF_VERSION_METADATA");
+  assert.equal(wrangler.routes, undefined, "bootstrap configuration must not claim production domains early");
   assert.equal(wrangler.assets.binding, "ASSETS");
   assert.equal(wrangler.assets.html_handling, "none");
   assert.equal(wrangler.vars.NEXUSNXS_SITE_MODE, "live");

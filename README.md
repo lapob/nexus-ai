@@ -11,7 +11,8 @@ solo Cloudflare Worker, `nexusnxs-site`, nell'account che possiede
 - `https://ai.nexusnxs.com`: servizio AI separato sul Tunnel esistente; il
   rilascio del sito non ne modifica DNS o configurazione.
 - Preview Cloudflare: URL versionate dello stesso Worker, senza alias
-  `workers.dev` stabile e con `noindex`.
+  `workers.dev` di produzione. L'alias temporaneo `candidate` è intenzionale,
+  appartiene alla singola versione ed è sempre `noindex`.
 
 ## Requisiti e controlli
 
@@ -20,6 +21,18 @@ solo Cloudflare Worker, `nexusnxs-site`, nell'account che possiede
 - Per la produzione, Cloudflare Account API Token `nexusnxs-release`, non un
   token personale, limitato a Workers Scripts e Workers Routes per questo
   account e per la sola zona `nexusnxs.com`.
+
+In locale la credenziale viene conservata dal sistema operativo (Gestore
+credenziali di Windows, Keychain o Secret Service), mai in un file del progetto:
+
+```bash
+npm run cloudflare:credential:store
+npm run cloudflare:credential:status
+```
+
+In CI si usa invece il secret protetto `CLOUDFLARE_API_TOKEN`; l'ambiente ha
+precedenza sul keyring. Il token viene inoltrato soltanto ai processi Wrangler e
+alle chiamate Cloudflare necessarie, non a npm, test o Git.
 
 ```bash
 npm ci --ignore-scripts
@@ -36,11 +49,33 @@ metadato di hosting obsoleto può sopravvivere.
 
 ## Rilascio controllato
 
-Il bootstrap si esegue una sola volta, senza route e con `workers_dev` spento:
+Il primo trasferimento usa fasi separate. Il bootstrap si esegue una sola volta,
+senza route e con `workers_dev` spento:
 
 ```bash
 npm run release:bootstrap
 ```
+
+Dopo il bootstrap si aggiungono al contratto `wrangler.jsonc` esclusivamente i
+Custom Domains `nexusnxs.com` e `www.nexusnxs.com`, si committa la modifica e si
+prepara la candidata. L'ID della versione viene esposto come
+`X-NexusNXS-Worker-Version`, così preview e dominio devono provare di servire
+esattamente lo stesso artefatto:
+
+```bash
+npm run release:prepare
+npm run release:activate-initial
+```
+
+Solo dopo la rimozione controllata dei vecchi record Sites di `www` e apex:
+
+```bash
+npm run release:cutover -- --confirm-domain-cutover
+```
+
+Il cutover collega prima `www`, poi l'apex, allo stesso Worker. Non modifica
+`ai.nexusnxs.com`; la sua salute viene verificata come gate indipendente e un
+suo guasto non provoca rollback del sito pubblico.
 
 Per ogni modifica successiva:
 
@@ -60,10 +95,9 @@ Rollback operativo esplicito:
 npm run release:rollback -- <version-id>
 ```
 
-Il token può essere fornito a Wrangler tramite `CLOUDFLARE_API_TOKEN` nel solo
-ambiente di rilascio. Non salvarlo in `.env` condivisi, Git, documentazione o
-script. L'`account_id` nel `wrangler.jsonc` non è segreto e impedisce di
-pubblicare accidentalmente nell'account sbagliato.
+Non salvare mai il token in `.env`, Git, documentazione o script.
+L'`account_id` nel `wrangler.jsonc` non è segreto e impedisce di pubblicare
+accidentalmente nell'account sbagliato.
 
 ## Stati operativi NexusNXS
 

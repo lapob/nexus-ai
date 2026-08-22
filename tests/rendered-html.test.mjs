@@ -235,3 +235,24 @@ test("keeps Cloudflare previews out of search indexes", async () => {
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 });
+
+test("proves the exact Cloudflare Worker version without claiming the AI hostname", async () => {
+  const versionId = "01234567-89ab-cdef-0123-456789abcdef";
+  const env = {
+    CF_VERSION_METADATA: {
+      id: versionId,
+      tag: "site-test",
+      timestamp: "2026-08-22T00:00:00.000Z",
+    },
+  };
+  const apex = await fetchWorker("https://nexusnxs.com/", { env });
+  assert.equal(apex.headers.get("x-nexusnxs-worker-version"), versionId);
+
+  const www = await fetchWorker("https://www.nexusnxs.com/downloads", { env });
+  assert.equal(www.status, 308);
+  assert.equal(www.headers.get("x-nexusnxs-worker-version"), versionId);
+
+  const ai = await fetchWorker("https://ai.nexusnxs.com/", { env });
+  assert.notEqual(ai.status, 308);
+  assert.equal(ai.headers.get("location"), null);
+});
