@@ -50,6 +50,24 @@ test("keeps production metadata and portable scripts", async () => {
   assert.doesNotMatch(`${layout}\n${chrome}`, /codex-preview|_sites-preview/i);
 });
 
+test("keeps public product claims aligned with the current client architecture", async () => {
+  const [home, desktop, downloads, privacy, security] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/desktop/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/downloads/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/privacy/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/security/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(home, /AI PRIVATA, PROTETTA, CONNESSA/);
+  assert.doesNotMatch(`${home}\n${desktop}`, /modelli eseguiti sulla tua macchina|AI locale completo/i);
+  assert.match(downloads, /4 GB di spazio libero consigliati/);
+  assert.match(privacy, /ultimi turni di contesto/);
+  assert.match(privacy, /massimo di 24 ore/);
+  assert.match(privacy, /non conserva il prompt completo/);
+  assert.match(security, /Distribuzione controllata/);
+  assert.doesNotMatch(security, /Artefatti firmati,[^\n]+con ogni release pubblica/);
+});
+
 test("redirects every known production alias to nexusnxs.com", async () => {
   for (const hostname of ["www.nexusnxs.com"]) {
     const response = await fetchWorker(`https://${hostname}/downloads?source=legacy`);
