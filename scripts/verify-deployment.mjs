@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fetchWithTrustedDns } from "./trusted-dns-fetch.mjs";
 
 const input = process.argv[2] ?? process.env.NEXUSNXS_VERIFY_URL ?? "https://nexusnxs.com";
 const expectedVersion = process.argv[3] ?? process.env.NEXUSNXS_EXPECTED_VERSION;
@@ -8,7 +9,7 @@ if (baseUrl.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(baseUr
   throw new Error("Deployment verification requires HTTPS outside localhost.");
 }
 
-const request = async (pathname, options = {}) => fetch(new URL(pathname, baseUrl), {
+const request = async (pathname, options = {}) => fetchWithTrustedDns(new URL(pathname, baseUrl), {
   redirect: "manual",
   signal: AbortSignal.timeout(15_000),
   ...options,
@@ -66,7 +67,7 @@ if (baseUrl.hostname.endsWith(".workers.dev")) {
 
 if (baseUrl.hostname === "nexusnxs.com") {
   assert.equal(home.headers.get("x-robots-tag"), null);
-  const www = await fetch("https://www.nexusnxs.com/downloads?source=release-check", {
+  const www = await fetchWithTrustedDns("https://www.nexusnxs.com/downloads?source=release-check", {
     redirect: "manual",
     signal: AbortSignal.timeout(15_000),
   });
@@ -76,7 +77,7 @@ if (baseUrl.hostname === "nexusnxs.com") {
     assert.equal(www.headers.get("x-nexusnxs-worker-version"), expectedVersion);
   }
 
-  const http = await fetch("http://nexusnxs.com/", {
+  const http = await fetchWithTrustedDns("http://nexusnxs.com/", {
     redirect: "manual",
     signal: AbortSignal.timeout(15_000),
   });

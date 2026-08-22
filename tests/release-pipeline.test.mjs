@@ -73,6 +73,7 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   assert.match(releaseScript, /artifact \? "dist\/server\/wrangler\.json" : "wrangler\.jsonc"/);
   assert.match(releaseScript, /AggregateError/);
   assert.match(verifier, /x-nexusnxs-worker-version/);
+  assert.match(verifier, /fetchWithTrustedDns/);
 
   assert.ok(scripts["release:bootstrap"]);
   assert.ok(scripts["release:activate-initial"]);
