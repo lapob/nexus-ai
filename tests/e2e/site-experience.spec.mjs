@@ -117,6 +117,11 @@ test("the mobile overlay closes at the desktop breakpoint and honors reduced mot
     .map((value) => value.trim().endsWith("ms") ? Number.parseFloat(value) / 1000 : Number.parseFloat(value)));
   expect(Math.max(...transitionSeconds)).toBeLessThanOrEqual(.02);
 
+  const ambientMotionSeconds = await page.locator(".app-orb span, .presence-grid article > i").evaluateAll((elements) => elements.flatMap((element) => getComputedStyle(element).animationDuration
+    .split(",")
+    .map((value) => value.trim().endsWith("ms") ? Number.parseFloat(value) / 1000 : Number.parseFloat(value))));
+  expect(Math.max(0, ...ambientMotionSeconds)).toBeLessThanOrEqual(.02);
+
   await page.setViewportSize({ width: 1025, height: 768 });
   await expect(page.locator("#main-navigation")).not.toHaveClass(/is-open/);
   await expect(page.locator(".nxs-menu-toggle")).toHaveAttribute("aria-expanded", "false");

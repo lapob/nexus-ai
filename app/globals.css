@@ -498,3 +498,67 @@ html.reveal-ready .reveal:not(.is-visible) {
     transform: none;
   }
 }
+
+/* Lightweight living motion: transform/opacity only, never layout or scroll. */
+@keyframes nxs-orb-breathe {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -4px, 0) scale(1.018); }
+}
+
+@keyframes nxs-presence-pulse {
+  0%, 100% { opacity: .62; transform: scale(.82); }
+  45% { opacity: 1; transform: scale(1.18); }
+}
+
+@keyframes nxs-orbit-drift {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-orb span {
+    animation: nxs-orb-breathe 7s cubic-bezier(.4, 0, .2, 1) infinite;
+    transform-origin: center;
+  }
+
+  .app-card:nth-child(2) .app-orb span {
+    animation-delay: -2.6s;
+  }
+
+  .presence-grid article > i,
+  .network-pill i,
+  .status i {
+    animation: nxs-presence-pulse 2.4s cubic-bezier(.4, 0, .2, 1) infinite;
+    transform-origin: center;
+  }
+
+  .presence-grid article:nth-child(2) > i { animation-delay: -.45s; }
+  .presence-grid article:nth-child(3) > i { animation-delay: -.9s; }
+  .presence-grid article:nth-child(4) > i { animation-delay: -1.35s; }
+
+  .mini-orb > i:nth-child(3) {
+    animation: nxs-orbit-drift 24s linear infinite;
+    transform-origin: center;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .presence-grid article {
+    transition: transform .2s cubic-bezier(.22, 1, .36, 1), border-color .2s ease, background-color .2s ease;
+  }
+
+  .presence-grid article:hover {
+    transform: translate3d(0, -2px, 0);
+    border-color: rgba(82, 238, 240, .19);
+    background: rgba(13, 27, 29, .86);
+  }
+
+  .primary-button svg,
+  .app-card > a svg {
+    transition: transform .2s cubic-bezier(.22, 1, .36, 1);
+  }
+
+  .primary-button:hover svg,
+  .app-card > a:hover svg {
+    transform: translate3d(2px, -2px, 0);
+  }
+}
