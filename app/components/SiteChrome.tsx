@@ -10,45 +10,150 @@ import { HardNavigationLink } from "./HardNavigationLink";
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [online, setOnline] = useState<boolean | null>(null);
+  const [navigating, setNavigating] = useState(false);
   const pathname = usePathname();
   const toggleRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
-    fetch("/api/status", { cache: "no-store" }).then((r) => r.json()).then((v) => setOnline(v.online === true)).catch(() => setOnline(false));
+    const controller = new AbortController();
+
+    fetch("/api/status", { cache: "no-store", signal: controller.signal })
+      .then((response) => response.json())
+      .then((value) => setOnline(value.online === true))
+      .catch((error: Error) => {
+        if (error.name !== "AbortError") setOnline(false);
+      });
+
+    return () => controller.abort();
   }, []);
+
   useEffect(() => {
     document.body.classList.toggle("menu-open", open);
     return () => document.body.classList.remove("menu-open");
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const background = [
+      document.querySelector<HTMLElement>(".skip-link"),
+      document.getElementById("site-content"),
+      document.querySelector<HTMLElement>(".nexus-connectivity"),
+    ].filter(Boolean) as HTMLElement[];
+
+    background.forEach((element) => {
+      element.setAttribute("inert", "");
+      element.setAttribute("aria-hidden", "true");
+    });
+
+    return () => background.forEach((element) => {
+      element.removeAttribute("inert");
+      element.removeAttribute("aria-hidden");
+    });
+  }, [open]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1025px)");
+    const closeWhenDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setNavigating(false);
+        setOpen(false);
+      }
+    };
+
+    desktop.addEventListener("change", closeWhenDesktop);
+    return () => desktop.removeEventListener("change", closeWhenDesktop);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const nav = navRef.current;
+    const brand = document.querySelector<HTMLElement>(".nxs-brand");
     const links = Array.from(nav?.querySelectorAll<HTMLElement>("a") ?? []);
-    links[0]?.focus();
+    const initialFocus = nav?.querySelector<HTMLElement>('[aria-current="page"]') ?? links[0];
+    const focusFrame = requestAnimationFrame(() => initialFocus?.focus());
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        setNavigating(false);
         setOpen(false);
         toggleRef.current?.focus();
         return;
       }
       if (event.key !== "Tab") return;
-      const focusable = [toggleRef.current, ...links].filter(Boolean) as HTMLElement[];
+      const focusable = [brand, toggleRef.current, ...links].filter(Boolean) as HTMLElement[];
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
-  return <header className="site-header">
-    <HardNavigationLink className="brand" href="/" aria-label="NexusNXS, homepage"><Image className="brand-icon" src="/nexus-icon.png" alt="Logo NexusNXS" width={48} height={48} priority unoptimized /><span>NEXUSNXS</span></HardNavigationLink>
-    <button ref={toggleRef} className="mobile-toggle" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="main-navigation" aria-label={open ? "Chiudi menu" : "Apri menu"}>{open ? <X /> : <Menu />}</button>
-    <nav ref={navRef} id="main-navigation" className={open ? "chrome-nav open" : "chrome-nav"} aria-label="Navigazione principale">
-      {PRIMARY_NAV_ITEMS.map(({ href, label }) => <HardNavigationLink key={href} href={href} onClick={()=>setOpen(false)} aria-current={pathname===href?"page":undefined}>{label}</HardNavigationLink>)}
-      <HardNavigationLink className="chrome-download" href="/downloads" onClick={()=>setOpen(false)} aria-current={pathname==="/downloads"?"page":undefined}>Download</HardNavigationLink>
+
+  const navigationItems = [
+    ...PRIMARY_NAV_ITEMS,
+    { href: "/downloads", label: "Download" },
+  ] as const;
+  const networkLabel = online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE";
+
+  return <header className={open ? "nxs-header is-menu-open" : "nxs-header"}>
+    <HardNavigationLink className="nxs-brand" href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
+      <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
+      <span>NEXUSNXS</span>
+    </HardNavigationLink>
+
+    <button
+      ref={toggleRef}
+      className="nxs-menu-toggle"
+      type="button"
+      onClick={() => {
+        setNavigating(false);
+        setOpen((current) => !current);
+      }}
+      aria-expanded={open}
+      aria-controls="main-navigation"
+      aria-label={open ? "Chiudi menu" : "Apri menu"}
+    >
+      <span aria-hidden="true">{open ? "CHIUDI" : "MENU"}</span>
+      {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+    </button>
+
+    <nav
+      ref={navRef}
+      id="main-navigation"
+      className={`nxs-nav${open ? " is-open" : ""}${navigating ? " is-navigating" : ""}`}
+      aria-label="Navigazione principale"
+      aria-busy={navigating}
+    >
+      <div className="nxs-nav__intro" aria-hidden="true">
+        <span>NAVIGAZIONE</span>
+        <span>05 SEZIONI</span>
+      </div>
+      <div className="nxs-nav__links">
+        {navigationItems.map(({ href, label }, index) => <HardNavigationLink
+          className={href === "/downloads" ? "nxs-nav__link nxs-nav__link--download" : "nxs-nav__link"}
+          key={href}
+          href={href}
+          onClick={() => setNavigating(true)}
+          aria-current={pathname === href ? "page" : undefined}
+        >
+          <span className="nxs-nav__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+          <span>{label}</span>
+          <span className="nxs-nav__arrow" aria-hidden="true">↗</span>
+        </HardNavigationLink>)}
+      </div>
+      <div className="nxs-nav__footer">
+        <span className={online === false ? "nxs-nav__status is-offline" : "nxs-nav__status"} aria-live="polite"><i aria-hidden="true" />{navigating ? "APERTURA PAGINA" : networkLabel}</span>
+        <span>AI LOCALE · PRIVATA · CONNESSA</span>
+      </div>
     </nav>
-    <HardNavigationLink className={`network-pill ${online === false ? "offline" : ""}`} href="/status"><i /> {online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE"}</HardNavigationLink>
+
+    <HardNavigationLink className={online === false ? "nxs-network is-offline" : "nxs-network"} href="/status">
+      <i aria-hidden="true" /> {networkLabel}
+    </HardNavigationLink>
   </header>;
 }
 

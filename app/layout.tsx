@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./navigation.css";
 import { ConnectivityPresence } from "./components/ConnectivityPresence";
 import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";
+import { HardNavigationLink } from "./components/HardNavigationLink";
 import { SiteHeader } from "./components/SiteChrome";
+import { PRIMARY_NAV_ITEMS } from "./lib/site-navigation";
 
 export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" };
 
@@ -46,7 +49,17 @@ export default function RootLayout({
       <body>
         <a className="skip-link" href="#main-content">Vai al contenuto</a>
         <SiteHeader />
-        {children}
+        <noscript>
+          <style>{`.nxs-header,.nexus-connectivity{display:none!important}.reveal{opacity:1!important;transform:none!important}`}</style>
+          <nav className="nxs-noscript" aria-label="Navigazione principale senza JavaScript">
+            <HardNavigationLink className="nxs-noscript__brand" href="/">NEXUSNXS</HardNavigationLink>
+            <div>
+              {PRIMARY_NAV_ITEMS.map(({ href, label }) => <HardNavigationLink key={href} href={href}>{label}</HardNavigationLink>)}
+              <HardNavigationLink href="/downloads">Download</HardNavigationLink>
+            </div>
+          </nav>
+        </noscript>
+        <div id="site-content">{children}</div>
         <ConnectivityPresence />
         <NexusPresenceRuntime />
       </body>

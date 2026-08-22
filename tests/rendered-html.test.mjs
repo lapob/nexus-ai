@@ -95,6 +95,32 @@ test("renders every public route with one shared, complete navigation", async ()
   }
 });
 
+test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", async () => {
+  const [chrome, navigationStyles, layout] = await Promise.all([
+    readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/navigation.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(chrome, /aria-expanded=\{open\}/);
+  assert.match(chrome, /aria-controls="main-navigation"/);
+  assert.match(chrome, /aria-busy=\{navigating\}/);
+  assert.match(chrome, /event\.key === "Escape"/);
+  assert.match(chrome, /setAttribute\("inert", ""\)/);
+  assert.match(chrome, /const brand = document\.querySelector/);
+  assert.match(chrome, /\[aria-current="page"\]/);
+  assert.match(chrome, /matchMedia\("\(min-width: 1025px\)"\)/);
+  assert.match(layout, /id="site-content"/);
+  assert.match(layout, /<noscript>/);
+  assert.match(layout, /Navigazione principale senza JavaScript/);
+  assert.match(layout, /\.reveal\{opacity:1!important/);
+  assert.match(navigationStyles, /@media \(max-width: 1024px\)/);
+  assert.match(navigationStyles, /position: fixed;[\s\S]*inset: 0;[\s\S]*height: 100dvh/);
+  assert.match(navigationStyles, /overflow-y: auto/);
+  assert.match(navigationStyles, /env\(safe-area-inset-bottom\)/);
+  assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
+});
+
 test("renders NexusNXS-owned maintenance and not-found states", async () => {
   const [maintenance, missing] = await Promise.all([
     render("/maintenance"),
