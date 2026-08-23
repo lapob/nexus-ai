@@ -177,3 +177,27 @@ test("the mobile overlay closes at the desktop breakpoint and honors reduced mot
   await expect(page.locator(".nxs-menu-toggle")).toHaveAttribute("aria-expanded", "false");
   await context.close();
 });
+
+test("motion quality adapts without exposing hardware details in the interface", async ({ browser }) => {
+  for (const profile of [
+    { expected: "lite", cores: 2, memory: 2, saveData: true, effectiveType: "2g" },
+    { expected: "balanced", cores: 8, memory: 8, saveData: false, effectiveType: "4g" },
+    { expected: "ultra", cores: 16, memory: 16, saveData: false, effectiveType: "4g" },
+  ]) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: "dark" });
+    await context.addInitScript((capability) => {
+      Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => capability.cores });
+      Object.defineProperty(navigator, "deviceMemory", { configurable: true, get: () => capability.memory });
+      Object.defineProperty(navigator, "connection", {
+        configurable: true,
+        get: () => ({ saveData: capability.saveData, effectiveType: capability.effectiveType }),
+      });
+    }, profile);
+    const page = await context.newPage();
+    await page.goto("/", { waitUntil: "load" });
+    await expect(page.locator("html")).toHaveClass(new RegExp(`nxs-motion-${profile.expected}`));
+    await expect(page.locator("html")).toHaveAttribute("data-motion-tier", profile.expected);
+    await expect(page.locator("body")).not.toContainText(/hardwareConcurrency|deviceMemory|motion tier/i);
+    await context.close();
+  }
+});

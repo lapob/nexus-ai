@@ -2,6 +2,26 @@
 
 import { useEffect } from "react";
 
+type MotionTier = "lite" | "balanced" | "ultra";
+
+type RuntimeNavigator = Navigator & {
+  deviceMemory?: number;
+  connection?: { saveData?: boolean; effectiveType?: string };
+};
+
+const MOTION_TIER_CLASSES = ["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
+
+function resolveMotionTier(runtime: RuntimeNavigator): MotionTier {
+  const cores = runtime.hardwareConcurrency ?? 8;
+  const memory = runtime.deviceMemory ?? 8;
+  const connection = runtime.connection;
+  const slowConnection = /^(slow-)?2g$|^3g$/.test(connection?.effectiveType ?? "");
+
+  if (connection?.saveData === true || slowConnection || cores <= 4 || memory <= 4) return "lite";
+  if (cores >= 12 && memory >= 8) return "ultra";
+  return "balanced";
+}
+
 const REVEAL_SELECTOR = [
   ".product-hero",
   ".trust-hero",
@@ -23,19 +43,14 @@ const REVEAL_SELECTOR = [
 export function SiteMotionRuntime() {
   useEffect(() => {
     const root = document.documentElement;
-    const runtime = navigator as Navigator & {
-      deviceMemory?: number;
-      connection?: { saveData?: boolean; effectiveType?: string };
-    };
-    const saveData = runtime.connection?.saveData === true;
-    const constrained = (runtime.hardwareConcurrency ?? 8) <= 4
-      || (runtime.deviceMemory ?? 8) <= 4
-      || /(^|-)2g$/.test(runtime.connection?.effectiveType ?? "");
+    const runtime = navigator as RuntimeNavigator;
+    const tier = resolveMotionTier(runtime);
     const revealTargets = Array.from(document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
     let scrollFrame = 0;
 
-    root.classList.add("nxs-motion-ready");
-    if (saveData || constrained) root.classList.add("nxs-motion-lite");
+    root.classList.remove(...MOTION_TIER_CLASSES);
+    root.classList.add("nxs-motion-ready", `nxs-motion-${tier}`);
+    root.dataset.motionTier = tier;
 
     const revealObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -69,7 +84,8 @@ export function SiteMotionRuntime() {
       revealObserver.disconnect();
       cancelAnimationFrame(scrollFrame);
       window.removeEventListener("scroll", onScroll);
-      root.classList.remove("nxs-motion-ready", "nxs-motion-lite");
+      root.classList.remove("nxs-motion-ready", ...MOTION_TIER_CLASSES);
+      delete root.dataset.motionTier;
       root.style.removeProperty("--nxs-scroll");
     };
   }, []);

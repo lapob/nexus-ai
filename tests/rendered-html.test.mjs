@@ -50,6 +50,26 @@ test("keeps production metadata and portable scripts", async () => {
   assert.doesNotMatch(`${layout}\n${chrome}`, /codex-preview|_sites-preview/i);
 });
 
+test("selects a private client motion tier without rendering device telemetry", async () => {
+  const [runtime, styles, packageJson, budget] = await Promise.all([
+    readFile(new URL("../app/components/SiteMotionRuntime.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/experience.css", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../scripts/check-performance-budget.mjs", import.meta.url), "utf8"),
+  ]);
+  assert.match(runtime, /type MotionTier = "lite" \| "balanced" \| "ultra"/);
+  assert.match(runtime, /saveData === true/);
+  assert.match(runtime, /hardwareConcurrency/);
+  assert.match(runtime, /deviceMemory/);
+  assert.match(runtime, /root\.dataset\.motionTier = tier/);
+  assert.match(styles, /\.nxs-motion-lite/);
+  assert.match(styles, /\.nxs-motion-balanced/);
+  assert.match(styles, /\.nxs-motion-ultra/);
+  assert.match(packageJson, /verify:performance/);
+  assert.match(budget, /JavaScript client/);
+  assert.match(budget, /products\/android-home\.png/);
+});
+
 test("keeps public product claims aligned with the current client architecture", async () => {
   const [home, desktop, downloads, privacy, security] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),

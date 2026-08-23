@@ -1,5 +1,7 @@
 :root {
   --nxs-scroll: 0;
+  --nxs-reveal-distance: 16px;
+  --nxs-reveal-duration: .72s;
 }
 
 /* Real product captures: the website shows the shipping interfaces, not drawn substitutes. */
@@ -81,9 +83,9 @@
 
 /* A single shared motion system keeps the pages expressive without permanent heavy loops. */
 .nxs-motion-ready .nxs-motion-candidate {
-  transform: translate3d(0, 16px, 0);
+  transform: translate3d(0, var(--nxs-reveal-distance), 0);
   transition:
-    transform .72s cubic-bezier(.16, 1, .3, 1);
+    transform var(--nxs-reveal-duration) cubic-bezier(.16, 1, .3, 1);
 }
 
 .nxs-motion-ready .nxs-motion-candidate.nxs-in-view {
@@ -136,9 +138,19 @@
   background: radial-gradient(circle, rgba(39, 207, 210, .18), transparent 68%);
 }
 
-.nxs-motion-lite .nxs-motion-candidate {
-  transform: translate3d(0, 8px, 0);
-  transition-duration: .36s;
+.nxs-motion-lite {
+  --nxs-reveal-distance: 8px;
+  --nxs-reveal-duration: .36s;
+}
+
+.nxs-motion-balanced {
+  --nxs-reveal-distance: 14px;
+  --nxs-reveal-duration: .62s;
+}
+
+.nxs-motion-ultra {
+  --nxs-reveal-distance: 18px;
+  --nxs-reveal-duration: .72s;
 }
 
 .nxs-motion-lite .nxs-nav,
