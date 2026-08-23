@@ -1,0 +1,158 @@
+:root {
+  --nxs-scroll: 0;
+}
+
+/* Real product captures: the website shows the shipping interfaces, not drawn substitutes. */
+.product-mockup--real .device-frame {
+  isolation: isolate;
+  overflow: hidden;
+  background: #020405;
+  box-shadow:
+    0 2.2rem 7rem rgba(0, 0, 0, .64),
+    0 0 0 1px rgba(82, 238, 240, .05),
+    0 0 4rem rgba(39, 207, 210, .05);
+}
+
+.product-mockup--real .device-bar {
+  position: relative;
+  z-index: 2;
+  border-bottom: 1px solid rgba(125, 224, 228, .08);
+  background: rgba(5, 10, 11, .92);
+  color: rgba(215, 246, 248, .68);
+}
+
+.product-screen {
+  position: relative;
+  height: calc(100% - 28px);
+  overflow: hidden;
+  border-radius: 10px;
+  background: #020405;
+}
+
+.product-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, .03), transparent 22%),
+    linear-gradient(180deg, transparent 74%, rgba(2, 4, 5, .18));
+}
+
+.product-screen img {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.product-mockup--real.android .product-screen {
+  border-radius: 0 0 25px 25px;
+}
+
+.product-mockup--real.android .product-screen img {
+  object-position: center top;
+}
+
+.product-mockup--real figcaption {
+  position: absolute;
+  z-index: 3;
+  inset: auto 14px 13px auto;
+  min-height: 26px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(125, 224, 228, .15);
+  border-radius: 999px;
+  background: rgba(2, 7, 8, .78);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: rgba(215, 246, 248, .78);
+  font: 8px var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: .11em;
+}
+
+.product-mockup--real figcaption i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #62e99d;
+  box-shadow: 0 0 10px rgba(98, 233, 157, .72);
+}
+
+/* A single shared motion system keeps the pages expressive without permanent heavy loops. */
+.nxs-motion-ready .nxs-motion-candidate {
+  transform: translate3d(0, 16px, 0);
+  transition:
+    transform .72s cubic-bezier(.16, 1, .3, 1);
+}
+
+.nxs-motion-ready .nxs-motion-candidate.nxs-in-view {
+  transform: none;
+}
+
+.nxs-motion-ready .feature-grid > article:nth-child(2),
+.nxs-motion-ready .control-grid > article:nth-child(2),
+.nxs-motion-ready .footer-links > div:nth-child(2) { transition-delay: 60ms; }
+
+.nxs-motion-ready .feature-grid > article:nth-child(3),
+.nxs-motion-ready .control-grid > article:nth-child(3),
+.nxs-motion-ready .footer-links > div:nth-child(3) { transition-delay: 110ms; }
+
+@media (hover: hover) and (pointer: fine) {
+  .product-mockup--real .device-frame {
+    transition: transform .48s cubic-bezier(.16, 1, .3, 1), border-color .3s ease, box-shadow .3s ease;
+  }
+
+  .product-mockup--real:hover .device-frame {
+    transform: translate3d(0, -5px, 0);
+    border-color: rgba(82, 238, 240, .26);
+    box-shadow:
+      0 2.6rem 8rem rgba(0, 0, 0, .68),
+      0 0 0 1px rgba(82, 238, 240, .08),
+      0 0 5rem rgba(39, 207, 210, .09);
+  }
+}
+
+@media (max-width: 1024px) {
+  #site-content { padding-left: 0; }
+  .product-mockup--real figcaption { inset: auto 10px 10px auto; }
+}
+
+@media (max-width: 560px) {
+  .product-mockup--real.android .device-frame { width: min(60vw, 245px); }
+  .product-mockup--real figcaption { font-size: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nxs-motion-ready .nxs-motion-candidate {
+    transform: none;
+    transition: none;
+  }
+}
+
+.nxs-motion-lite .product-mockup--real .mockup-glow {
+  filter: none;
+  opacity: .24;
+  background: radial-gradient(circle, rgba(39, 207, 210, .18), transparent 68%);
+}
+
+.nxs-motion-lite .nxs-motion-candidate {
+  transform: translate3d(0, 8px, 0);
+  transition-duration: .36s;
+}
+
+.nxs-motion-lite .nxs-nav,
+.nxs-motion-lite .product-mockup--real figcaption {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .nxs-header,
+  .nxs-nav,
+  .product-mockup--real figcaption {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: #020405;
+  }
+}

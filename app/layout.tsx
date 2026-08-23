@@ -2,11 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 import "./navigation.css";
+import "./experience.css";
 import { CspNonceProvider } from "./components/CspNonceContext";
 import { ConnectivityPresence } from "./components/ConnectivityPresence";
 import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";
 import { HardNavigationLink } from "./components/HardNavigationLink";
 import { SiteHeader } from "./components/SiteChrome";
+import { SiteMotionRuntime } from "./components/SiteMotionRuntime";
 import { PRIMARY_NAV_ITEMS } from "./lib/site-navigation";
 
 export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" };
@@ -69,6 +71,7 @@ export default async function RootLayout({
           </noscript>
           <div id="site-content" tabIndex={-1}>{children}</div>
           <ConnectivityPresence />
+          <SiteMotionRuntime />
           <NexusPresenceRuntime />
         </CspNonceProvider>
       </body>

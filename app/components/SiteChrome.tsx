@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowUpRight, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { PRIMARY_NAV_ITEMS } from "../lib/site-navigation";
@@ -92,9 +92,18 @@ export function SiteHeader() {
   }, [open]);
 
   const navigationItems = [
+    { href: "/", label: "Home" },
     ...PRIMARY_NAV_ITEMS,
     { href: "/downloads", label: "Download" },
   ] as const;
+  const iconByHref = {
+    "/": House,
+    "/desktop": Monitor,
+    "/android": Smartphone,
+    "/security": ShieldCheck,
+    "/status": Activity,
+    "/downloads": ArrowDownToLine,
+  } as const;
   const networkLabel = online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE";
 
   return <header className={open ? "nxs-header is-menu-open" : "nxs-header"}>
@@ -126,18 +135,23 @@ export function SiteHeader() {
       aria-busy={navigating}
     >
       <div className="nxs-nav__links">
-        {navigationItems.map(({ href, label }, index) => <HardNavigationLink
-          className={href === "/downloads" ? "nxs-nav__link nxs-nav__link--download" : "nxs-nav__link"}
-          key={href}
-          href={href}
-          onClick={() => setNavigating(true)}
-          aria-current={pathname === href ? "page" : undefined}
-        >
-          <span className="nxs-nav__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-          <span>{label}</span>
-          <span className="nxs-nav__arrow" aria-hidden="true">↗</span>
-        </HardNavigationLink>)}
+        {navigationItems.map(({ href, label }, index) => {
+          const Icon = iconByHref[href];
+          return <HardNavigationLink
+            className={href === "/downloads" ? "nxs-nav__link nxs-nav__link--download" : "nxs-nav__link"}
+            key={href}
+            href={href}
+            onClick={() => setNavigating(true)}
+            aria-current={pathname === href ? "page" : undefined}
+          >
+            <span className="nxs-nav__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            <span className="nxs-nav__icon" aria-hidden="true"><Icon size={18} strokeWidth={1.65} /></span>
+            <span className="nxs-nav__label">{label}</span>
+            <span className="nxs-nav__arrow" aria-hidden="true">↗</span>
+          </HardNavigationLink>;
+        })}
       </div>
+      <span className="nxs-nav__progress" aria-hidden="true"><i /></span>
       <div className="nxs-nav__footer">
         <span className={online === false ? "nxs-nav__status is-offline" : "nxs-nav__status"} aria-live="polite"><i aria-hidden="true" />{navigating ? "APERTURA PAGINA" : networkLabel}</span>
         <span>AI PRIVATA · PROTETTA · CONNESSA</span>
@@ -159,5 +173,26 @@ export function SiteFooter({ ctaHref = "/downloads", ctaLabel = "Esplora NexusNX
 }
 
 export function ProductMockup({ type }: { type: "desktop" | "android" }) {
-  return <div className={`product-mockup ${type}`} aria-hidden="true"><div className="mockup-glow" /><div className="device-frame"><div className="device-bar"><i /><i /><i /><span>NEXUSNXS / {type.toUpperCase()}</span></div><div className="device-content"><div className="mini-sidebar"><b>N</b><i /><i /><i /></div><div className="mini-main"><div className="mini-orb"><i/><i/><i/><span/></div><small>NEXUSNXS CORE · PRONTO</small><p>Come posso aiutarti?</p><span>AI privata, protetta e connessa al Core.</span><div className="mini-input"><span>Chiedi a NexusNXS</span><i/></div></div></div></div></div>;
+  const product = type === "desktop"
+    ? {
+        src: "/products/desktop-conversation.png",
+        alt: "Interfaccia reale di NexusNXS per PC con una conversazione aperta",
+        label: "APP PC REALE",
+      }
+    : {
+        src: "/products/android-home.png",
+        alt: "Interfaccia reale di NexusNXS per Android pronta per una nuova richiesta",
+        label: "APP ANDROID REALE",
+      };
+
+  return <figure className={`product-mockup product-mockup--real ${type}`}>
+    <div className="mockup-glow" aria-hidden="true" />
+    <div className="device-frame">
+      <div className="device-bar" aria-hidden="true"><i /><i /><i /><span>NEXUSNXS / {type.toUpperCase()}</span></div>
+      <div className="product-screen">
+        <Image src={product.src} alt={product.alt} fill sizes={type === "desktop" ? "(max-width: 900px) 92vw, 620px" : "(max-width: 900px) 50vw, 245px"} unoptimized />
+      </div>
+      <figcaption><i aria-hidden="true" />{product.label}</figcaption>
+    </div>
+  </figure>;
 }

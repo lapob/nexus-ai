@@ -80,11 +80,61 @@ test("the mobile navigation is icon-only, fullscreen and keyboard safe at every 
     expect(state.rect?.width).toBeCloseTo(viewport.width, 0);
     expect(state.rect?.height).toBeCloseTo(viewport.height, 0);
     expect(Math.max(...state.linkSizes)).toBeLessThanOrEqual(38);
+    const linkLayout = await navigation.locator("a").first().evaluate((link) => ({
+      columns: getComputedStyle(link).gridTemplateColumns.split(" ").filter(Boolean).length,
+      number: getComputedStyle(link.querySelector(".nxs-nav__number")).display,
+      icon: getComputedStyle(link.querySelector(".nxs-nav__icon")).display,
+      wraps: link.scrollHeight > link.clientHeight + 1,
+    }));
+    expect(linkLayout.columns).toBe(3);
+    expect(linkLayout.number).toBe("none");
+    expect(linkLayout.icon).toBe("grid");
+    expect(linkLayout.wraps).toBe(false);
 
     await page.keyboard.press("Escape");
     await expect(navigation).toBeHidden();
     await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeFocused();
     await context.close();
+  }
+});
+
+test("the desktop navigation is a compact, expanding and accessible side rail", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/desktop", { waitUntil: "load" });
+  const navigation = page.getByRole("navigation", { name: "Navigazione principale" });
+  const content = page.locator("#site-content");
+
+  await expect(navigation).toBeVisible();
+  const compact = await navigation.boundingBox();
+  expect(compact?.width).toBeCloseTo(76, 0);
+  expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(76, 0);
+  await expect(navigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
+
+  await navigation.hover();
+  await page.waitForTimeout(380);
+  const expanded = await navigation.boundingBox();
+  expect(expanded?.width).toBeGreaterThanOrEqual(246);
+  await expect(navigation.locator(".nxs-nav__label").first()).toBeVisible();
+
+  const layout = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+});
+
+test("product pages use real accessible app captures without hydration flashes", async ({ page }) => {
+  for (const product of [
+    { route: "/desktop", image: "desktop-conversation.png", alt: /interfaccia reale.*PC/i },
+    { route: "/android", image: "android-home.png", alt: /interfaccia reale.*Android/i },
+  ]) {
+    await page.goto(product.route, { waitUntil: "domcontentloaded" });
+    const hero = page.locator(".product-hero");
+    const image = page.locator(`img[src*="${product.image}"]`).first();
+    await expect(hero).toBeVisible();
+    await expect(image).toHaveAttribute("alt", product.alt);
+    await page.waitForTimeout(120);
+    expect(Number.parseFloat(await hero.evaluate((element) => getComputedStyle(element).opacity))).toBe(1);
   }
 });
 
