@@ -113,7 +113,8 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
   assert.match(statusHelper, /data\.status === "ok"/);
   assert.match(statusRoute, /checkNexusNxsAi/);
   assert.match(statusPage, /checkNexusNxsAi/);
-  assert.match(statusPage, /NON MONITORATO/);
+  assert.match(statusPage, /PRIVATO/);
+  assert.match(statusPage, /Fuori dal perimetro pubblico/);
 });
 
 test("renders every public route with one shared, complete navigation", async () => {

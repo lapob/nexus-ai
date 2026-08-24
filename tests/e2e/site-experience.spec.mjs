@@ -201,3 +201,53 @@ test("motion quality adapts without exposing hardware details in the interface",
     await context.close();
   }
 });
+
+test("mobile status and security surfaces stay below the fixed chrome and animate without clipping", async ({ browser }) => {
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 592, height: 960 },
+  ]) {
+    const context = await browser.newContext({ viewport, colorScheme: "dark", reducedMotion: "no-preference" });
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => 8 });
+      Object.defineProperty(navigator, "deviceMemory", { configurable: true, get: () => 8 });
+      Object.defineProperty(navigator, "connection", {
+        configurable: true,
+        get: () => ({ saveData: false, effectiveType: "4g" }),
+      });
+    });
+    const page = await context.newPage();
+
+    for (const route of ["/security", "/status"]) {
+      await page.goto(route, { waitUntil: "load" });
+      const geometry = await page.evaluate(() => {
+        const header = document.querySelector(".nxs-header")?.getBoundingClientRect();
+        const firstSection = document.querySelector(".inner-page > section:first-child")?.getBoundingClientRect();
+        const bounded = [...document.querySelectorAll(".trust-seal, .trust-seal span, .service-list > div")]
+          .map((element) => element.getBoundingClientRect())
+          .every((rect) => rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+        return {
+          headerBottom: header?.bottom ?? 0,
+          firstSectionTop: firstSection?.top ?? -1,
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+          bounded,
+        };
+      });
+
+      expect(geometry.firstSectionTop, `${route} must begin at the viewport top`).toBeGreaterThanOrEqual(0);
+      expect(geometry.headerBottom, `${route} header must have a stable height`).toBeGreaterThanOrEqual(64);
+      expect(geometry.scrollWidth, `${route} must not overflow`).toBeLessThanOrEqual(geometry.clientWidth + 1);
+      expect(geometry.bounded, `${route} mobile content must remain bounded`).toBe(true);
+    }
+
+    await page.goto("/security", { waitUntil: "load" });
+    await expect(page.locator("html")).toHaveClass(/nxs-motion-balanced/);
+    const seal = page.locator(".trust-seal");
+    await expect(seal).toBeVisible();
+    const sealMotion = await seal.evaluate((element) => getComputedStyle(element).animationName);
+    expect(sealMotion).toContain("nxs-trust-breathe");
+    await context.close();
+  }
+});

@@ -303,7 +303,14 @@
   }
   .nexus-operational__eyebrow, .nexus-operational__actions { justify-content: center; }
   .nexus-operational__copy > p:not(.nexus-operational__eyebrow) { margin-inline: auto; }
-  .status-hero .status-presence { position: relative; inset: auto; margin: 0 0 1rem auto; }
+  .status-hero .status-presence {
+    position: relative;
+    inset: auto;
+    width: clamp(6.5rem, 24vw, 8rem);
+    min-height: 5.5rem;
+    margin: 0 0 .45rem auto;
+    opacity: .62;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
