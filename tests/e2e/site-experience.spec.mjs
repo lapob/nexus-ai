@@ -103,15 +103,18 @@ test("the desktop navigation is a compact, expanding and accessible side rail", 
   await page.goto("/desktop", { waitUntil: "load" });
   const header = page.locator(".nxs-header");
   const navigation = page.getByRole("navigation", { name: "Navigazione principale" });
+  const topNavigation = page.getByRole("navigation", { name: "Navigazione rapida" });
   const content = page.locator("#site-content");
 
   await expect(navigation).toBeVisible();
   const headerBox = await header.boundingBox();
   const compact = await navigation.boundingBox();
   expect(headerBox?.height).toBeCloseTo(72, 0);
-  expect(compact?.y).toBeCloseTo(headerBox?.height ?? 0, 0);
-  expect(compact?.height).toBeCloseTo(900 - (headerBox?.height ?? 0), 0);
+  expect(compact?.y).toBeCloseTo(0, 0);
+  expect(compact?.height).toBeCloseTo(900, 0);
   expect(compact?.width).toBeCloseTo(76, 0);
+  await expect(topNavigation).toBeVisible();
+  await expect(topNavigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
   expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(76, 0);
   await expect(navigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
 
@@ -166,9 +169,9 @@ test("fixed chrome stays stable at effective 100, 125, 150 and 200 percent deskt
     expect(before.scrollWidth).toBeLessThanOrEqual(before.clientWidth + 1);
 
     if (viewport.desktopRail) {
-      expect(before.nav?.top).toBeCloseTo(before.header?.bottom ?? 0, 0);
+      expect(before.nav?.top).toBeCloseTo(0, 0);
       expect(before.nav?.bottom).toBeCloseTo(viewport.height, 0);
-      expect(before.nav?.height).toBeCloseTo(viewport.height - (before.header?.height ?? 0), 0);
+      expect(before.nav?.height).toBeCloseTo(viewport.height, 0);
       expect(before.nav?.width).toBeCloseTo(76, 0);
     } else {
       await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();

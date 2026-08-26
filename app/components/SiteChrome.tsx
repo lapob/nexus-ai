@@ -106,11 +106,19 @@ export function SiteHeader() {
   } as const;
   const networkLabel = online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE";
 
-  return <header className={open ? "nxs-header is-menu-open" : "nxs-header"}>
+  return <><header className={open ? "nxs-header is-menu-open" : "nxs-header"}>
     <HardNavigationLink className="nxs-brand" href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
       <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
       <span>NEXUSNXS</span>
     </HardNavigationLink>
+
+    <nav className="nxs-top-nav" aria-label="Navigazione rapida">
+      {navigationItems.map(({ href, label }) => <HardNavigationLink
+        key={href}
+        href={href}
+        aria-current={pathname === href ? "page" : undefined}
+      >{label}</HardNavigationLink>)}
+    </nav>
 
     <button
       ref={toggleRef}
@@ -127,41 +135,40 @@ export function SiteHeader() {
       <span className="nxs-menu-glyph" aria-hidden="true"><i /><i /><i /></span>
     </button>
 
-    <nav
-      ref={navRef}
-      id="main-navigation"
-      className={`nxs-nav${open ? " is-open" : ""}${navigating ? " is-navigating" : ""}`}
-      aria-label="Navigazione principale"
-      aria-busy={navigating}
-    >
-      <div className="nxs-nav__links">
-        {navigationItems.map(({ href, label }, index) => {
-          const Icon = iconByHref[href];
-          return <HardNavigationLink
-            className={href === "/downloads" ? "nxs-nav__link nxs-nav__link--download" : "nxs-nav__link"}
-            key={href}
-            href={href}
-            onClick={() => setNavigating(true)}
-            aria-current={pathname === href ? "page" : undefined}
-          >
-            <span className="nxs-nav__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-            <span className="nxs-nav__icon" aria-hidden="true"><Icon size={18} strokeWidth={1.65} /></span>
-            <span className="nxs-nav__label">{label}</span>
-            <span className="nxs-nav__arrow" aria-hidden="true">↗</span>
-          </HardNavigationLink>;
-        })}
-      </div>
-      <span className="nxs-nav__progress" aria-hidden="true"><i /></span>
-      <div className="nxs-nav__footer">
-        <span className={online === false ? "nxs-nav__status is-offline" : "nxs-nav__status"} aria-live="polite"><i aria-hidden="true" />{navigating ? "APERTURA PAGINA" : networkLabel}</span>
-        <span>AI PRIVATA · PROTETTA · CONNESSA</span>
-      </div>
-    </nav>
-
     <HardNavigationLink className={online === false ? "nxs-network is-offline" : "nxs-network"} href="/status">
       <i aria-hidden="true" /> {networkLabel}
     </HardNavigationLink>
-  </header>;
+  </header>
+  <nav
+    ref={navRef}
+    id="main-navigation"
+    className={`nxs-nav${open ? " is-open" : ""}${navigating ? " is-navigating" : ""}`}
+    aria-label="Navigazione principale"
+    aria-busy={navigating}
+  >
+    <div className="nxs-nav__links">
+      {navigationItems.map(({ href, label }, index) => {
+        const Icon = iconByHref[href];
+        return <HardNavigationLink
+          className={href === "/downloads" ? "nxs-nav__link nxs-nav__link--download" : "nxs-nav__link"}
+          key={href}
+          href={href}
+          onClick={() => setNavigating(true)}
+          aria-current={pathname === href ? "page" : undefined}
+        >
+          <span className="nxs-nav__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+          <span className="nxs-nav__icon" aria-hidden="true"><Icon size={18} strokeWidth={1.65} /></span>
+          <span className="nxs-nav__label">{label}</span>
+          <span className="nxs-nav__arrow" aria-hidden="true">↗</span>
+        </HardNavigationLink>;
+      })}
+    </div>
+    <span className="nxs-nav__progress" aria-hidden="true"><i /></span>
+    <div className="nxs-nav__footer">
+      <span className={online === false ? "nxs-nav__status is-offline" : "nxs-nav__status"} aria-live="polite"><i aria-hidden="true" />{navigating ? "APERTURA PAGINA" : networkLabel}</span>
+      <span>AI PRIVATA · PROTETTA · CONNESSA</span>
+    </div>
+  </nav></>;
 }
 
 export function SiteFooter({ ctaHref = "/downloads", ctaLabel = "Esplora NexusNXS" }: { ctaHref?: string; ctaLabel?: string } = {}) {
