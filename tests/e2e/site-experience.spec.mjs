@@ -98,7 +98,7 @@ test("the mobile navigation is icon-only, fullscreen and keyboard safe at every 
   }
 });
 
-test("the desktop navigation is a compact, expanding and accessible side rail", async ({ page }) => {
+test("desktop uses one compact top navigation without a duplicate side rail", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/desktop", { waitUntil: "load" });
   const header = page.locator(".nxs-header");
@@ -106,23 +106,12 @@ test("the desktop navigation is a compact, expanding and accessible side rail", 
   const topNavigation = page.getByRole("navigation", { name: "Navigazione rapida" });
   const content = page.locator("#site-content");
 
-  await expect(navigation).toBeVisible();
+  await expect(navigation).toBeHidden();
   const headerBox = await header.boundingBox();
-  const compact = await navigation.boundingBox();
   expect(headerBox?.height).toBeCloseTo(72, 0);
-  expect(compact?.y).toBeCloseTo(0, 0);
-  expect(compact?.height).toBeCloseTo(900, 0);
-  expect(compact?.width).toBeCloseTo(76, 0);
   await expect(topNavigation).toBeVisible();
   await expect(topNavigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
-  expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(76, 0);
-  await expect(navigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
-
-  await navigation.hover();
-  await page.waitForTimeout(380);
-  const expanded = await navigation.boundingBox();
-  expect(expanded?.width).toBeGreaterThanOrEqual(246);
-  await expect(navigation.locator(".nxs-nav__label").first()).toBeVisible();
+  expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(0, 0);
 
   const layout = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
@@ -169,10 +158,8 @@ test("fixed chrome stays stable at effective 100, 125, 150 and 200 percent deskt
     expect(before.scrollWidth).toBeLessThanOrEqual(before.clientWidth + 1);
 
     if (viewport.desktopRail) {
-      expect(before.nav?.top).toBeCloseTo(0, 0);
-      expect(before.nav?.bottom).toBeCloseTo(viewport.height, 0);
-      expect(before.nav?.height).toBeCloseTo(viewport.height, 0);
-      expect(before.nav?.width).toBeCloseTo(76, 0);
+      await expect(page.getByRole("navigation", { name: "Navigazione rapida" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
     } else {
       await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
       await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
@@ -191,11 +178,6 @@ test("fixed chrome stays stable at effective 100, 125, 150 and 200 percent deskt
     expect(after.header?.top).toBeCloseTo(before.header?.top ?? 0, 0);
     expect(after.header?.bottom).toBeCloseTo(before.header?.bottom ?? 0, 0);
     expect(after.header?.height).toBeCloseTo(before.header?.height ?? 0, 0);
-    if (viewport.desktopRail) {
-      expect(after.nav?.top).toBeCloseTo(before.nav?.top ?? 0, 0);
-      expect(after.nav?.bottom).toBeCloseTo(before.nav?.bottom ?? 0, 0);
-      expect(after.nav?.height).toBeCloseTo(before.nav?.height ?? 0, 0);
-    }
     await context.close();
   }
 });
@@ -308,13 +290,14 @@ test("homepage sections reveal on scroll through the shared motion runtime", asy
   expect(initialReveal.reducedMotion).toBe(false);
   expect(initialReveal.matchesMotionRule, initialReveal.rootClassName).toBe(true);
   expect(initialReveal.top).toBeGreaterThan(720);
-  expect(initialReveal.opacity).toBe(1);
+  expect(initialReveal.opacity).toBe(0);
   expect(initialReveal.transform).not.toBe("none");
   expect(initialReveal.translateY).toBeGreaterThan(0);
 
   await target.scrollIntoViewIfNeeded();
   await expect(target).toHaveClass(/nxs-in-view/);
   await expect.poll(() => target.evaluate((element) => getComputedStyle(element).transform)).toBe("none");
+  await expect.poll(() => target.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity))).toBe(1);
 
   const progress = Number.parseFloat(await page.locator("html").evaluate((element) => getComputedStyle(element).getPropertyValue("--nxs-scroll")));
   expect(progress).toBeGreaterThan(0);

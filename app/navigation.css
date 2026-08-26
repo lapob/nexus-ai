@@ -703,6 +703,20 @@
   .nxs-nav::-webkit-scrollbar { display: none; }
 }
 
+/* Desktop uses one navigation surface only: the compact top bar. The same
+   semantic menu remains available as a full-screen overlay on touch layouts. */
+@media (min-width: 1025px) {
+  :root { --nxs-rail-width: 0px; }
+
+  #site-content { padding-left: 0; }
+
+  .nxs-header {
+    padding-left: max(var(--page-pad), calc((100vw - var(--content-max)) / 2));
+  }
+
+  .nxs-nav { display: none; }
+}
+
 @media (max-width: 1024px) {
   .nxs-nav__link,
   .nxs-nav__link--download {

@@ -84,6 +84,7 @@
 /* A single shared motion system keeps the pages expressive without permanent heavy loops. */
 .nxs-motion-preparing .nxs-motion-candidate,
 .nxs-motion-ready .nxs-motion-candidate {
+  opacity: 0;
   transform: translate3d(0, var(--nxs-reveal-distance), 0);
 }
 
@@ -93,11 +94,15 @@
 
 .nxs-motion-ready .nxs-motion-candidate {
   transition:
+    opacity calc(var(--nxs-reveal-duration) * .82) cubic-bezier(.16, 1, .3, 1),
     transform var(--nxs-reveal-duration) cubic-bezier(.16, 1, .3, 1);
+  will-change: opacity, transform;
 }
 
 .nxs-motion-ready .nxs-motion-candidate.nxs-in-view {
+  opacity: 1;
   transform: none;
+  will-change: auto;
 }
 
 .nxs-motion-ready .feature-grid > article:nth-child(2),
@@ -135,6 +140,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nxs-motion-ready .nxs-motion-candidate {
+    opacity: 1;
     transform: none;
     transition: none;
   }
