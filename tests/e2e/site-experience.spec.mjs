@@ -304,6 +304,26 @@ test("homepage sections reveal on scroll through the shared motion runtime", asy
   await context.close();
 });
 
+test("ambient motion only runs while its surface is near the viewport", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, colorScheme: "dark", reducedMotion: "no-preference" });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => 8 });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, get: () => 8 });
+  });
+  const page = await context.newPage();
+  await page.goto("/", { waitUntil: "load" });
+
+  const surface = page.locator(".presence-system");
+  const indicator = surface.locator(".presence-grid article > i").first();
+  await expect(surface).not.toHaveClass(/nxs-ambient-active/);
+  await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).animationPlayState)).toBe("paused");
+
+  await surface.scrollIntoViewIfNeeded();
+  await expect(surface).toHaveClass(/nxs-ambient-active/);
+  await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).animationPlayState)).toBe("running");
+  await context.close();
+});
+
 test("reduced motion keeps every reveal target immediately readable", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
   const page = await context.newPage();
@@ -363,6 +383,8 @@ test("mobile status and security surfaces stay below the fixed chrome and animat
     await expect(page.locator("html")).toHaveClass(/nxs-motion-balanced/);
     const seal = page.locator(".trust-seal");
     await expect(seal).toBeVisible();
+    await seal.evaluate((element) => element.scrollIntoView({ block: "center" }));
+    await expect(seal).toHaveClass(/nxs-ambient-active/);
     const sealMotion = await seal.evaluate((element) => getComputedStyle(element).animationName);
     expect(sealMotion).toContain("nxs-trust-breathe");
     await context.close();

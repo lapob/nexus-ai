@@ -240,6 +240,16 @@
   .nxs-motion-ultra .trust-seal::after {
     animation: nxs-trust-sheen 9s ease-in-out infinite;
   }
+
+  .trust-seal,
+  .trust-seal::after {
+    animation-play-state: paused;
+  }
+
+  .trust-seal.nxs-ambient-active,
+  .trust-seal.nxs-ambient-active::after {
+    animation-play-state: running;
+  }
 }
 
 @media (max-width: 820px) {

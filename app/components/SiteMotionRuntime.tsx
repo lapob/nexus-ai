@@ -41,18 +41,45 @@ const REVEAL_SELECTOR = [
   ".footer-links > div",
 ].join(",");
 
+const AMBIENT_SELECTOR = [
+  ".hero",
+  ".app-grid",
+  ".presence-system",
+  ".trust-seal",
+  "[data-nexus-presence]",
+].join(",");
+
 export function SiteMotionRuntime() {
   useLayoutEffect(() => {
     const root = document.documentElement;
     const runtime = navigator as RuntimeNavigator;
     const tier = resolveMotionTier(runtime);
     const revealTargets = Array.from(document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
+    const ambientTargets = Array.from(document.querySelectorAll<HTMLElement>(AMBIENT_SELECTOR));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let scrollFrame = 0;
 
     root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
     root.classList.add("nxs-motion-preparing", `nxs-motion-${tier}`);
     root.dataset.motionTier = tier;
+
+    const syncVisibility = () => {
+      root.toggleAttribute("data-motion-paused", document.hidden);
+    };
+    syncVisibility();
+    document.addEventListener("visibilitychange", syncVisibility);
+
+    const ambientObserver = typeof IntersectionObserver === "function" && !reducedMotion.matches && tier !== "lite"
+      ? new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          entry.target.classList.toggle("nxs-ambient-active", entry.isIntersecting);
+        }
+      }, { rootMargin: "80px 0px", threshold: 0.01 })
+      : null;
+    ambientTargets.forEach((target) => {
+      if (ambientObserver) ambientObserver.observe(target);
+      else target.classList.toggle("nxs-ambient-active", !reducedMotion.matches && tier !== "lite");
+    });
 
     const showTarget = (target: HTMLElement) => {
       target.classList.add("nxs-in-view");
@@ -96,10 +123,14 @@ export function SiteMotionRuntime() {
 
     return () => {
       revealObserver?.disconnect();
+      ambientObserver?.disconnect();
       cancelAnimationFrame(scrollFrame);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
+      ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
+      document.removeEventListener("visibilitychange", syncVisibility);
+      root.removeAttribute("data-motion-paused");
       root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
       delete root.dataset.motionTier;
       root.style.removeProperty("--nxs-scroll");

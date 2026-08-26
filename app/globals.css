@@ -523,6 +523,38 @@ body {
     animation: nxs-orbit-drift 24s linear infinite;
     transform-origin: center;
   }
+
+  /* Ambient loops are dormant off-screen and while the tab is hidden. */
+  .app-orb span,
+  .presence-grid article > i,
+  .network-pill i,
+  .status i,
+  .mini-orb > i:nth-child(3),
+  .aurora i:nth-child(3) {
+    animation-play-state: paused;
+  }
+
+  .nxs-ambient-active .app-orb span,
+  .nxs-ambient-active .presence-grid article > i,
+  .nxs-ambient-active .network-pill i,
+  .nxs-ambient-active .status i,
+  .nxs-ambient-active .mini-orb > i:nth-child(3),
+  .hero.nxs-ambient-active .aurora i:nth-child(3) {
+    animation-play-state: running;
+  }
+
+  html[data-motion-paused] * {
+    animation-play-state: paused !important;
+  }
+
+  .nxs-motion-lite .app-orb span,
+  .nxs-motion-lite .presence-grid article > i,
+  .nxs-motion-lite .network-pill i,
+  .nxs-motion-lite .status i,
+  .nxs-motion-lite .mini-orb > i:nth-child(3),
+  .nxs-motion-lite .aurora i:nth-child(3) {
+    animation: none;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
