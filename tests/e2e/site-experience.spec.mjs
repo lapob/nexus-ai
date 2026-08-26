@@ -324,6 +324,26 @@ test("ambient motion only runs while its surface is near the viewport", async ({
   await context.close();
 });
 
+test("the product demo is keyboard native and local performance metrics never transmit", async ({ page }) => {
+  const requests = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/", { waitUntil: "load" });
+
+  const demo = page.locator(".nexus-demo");
+  await demo.scrollIntoViewIfNeeded();
+  const firstPrompt = demo.locator("details").first();
+  await firstPrompt.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(firstPrompt).toHaveAttribute("open", "");
+  await expect(firstPrompt).toContainText("contesto autorizzato", { useInnerText: false });
+
+  await page.goto("/status", { waitUntil: "load" });
+  const metrics = page.locator(".client-performance");
+  await expect(metrics).toBeVisible();
+  await expect(metrics).toContainText("Privacy intatta");
+  expect(requests.some((url) => /vitals|analytics|telemetry/iu.test(url))).toBe(false);
+});
+
 test("reduced motion keeps every reveal target immediately readable", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
   const page = await context.newPage();

@@ -20,7 +20,7 @@ const find = (relative) => files.find((file) => file.relative === relative)?.byt
 const kib = (bytes) => Math.round(bytes / 102.4) / 10;
 
 const checks = [
-  { label: "JavaScript client", actual: sum((file) => file.relative.endsWith(".js")), maximum: 550 * 1024 },
+  { label: "JavaScript client", actual: sum((file) => file.relative.endsWith(".js")), maximum: 525 * 1024 },
   { label: "CSS client", actual: sum((file) => file.relative.endsWith(".css")), maximum: 96 * 1024 },
   { label: "Cattura Android", actual: find("products/android-home.png"), maximum: 190 * 1024 },
   { label: "Cattura desktop", actual: find("products/desktop-conversation.png"), maximum: 190 * 1024 },
