@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -23,6 +23,7 @@ function resolveMotionTier(runtime: RuntimeNavigator): MotionTier {
 }
 
 const REVEAL_SELECTOR = [
+  ".reveal",
   ".product-hero",
   ".trust-hero",
   ".download-hero",
@@ -41,32 +42,44 @@ const REVEAL_SELECTOR = [
 ].join(",");
 
 export function SiteMotionRuntime() {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     const runtime = navigator as RuntimeNavigator;
     const tier = resolveMotionTier(runtime);
     const revealTargets = Array.from(document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let scrollFrame = 0;
 
-    root.classList.remove(...MOTION_TIER_CLASSES);
-    root.classList.add("nxs-motion-ready", `nxs-motion-${tier}`);
+    root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
+    root.classList.add("nxs-motion-preparing", `nxs-motion-${tier}`);
     root.dataset.motionTier = tier;
 
-    const revealObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        (entry.target as HTMLElement).classList.add("nxs-in-view");
-        revealObserver.unobserve(entry.target);
-      }
-    }, { rootMargin: "80px 0px -8%", threshold: 0.04 });
+    const showTarget = (target: HTMLElement) => {
+      target.classList.add("nxs-in-view");
+    };
+    const revealObserver = typeof IntersectionObserver === "function" && !reducedMotion.matches
+      ? new IntersectionObserver((entries, observer) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          showTarget(entry.target as HTMLElement);
+          observer.unobserve(entry.target);
+        }
+      }, { rootMargin: "96px 0px -7%", threshold: 0.04 })
+      : null;
     revealTargets.forEach((target) => {
-      if (target.getBoundingClientRect().top <= window.innerHeight * 1.04) {
-        target.classList.add("nxs-in-view");
+      if (!revealObserver || target.getBoundingClientRect().top <= window.innerHeight * 1.02) {
+        showTarget(target);
         return;
       }
       target.classList.add("nxs-motion-candidate");
       revealObserver.observe(target);
     });
+
+    // Commit the hidden starting state before transitions are enabled. This
+    // prevents the first hydration frame from animating content backwards.
+    void root.offsetWidth;
+    root.classList.remove("nxs-motion-preparing");
+    root.classList.add("nxs-motion-ready");
 
     const updateScroll = () => {
       scrollFrame = 0;
@@ -79,12 +92,15 @@ export function SiteMotionRuntime() {
 
     updateScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
 
     return () => {
-      revealObserver.disconnect();
+      revealObserver?.disconnect();
       cancelAnimationFrame(scrollFrame);
       window.removeEventListener("scroll", onScroll);
-      root.classList.remove("nxs-motion-ready", ...MOTION_TIER_CLASSES);
+      window.removeEventListener("resize", onScroll);
+      revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
+      root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
       delete root.dataset.motionTier;
       root.style.removeProperty("--nxs-scroll");
     };

@@ -82,8 +82,16 @@
 }
 
 /* A single shared motion system keeps the pages expressive without permanent heavy loops. */
+.nxs-motion-preparing .nxs-motion-candidate,
 .nxs-motion-ready .nxs-motion-candidate {
   transform: translate3d(0, var(--nxs-reveal-distance), 0);
+}
+
+.nxs-motion-preparing .nxs-motion-candidate {
+  transition: none;
+}
+
+.nxs-motion-ready .nxs-motion-candidate {
   transition:
     transform var(--nxs-reveal-duration) cubic-bezier(.16, 1, .3, 1);
 }
@@ -206,17 +214,6 @@
   text-wrap: balance;
 }
 
-.nxs-motion-ready .nxs-motion-candidate {
-  opacity: .72;
-  transition:
-    opacity var(--nxs-reveal-duration) ease,
-    transform var(--nxs-reveal-duration) cubic-bezier(.16, 1, .3, 1);
-}
-
-.nxs-motion-ready .nxs-motion-candidate.nxs-in-view {
-  opacity: 1;
-}
-
 @keyframes nxs-trust-breathe {
   0%, 100% { transform: translate3d(0, 0, 0); }
   50% { transform: translate3d(0, -4px, 0); }
@@ -331,10 +328,6 @@
   .nxs-motion-ready .nxs-motion-candidate {
     transform: translate3d(0, 8px, 0);
   }
-}
-
-.nxs-motion-lite .nxs-motion-candidate {
-  opacity: .88;
 }
 
 @media (prefers-reduced-motion: reduce) {

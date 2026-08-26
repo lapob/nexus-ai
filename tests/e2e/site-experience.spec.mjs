@@ -101,11 +101,16 @@ test("the mobile navigation is icon-only, fullscreen and keyboard safe at every 
 test("the desktop navigation is a compact, expanding and accessible side rail", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/desktop", { waitUntil: "load" });
+  const header = page.locator(".nxs-header");
   const navigation = page.getByRole("navigation", { name: "Navigazione principale" });
   const content = page.locator("#site-content");
 
   await expect(navigation).toBeVisible();
+  const headerBox = await header.boundingBox();
   const compact = await navigation.boundingBox();
+  expect(headerBox?.height).toBeCloseTo(72, 0);
+  expect(compact?.y).toBeCloseTo(headerBox?.height ?? 0, 0);
+  expect(compact?.height).toBeCloseTo(900 - (headerBox?.height ?? 0), 0);
   expect(compact?.width).toBeCloseTo(76, 0);
   expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(76, 0);
   await expect(navigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
@@ -121,6 +126,75 @@ test("the desktop navigation is a compact, expanding and accessible side rail", 
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+});
+
+test("fixed chrome stays stable at effective 100, 125, 150 and 200 percent desktop scales", async ({ browser }) => {
+  for (const viewport of [
+    { width: 1920, height: 1080, desktopRail: true },
+    { width: 1536, height: 864, desktopRail: true },
+    { width: 1280, height: 720, desktopRail: true },
+    { width: 960, height: 540, desktopRail: false },
+  ]) {
+    const context = await browser.newContext({ viewport, colorScheme: "dark" });
+    const page = await context.newPage();
+    await page.goto("/", { waitUntil: "load" });
+
+    const before = await page.evaluate(() => {
+      const header = document.querySelector(".nxs-header")?.getBoundingClientRect();
+      const brand = document.querySelector(".nxs-brand")?.getBoundingClientRect();
+      const controlElement = [...document.querySelectorAll(".nxs-network, .nxs-menu-toggle")]
+        .find((element) => getComputedStyle(element).display !== "none");
+      const control = controlElement?.getBoundingClientRect();
+      const nav = document.getElementById("main-navigation")?.getBoundingClientRect();
+      return {
+        header: header && { top: header.top, right: header.right, bottom: header.bottom, left: header.left, height: header.height },
+        brandRight: brand?.right ?? 0,
+        controlLeft: control?.left ?? innerWidth,
+        nav: nav && { top: nav.top, bottom: nav.bottom, height: nav.height, width: nav.width },
+        position: getComputedStyle(document.querySelector(".nxs-header")).position,
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+
+    expect(before.position).toBe("fixed");
+    expect(before.header?.top).toBeCloseTo(0, 0);
+    expect(before.header?.left).toBeCloseTo(0, 0);
+    expect(before.header?.right).toBeCloseTo(viewport.width, 0);
+    expect(before.header?.height).toBeCloseTo(viewport.desktopRail ? 72 : 64, 0);
+    expect(before.brandRight + 8).toBeLessThanOrEqual(before.controlLeft);
+    expect(before.scrollWidth).toBeLessThanOrEqual(before.clientWidth + 1);
+
+    if (viewport.desktopRail) {
+      expect(before.nav?.top).toBeCloseTo(before.header?.bottom ?? 0, 0);
+      expect(before.nav?.bottom).toBeCloseTo(viewport.height, 0);
+      expect(before.nav?.height).toBeCloseTo(viewport.height - (before.header?.height ?? 0), 0);
+      expect(before.nav?.width).toBeCloseTo(76, 0);
+    } else {
+      await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
+    }
+
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(80);
+    const after = await page.evaluate(() => {
+      const header = document.querySelector(".nxs-header")?.getBoundingClientRect();
+      const nav = document.getElementById("main-navigation")?.getBoundingClientRect();
+      return {
+        header: header && { top: header.top, bottom: header.bottom, height: header.height },
+        nav: nav && { top: nav.top, bottom: nav.bottom, height: nav.height },
+      };
+    });
+    expect(after.header?.top).toBeCloseTo(before.header?.top ?? 0, 0);
+    expect(after.header?.bottom).toBeCloseTo(before.header?.bottom ?? 0, 0);
+    expect(after.header?.height).toBeCloseTo(before.header?.height ?? 0, 0);
+    if (viewport.desktopRail) {
+      expect(after.nav?.top).toBeCloseTo(before.nav?.top ?? 0, 0);
+      expect(after.nav?.bottom).toBeCloseTo(before.nav?.bottom ?? 0, 0);
+      expect(after.nav?.height).toBeCloseTo(before.nav?.height ?? 0, 0);
+    }
+    await context.close();
+  }
 });
 
 test("product pages use real accessible app captures without hydration flashes", async ({ page }) => {
@@ -200,6 +274,63 @@ test("motion quality adapts without exposing hardware details in the interface",
     await expect(page.locator("body")).not.toContainText(/hardwareConcurrency|deviceMemory|motion tier/i);
     await context.close();
   }
+});
+
+test("homepage sections reveal on scroll through the shared motion runtime", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, colorScheme: "dark", reducedMotion: "no-preference" });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => 8 });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, get: () => 8 });
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      get: () => ({ saveData: false, effectiveType: "4g" }),
+    });
+  });
+  const page = await context.newPage();
+  await page.goto("/", { waitUntil: "load" });
+
+  const target = page.locator(".presence-system");
+  await expect(target).toHaveClass(/nxs-motion-candidate/);
+  const initialReveal = await target.evaluate((element) => ({
+    className: element.className,
+    opacity: Number.parseFloat(getComputedStyle(element).opacity),
+    transform: getComputedStyle(element).transform,
+    translateY: new DOMMatrix(getComputedStyle(element).transform).m42,
+    reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+    matchesMotionRule: element.matches(".nxs-motion-ready .nxs-motion-candidate"),
+    rootClassName: document.documentElement.className,
+    top: element.getBoundingClientRect().top,
+  }));
+  expect(initialReveal.className).not.toContain("nxs-in-view");
+  expect(initialReveal.reducedMotion).toBe(false);
+  expect(initialReveal.matchesMotionRule, initialReveal.rootClassName).toBe(true);
+  expect(initialReveal.top).toBeGreaterThan(720);
+  expect(initialReveal.opacity).toBe(1);
+  expect(initialReveal.transform).not.toBe("none");
+  expect(initialReveal.translateY).toBeGreaterThan(0);
+
+  await target.scrollIntoViewIfNeeded();
+  await expect(target).toHaveClass(/nxs-in-view/);
+  await expect.poll(() => target.evaluate((element) => getComputedStyle(element).transform)).toBe("none");
+
+  const progress = Number.parseFloat(await page.locator("html").evaluate((element) => getComputedStyle(element).getPropertyValue("--nxs-scroll")));
+  expect(progress).toBeGreaterThan(0);
+  await context.close();
+});
+
+test("reduced motion keeps every reveal target immediately readable", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
+  const page = await context.newPage();
+  await page.goto("/", { waitUntil: "load" });
+
+  const targets = page.locator(".reveal");
+  await expect(targets.first()).toHaveClass(/nxs-in-view/);
+  const states = await targets.evaluateAll((elements) => elements.map((element) => ({
+    opacity: Number.parseFloat(getComputedStyle(element).opacity),
+    transform: getComputedStyle(element).transform,
+  })));
+  expect(states.every(({ opacity, transform }) => opacity === 1 && transform === "none")).toBe(true);
+  await context.close();
 });
 
 test("mobile status and security surfaces stay below the fixed chrome and animate without clipping", async ({ browser }) => {

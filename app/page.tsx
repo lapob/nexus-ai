@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect } from "react";
 import { ArrowUpRight, Blocks, BrainCircuit, Fingerprint, KeyRound, LockKeyhole, MessageCircle, Mic2, Orbit, ShieldCheck, Sparkles, Workflow, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
@@ -19,25 +16,6 @@ const presenceStates = [
 ];
 
 export default function Home() {
-  useEffect(() => {
-    const elements = Array.from(document.querySelectorAll<HTMLElement>(".reveal"));
-    const reveal = new IntersectionObserver((entries, observer) => entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      entry.target.classList.add("is-visible");
-      observer.unobserve(entry.target);
-    }), { threshold: 0.12 });
-
-    elements.forEach((element) => {
-      if (element.getBoundingClientRect().top < window.innerHeight * .92) element.classList.add("is-visible");
-      else reveal.observe(element);
-    });
-    document.documentElement.classList.add("reveal-ready");
-
-    return () => {
-      reveal.disconnect();
-      document.documentElement.classList.remove("reveal-ready");
-    };
-  }, []);
   return (
     <main id="main-content">
       <StructuredData data={[{"@context":"https://schema.org","@type":"WebSite",name:"NexusNXS",url:"https://nexusnxs.com",inLanguage:"it-IT"},{"@context":"https://schema.org","@type":"Organization",name:"NexusNXS",url:"https://nexusnxs.com",logo:"https://nexusnxs.com/nexus-icon.png",email:"hello@nexusnxs.com"}]} />

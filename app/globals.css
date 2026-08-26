@@ -339,16 +339,7 @@ body {
   margin-bottom: var(--nxs-section-space);
 }
 
-.reveal {
-  opacity: 1;
-  transform: none;
-}
-
-html.reveal-ready .reveal:not(.is-visible) {
-  opacity: 1;
-  transform: translateY(10px);
-  transition: transform .55s cubic-bezier(.22, 1, .36, 1);
-}
+.reveal { opacity: 1; transform: none; }
 
 .release-hash {
   grid-column: 2 / 4;
@@ -489,13 +480,6 @@ html.reveal-ready .reveal:not(.is-visible) {
   .legal-hero h1,
   .nexus-operational h1 {
     overflow-wrap: normal;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html.reveal-ready .reveal:not(.is-visible) {
-    opacity: 1;
-    transform: none;
   }
 }
 
