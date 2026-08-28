@@ -98,19 +98,16 @@ test("the mobile navigation is icon-only, fullscreen and keyboard safe at every 
   }
 });
 
-test("desktop uses one compact top navigation without a duplicate side rail", async ({ page }) => {
+test("desktop has no persistent header or navigation rail", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/desktop", { waitUntil: "load" });
-  const header = page.locator(".nxs-header");
   const navigation = page.getByRole("navigation", { name: "Navigazione principale" });
-  const topNavigation = page.getByRole("navigation", { name: "Navigazione rapida" });
   const content = page.locator("#site-content");
 
   await expect(navigation).toBeHidden();
-  const headerBox = await header.boundingBox();
-  expect(headerBox?.height).toBeCloseTo(72, 0);
-  await expect(topNavigation).toBeVisible();
-  await expect(topNavigation.getByRole("link", { name: "PC", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator(".nxs-header, .nxs-top-nav")).toHaveCount(0);
+  await expect(page.locator(".nxs-floating-brand")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
   expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(0, 0);
 
   const layout = await page.evaluate(() => ({
@@ -120,64 +117,54 @@ test("desktop uses one compact top navigation without a duplicate side rail", as
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
 });
 
-test("fixed chrome stays stable at effective 100, 125, 150 and 200 percent desktop scales", async ({ browser }) => {
+test("floating controls stay stable at effective 100, 125, 150 and 200 percent desktop scales", async ({ browser }) => {
   for (const viewport of [
-    { width: 1920, height: 1080, desktopRail: true },
-    { width: 1536, height: 864, desktopRail: true },
-    { width: 1280, height: 720, desktopRail: true },
-    { width: 960, height: 540, desktopRail: false },
+    { width: 1920, height: 1080 },
+    { width: 1536, height: 864 },
+    { width: 1280, height: 720 },
+    { width: 960, height: 540 },
   ]) {
     const context = await browser.newContext({ viewport, colorScheme: "dark" });
     const page = await context.newPage();
     await page.goto("/", { waitUntil: "load" });
 
     const before = await page.evaluate(() => {
-      const header = document.querySelector(".nxs-header")?.getBoundingClientRect();
-      const brand = document.querySelector(".nxs-brand")?.getBoundingClientRect();
-      const controlElement = [...document.querySelectorAll(".nxs-network, .nxs-menu-toggle")]
-        .find((element) => getComputedStyle(element).display !== "none");
-      const control = controlElement?.getBoundingClientRect();
-      const nav = document.getElementById("main-navigation")?.getBoundingClientRect();
+      const brand = document.querySelector(".nxs-floating-brand")?.getBoundingClientRect();
+      const control = document.querySelector(".nxs-menu-toggle")?.getBoundingClientRect();
       return {
-        header: header && { top: header.top, right: header.right, bottom: header.bottom, left: header.left, height: header.height },
-        brandRight: brand?.right ?? 0,
-        controlLeft: control?.left ?? innerWidth,
-        nav: nav && { top: nav.top, bottom: nav.bottom, height: nav.height, width: nav.width },
-        position: getComputedStyle(document.querySelector(".nxs-header")).position,
+        brand: brand && { top: brand.top, left: brand.left, width: brand.width, height: brand.height },
+        control: control && { top: control.top, right: control.right, width: control.width, height: control.height },
+        brandPosition: getComputedStyle(document.querySelector(".nxs-floating-brand")).position,
+        controlPosition: getComputedStyle(document.querySelector(".nxs-menu-toggle")).position,
         clientWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth,
       };
     });
 
-    expect(before.position).toBe("fixed");
-    expect(before.header?.top).toBeCloseTo(0, 0);
-    expect(before.header?.left).toBeCloseTo(0, 0);
-    expect(before.header?.right).toBeCloseTo(viewport.width, 0);
-    expect(before.header?.height).toBeCloseTo(viewport.desktopRail ? 72 : 64, 0);
-    expect(before.brandRight + 8).toBeLessThanOrEqual(before.controlLeft);
+    expect(before.brandPosition).toBe("fixed");
+    expect(before.controlPosition).toBe("fixed");
+    expect(before.brand?.width).toBeGreaterThanOrEqual(44);
+    expect(before.brand?.height).toBeGreaterThanOrEqual(44);
+    expect(before.control?.width).toBeGreaterThanOrEqual(44);
+    expect(before.control?.height).toBeGreaterThanOrEqual(44);
+    expect(before.brand?.left).toBeGreaterThanOrEqual(12);
+    expect(before.control?.right).toBeLessThanOrEqual(viewport.width - 12);
     expect(before.scrollWidth).toBeLessThanOrEqual(before.clientWidth + 1);
-
-    if (viewport.desktopRail) {
-      await expect(page.getByRole("navigation", { name: "Navigazione rapida" })).toBeVisible();
-      await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
-    } else {
-      await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
-      await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
-    }
+    await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
 
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await page.waitForTimeout(80);
     const after = await page.evaluate(() => {
-      const header = document.querySelector(".nxs-header")?.getBoundingClientRect();
-      const nav = document.getElementById("main-navigation")?.getBoundingClientRect();
+      const brand = document.querySelector(".nxs-floating-brand")?.getBoundingClientRect();
+      const control = document.querySelector(".nxs-menu-toggle")?.getBoundingClientRect();
       return {
-        header: header && { top: header.top, bottom: header.bottom, height: header.height },
-        nav: nav && { top: nav.top, bottom: nav.bottom, height: nav.height },
+        brand: brand && { top: brand.top, left: brand.left, width: brand.width, height: brand.height },
+        control: control && { top: control.top, right: control.right, width: control.width, height: control.height },
       };
     });
-    expect(after.header?.top).toBeCloseTo(before.header?.top ?? 0, 0);
-    expect(after.header?.bottom).toBeCloseTo(before.header?.bottom ?? 0, 0);
-    expect(after.header?.height).toBeCloseTo(before.header?.height ?? 0, 0);
+    expect(after.brand).toEqual(before.brand);
+    expect(after.control).toEqual(before.control);
     await context.close();
   }
 });
@@ -215,7 +202,7 @@ test("every mobile navigation destination opens and marks the current page", asy
   }
 });
 
-test("the mobile overlay closes at the desktop breakpoint and honors reduced motion", async ({ browser }) => {
+test("the fullscreen overlay remains coherent across breakpoints and honors reduced motion", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: "reduce", colorScheme: "dark" });
   const page = await context.newPage();
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -232,8 +219,9 @@ test("the mobile overlay closes at the desktop breakpoint and honors reduced mot
   expect(Math.max(0, ...ambientMotionSeconds)).toBeLessThanOrEqual(.02);
 
   await page.setViewportSize({ width: 1025, height: 768 });
-  await expect(page.locator("#main-navigation")).not.toHaveClass(/is-open/);
-  await expect(page.locator(".nxs-menu-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#main-navigation")).toHaveClass(/is-open/);
+  await expect(page.locator(".nxs-menu-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#main-navigation")).toBeVisible();
   await context.close();
 });
 
@@ -359,7 +347,7 @@ test("reduced motion keeps every reveal target immediately readable", async ({ b
   await context.close();
 });
 
-test("mobile status and security surfaces stay below the fixed chrome and animate without clipping", async ({ browser }) => {
+test("mobile status and security surfaces stay bounded around the floating controls", async ({ browser }) => {
   for (const viewport of [
     { width: 360, height: 800 },
     { width: 390, height: 844 },
@@ -379,13 +367,14 @@ test("mobile status and security surfaces stay below the fixed chrome and animat
     for (const route of ["/security", "/status"]) {
       await page.goto(route, { waitUntil: "load" });
       const geometry = await page.evaluate(() => {
-        const header = document.querySelector(".nxs-header")?.getBoundingClientRect();
+        const brand = document.querySelector(".nxs-floating-brand")?.getBoundingClientRect();
+        const menu = document.querySelector(".nxs-menu-toggle")?.getBoundingClientRect();
         const firstSection = document.querySelector(".inner-page > section:first-child")?.getBoundingClientRect();
         const bounded = [...document.querySelectorAll(".trust-seal, .trust-seal span, .service-list > div")]
           .map((element) => element.getBoundingClientRect())
           .every((rect) => rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
         return {
-          headerBottom: header?.bottom ?? 0,
+          floatingControls: [brand, menu].every((rect) => rect && rect.top >= 0 && rect.bottom <= innerHeight),
           firstSectionTop: firstSection?.top ?? -1,
           scrollWidth: document.documentElement.scrollWidth,
           clientWidth: document.documentElement.clientWidth,
@@ -394,7 +383,7 @@ test("mobile status and security surfaces stay below the fixed chrome and animat
       });
 
       expect(geometry.firstSectionTop, `${route} must begin at the viewport top`).toBeGreaterThanOrEqual(0);
-      expect(geometry.headerBottom, `${route} header must have a stable height`).toBeGreaterThanOrEqual(64);
+      expect(geometry.floatingControls, `${route} floating controls must remain in the viewport`).toBe(true);
       expect(geometry.scrollWidth, `${route} must not overflow`).toBeLessThanOrEqual(geometry.clientWidth + 1);
       expect(geometry.bounded, `${route} mobile content must remain bounded`).toBe(true);
     }

@@ -132,7 +132,7 @@ test("renders every public route with one shared, complete navigation", async ()
   }
 });
 
-test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", async () => {
+test("keeps the floating navigation fullscreen, accessible, and free of persistent bars", async () => {
   const [chrome, navigationStyles, layout, globalStyles] = await Promise.all([
     readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/navigation.css", import.meta.url), "utf8"),
@@ -150,7 +150,9 @@ test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", asyn
   assert.match(chrome, /setAttribute\("inert", ""\)/);
   assert.match(chrome, /const brand = document\.querySelector/);
   assert.match(chrome, /\[aria-current="page"\]/);
-  assert.match(chrome, /matchMedia\("\(min-width: 1025px\)"\)/);
+  assert.match(chrome, /className="nxs-floating-brand"/);
+  assert.doesNotMatch(chrome, /className="nxs-header/);
+  assert.doesNotMatch(chrome, /nxs-top-nav/);
   assert.match(layout, /id="site-content"/);
   assert.match(layout, /href="#site-content"/);
   assert.match(layout, /id="site-content" tabIndex=\{-1\}/);
@@ -158,13 +160,13 @@ test("keeps the mobile navigation fullscreen, accessible, and tablet-safe", asyn
   assert.match(layout, /Navigazione principale senza JavaScript/);
   assert.match(layout, /href="\/noscript\.css"/);
   assert.doesNotMatch(layout, /<style>/);
-  assert.match(navigationStyles, /@media \(max-width: 1024px\)/);
   assert.match(navigationStyles, /position: fixed;[\s\S]*inset: 0;[\s\S]*height: 100dvh/);
   assert.match(navigationStyles, /overflow-y: auto/);
   assert.match(navigationStyles, /env\(safe-area-inset-bottom\)/);
-  assert.match(navigationStyles, /width: 44px;[\s\S]*height: 44px;/);
+  assert.match(navigationStyles, /\.nxs-floating-brand,[\s\S]*\.nxs-menu-toggle[\s\S]*position: fixed/);
+  assert.match(navigationStyles, /width: 50px;[\s\S]*height: 50px;/);
   assert.match(navigationStyles, /\.nxs-menu-toggle\[aria-expanded="true"\]/);
-  assert.match(navigationStyles, /font-size: clamp\(1\.3rem, 4\.8vw, 2\.1rem\)/);
+  assert.match(navigationStyles, /font-size: clamp\(1\.15rem, 2\.4vw, 1\.8rem\)/);
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
   assert.match(globalStyles, /--font-geist-mono:ui-monospace,SFMono-Regular,Consolas/);
   assert.match(globalStyles, /\.card-top,\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);

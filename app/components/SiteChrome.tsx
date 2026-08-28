@@ -51,22 +51,9 @@ export function SiteHeader() {
   }, [open]);
 
   useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 1025px)");
-    const closeWhenDesktop = (event: MediaQueryListEvent) => {
-      if (event.matches) {
-        setNavigating(false);
-        setOpen(false);
-      }
-    };
-
-    desktop.addEventListener("change", closeWhenDesktop);
-    return () => desktop.removeEventListener("change", closeWhenDesktop);
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
     const nav = navRef.current;
-    const brand = document.querySelector<HTMLElement>(".nxs-brand");
+    const brand = document.querySelector<HTMLElement>(".nxs-floating-brand");
     const links = Array.from(nav?.querySelectorAll<HTMLElement>("a") ?? []);
     const initialFocus = nav?.querySelector<HTMLElement>('[aria-current="page"]') ?? links[0];
     const focusFrame = requestAnimationFrame(() => initialFocus?.focus());
@@ -106,20 +93,10 @@ export function SiteHeader() {
   } as const;
   const networkLabel = online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE";
 
-  return <><header className={open ? "nxs-header is-menu-open" : "nxs-header"}>
-    <HardNavigationLink className="nxs-brand" href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
+  return <>
+    <HardNavigationLink className="nxs-floating-brand" href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
       <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
-      <span>NEXUSNXS</span>
     </HardNavigationLink>
-
-    <nav className="nxs-top-nav" aria-label="Navigazione rapida">
-      {navigationItems.map(({ href, label }) => <HardNavigationLink
-        key={href}
-        href={href}
-        aria-current={pathname === href ? "page" : undefined}
-      >{label}</HardNavigationLink>)}
-    </nav>
-
     <button
       ref={toggleRef}
       className="nxs-menu-toggle"
@@ -134,12 +111,7 @@ export function SiteHeader() {
     >
       <span className="nxs-menu-glyph" aria-hidden="true"><i /><i /><i /></span>
     </button>
-
-    <HardNavigationLink className={online === false ? "nxs-network is-offline" : "nxs-network"} href="/status">
-      <i aria-hidden="true" /> {networkLabel}
-    </HardNavigationLink>
-  </header>
-  <nav
+    <nav
     ref={navRef}
     id="main-navigation"
     className={`nxs-nav${open ? " is-open" : ""}${navigating ? " is-navigating" : ""}`}
@@ -168,7 +140,8 @@ export function SiteHeader() {
       <span className={online === false ? "nxs-nav__status is-offline" : "nxs-nav__status"} aria-live="polite"><i aria-hidden="true" />{navigating ? "APERTURA PAGINA" : networkLabel}</span>
       <span>AI PRIVATA · PROTETTA · CONNESSA</span>
     </div>
-  </nav></>;
+    </nav>
+  </>;
 }
 
 export function SiteFooter({ ctaHref = "/downloads", ctaLabel = "Esplora NexusNXS" }: { ctaHref?: string; ctaLabel?: string } = {}) {
