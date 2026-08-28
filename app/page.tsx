@@ -5,7 +5,7 @@ import { HardNavigationLink } from "./components/HardNavigationLink";
 
 const apps = [
   { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", href: "/desktop", Icon: Workflow },
-  { index: "02", name: "NexusNXS per Android", platform: "Android · Continuità cifrata", description: "La stessa presenza NexusNXS in movimento, con sessioni protette, pairing revocabile e continuità reale.", accent: "teal", href: "/android", Icon: KeyRound },
+  { index: "02", name: "NexusNXS per Android", platform: "Android · Core vocale", description: "Un Core neurale da toccare e una scrittura essenziale quando serve: il ragionamento resta sui servizi NexusNXS.", accent: "teal", href: "/android", Icon: KeyRound },
 ];
 
 const presenceStates = [
