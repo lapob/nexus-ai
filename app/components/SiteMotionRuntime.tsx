@@ -58,6 +58,7 @@ export function SiteMotionRuntime() {
     const ambientTargets = Array.from(document.querySelectorAll<HTMLElement>(AMBIENT_SELECTOR));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let scrollFrame = 0;
+    let revealFrame = 0;
 
     root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
     root.classList.add("nxs-motion-preparing", `nxs-motion-${tier}`);
@@ -93,13 +94,15 @@ export function SiteMotionRuntime() {
         }
       }, { rootMargin: "96px 0px -7%", threshold: 0.04 })
       : null;
+    const initiallyVisible: HTMLElement[] = [];
     revealTargets.forEach((target) => {
-      if (!revealObserver || target.getBoundingClientRect().top <= window.innerHeight * 1.02) {
+      if (!revealObserver) {
         showTarget(target);
         return;
       }
       target.classList.add("nxs-motion-candidate");
-      revealObserver.observe(target);
+      if (target.getBoundingClientRect().top <= window.innerHeight * 1.02) initiallyVisible.push(target);
+      else revealObserver.observe(target);
     });
 
     // Commit the hidden starting state before transitions are enabled. This
@@ -107,6 +110,9 @@ export function SiteMotionRuntime() {
     void root.offsetWidth;
     root.classList.remove("nxs-motion-preparing");
     root.classList.add("nxs-motion-ready");
+    if (initiallyVisible.length > 0) {
+      revealFrame = requestAnimationFrame(() => initiallyVisible.forEach(showTarget));
+    }
 
     const updateScroll = () => {
       scrollFrame = 0;
@@ -125,6 +131,7 @@ export function SiteMotionRuntime() {
       revealObserver?.disconnect();
       ambientObserver?.disconnect();
       cancelAnimationFrame(scrollFrame);
+      cancelAnimationFrame(revealFrame);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));

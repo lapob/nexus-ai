@@ -70,6 +70,13 @@ test("selects a private client motion tier without rendering device telemetry", 
   assert.match(budget, /products\/android-home\.png/);
 });
 
+test("animates initially visible product cards after the prepared frame", async () => {
+  const runtime = await readFile(new URL("../app/components/SiteMotionRuntime.tsx", import.meta.url), "utf8");
+  assert.match(runtime, /const initiallyVisible: HTMLElement\[\] = \[\]/);
+  assert.match(runtime, /target\.classList\.add\("nxs-motion-candidate"\)[\s\S]*initiallyVisible\.push\(target\)/);
+  assert.match(runtime, /requestAnimationFrame\(\(\) => initiallyVisible\.forEach\(showTarget\)\)/);
+});
+
 test("keeps public product claims aligned with the current client architecture", async () => {
   const [home, desktop, downloads, privacy, security] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
