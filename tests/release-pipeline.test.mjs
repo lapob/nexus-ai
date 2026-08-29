@@ -89,3 +89,9 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   ]);
   assert.match(releaseScript, /routes\.length !== 0/);
 });
+
+test("verifies immutable Cloudflare previews before promotion", async () => {
+  const release = await readFile(new URL("../scripts/cloudflare-release.mjs", import.meta.url), "utf8");
+  assert.match(release, /event\?\.preview_url \?\? event\?\.preview_alias_url/);
+  assert.match(release, /verifySite\(candidate\.preview_url, candidate\.version_id\)/);
+});

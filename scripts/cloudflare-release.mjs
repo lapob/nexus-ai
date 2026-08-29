@@ -240,7 +240,10 @@ async function prepare() {
     "--message", `candidate ${shortSha}`,
   ], { artifact: true, env: { WRANGLER_OUTPUT_FILE_PATH: outputPath } });
   const event = await parseUploadEvent(outputPath);
-  const previewUrl = event?.preview_alias_url ?? event?.preview_url;
+  // The named preview alias can retain an older edge mapping briefly after a
+  // version upload. Gate and promote the immutable version URL instead so the
+  // verified bytes always match version_id.
+  const previewUrl = event?.preview_url ?? event?.preview_alias_url;
   if (!event?.version_id || !previewUrl) throw new Error("Wrangler did not return a version ID and Preview URL.");
   const candidate = {
     source_commit: sha,
