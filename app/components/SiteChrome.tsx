@@ -11,6 +11,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [online, setOnline] = useState<boolean | null>(null);
   const [navigating, setNavigating] = useState(false);
+  const [chromeAwake, setChromeAwake] = useState(true);
   const pathname = usePathname();
   const toggleRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -29,6 +30,24 @@ export function SiteHeader() {
   useEffect(() => {
     document.body.classList.toggle("menu-open", open);
     return () => document.body.classList.remove("menu-open");
+  }, [open]);
+
+  useEffect(() => {
+    let timer = 0;
+    const wake = () => {
+      setChromeAwake(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (!open) setChromeAwake(false);
+      }, 4_200);
+    };
+    const events: Array<keyof WindowEventMap> = ["pointermove", "pointerdown", "keydown", "scroll"];
+    events.forEach((event) => window.addEventListener(event, wake, { passive: true }));
+    wake();
+    return () => {
+      window.clearTimeout(timer);
+      events.forEach((event) => window.removeEventListener(event, wake));
+    };
   }, [open]);
 
   useEffect(() => {
@@ -94,12 +113,13 @@ export function SiteHeader() {
   const networkLabel = online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE";
 
   return <>
-    <HardNavigationLink className="nxs-floating-brand" href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
+    <HardNavigationLink className="nxs-floating-brand" data-awake={open || chromeAwake} href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
       <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
     </HardNavigationLink>
     <button
       ref={toggleRef}
       className="nxs-menu-toggle"
+      data-awake={open || chromeAwake}
       type="button"
       onClick={() => {
         setNavigating(false);

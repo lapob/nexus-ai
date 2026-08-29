@@ -151,6 +151,8 @@ test("keeps the floating navigation fullscreen, accessible, and free of persiste
   assert.match(chrome, /const brand = document\.querySelector/);
   assert.match(chrome, /\[aria-current="page"\]/);
   assert.match(chrome, /className="nxs-floating-brand"/);
+  assert.match(chrome, /data-awake=\{open \|\| chromeAwake\}/);
+  assert.match(chrome, /4_200/);
   assert.doesNotMatch(chrome, /className="nxs-header/);
   assert.doesNotMatch(chrome, /nxs-top-nav/);
   assert.match(layout, /id="site-content"/);
@@ -166,6 +168,7 @@ test("keeps the floating navigation fullscreen, accessible, and free of persiste
   assert.match(navigationStyles, /\.nxs-floating-brand,[\s\S]*\.nxs-menu-toggle[\s\S]*position: fixed/);
   assert.match(navigationStyles, /width: 50px;[\s\S]*height: 50px;/);
   assert.match(navigationStyles, /\.nxs-menu-toggle\[aria-expanded="true"\]/);
+  assert.match(navigationStyles, /\[data-awake="false"\]/);
   assert.match(navigationStyles, /font-size: clamp\(1\.15rem, 2\.4vw, 1\.8rem\)/);
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
   assert.match(globalStyles, /--font-geist-mono:ui-monospace,SFMono-Regular,Consolas/);
