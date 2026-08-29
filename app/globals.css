@@ -678,17 +678,6 @@ body {
   }
 }
 
-@supports (view-transition-name: none) {
-  @view-transition { navigation: auto; }
-  .site-header { view-transition-name: nexus-header; }
-  .brand { view-transition-name: nexus-brand; }
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: .24s;
-    animation-timing-function: cubic-bezier(.22, 1, .36, 1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .nxs-motion-candidate,
   .nxs-motion-candidate.nxs-in-view,
@@ -698,11 +687,5 @@ body {
     transform: none !important;
     animation: none !important;
     transition: none !important;
-  }
-
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 }

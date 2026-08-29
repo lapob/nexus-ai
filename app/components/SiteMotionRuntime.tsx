@@ -49,6 +49,14 @@ const AMBIENT_SELECTOR = [
   "[data-nexus-presence]",
 ].join(",");
 
+const IMMEDIATE_REVEAL_SELECTOR = [
+  ".product-hero",
+  ".trust-hero",
+  ".download-hero",
+  ".status-hero",
+  ".legal-hero",
+].join(",");
+
 export function SiteMotionRuntime() {
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -96,12 +104,17 @@ export function SiteMotionRuntime() {
       : null;
     const initiallyVisible: HTMLElement[] = [];
     revealTargets.forEach((target) => {
-      if (!revealObserver) {
+      if (!revealObserver || target.matches(IMMEDIATE_REVEAL_SELECTOR)) {
+        showTarget(target);
+        return;
+      }
+      const entersInitialViewport = target.getBoundingClientRect().top <= window.innerHeight * 1.02;
+      if (entersInitialViewport && !target.matches(".app-card")) {
         showTarget(target);
         return;
       }
       target.classList.add("nxs-motion-candidate");
-      if (target.getBoundingClientRect().top <= window.innerHeight * 1.02) initiallyVisible.push(target);
+      if (entersInitialViewport) initiallyVisible.push(target);
       else revealObserver.observe(target);
     });
 

@@ -75,6 +75,7 @@ test("animates initially visible product cards after the prepared frame", async 
   assert.match(runtime, /const initiallyVisible: HTMLElement\[\] = \[\]/);
   assert.match(runtime, /target\.classList\.add\("nxs-motion-candidate"\)[\s\S]*initiallyVisible\.push\(target\)/);
   assert.match(runtime, /requestAnimationFrame\(\(\) => initiallyVisible\.forEach\(showTarget\)\)/);
+  assert.match(runtime, /target\.matches\(IMMEDIATE_REVEAL_SELECTOR\)/, "product heroes must remain immediately readable");
 });
 
 test("keeps public product claims aligned with the current client architecture", async () => {
