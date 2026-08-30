@@ -2,7 +2,6 @@ import { ArrowUpRight, Blocks, BrainCircuit, Fingerprint, KeyRound, LockKeyhole,
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
-import { NexusCoreDemo } from "./components/NexusCoreDemo";
 
 const apps = [
   { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", href: "/desktop", Icon: Workflow },
@@ -24,8 +23,8 @@ export default function Home() {
         <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
         <p className="eyebrow"><Sparkles size={13} strokeWidth={1.5} /> NEXUSNXS · AI PRIVATA, PROTETTA, CONNESSA</p>
         <h1>La tua intelligenza.<br /><em>Un solo NexusNXS.</em></h1>
-        <p className="hero-copy">Un’unica intelligenza tra PC e Android. NexusNXS Core, voce, progetti e continuità protetta, con impostazioni e cronologia sotto il tuo controllo.</p>
-        <div className="hero-actions"><a className="primary-button" href="#apps">Esplora NexusNXS <ArrowUpRight size={15} /></a><HardNavigationLink className="text-link" href="/security">Apri il Trust Center <span>→</span></HardNavigationLink></div>
+        <p className="hero-copy">Un’unica intelligenza tra PC, Android e Web. Il Core ascolta, comprende e continua il contesto; la scrittura resta un’opzione e le impostazioni avanzate vivono solo sul desktop.</p>
+        <div className="hero-actions"><HardNavigationLink className="primary-button" href="https://ai.nexusnxs.com">Apri NexusNXS AI <ArrowUpRight size={15} /></HardNavigationLink><a className="text-link" href="#apps">Scopri le applicazioni <span>→</span></a></div>
         <div className="trust-line"><span><Fingerprint size={13} /> AI CONNESSA</span><span><ShieldCheck size={13} /> ACCESSI REVOCABILI</span><span><Blocks size={13} /> CONTINUITÀ PROTETTA</span></div>
         <div className="scroll-cue" aria-hidden="true">SCORRI <i /></div>
       </section>
@@ -42,9 +41,8 @@ export default function Home() {
         <div className="one-nexus-copy"><p className="section-label">/ 04 — ECOSISTEMA NEXUSNXS</p><h2>Due applicazioni.<br /><em>Una sola istanza.</em></h2><p>NexusNXS per PC e Android condividono sessione, identità e infrastruttura senza trasformare i tuoi dati in un prodotto.</p><HardNavigationLink className="text-link" href="/status">VEDI LO STATO DELLA RETE <span>→</span></HardNavigationLink></div>
         <div className="nexus-stage"><ProductMockup type="desktop"/><ProductMockup type="android"/><span className="orbit-line one"/><span className="orbit-line two"/></div>
       </section>
-      <NexusCoreDemo />
       <section className="security reveal" id="security">
-        <div className="security-copy"><p className="section-label">/ 06 — SICUREZZA NEXUSNXS</p><h2>La fiducia non si chiede.<br /><em>Si dimostra.</em></h2><p>Riduciamo i dati, separiamo il servizio pubblico dall’amministrazione privata e blocchiamo i download finché non sono verificabili.</p><HardNavigationLink className="primary-button light" href="/security">Apri il Trust Center <span>→</span></HardNavigationLink></div>
+        <div className="security-copy"><p className="section-label">/ 05 — SICUREZZA NEXUSNXS</p><h2>La fiducia non si chiede.<br /><em>Si dimostra.</em></h2><p>Riduciamo i dati, separiamo il servizio pubblico dall’amministrazione privata e blocchiamo i download finché non sono verificabili.</p><HardNavigationLink className="primary-button light" href="/security">Apri il Trust Center <span>→</span></HardNavigationLink></div>
         <div className="security-panel" id="principles"><div className="scanline" /><p>SECURITY POSTURE <span>CONTROLLI DOCUMENTATI</span></p><div className="shield" aria-hidden="true"><ShieldCheck size={72} strokeWidth={1} /></div><dl><div><dt><LockKeyhole size={14} /> Distribuzione</dt><dd>Firma richiesta</dd></div><div><dt><Fingerprint size={14} /> Dati</dt><dd>Cifratura in transito</dd></div><div><dt><Orbit size={14} /> Telemetria</dt><dd>Minima &amp; trasparente</dd></div><div><dt><Blocks size={14} /> Aggiornamenti</dt><dd>Integrità verificabile</dd></div></dl></div>
       </section>
       <SiteFooter />

@@ -312,21 +312,15 @@ test("ambient motion only runs while its surface is near the viewport", async ({
   await context.close();
 });
 
-test("the product demo is keyboard native and local performance metrics never transmit", async ({ page }) => {
+test("the homepage routes to the single live AI and local performance metrics never transmit", async ({ page }) => {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
   await page.goto("/", { waitUntil: "load" });
 
-  const demo = page.locator(".core-demo");
-  await demo.scrollIntoViewIfNeeded();
-  const keyboard = demo.locator(".core-demo-keyboard");
-  await keyboard.focus();
-  await page.keyboard.press("Enter");
-  const input = demo.getByLabel("Messaggio dimostrativo", { exact: true });
-  await expect(input).toBeFocused();
-  await input.fill("Continua dal telefono");
-  await page.keyboard.press("Enter");
-  await expect(demo).toContainText("mantiene il contesto");
+  const aiLinks = page.getByRole("link", { name: /NexusNXS AI/i });
+  await expect(aiLinks.first()).toHaveAttribute("href", "https://ai.nexusnxs.com");
+  await expect(page.locator(".core-demo")).toHaveCount(0);
+  await expect(page.getByText(/demo resta locale nel browser/i)).toHaveCount(0);
 
   await page.goto("/status", { waitUntil: "load" });
   const metrics = page.locator(".client-performance");
