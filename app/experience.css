@@ -343,12 +343,34 @@ summary:focus:not(:focus-visible) { outline: none; }
   transition: transform .34s cubic-bezier(.2,.8,.2,1), filter .34s ease;
 }
 
+.core-demo-orb::before,
+.core-demo-orb::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.core-demo-orb::before {
+  inset: 9%;
+  border: 1px solid rgba(89, 235, 236, .16);
+  background: conic-gradient(from 42deg, transparent 0 18%, rgba(85, 237, 239, .2) 25%, transparent 34% 68%, rgba(144, 255, 255, .16) 76%, transparent 84%);
+  box-shadow: inset 0 0 2rem rgba(43, 219, 221, .06), 0 0 2.8rem rgba(33, 211, 214, .08);
+  animation: core-demo-orbit 18s linear infinite reverse;
+}
+
+.core-demo-orb::after {
+  inset: 24%;
+  border: 1px solid rgba(168, 255, 255, .2);
+  box-shadow: 0 0 1.8rem rgba(74, 232, 234, .12);
+}
+
 .core-demo-orb:hover { transform: scale(1.025); filter: brightness(1.1); }
 .core-demo-orb:active { transform: scale(.985); }
 .core-demo-orb:focus-visible { outline: 1px solid rgba(115, 244, 245, .8); outline-offset: 10px; }
 
 .core-demo-nucleus {
-  width: 33%;
+  width: 41%;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -360,14 +382,14 @@ summary:focus:not(:focus-visible) { outline: none; }
 
 .core-demo-particles { position: absolute; inset: 0; animation: core-demo-orbit 24s linear infinite; }
 .core-demo-particles i {
-  --radius: calc(34% + var(--particle) * .45%);
+  --radius: calc(3.15rem + var(--particle) * .06rem);
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(2px + var(--particle) * .035px);
+  width: calc(2px + var(--particle) * .045px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: rgba(111, 244, 245, calc(.24 + var(--particle) * .012));
+  background: rgba(126, 250, 251, calc(.38 + var(--particle) * .014));
   box-shadow: 0 0 .7rem rgba(65, 237, 239, .72);
   transform: rotate(calc(var(--particle) * 12.857deg)) translateX(var(--radius));
   transform-origin: 0 0;
