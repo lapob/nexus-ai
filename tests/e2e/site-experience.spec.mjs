@@ -317,13 +317,16 @@ test("the product demo is keyboard native and local performance metrics never tr
   page.on("request", (request) => requests.push(request.url()));
   await page.goto("/", { waitUntil: "load" });
 
-  const demo = page.locator(".nexus-demo");
+  const demo = page.locator(".core-demo");
   await demo.scrollIntoViewIfNeeded();
-  const firstPrompt = demo.locator("details").first();
-  await firstPrompt.locator("summary").focus();
+  const keyboard = demo.locator(".core-demo-keyboard");
+  await keyboard.focus();
   await page.keyboard.press("Enter");
-  await expect(firstPrompt).toHaveAttribute("open", "");
-  await expect(firstPrompt).toContainText("contesto autorizzato", { useInnerText: false });
+  const input = demo.getByLabel("Messaggio dimostrativo", { exact: true });
+  await expect(input).toBeFocused();
+  await input.fill("Continua dal telefono");
+  await page.keyboard.press("Enter");
+  await expect(demo).toContainText("mantiene il contesto");
 
   await page.goto("/status", { waitUntil: "load" });
   const metrics = page.locator(".client-performance");

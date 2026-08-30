@@ -2,6 +2,7 @@ import { ArrowUpRight, Blocks, BrainCircuit, Fingerprint, KeyRound, LockKeyhole,
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
+import { NexusCoreDemo } from "./components/NexusCoreDemo";
 
 const apps = [
   { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", href: "/desktop", Icon: Workflow },
@@ -41,14 +42,7 @@ export default function Home() {
         <div className="one-nexus-copy"><p className="section-label">/ 04 — ECOSISTEMA NEXUSNXS</p><h2>Due applicazioni.<br /><em>Una sola istanza.</em></h2><p>NexusNXS per PC e Android condividono sessione, identità e infrastruttura senza trasformare i tuoi dati in un prodotto.</p><HardNavigationLink className="text-link" href="/status">VEDI LO STATO DELLA RETE <span>→</span></HardNavigationLink></div>
         <div className="nexus-stage"><ProductMockup type="desktop"/><ProductMockup type="android"/><span className="orbit-line one"/><span className="orbit-line two"/></div>
       </section>
-      <section className="nexus-demo reveal" aria-labelledby="demo-title">
-        <div className="nexus-demo-copy"><p className="section-label">/ 05 — PROVA IL FLUSSO</p><h2 id="demo-title">Un comando.<br /><em>Un risultato comprensibile.</em></h2><p>Una dimostrazione deterministica dell’esperienza NexusNXS. Non invia dati e non simula una conversazione reale.</p></div>
-        <div className="demo-prompts">
-          <details name="nexus-demo"><summary>«Riassumi questo progetto» <span>→</span></summary><div><small>ANALISI</small><p>Legge soltanto il contesto autorizzato, evidenzia decisioni e rischi, poi restituisce una sintesi verificabile.</p></div></details>
-          <details name="nexus-demo"><summary>«Correggi questo file» <span>→</span></summary><div><small>AZIONE CONTROLLATA</small><p>Prepara il diff, mostra l’impatto e attende il consenso prima di scrivere. Ogni modifica produce una ricevuta.</p></div></details>
-          <details name="nexus-demo"><summary>«Continua dal telefono» <span>→</span></summary><div><small>CONTINUITÀ</small><p>Riprende la conversazione associata senza trasferire privilegi operativi o accessi amministrativi.</p></div></details>
-        </div>
-      </section>
+      <NexusCoreDemo />
       <section className="security reveal" id="security">
         <div className="security-copy"><p className="section-label">/ 06 — SICUREZZA NEXUSNXS</p><h2>La fiducia non si chiede.<br /><em>Si dimostra.</em></h2><p>Riduciamo i dati, separiamo il servizio pubblico dall’amministrazione privata e blocchiamo i download finché non sono verificabili.</p><HardNavigationLink className="primary-button light" href="/security">Apri il Trust Center <span>→</span></HardNavigationLink></div>
         <div className="security-panel" id="principles"><div className="scanline" /><p>SECURITY POSTURE <span>CONTROLLI DOCUMENTATI</span></p><div className="shield" aria-hidden="true"><ShieldCheck size={72} strokeWidth={1} /></div><dl><div><dt><LockKeyhole size={14} /> Distribuzione</dt><dd>Firma richiesta</dd></div><div><dt><Fingerprint size={14} /> Dati</dt><dd>Cifratura in transito</dd></div><div><dt><Orbit size={14} /> Telemetria</dt><dd>Minima &amp; trasparente</dd></div><div><dt><Blocks size={14} /> Aggiornamenti</dt><dd>Integrità verificabile</dd></div></dl></div>
