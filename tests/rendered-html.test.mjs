@@ -24,12 +24,13 @@ test("server-renders the NexusNXS public homepage", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="it">/i);
   assert.match(html, /NEXUSNXS/);
-  assert.match(html, /La tua intelligenza/);
+  assert.match(html, /Chiedilo a Nexus/);
   assert.match(html, /AI PRIVATA, PROTETTA, CONNESSA/);
   assert.match(html, /STATI COMPRENSIBILI/);
   assert.match(html, /Trust Center/);
   assert.match(html, /NexusNXS per PC/);
   assert.match(html, /NexusNXS per Android/);
+  assert.match(html, /FOUNDER BETA/);
   assert.match(html, /application\/ld\+json/);
   assert.doesNotMatch(html, /codex-preview|starter loading skeleton|Your site is taking shape/i);
 });
@@ -126,8 +127,8 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
 });
 
 test("renders every public route with one shared, complete navigation", async () => {
-  const routes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
-  const expectedNavigation = ["/desktop", "/android", "/security", "/status", "/downloads"];
+  const routes = ["/", "/desktop", "/android", "/pricing", "/downloads", "/security", "/status", "/privacy", "/terms"];
+  const expectedNavigation = ["/desktop", "/android", "/pricing", "/security", "/status", "/downloads"];
 
   for (const route of routes) {
     const response = await render(route);

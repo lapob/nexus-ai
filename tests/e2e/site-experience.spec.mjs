@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const publicRoutes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
+const publicRoutes = ["/", "/desktop", "/android", "/pricing", "/downloads", "/security", "/status", "/privacy", "/terms"];
 const responsiveRoutes = [...publicRoutes, "/maintenance", "/percorso-che-non-esiste"];
 
 test("all public and operational pages render without horizontal overflow or oversized headings", async ({ page }) => {

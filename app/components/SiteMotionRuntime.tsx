@@ -37,6 +37,7 @@ const REVEAL_SELECTOR = [
   ".download-hero",
   ".status-hero",
   ".legal-hero",
+  ".pricing-hero",
   ".product-facts > div",
   ".feature-grid > article",
   ".control-grid > article",
@@ -45,6 +46,9 @@ const REVEAL_SELECTOR = [
   ".verify-guide",
   ".report-band",
   ".release-notes > article",
+  ".pricing-grid > article",
+  ".founder-program",
+  ".pricing-disclosure",
   ".uptime-panel",
   ".footer-links > div",
 ].join(",");
@@ -63,6 +67,7 @@ const IMMEDIATE_REVEAL_SELECTOR = [
   ".download-hero",
   ".status-hero",
   ".legal-hero",
+  ".pricing-hero",
 ].join(",");
 
 export function SiteMotionRuntime() {

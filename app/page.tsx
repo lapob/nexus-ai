@@ -1,4 +1,4 @@
-import { ArrowUpRight, Blocks, BrainCircuit, Fingerprint, KeyRound, LockKeyhole, MessageCircle, Mic2, Orbit, ShieldCheck, Sparkles, Workflow, Zap } from "lucide-react";
+import { ArrowUpRight, Blocks, BrainCircuit, Check, Fingerprint, KeyRound, LockKeyhole, MessageCircle, Mic2, Orbit, ShieldCheck, Sparkles, Workflow, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
@@ -22,8 +22,8 @@ export default function Home() {
       <section className="hero" id="top">
         <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
         <p className="eyebrow"><Sparkles size={13} strokeWidth={1.5} /> NEXUSNXS · AI PRIVATA, PROTETTA, CONNESSA</p>
-        <h1>La tua intelligenza.<br /><em>Un solo NexusNXS.</em></h1>
-        <p className="hero-copy">Un’unica intelligenza tra PC, Android e Web. Il Core ascolta, comprende e continua il contesto; la scrittura resta un’opzione e le impostazioni avanzate vivono solo sul desktop.</p>
+        <h1>Chiedilo a Nexus.<br /><em>Fallo sul tuo PC.</em></h1>
+        <p className="hero-copy">Un assistente personale che continua tra PC, Android e Web: comprende la richiesta, prepara il lavoro e agisce sul computer soltanto entro autorizzazioni chiare e revocabili.</p>
         <div className="hero-actions"><HardNavigationLink className="primary-button" href="https://ai.nexusnxs.com">Apri NexusNXS AI <ArrowUpRight size={15} /></HardNavigationLink><a className="text-link" href="#apps">Scopri le applicazioni <span>→</span></a></div>
         <div className="trust-line"><span><Fingerprint size={13} /> AI CONNESSA</span><span><ShieldCheck size={13} /> ACCESSI REVOCABILI</span><span><Blocks size={13} /> CONTINUITÀ PROTETTA</span></div>
         <div className="scroll-cue" aria-hidden="true">SCORRI <i /></div>
@@ -44,6 +44,11 @@ export default function Home() {
       <section className="security reveal" id="security">
         <div className="security-copy"><p className="section-label">/ 05 — SICUREZZA NEXUSNXS</p><h2>La fiducia non si chiede.<br /><em>Si dimostra.</em></h2><p>Riduciamo i dati, separiamo il servizio pubblico dall’amministrazione privata e blocchiamo i download finché non sono verificabili.</p><HardNavigationLink className="primary-button light" href="/security">Apri il Trust Center <span>→</span></HardNavigationLink></div>
         <div className="security-panel" id="principles"><div className="scanline" /><p>SECURITY POSTURE <span>CONTROLLI DOCUMENTATI</span></p><div className="shield" aria-hidden="true"><ShieldCheck size={72} strokeWidth={1} /></div><dl><div><dt><LockKeyhole size={14} /> Distribuzione</dt><dd>Firma richiesta</dd></div><div><dt><Fingerprint size={14} /> Dati</dt><dd>Cifratura in transito</dd></div><div><dt><Orbit size={14} /> Telemetria</dt><dd>Minima &amp; trasparente</dd></div><div><dt><Blocks size={14} /> Aggiornamenti</dt><dd>Integrità verificabile</dd></div></dl></div>
+      </section>
+      <section className="founder-preview reveal" aria-labelledby="founder-preview-title">
+        <div><p className="section-label">/ 06 — FOUNDER BETA</p><h2 id="founder-preview-title">Prima misuriamo.<br /><em>Poi cresciamo.</em></h2><p>La beta a pagamento aprirà soltanto dopo i controlli su capacità, disponibilità, assistenza, privacy e pagamenti. Nessun piano illimitato e nessun addebito nascosto.</p></div>
+        <ul><li><Check size={16} /> Numero iniziale di partecipanti limitato</li><li><Check size={16} /> Quote pubblicate prima dell’acquisto</li><li><Check size={16} /> Consenso separato per contribuire al miglioramento</li></ul>
+        <HardNavigationLink className="primary-button" href="/pricing">Scopri i piani <ArrowUpRight size={15} /></HardNavigationLink>
       </section>
       <SiteFooter />
     </main>
