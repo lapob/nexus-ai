@@ -25,6 +25,23 @@ test("all public and operational pages render without horizontal overflow or ove
   }
 });
 
+test("the homepage loads real product captures without CSP or runtime errors", async ({ page }) => {
+  const errors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator(".app-card-visual").first().scrollIntoViewIfNeeded();
+  await expect(page.locator(".app-card-visual img")).toHaveCount(2);
+  const captures = await page.locator(".app-card-visual img").evaluateAll((images) =>
+    images.map((image) => ({ width: image.naturalWidth, height: image.naturalHeight })),
+  );
+  expect(captures.every(({ width, height }) => width > 0 && height > 0)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("core routes pass automated WCAG A/AA checks", async ({ page }) => {
   for (const route of publicRoutes) {
     await page.goto(route, { waitUntil: "load" });
