@@ -117,7 +117,7 @@ export function SiteMotionRuntime() {
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const reduced = reducedMotion.matches;
-      const frameInterval = tier === "ultra" ? 22 : tier === "balanced" ? 33 : 1000;
+      const frameInterval = tier === "ultra" || tier === "balanced" ? 16.5 : 33;
       if (!reduced && now - cosmicLastFrame < frameInterval) {
         cosmicFrame = requestAnimationFrame(drawCosmicField);
         return;

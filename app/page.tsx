@@ -5,7 +5,7 @@ import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
 
 const apps = [
-  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", device: "desktop", image: "/products/desktop-conversation.png", alt: "NexusNXS per PC con una conversazione operativa", href: "/desktop" },
+  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", device: "desktop", image: "/products/desktop-core.png", alt: "Core particellare reale di NexusNXS per PC", href: "/desktop" },
   { index: "02", name: "NexusNXS per Android", platform: "Android · Core vocale", description: "Un Core neurale da toccare e una scrittura essenziale quando serve: il ragionamento resta sui servizi NexusNXS.", accent: "teal", device: "android", image: "/products/android-home.png", alt: "NexusNXS per Android pronto all'ascolto", href: "/android" },
 ];
 

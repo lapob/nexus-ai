@@ -60,7 +60,7 @@
 .nexus-operational[data-nexus-state="degraded"],
 .nexus-presence[data-state="degraded"] { --nexus-state-accent: #f0ca68; }
 .nexus-operational[data-nexus-state="error"],
-.nexus-presence[data-state="error"] { --nexus-state-accent: #ff746c; }
+.nexus-presence[data-state="error"] { --nexus-state-accent: #d69a58; }
 .nexus-operational[data-nexus-state="offline"],
 .nexus-presence[data-state="offline"] { --nexus-state-accent: #657879; }
 .nexus-operational[data-nexus-state="loading"],

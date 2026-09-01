@@ -69,7 +69,8 @@ body{min-width:0}.menu-open{overflow:hidden}main{overflow:clip}.site-header{posi
 
 /* NexusNXS professional system */
 @font-face{font-family:"NexusNXS Inter";src:url("/fonts/inter-latin.woff2") format("woff2");font-style:normal;font-weight:100 900;font-display:swap}
-:root{--font-inter:"NexusNXS Inter",Inter,system-ui,sans-serif;--font-cormorant:var(--font-inter);--font-geist-mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;--content-max:1240px;--page-pad:clamp(22px,5vw,72px);--surface:#0d0d13;--surface-2:#12121a;--soft-line:rgba(255,255,255,.105);--text:#f5f3f8;--subtle:#b8b4c1;--brand:#8c78ff;--brand-2:#68d9dd;--success:#71e7ad;--warning:#f1c979}
+@font-face{font-family:"NexusNXS Mono";src:url("/fonts/jetbrains-mono-latin.woff2") format("woff2");font-style:normal;font-weight:100 800;font-display:swap}
+:root{--font-inter:"NexusNXS Inter",Inter,system-ui,sans-serif;--font-cormorant:var(--font-inter);--font-geist-mono:"NexusNXS Mono",ui-monospace,SFMono-Regular,Consolas,monospace;--content-max:1240px;--page-pad:clamp(22px,5vw,72px);--surface:#0d0d13;--surface-2:#12121a;--soft-line:rgba(255,255,255,.105);--text:#f5f3f8;--subtle:#b8b4c1;--brand:#8c78ff;--brand-2:#68d9dd;--success:#71e7ad;--warning:#f1c979}
 html{scroll-padding-top:88px}
 body{font-family:var(--font-inter),Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#07070b;color:var(--text);text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
 h1,h2,h3,p{overflow-wrap:break-word}
@@ -114,7 +115,7 @@ h1 em,h2 em,.manifesto-text{font-family:var(--font-cormorant),Georgia,serif}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.reveal{opacity:1;transform:none}.aurora i:nth-child(3){animation:none}}
 
 /* NexusNXS app-native theme — source: desktop and Android design systems */
-:root{--ink:#020405;--paper:#020405;--muted:rgba(176,210,214,.42);--line:rgba(125,224,228,.11);--violet:#52eef0;--surface:#091113;--surface-2:#0d181a;--soft-line:rgba(125,224,228,.11);--text:#e9fdff;--subtle:rgba(201,238,241,.64);--brand:#52eef0;--brand-2:#27cfd2;--success:#58e8bd;--warning:#bd9f4f;--error:#c95d57}
+:root{--ink:#020405;--paper:#020405;--muted:rgba(176,210,214,.42);--line:rgba(125,224,228,.11);--violet:#52eef0;--surface:#091113;--surface-2:#0d181a;--soft-line:rgba(125,224,228,.11);--text:#e9fdff;--subtle:rgba(201,238,241,.64);--brand:#52eef0;--brand-2:#27cfd2;--success:#58e8bd;--warning:#bd9f4f;--error:#d69a58}
 body{background:var(--ink);color:var(--text)}
 h1 em,h2 em,.manifesto-text,.section-heading h2,.security h2,footer h2,.app-card h3,.mini-main p,.architecture-band h2,.one-nexus h2,.data-flow h2,.feature-grid h3,.control-grid h2,.release-list h2,.verify-guide h2,.report-band h2,.status-note h2,.release-notes h2,.uptime-panel h2,.legal-hero h1{font-family:var(--font-inter),Inter,system-ui,sans-serif;font-style:normal}
 h1 em,h2 em{color:var(--cyan,#52eef0)}

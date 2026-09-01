@@ -12,7 +12,7 @@
     maintenance: { accent: "#F0CA68", energy: 0.82 },
     degraded: { accent: "#F0CA68", energy: 0.34 },
     offline: { accent: "#657879", energy: 0.22 },
-    error: { accent: "#FF746C", energy: 0.46 },
+    error: { accent: "#D69A58", energy: 0.42 },
     "not-found": { accent: "#4BE7E9", energy: 0.22 },
   };
 

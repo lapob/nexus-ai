@@ -188,7 +188,7 @@ test("floating controls stay stable at effective 100, 125, 150 and 200 percent d
 
 test("product pages use real accessible app captures without hydration flashes", async ({ page }) => {
   for (const product of [
-    { route: "/desktop", image: "desktop-conversation.png", alt: /interfaccia reale.*PC/i },
+    { route: "/desktop", image: "desktop-core.png", alt: /interfaccia reale.*PC/i },
     { route: "/android", image: "android-home.png", alt: /interfaccia reale.*Android/i },
   ]) {
     await page.goto(product.route, { waitUntil: "domcontentloaded" });

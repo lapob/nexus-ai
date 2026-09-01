@@ -180,7 +180,7 @@ test("keeps the floating navigation fullscreen, accessible, and free of persiste
   assert.match(navigationStyles, /\[data-awake="false"\]/);
   assert.match(navigationStyles, /font-size: clamp\(1\.15rem, 2\.4vw, 1\.8rem\)/);
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
-  assert.match(globalStyles, /--font-geist-mono:ui-monospace,SFMono-Regular,Consolas/);
+  assert.match(globalStyles, /--font-geist-mono:"NexusNXS Mono",ui-monospace,SFMono-Regular,Consolas/);
   assert.match(globalStyles, /\.card-top,\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);
   assert.match(globalStyles, /\.presence-grid small\{color:rgba\(176,210,214,\.60\)\}/);
   assert.match(globalStyles, /\.trust-hero > \*,[\s\S]*\.data-flow > \*[\s\S]*min-width: 0/);
@@ -259,7 +259,7 @@ test("ports the deterministic NexusNXS presence and caches only its offline shel
   assert.match(presence, /javaRandom\(73\)/);
   assert.match(presence, /normalizedX \* 5\.2/);
   assert.match(presence, /particle\.y \* 7\.4/);
-  for (const color of ["#4BE7E9", "#8EC8FF", "#F0CA68", "#657879", "#FF746C"]) {
+  for (const color of ["#4BE7E9", "#8EC8FF", "#F0CA68", "#657879", "#D69A58"]) {
     assert.match(presence, new RegExp(color, "i"));
   }
   assert.match(styles, /prefers-reduced-motion: reduce/);
