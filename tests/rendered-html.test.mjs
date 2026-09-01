@@ -72,11 +72,17 @@ test("selects a private client motion tier without rendering device telemetry", 
 });
 
 test("animates initially visible product cards after the prepared frame", async () => {
-  const runtime = await readFile(new URL("../app/components/SiteMotionRuntime.tsx", import.meta.url), "utf8");
+  const [runtime, styles] = await Promise.all([
+    readFile(new URL("../app/components/SiteMotionRuntime.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
   assert.match(runtime, /const initiallyVisible: HTMLElement\[\] = \[\]/);
   assert.match(runtime, /target\.classList\.add\("nxs-motion-candidate"\)[\s\S]*initiallyVisible\.push\(target\)/);
   assert.match(runtime, /requestAnimationFrame\(\(\) => initiallyVisible\.forEach\(showTarget\)\)/);
   assert.match(runtime, /target\.matches\(IMMEDIATE_REVEAL_SELECTOR\)/, "product heroes must remain immediately readable");
+  assert.match(styles, /@keyframes nxs-hero-field-drift/);
+  assert.match(styles, /hero\.nxs-ambient-active \.aurora::before/);
+  assert.match(styles, /nxs-motion-lite \.aurora::before/);
 });
 
 test("keeps public product claims aligned with the current client architecture", async () => {

@@ -491,6 +491,24 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes nxs-hero-field-drift {
+  0% { transform: translate3d(-1.2%, -.8%, 0) scale(1.035); }
+  50% { transform: translate3d(1.1%, .7%, 0) scale(1.055); }
+  100% { transform: translate3d(-.4%, 1.1%, 0) scale(1.04); }
+}
+
+.aurora::before {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  opacity: .34;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 68% 42%, rgba(128, 252, 255, .52) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 34% 73%, rgba(82, 238, 240, .24) 0 1px, transparent 1.8px);
+  background-size: 173px 149px, 251px 167px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .app-orb span {
     animation: nxs-orb-breathe 7s cubic-bezier(.4, 0, .2, 1) infinite;
@@ -517,13 +535,25 @@ body {
     transform-origin: center;
   }
 
+  .aurora::before {
+    animation: nxs-hero-field-drift 18s cubic-bezier(.4, 0, .2, 1) -7s infinite alternate;
+  }
+
+  .aurora::after {
+    inset: -8%;
+    animation: nxs-hero-field-drift 14s cubic-bezier(.4, 0, .2, 1) infinite alternate;
+    transform-origin: 70% 48%;
+  }
+
   /* Ambient loops are dormant off-screen and while the tab is hidden. */
   .app-orb span,
   .presence-grid article > i,
   .network-pill i,
   .status i,
   .mini-orb > i:nth-child(3),
-  .aurora i:nth-child(3) {
+  .aurora i:nth-child(3),
+  .aurora::before,
+  .aurora::after {
     animation-play-state: paused;
   }
 
@@ -532,7 +562,9 @@ body {
   .nxs-ambient-active .network-pill i,
   .nxs-ambient-active .status i,
   .nxs-ambient-active .mini-orb > i:nth-child(3),
-  .hero.nxs-ambient-active .aurora i:nth-child(3) {
+  .hero.nxs-ambient-active .aurora i:nth-child(3),
+  .hero.nxs-ambient-active .aurora::before,
+  .hero.nxs-ambient-active .aurora::after {
     animation-play-state: running;
   }
 
@@ -545,7 +577,9 @@ body {
   .nxs-motion-lite .network-pill i,
   .nxs-motion-lite .status i,
   .nxs-motion-lite .mini-orb > i:nth-child(3),
-  .nxs-motion-lite .aurora i:nth-child(3) {
+  .nxs-motion-lite .aurora i:nth-child(3),
+  .nxs-motion-lite .aurora::before,
+  .nxs-motion-lite .aurora::after {
     animation: none;
   }
 }

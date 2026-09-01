@@ -318,12 +318,20 @@ test("ambient motion only runs while its surface is near the viewport", async ({
   const page = await context.newPage();
   await page.goto("/", { waitUntil: "load" });
 
+  const hero = page.locator(".hero");
+  await expect(hero).toHaveClass(/nxs-ambient-active/);
+  const initialHeroTransform = await hero.evaluate((element) => getComputedStyle(element.querySelector(".aurora"), "::before").transform);
+  await page.waitForTimeout(260);
+  const movingHeroTransform = await hero.evaluate((element) => getComputedStyle(element.querySelector(".aurora"), "::before").transform);
+  expect(movingHeroTransform).not.toBe(initialHeroTransform);
+
   const surface = page.locator(".presence-system");
   const indicator = surface.locator(".presence-grid article > i").first();
   await expect(surface).not.toHaveClass(/nxs-ambient-active/);
   await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).animationPlayState)).toBe("paused");
 
   await surface.scrollIntoViewIfNeeded();
+  await expect(hero).not.toHaveClass(/nxs-ambient-active/);
   await expect(surface).toHaveClass(/nxs-ambient-active/);
   await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).animationPlayState)).toBe("running");
   await context.close();
