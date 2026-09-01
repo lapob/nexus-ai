@@ -4,18 +4,6 @@
   --nxs-reveal-duration: .72s;
 }
 
-/* Pointer interaction stays visually quiet; keyboard focus remains explicit. */
-* { -webkit-tap-highlight-color: transparent; }
-button,
-a,
-summary {
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: manipulation;
-}
-button:focus:not(:focus-visible),
-a:focus:not(:focus-visible),
-summary:focus:not(:focus-visible) { outline: none; }
 ::selection { color: #efffff; background: rgba(82, 238, 240, .2); }
 
 /* Pointer taps stay clean on every route. Keep selection available in prose and
@@ -26,6 +14,7 @@ summary:focus:not(:focus-visible) { outline: none; }
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 :where(a, button, summary, [role="button"], [role="tab"], [role="menuitem"]):focus:not(:focus-visible) {
@@ -75,6 +64,21 @@ summary:focus:not(:focus-visible) { outline: none; }
   height: 100%;
   object-fit: cover;
   object-position: center top;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* The desktop capture is a real 1090 x 613 frame. Account for the compact
+   28px product bar so the screenshot remains fully visible and never looks
+   square or cropped on wide and narrow layouts. */
+.product-mockup--real.desktop .device-frame {
+  width: min(100%, 760px);
+  aspect-ratio: 1090 / 641;
+  border-radius: 22px;
+}
+
+.product-mockup--real.desktop .product-screen img {
+  object-fit: contain;
 }
 
 .product-mockup--real.android .product-screen {
@@ -165,8 +169,124 @@ summary:focus:not(:focus-visible) { outline: none; }
 }
 
 @media (max-width: 560px) {
+  .product-mockup--real.desktop .device-frame {
+    width: 100%;
+    border-radius: 15px;
+  }
   .product-mockup--real.android .device-frame { width: min(60vw, 245px); }
   .product-mockup--real figcaption { font-size: 7px; }
+}
+
+/* Download center: centered editorial hero and release cards with one clear
+   visual axis. Entry motion remains vertical-only; no panel flies in from a
+   side or animates from an unrelated selection. */
+.download-hero {
+  min-height: min(780px, 92svh);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+}
+
+.download-hero > * { max-width: 780px; }
+.download-hero h1 { max-width: 14ch; margin-inline: auto; }
+.download-brand { justify-content: center; }
+.download-hero .eyebrow { justify-content: center; }
+.download-hero .release-policy { text-align: left; }
+
+.release-list {
+  gap: 20px;
+}
+
+.release-list article {
+  grid-template-columns: 64px minmax(0, 1fr) minmax(260px, .68fr);
+  grid-template-areas:
+    "icon title facts"
+    ". requirements actions"
+    ". hash actions";
+  align-items: start;
+  gap: 22px 28px;
+  padding: clamp(28px, 3.3vw, 42px);
+}
+
+.release-icon { grid-area: icon; }
+.release-title { grid-area: title; }
+.release-list dl { grid-area: facts; }
+.release-requirements { grid-area: requirements; }
+.release-hash { grid-area: hash; }
+.release-actions { grid-area: actions; align-self: stretch; align-content: center; }
+
+.release-list dl,
+.release-requirements,
+.release-hash,
+.release-actions {
+  min-width: 0;
+}
+
+.release-list dl { margin: 0; }
+.release-list .release-actions > small { max-width: 32ch; justify-self: center; }
+
+.verify-guide {
+  align-items: start;
+  border-radius: 20px;
+}
+
+.hash-preview code { overflow-wrap: anywhere; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .nxs-motion-ready .download-hero.nxs-in-view {
+    animation: nxs-download-arrive .64s cubic-bezier(.16, 1, .3, 1) both;
+  }
+
+  @keyframes nxs-download-arrive {
+    from { opacity: 0; transform: translate3d(0, 14px, 0); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@media (max-width: 900px) {
+  .release-list article {
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-areas:
+      "icon title"
+      ". facts"
+      ". requirements"
+      ". hash"
+      ". actions";
+  }
+
+  .release-actions { justify-items: start; }
+  .release-list .release-actions > small { max-width: 54ch; justify-self: start; text-align: left; }
+}
+
+@media (max-width: 560px) {
+  .download-hero {
+    min-height: auto;
+    padding-top: calc(64px + env(safe-area-inset-top) + 4rem);
+    padding-bottom: 4.5rem;
+  }
+
+  .download-brand { flex-direction: column; gap: 10px; }
+  .download-hero .release-policy { width: 100%; }
+  .release-list { width: calc(100% - 2 * var(--page-pad)); }
+  .release-list article {
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-areas:
+      "icon title"
+      "facts facts"
+      "requirements requirements"
+      "hash hash"
+      "actions actions";
+    gap: 20px 16px;
+    border-radius: 16px;
+  }
+
+  .release-icon { width: 48px; height: 48px; }
+  .release-list dl { grid-template-columns: 1fr 1fr; }
+  .release-actions { justify-items: stretch; }
+  .release-download { width: 100%; }
+  .release-list .release-actions > small { justify-self: center; text-align: center; }
+  .verify-guide { width: calc(100% - 2 * var(--page-pad)); border-radius: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
