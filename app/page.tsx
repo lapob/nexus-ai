@@ -1,11 +1,12 @@
-import { ArrowUpRight, Blocks, BrainCircuit, Check, Fingerprint, KeyRound, LockKeyhole, MessageCircle, Mic2, Orbit, ShieldCheck, Sparkles, Workflow, Zap } from "lucide-react";
+import Image from "next/image";
+import { ArrowUpRight, Blocks, BrainCircuit, Check, Fingerprint, LockKeyhole, MessageCircle, Mic2, Orbit, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
 
 const apps = [
-  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", href: "/desktop", Icon: Workflow },
-  { index: "02", name: "NexusNXS per Android", platform: "Android · Core vocale", description: "Un Core neurale da toccare e una scrittura essenziale quando serve: il ragionamento resta sui servizi NexusNXS.", accent: "teal", href: "/android", Icon: KeyRound },
+  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", device: "desktop", image: "/products/desktop-conversation.png", alt: "NexusNXS per PC con una conversazione operativa", href: "/desktop" },
+  { index: "02", name: "NexusNXS per Android", platform: "Android · Core vocale", description: "Un Core neurale da toccare e una scrittura essenziale quando serve: il ragionamento resta sui servizi NexusNXS.", accent: "teal", device: "android", image: "/products/android-home.png", alt: "NexusNXS per Android pronto all'ascolto", href: "/android" },
 ];
 
 const presenceStates = [
@@ -31,7 +32,7 @@ export default function Home() {
       <section className="manifesto reveal" id="vision"><p className="section-label">/ 01 — LA PRESENZA</p><p className="manifesto-text">NexusNXS non è un insieme di app separate. È <strong>una sola intelligenza privata</strong> che continua tra i tuoi dispositivi.</p></section>
       <section className="apps-section" id="apps">
         <div className="section-heading reveal"><div><p className="section-label">/ 02 — Le applicazioni</p><h2>Un ecosistema.<br />Il tuo ritmo.</h2></div><p>Ogni prodotto nasce per risolvere bene un problema reale. Insieme, diventano un ambiente senza attriti.</p></div>
-        <div className="app-grid">{apps.map((app) => <article className={`app-card reveal ${app.accent}`} key={app.name}><div className="card-top"><span>{app.index}</span><span className="status"><i /> PREVIEW VERIFICATA</span></div><div className="app-orb" aria-hidden="true"><span><app.Icon size={46} strokeWidth={1.15} /></span></div><p className="platform">{app.platform}</p><h3>{app.name}</h3><p>{app.description}</p><HardNavigationLink href={app.href} aria-label={`Scopri di più su ${app.name}`}>SCOPRI DI PIÙ <ArrowUpRight size={14} /></HardNavigationLink></article>)}</div>
+        <div className="app-grid">{apps.map((app) => <article className={`app-card reveal ${app.accent}`} key={app.name}><div className="card-top"><span>{app.index}</span><span className="status"><i /> BUILD VERIFICATA</span></div><div className={`app-card-visual ${app.device}`}><div className="app-card-visual__screen"><Image src={app.image} alt={app.alt} fill sizes={app.device === "desktop" ? "(max-width: 800px) 88vw, 540px" : "180px"} unoptimized /></div></div><p className="platform">{app.platform}</p><h3>{app.name}</h3><p>{app.description}</p><HardNavigationLink href={app.href} aria-label={`Scopri di più su ${app.name}`}>SCOPRI DI PIÙ <ArrowUpRight size={14} /></HardNavigationLink></article>)}</div>
       </section>
       <section className="presence-system reveal" aria-labelledby="presence-title">
         <div className="presence-copy"><p className="section-label">/ 03 — STATI COMPRENSIBILI</p><h2 id="presence-title">Sai sempre<br /><em>cosa sta facendo.</em></h2><p>Colori e movimento hanno un significato operativo, lo stesso sulle app e sul sito. Nessun indicatore puramente decorativo.</p></div>

@@ -1,4 +1,10 @@
 import { defineConfig } from "@playwright/test";
+import fs from "node:fs";
+
+const localBrowser = process.env.NEXUS_PLAYWRIGHT_EXECUTABLE;
+const launchOptions = localBrowser && fs.existsSync(localBrowser)
+  ? { executablePath: localBrowser }
+  : undefined;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -16,6 +22,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:41793",
     viewport: { width: 1280, height: 800 },
     colorScheme: "dark",
+    launchOptions,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",

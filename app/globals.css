@@ -708,3 +708,51 @@ body { isolation: isolate; }
 }
 .nxs-motion-lite .nxs-cosmic-field { opacity: .42; }
 @media (prefers-reduced-motion: reduce) { .nxs-cosmic-field { opacity: .28; } }
+
+/* Product proof — real, current application captures in a restrained frame. */
+.app-card-visual {
+  position: relative;
+  height: clamp(15.5rem, 26vw, 19rem);
+  margin: 1.7rem -.35rem 1.9rem;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(125, 224, 228, .1);
+  border-radius: 1.25rem;
+  background: radial-gradient(circle at 50% 40%, rgba(47, 202, 204, .11), transparent 46%), #010607;
+}
+
+.app-card-visual__screen {
+  position: relative;
+  z-index: 1;
+  width: min(90%, 34rem);
+  aspect-ratio: 1090 / 613;
+  overflow: hidden;
+  border: 1px solid rgba(132, 232, 231, .14);
+  border-radius: .8rem;
+  background: #010405;
+  box-shadow: 0 1.35rem 4.5rem rgba(0, 0, 0, .58);
+}
+
+.app-card-visual__screen img {
+  object-fit: cover;
+}
+
+.app-card-visual.android .app-card-visual__screen {
+  width: min(41%, 8.9rem);
+  aspect-ratio: 360 / 640;
+  border-radius: 1.35rem;
+}
+
+.app-card-visual.android .app-card-visual__screen img { object-fit: contain; }
+
+@media (max-width: 560px) {
+  .app-card-visual {
+    height: 15rem;
+    margin-inline: -.4rem;
+    border-radius: 1rem;
+  }
+
+  .app-card-visual.desktop .app-card-visual__screen { width: 96%; }
+  .app-card-visual.android .app-card-visual__screen { width: 7.25rem; }
+}
