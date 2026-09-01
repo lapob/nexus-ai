@@ -322,12 +322,14 @@ async function promote() {
     "--yes", "--message", `production ${sha.slice(0, 12)}`,
   ]);
   try {
-    await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 3 });
+    // Custom-domain propagation can trail the Worker deployment by several
+    // tens of seconds. Wait for edge convergence before declaring failure.
+    await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 12 });
   } catch (releaseError) {
     if (previous && previous !== candidate.version_id) {
       runWrangler(["rollback", previous, "--yes", "--message", `automatic rollback ${sha.slice(0, 12)}`]);
       try {
-        await verifySite("https://nexusnxs.com", previous, { attempts: 3 });
+        await verifySite("https://nexusnxs.com", previous, { attempts: 12 });
       } catch (rollbackError) {
         throw new AggregateError([releaseError, rollbackError], "Production gate and rollback verification both failed.");
       }

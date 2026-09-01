@@ -90,6 +90,14 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   assert.match(releaseScript, /routes\.length !== 0/);
 });
 
+test("allows the production domain enough time to converge before rollback", async () => {
+  const releaseScript = await readFile(new URL("../scripts/cloudflare-release.mjs", import.meta.url), "utf8");
+  assert.match(
+    releaseScript,
+    /verifySite\("https:\/\/nexusnxs\.com", candidate\.version_id, \{ attempts: 12 \}\)/,
+  );
+});
+
 test("verifies immutable Cloudflare previews before promotion", async () => {
   const release = await readFile(new URL("../scripts/cloudflare-release.mjs", import.meta.url), "utf8");
   assert.match(release, /event\?\.preview_url \?\? event\?\.preview_alias_url/);
