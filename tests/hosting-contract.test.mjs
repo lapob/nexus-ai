@@ -21,8 +21,10 @@ test("uses one account-owned Cloudflare Worker and no OpenAI Sites runtime", asy
   assert.deepEqual(wrangler.routes, [
     { pattern: "nexusnxs.com", custom_domain: true },
     { pattern: "www.nexusnxs.com", custom_domain: true },
+    { pattern: "ai.nexusnxs.com/*", zone_name: "nexusnxs.com" },
   ]);
-  assert.ok(wrangler.routes.every((route) => !route.pattern.includes("ai.nexusnxs.com")));
+  assert.match(worker, /Il Core sta/);
+  assert.match(worker, /X-NexusNXS-Edge-State/);
   assert.equal(wrangler.assets.binding, "ASSETS");
   assert.equal(wrangler.assets.html_handling, "none");
   assert.equal(wrangler.vars.NEXUSNXS_SITE_MODE, "live");

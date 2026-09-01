@@ -18,6 +18,10 @@
     {
       "pattern": "www.nexusnxs.com",
       "custom_domain": true
+    },
+    {
+      "pattern": "ai.nexusnxs.com/*",
+      "zone_name": "nexusnxs.com"
     }
   ],
   "assets": {

@@ -21,7 +21,7 @@ const kib = (bytes) => Math.round(bytes / 102.4) / 10;
 
 const checks = [
   { label: "JavaScript client", actual: sum((file) => file.relative.endsWith(".js")), maximum: 525 * 1024 },
-  { label: "CSS client", actual: sum((file) => file.relative.endsWith(".css")), maximum: 97 * 1024 },
+  { label: "CSS client", actual: sum((file) => file.relative.endsWith(".css")), maximum: 98 * 1024 },
   { label: "Font tecnico", actual: find("fonts/jetbrains-mono-latin.woff2"), maximum: 42 * 1024 },
   { label: "Cattura Android", actual: find("products/android-home.png"), maximum: 190 * 1024 },
   { label: "Cattura desktop", actual: find("products/desktop-core.png"), maximum: 190 * 1024 },

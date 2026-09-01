@@ -329,7 +329,7 @@ test("keeps Cloudflare previews out of search indexes", async () => {
   assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 });
 
-test("proves the exact Cloudflare Worker version without claiming the AI hostname", async () => {
+test("proves the exact Cloudflare Worker version across the site and AI edge", async () => {
   const versionId = "01234567-89ab-cdef-0123-456789abcdef";
   const env = {
     CF_VERSION_METADATA: {
@@ -345,7 +345,38 @@ test("proves the exact Cloudflare Worker version without claiming the AI hostnam
   assert.equal(www.status, 308);
   assert.equal(www.headers.get("x-nexusnxs-worker-version"), versionId);
 
-  const ai = await fetchWorker("https://ai.nexusnxs.com/", { env });
-  assert.notEqual(ai.status, 308);
-  assert.equal(ai.headers.get("location"), null);
+  const ai = await fetchWorker("https://ai.nexusnxs.com/", {
+    env: {
+      ...env,
+      AI_UPSTREAM: { fetch: async () => new Response("AI online", { status: 200 }) },
+    },
+  });
+  assert.equal(ai.status, 200);
+  assert.equal(ai.headers.get("x-nexusnxs-worker-version"), versionId);
+  assert.equal(ai.headers.get("x-nexusnxs-edge-state"), "online");
+  assert.equal(await ai.text(), "AI online");
+});
+
+test("replaces a failed AI tunnel with the branded offline experience", async () => {
+  const offlineUpstream = { fetch: async () => new Response("Cloudflare 1033", { status: 530 }) };
+  const navigation = await fetchWorker("https://ai.nexusnxs.com/", {
+    env: { AI_UPSTREAM: offlineUpstream },
+  });
+  assert.equal(navigation.status, 503);
+  assert.equal(navigation.headers.get("x-nexusnxs-state"), "offline");
+  assert.equal(navigation.headers.get("x-nexusnxs-edge-state"), "offline");
+  assert.equal(navigation.headers.get("retry-after"), "8");
+  assert.match(navigation.headers.get("content-security-policy") ?? "", /script-src 'nonce-/);
+  const html = await navigation.text();
+  assert.match(html, /NexusNXS AI · Riconnessione/);
+  assert.match(html, /Il Core sta/);
+  assert.match(html, /Riprova ora/);
+  assert.doesNotMatch(html, /Cloudflare|1033|workstation|tunnel/i);
+
+  const health = await fetchWorker("https://ai.nexusnxs.com/readyz", {
+    headers: { accept: "application/json" },
+    env: { AI_UPSTREAM: offlineUpstream },
+  });
+  assert.equal(health.status, 503);
+  assert.deepEqual(await health.json(), { status: "offline", retryAfter: 8 });
 });

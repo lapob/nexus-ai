@@ -70,6 +70,10 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   assert.match(releaseScript, /await rm\(outputPath, \{ force: true \}\)/);
   assert.match(releaseScript, /--confirm-domain-cutover/);
   assert.match(releaseScript, /assertProductionDomainsAttached/);
+  assert.match(releaseScript, /runWrangler\(\["triggers", "deploy"\]/);
+  assert.match(releaseScript, /aiRoutePreviouslyAttached/);
+  assert.match(releaseScript, /removeAiRoute/);
+  assert.match(releaseScript, /verifyAiHealth\(candidate\.version_id, \{ attempts: 12 \}\)/);
   assert.match(releaseScript, /artifact \? "dist\/server\/wrangler\.json" : "wrangler\.jsonc"/);
   assert.match(releaseScript, /AggregateError/);
   assert.match(verifier, /x-nexusnxs-worker-version/);
@@ -86,6 +90,7 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   assert.deepEqual(config.routes, [
     { pattern: "nexusnxs.com", custom_domain: true },
     { pattern: "www.nexusnxs.com", custom_domain: true },
+    { pattern: "ai.nexusnxs.com/*", zone_name: "nexusnxs.com" },
   ]);
   assert.match(releaseScript, /routes\.length !== 0/);
 });

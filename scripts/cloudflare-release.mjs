@@ -14,6 +14,8 @@ const npmCli = process.env.npm_execpath;
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const workerName = "nexusnxs-site";
 const productionHostnames = ["www.nexusnxs.com", "nexusnxs.com"];
+const zoneId = "544b901eff88c7f156348b4dfc6184fe";
+const aiRoutePattern = "ai.nexusnxs.com/*";
 let accountToken;
 
 function childEnvironment(extra = {}) {
@@ -86,21 +88,35 @@ async function verifySite(url, versionId, { attempts = 1 } = {}) {
   throw new Error(`Site verification failed after ${attempts} attempt(s): ${url}`);
 }
 
-async function verifyAiHealth() {
-  const response = await fetch("https://ai.nexusnxs.com/healthz", {
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(15_000),
-  });
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
+async function verifyAiHealth(expectedVersion, { attempts = 1 } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch("https://ai.nexusnxs.com/healthz", {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const payload = await response.json().catch(() => null);
+      if (response.status !== 200 || payload?.status !== "ok") {
+        throw new Error(`ai.nexusnxs.com health gate failed with status ${response.status}.`);
+      }
+      if (expectedVersion && response.headers.get("x-nexusnxs-worker-version") !== expectedVersion) {
+        throw new Error("ai.nexusnxs.com is not passing through the expected NexusNXS edge version.");
+      }
+      if (expectedVersion && response.headers.get("x-nexusnxs-edge-state") !== "online") {
+        throw new Error("ai.nexusnxs.com did not report an online edge state.");
+      }
+      console.log("AI service verified independently: https://ai.nexusnxs.com/healthz");
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        console.warn(`AI edge verification attempt ${attempt}/${attempts} failed; retrying.`);
+        await delay(5_000);
+      }
+    }
   }
-  if (response.status !== 200 || payload?.status !== "ok") {
-    throw new Error(`ai.nexusnxs.com health gate failed with status ${response.status}; the site version was not rolled back.`);
-  }
-  console.log("AI service verified independently: https://ai.nexusnxs.com/healthz");
+  throw lastError ?? new Error("AI edge verification failed.");
 }
 
 function assertCleanSource() {
@@ -154,6 +170,47 @@ async function cloudflareRequest(pathname, init = {}) {
     payload = { errors: [{ message: text.slice(0, 300) }] };
   }
   return { response, payload };
+}
+
+async function cloudflareZoneRequest(pathname, init = {}) {
+  if (!accountToken) throw new Error("Cloudflare account credential was not loaded.");
+  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}${pathname}`, {
+    ...init,
+    headers: {
+      authorization: `Bearer ${accountToken}`,
+      "content-type": "application/json",
+      ...init.headers,
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  const payload = await response.json().catch(() => ({}));
+  return { response, payload };
+}
+
+async function workerRoutes() {
+  const { response, payload } = await cloudflareZoneRequest("/workers/routes");
+  if (!response.ok || payload.success === false || !Array.isArray(payload.result)) {
+    throw new Error(`Unable to read Worker routes (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
+  }
+  return payload.result;
+}
+
+async function hasAiRoute() {
+  return (await workerRoutes()).some((route) => route.pattern === aiRoutePattern && route.script === workerName);
+}
+
+async function deployTriggers() {
+  runWrangler(["triggers", "deploy"], { artifact: true });
+  if (!(await hasAiRoute())) throw new Error(`${aiRoutePattern} was not attached to ${workerName}.`);
+}
+
+async function removeAiRoute() {
+  const route = (await workerRoutes()).find((item) => item.pattern === aiRoutePattern && item.script === workerName);
+  if (!route?.id) return;
+  const { response, payload } = await cloudflareZoneRequest(`/workers/routes/${route.id}`, { method: "DELETE" });
+  if (!response.ok || payload.success === false) {
+    throw new Error(`Unable to restore the previous AI route state (${response.status}).`);
+  }
 }
 
 async function assertWorkerDoesNotExist() {
@@ -317,6 +374,7 @@ async function promote() {
   await verifySite(candidate.preview_url, candidate.version_id);
   await verifyAiHealth();
   const previous = await currentVersion();
+  const aiRoutePreviouslyAttached = await hasAiRoute();
   runWrangler([
     "versions", "deploy", `${candidate.version_id}@100%`,
     "--yes", "--message", `production ${sha.slice(0, 12)}`,
@@ -325,7 +383,10 @@ async function promote() {
     // Custom-domain propagation can trail the Worker deployment by several
     // tens of seconds. Wait for edge convergence before declaring failure.
     await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 12 });
+    await deployTriggers();
+    await verifyAiHealth(candidate.version_id, { attempts: 12 });
   } catch (releaseError) {
+    if (!aiRoutePreviouslyAttached) await removeAiRoute();
     if (previous && previous !== candidate.version_id) {
       runWrangler(["rollback", previous, "--yes", "--message", `automatic rollback ${sha.slice(0, 12)}`]);
       try {
@@ -336,7 +397,6 @@ async function promote() {
     }
     throw releaseError;
   }
-  await verifyAiHealth();
   console.log(`Production release complete: ${candidate.version_id}`);
 }
 
