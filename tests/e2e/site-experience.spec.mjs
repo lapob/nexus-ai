@@ -42,6 +42,54 @@ test("the homepage loads real product captures without CSP or runtime errors", a
   expect(errors).toEqual([]);
 });
 
+test("real product captures keep Android system bars visible and use precise hover targets", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/", { waitUntil: "load" });
+
+  const showcase = page.locator(".one-nexus");
+  await showcase.scrollIntoViewIfNeeded();
+  const androidScreen = showcase.locator(".product-mockup--real.android .product-screen");
+  const androidImage = androidScreen.locator("img");
+  const androidGeometry = await androidScreen.evaluate((screen) => {
+    const image = screen.querySelector("img");
+    const screenRect = screen.getBoundingClientRect();
+    const imageRect = image?.getBoundingClientRect();
+    return {
+      ratio: screenRect.width / screenRect.height,
+      imageRatio: imageRect ? imageRect.width / imageRect.height : 0,
+      naturalRatio: image ? image.naturalWidth / image.naturalHeight : 0,
+      objectFit: image ? getComputedStyle(image).objectFit : "",
+    };
+  });
+  expect(androidGeometry.objectFit).toBe("contain");
+  expect(androidGeometry.ratio).toBeCloseTo(9 / 16, 2);
+  expect(androidGeometry.imageRatio).toBeCloseTo(androidGeometry.naturalRatio, 2);
+  await expect(androidImage).toBeVisible();
+
+  const desktopFrame = showcase.locator(".product-mockup--real.desktop .device-frame");
+  const frameBox = await desktopFrame.boundingBox();
+  expect(frameBox).not.toBeNull();
+
+  await page.mouse.move(4, 4);
+  await page.waitForTimeout(520);
+  expect(await desktopFrame.evaluate((frame) => new DOMMatrix(getComputedStyle(frame).transform).m42)).toBeCloseTo(0, 1);
+
+  await page.mouse.move(frameBox.x + frameBox.width / 2, frameBox.y + frameBox.height / 2);
+  await page.waitForTimeout(520);
+  expect(await desktopFrame.evaluate((frame) => new DOMMatrix(getComputedStyle(frame).transform).m42)).toBeLessThan(-3);
+
+  const desktopCardScreen = page.locator(".app-card-visual.desktop .app-card-visual__screen");
+  await desktopCardScreen.scrollIntoViewIfNeeded();
+  const cardScreenBox = await desktopCardScreen.boundingBox();
+  expect(cardScreenBox).not.toBeNull();
+  await page.mouse.move(cardScreenBox.x - 8, cardScreenBox.y + cardScreenBox.height / 2);
+  await page.waitForTimeout(460);
+  expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeCloseTo(0, 1);
+  await page.mouse.move(cardScreenBox.x + cardScreenBox.width / 2, cardScreenBox.y + cardScreenBox.height / 2);
+  await page.waitForTimeout(460);
+  expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeLessThan(-3);
+});
+
 test("core routes pass automated WCAG A/AA checks", async ({ page }) => {
   for (const route of publicRoutes) {
     await page.goto(route, { waitUntil: "load" });
