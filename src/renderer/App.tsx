@@ -222,6 +222,7 @@ export function App() {
           onApproveTraining={nexus.approveForTraining}
           onRegenerate={nexus.regenerateResponse}
           onContinue={nexus.continueResponse}
+          onStop={nexus.stopResponse}
           onDismiss={nexus.dismissResponse}
         />
       )}

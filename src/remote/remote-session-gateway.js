@@ -60,6 +60,7 @@ const SESSION_ROTATION_GRACE_MS = 10 * 60 * 1000;
 const READINESS_CACHE_TTL_MS = 2_000;
 const READINESS_PROBE_TIMEOUT_MS = 1_000;
 const STREAM_HEARTBEAT_MS = 10_000;
+const GUEST_RECONNECT_GRACE_MS = 15_000;
 const POWER_ACTION_DELAY_SECONDS = 15;
 const MAX_ADMIN_TICKETS = 64;
 const MAX_GUEST_SESSIONS = 5_000;
@@ -960,7 +961,15 @@ class RemoteSessionGateway {
 
   startGuestExecution(guest, body, descriptor) {
     const controller = new AbortController();
-    const execution = { key: descriptor.key, controller, listeners: new Set(), subscribers: 0, settled: false, promise: null };
+    const execution = {
+      key: descriptor.key,
+      controller,
+      listeners: new Set(),
+      subscribers: 0,
+      settled: false,
+      disconnectTimer: null,
+      promise: null
+    };
     execution.emit = (event) => {
       for (const listener of [...execution.listeners]) {
         try { listener(event); } catch { execution.listeners.delete(listener); }
@@ -1027,6 +1036,8 @@ class RemoteSessionGateway {
         throw error;
       } finally {
         execution.settled = true;
+        clearTimeout(execution.disconnectTimer);
+        execution.disconnectTimer = null;
         release?.();
         this.activeGuestExecutions.delete(descriptor.key);
       }
@@ -1038,6 +1049,8 @@ class RemoteSessionGateway {
   }
 
   subscribeGuestExecution(execution, response, listener = null) {
+    clearTimeout(execution.disconnectTimer);
+    execution.disconnectTimer = null;
     execution.subscribers += 1;
     if (listener) execution.listeners.add(listener);
     let active = true;
@@ -1046,7 +1059,13 @@ class RemoteSessionGateway {
       active = false;
       if (listener) execution.listeners.delete(listener);
       execution.subscribers = Math.max(0, execution.subscribers - 1);
-      if (!execution.settled && execution.subscribers === 0) execution.controller.abort();
+      if (!execution.settled && execution.subscribers === 0 && !execution.disconnectTimer) {
+        execution.disconnectTimer = setTimeout(() => {
+          execution.disconnectTimer = null;
+          if (!execution.settled && execution.subscribers === 0) execution.controller.abort();
+        }, GUEST_RECONNECT_GRACE_MS);
+        execution.disconnectTimer.unref?.();
+      }
     };
     const disconnected = () => { if (!response.writableEnded) detach(); };
     response.once('close', disconnected);
@@ -2016,6 +2035,19 @@ class RemoteSessionGateway {
             code: error?.code || 'IMAGE_PROVIDER_ERROR'
           });
         }
+      }
+      if (request.method === 'POST' && url.pathname === '/api/guest/messages/cancel') {
+        const guest = this.guestSession(request);
+        if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
+        const body = await this.body(request);
+        const clientMessageId = String(body.clientMessageId || '');
+        if (!/^[a-f0-9-]{20,80}$/i.test(clientMessageId)) {
+          return this.json(response, 400, { error: 'Identificativo messaggio non valido.' });
+        }
+        const key = crypto.createHash('sha256').update(`${guest.installationHash}:${clientMessageId}`).digest('hex');
+        const execution = this.activeGuestExecutions.get(key);
+        if (execution && !execution.settled) execution.controller.abort();
+        return this.json(response, 200, { cancelled: Boolean(execution && !execution.settled) });
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/messages/stream') {
         const guest = this.guestSession(request);

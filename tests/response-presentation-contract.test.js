@@ -14,6 +14,8 @@ test('desktop rende Markdown semantico anche durante lo streaming', () => {
   assert.match(surface, /kind: 'callout'/);
   assert.match(surface, /kind: 'table'/);
   assert.match(surface, /className="answer-context"/);
+  assert.match(surface, /className="answer-stop"/);
+  assert.match(surface, /onClick=\{onStop\}/);
   assert.match(styles, /\.response-callout/);
   assert.match(styles, /\.response-table-wrap/);
   assert.match(styles, /\.code-card-meta/);
@@ -25,7 +27,8 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   const html = enhancePublicAiHtml({ base, coreStyle: '', coreScript: '' });
   assert.match(html, /id="answerContext"/);
   assert.match(html, /class="web-answer-context"/);
-  assert.match(html, /formatAnswer\(rawAnswer,\{streaming:true\}\)/);
+  assert.match(html, /answer\.textContent=rawAnswer/);
+  assert.match(html, /formatAnswer\(responseText\)/);
   assert.match(html, /rawAnswer=recentAnswer\.content;formatAnswer\(recentAnswer\.content\)/);
   assert.match(html, /className = 'web-code-card'/);
   assert.match(html, /className = 'web-callout'/);
@@ -38,6 +41,12 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /function followAnswer\(\)/);
   assert.match(html, /document\.documentElement\.scrollHeight-innerHeight/);
   assert.match(html, /if\(busy\)followStream=false/);
+  assert.match(html, /\.dock\{position:fixed/);
+  assert.match(html, /data-mode=stop/);
+  assert.match(html, /function stopGeneration\(\)/);
+  assert.match(html, /\/api\/guest\/messages\/cancel/);
+  assert.match(html, /Riprendo la risposta/);
+  assert.match(html, /async function memoryRead\(\)\{return\[\]/);
   assert.doesNotMatch(html, /answer\.textContent\+=pendingAnswer/);
   for (const [index, match] of [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].entries()) {
     assert.doesNotThrow(() => new vm.Script(match[1]), `script Web generato ${index + 1}`);

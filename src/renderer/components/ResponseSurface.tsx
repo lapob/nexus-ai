@@ -20,6 +20,7 @@ interface ResponseSurfaceProps {
   onApproveTraining: (approvedResponse?: string, rejectedResponse?: string) => void;
   onRegenerate: () => void;
   onContinue: () => void;
+  onStop: () => void;
   onDismiss: () => void;
 }
 
@@ -350,7 +351,7 @@ export const MarkdownContent = memo(function MarkdownContent({ text, streaming =
 
 // #region 02 — Canvas della risposta
 
-export function ResponseSurface({ response, error, active, artifacts, previousResponse = '', trainingSaved, onApproveTraining, onRegenerate, onContinue, onDismiss }: ResponseSurfaceProps) {
+export function ResponseSurface({ response, error, active, artifacts, previousResponse = '', trainingSaved, onApproveTraining, onRegenerate, onContinue, onStop, onDismiss }: ResponseSurfaceProps) {
   const [correcting, setCorrecting] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -419,6 +420,12 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
           aria-busy={active}
         >
           <QuietClose onClick={onDismiss} label="Chiudi risposta" />
+          {!error && active && (
+            <button className="answer-stop" type="button" onClick={onStop} aria-label="Interrompi e conserva la risposta">
+              <i aria-hidden="true" />
+              <span>Interrompi</span>
+            </button>
+          )}
           {!error && active && <span className="answer-stream-indicator" aria-hidden="true" />}
           {!error && <div className="answer-context" data-kind={kind} role="status" aria-live="polite">
             <i aria-hidden="true" />

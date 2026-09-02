@@ -619,7 +619,7 @@ export function useNexusController() {
     void speak(`Ci sei, ${name}?`, `attention-${Date.now()}`, false);
   }, [attentionRequest, speak]);
 
-  const completeConversation = useCallback((requestKey: string = crypto.randomUUID(), incomplete = false) => {
+  const completeConversation = useCallback((requestKey: string = crypto.randomUUID(), incomplete = false, announce = true) => {
     const answer = responseRef.current.trim();
     setStep('verify', 'complete');
     addLog('Completato');
@@ -646,7 +646,8 @@ export function useNexusController() {
       // Durante il barge-in la vecchia risposta resta leggibile ma non viene
       // pronunciata sopra al microfono o alla frase già pronta in coda.
       if (bargeInActive.current || queuedVoicePromptRef.current) setState('listening');
-      else void speak(answer, requestKey);
+      else if (announce) void speak(answer, requestKey);
+      else setState('idle');
     } else {
       setState('idle');
     }
@@ -1726,6 +1727,24 @@ export function useNexusController() {
     setState(settings?.model ? 'idle' : 'offline');
   }, [settings?.model, stopSpeech]);
 
+  const stopResponse = useCallback(() => {
+    const requestId = activeRequest.current;
+    if (!requestId) return;
+    activeRequest.current = '';
+    requestGenerating.current = false;
+    setGenerating(false);
+    void window.nexus.cancel(requestId);
+    void stopSpeech(false);
+    responseRef.current = publicResponseText(responseRef.current);
+    flushResponsePaint();
+    window.localStorage.removeItem(INTERRUPTED_DRAFT_KEY);
+    if (responseRef.current.trim()) completeConversation(requestId, true, false);
+    else {
+      addLog('Generazione interrotta');
+      setState(settings?.model ? 'idle' : 'offline');
+    }
+  }, [addLog, completeConversation, flushResponsePaint, settings?.model, stopSpeech]);
+
   const deleteConversation = useCallback((id: string) => {
     setConversationHistory(removeConversation(id));
     if (id === currentConversationId.current) startNewConversation();
@@ -1887,6 +1906,7 @@ export function useNexusController() {
     submit,
     regenerateResponse,
     continueResponse,
+    stopResponse,
     dismissResponse,
     detectModels,
     saveSettings,

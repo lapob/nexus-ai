@@ -1349,7 +1349,7 @@ test('retry simultanei condividono una sola inferenza in-flight', async () => {
   } finally { release?.(); await Promise.allSettled([first, second].filter(Boolean)); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('la disconnessione dell’ultimo stream cancella il lavoro lato server', async () => {
+test('una disconnessione breve conserva il lavoro e lo stop esplicito lo annulla', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-cancel-'));
   let resolveStarted; let cancelled = false;
   const started = new Promise((resolve) => { resolveStarted = resolve; });
@@ -1365,14 +1365,22 @@ test('la disconnessione dell’ultimo stream cancella il lavoro lato server', as
     const port = await freePort(); await gateway.configure({ enabled: true, port });
     const baseUrl = `http://127.0.0.1:${port}`; const guest = await bootstrapGuest(baseUrl);
     const abort = new AbortController();
+    const clientMessageId = '019fa53a-63c1-79b1-bf97-08fdf3bb5cc0';
+    const headers = { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' };
     const response = await fetch(`${baseUrl}/api/guest/messages/stream`, {
       method: 'POST', signal: abort.signal,
-      headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: 'Interrompi', history: [], clientMessageId: '019fa53a-63c1-79b1-bf97-08fdf3bb5cc0' })
+      headers,
+      body: JSON.stringify({ text: 'Interrompi', history: [], clientMessageId })
     });
     await started;
     abort.abort();
     await assert.rejects(response.text());
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(cancelled, false);
+    const stopped = await (await fetch(`${baseUrl}/api/guest/messages/cancel`, {
+      method: 'POST', headers, body: JSON.stringify({ clientMessageId })
+    })).json();
+    assert.equal(stopped.cancelled, true);
     for (let attempt = 0; attempt < 20 && !cancelled; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(cancelled, true);
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
