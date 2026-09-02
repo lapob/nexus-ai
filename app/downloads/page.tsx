@@ -24,7 +24,7 @@ const releases = [
     requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
-    sha256: "94FAFBD68EFA749FC6F6B99FA20C94CB7071FBCA5208E5CE7C314BB3C8B23EE5",
+    sha256: "C46962BA3E14075C46B228116B9E5E5C2B113447BF9E500CAF42275B8B2EC464",
     url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.5-preview.1/NexusNXS-0.3.5-Setup.exe",
   },
   {
