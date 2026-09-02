@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "standard": "OWASP ASVS 5.0.0",
+  "scope": "NexusNXS desktop renderer, public/private gateway and Android clients",
+  "coverageType": "chapter-level evidence map",
+  "assurance": "internal evidence inventory, not requirement-level verification or external certification",
+  "controls": [
+    { "id": "V1", "chapter": "Encoding and Sanitization", "evidence": ["src/core/security.js", "src/application/ipc-contracts.js"], "tests": ["tests/security.test.js", "tests/ipc-contracts.test.js"] },
+    { "id": "V2", "chapter": "Validation and Business Logic", "evidence": ["docs/ACTION_RUNTIME.md"], "tests": ["tests/action-runtime.test.js", "tests/workflow-runtime.test.js"] },
+    { "id": "V3", "chapter": "Web Frontend Security", "evidence": ["src/infrastructure/electron/renderer-protocol.js"], "tests": ["tests/trusted-renderer.test.js", "tests/preload-contract.test.js"] },
+    { "id": "V4", "chapter": "API and Web Service", "evidence": ["src/remote/remote-session-gateway.js"], "tests": ["tests/remote-session-gateway.test.js"] },
+    { "id": "V5", "chapter": "File Handling", "evidence": ["src/application/attachments.js"], "tests": ["tests/attachments.test.js"] },
+    { "id": "V6", "chapter": "Authentication", "evidence": ["docs/REMOTE_SESSIONS.md"], "tests": ["tests/remote-device-identity.test.js", "tests/android-security-contract.test.js"] },
+    { "id": "V7", "chapter": "Session Management", "evidence": ["src/remote/remote-session-gateway.js"], "tests": ["tests/remote-session-gateway.test.js"] },
+    { "id": "V8", "chapter": "Authorization", "evidence": ["docs/ACTION_RUNTIME.md", "config/tailscale-grants.example.hujson"], "tests": ["tests/action-runtime.test.js"] },
+    { "id": "V11", "chapter": "Cryptography", "evidence": ["src/security/release-integrity.js"], "tests": ["tests/encrypted-backup.test.js", "tests/safe-storage-secret.test.js", "tests/release-integrity.test.js"] },
+    { "id": "V12", "chapter": "Secure Communication", "evidence": ["config/public-client.json"], "tests": ["tests/android-security-contract.test.js", "tests/nexus-service-provider.test.js"] },
+    { "id": "V13", "chapter": "Configuration", "evidence": ["SECURITY.md", ".github/workflows/security.yml"], "tests": ["tests/app-lifecycle-security.test.js", "tests/config.test.js"] },
+    { "id": "V14", "chapter": "Data Protection", "evidence": ["docs/DATA_GOVERNANCE.md"], "tests": ["tests/encrypted-backup.test.js", "tests/logger.test.js"] },
+    { "id": "V15", "chapter": "Secure Coding and Architecture", "evidence": ["docs/ARCHITECTURE.md", "docs/AGENTIC_SECURITY.md"], "tests": ["tests/security-boundaries.test.js"] },
+    { "id": "V16", "chapter": "Security Logging and Error Handling", "evidence": ["src/security/security-event-store.js", "docs/INCIDENT_RESPONSE.md"], "tests": ["tests/security-event-store.test.js", "tests/logger.test.js"] }
+  ],
+  "notApplicable": [
+    { "id": "V9", "chapter": "Self-contained Tokens", "reason": "NexusNXS non usa JWT o token self-contained nei flussi coperti." },
+    { "id": "V10", "chapter": "OAuth and OIDC", "reason": "NexusNXS non offre login OAuth/OIDC nei flussi coperti." },
+    { "id": "V17", "chapter": "WebRTC", "reason": "NexusNXS non usa WebRTC nei flussi coperti." }
+  ]
+}

@@ -1,6 +1,12 @@
+/**
+ * @module scripts/doctor
+ * @description Diagnostica offline e non distruttiva dell'installazione NEXUSNXS.
+ */
+
 const fs = require('node:fs');
 const path = require('node:path');
-const { resolveVaultPath } = require('../src/portable-paths');
+const { execFileSync } = require('node:child_process');
+const { resolveVaultPath } = require('../src/infrastructure/storage/portable-paths');
 const { loadRuntimeConfig } = require('../src/core/config');
 
 const appRoot = path.resolve(__dirname, '..');
@@ -15,7 +21,31 @@ function check(name, operation, required = true) {
 }
 
 check('Node.js', () => process.version);
-check('package.json', () => JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8')).version);
+const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
+check('package.json', () => packageJson.version);
+check('npm command targets', () => {
+  const targets = new Set();
+  for (const command of Object.values(packageJson.scripts || {})) {
+    for (const match of String(command).matchAll(/(?:scripts|tests|src)[\\/][^\s&"'*?]+\.(?:js|ps1)/g)) {
+      targets.add(match[0]);
+    }
+  }
+  const missing = [...targets].filter((target) => !fs.existsSync(path.join(appRoot, target)));
+  if (missing.length) throw new Error(`target mancanti: ${missing.join(', ')}`);
+  return `${Object.keys(packageJson.scripts || {}).length} comandi · ${targets.size} target verificati`;
+});
+check('Electron development runtime', () => {
+  fs.accessSync(path.join(appRoot, 'node_modules', 'electron', 'cli.js'), fs.constants.R_OK);
+  return 'CLI disponibile';
+});
+check('PowerShell 7', () => {
+  if (process.platform !== 'win32') return 'non richiesto su questo sistema';
+  return execFileSync('pwsh.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$PSVersionTable.PSVersion.ToString()'], {
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 5000
+  }).trim();
+});
 check('runtime configuration', () => {
   const config = loadRuntimeConfig();
   return `${config.ai.provider} · ${config.ai.ollama.baseUrl} · model=${config.ai.chatModel || 'none'} · log=${config.logging.level}`;
@@ -31,8 +61,8 @@ check('vault', () => {
   return `${location.vaultPath} (${location.source})`;
 });
 check('renderer', () => {
-  for (const file of ['index.html', 'styles.css', 'app.js']) fs.accessSync(path.join(appRoot, 'src', 'renderer', file), fs.constants.R_OK);
-  return 'HTML, CSS e JavaScript leggibili';
+  fs.accessSync(path.join(appRoot, 'renderer-dist', 'index.html'), fs.constants.R_OK);
+  return 'bundle React/TypeScript compilato e leggibile';
 });
 check('local model endpoint', () => 'non contattato (diagnostica offline)', false);
 

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "maximumInvitedTesters": 20,
+  "artifactMaximumAgeHours": {
+    "productSlo": 24,
+    "backupRecovery": 168,
+    "aiEvaluation": 24,
+    "desktopMotion": 24,
+    "androidDeviceMatrix": 336
+  },
+  "android": {
+    "requiredProfiles": 5,
+    "maximumJankyPercent": 18,
+    "minimumFramesPerProfile": 20
+  },
+  "externalControls": [
+    {
+      "id": "privacy-consent-copy-reviewed",
+      "environment": "NEXUS_FOUNDER_PRIVACY_REVIEWED",
+      "description": "Informativa, cancellazione ed eventuale contributo al miglioramento sono stati provati con un tester reale."
+    },
+    {
+      "id": "founder-support-owner",
+      "environment": "NEXUS_FOUNDER_SUPPORT_READY",
+      "description": "Esiste un responsabile raggiungibile per accesso, revoca, incidenti e recupero dei tester invitati."
+    }
+  ]
+}

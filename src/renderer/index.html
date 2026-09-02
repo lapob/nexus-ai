@@ -1,108 +1,18 @@
+<!--
+  @module renderer/index
+  @description Documento minimo che ospita la shell React isolata.
+-->
 <!doctype html>
 <html lang="it">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
-  <title>NEXUS OS</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>NexusNXS</title>
 </head>
 <body>
-  <main id="nexusShell" class="nexus-shell" data-system-state="initializing" data-activity="idle" data-chat-state="closed" data-context-state="closed">
-    <div class="ambient-layer" aria-hidden="true"></div>
-
-    <section id="graphViewport" class="graph-viewport" aria-label="Desktop cognitivo Nexus">
-      <canvas id="knowledgeCanvas" class="graph-canvas" role="application" tabindex="0" aria-label="Grafo interattivo. Usa le frecce per esplorare i nodi, Home per tornare al Core ed Escape per azzerare la vista." aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home Escape"></canvas>
-      <div id="graphLabelLayer" class="graph-label-layer" aria-hidden="true"></div>
-      <div id="graphFocusOverlay" class="graph-focus-overlay" aria-hidden="true"></div>
-      <div id="graphNodeList" class="sr-only" role="list" aria-label="Nodi del grafo"></div>
-    </section>
-
-    <header id="topLeftHud" class="top-left-hud">
-      <div class="nexus-identity"><span class="nexus-mark" aria-hidden="true">N</span><div><strong>NEXUS</strong><span>NEURAL INTELLIGENCE OS</span></div></div>
-      <div class="status-line"><span id="statusIndicator" class="status-indicator" aria-hidden="true"></span><strong id="systemStatus" role="status" aria-live="polite">INITIALIZING</strong><span id="currentMode">LOCAL WORKSPACE</span><button id="runtimeCheck" type="button">CHECK RUNTIME</button></div>
-    </header>
-
-    <div id="topRightHud" class="top-right-hud">
-      <button id="searchTrigger" class="hud-action search-action" type="button" aria-label="Apri ricerca" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" title="Apri ricerca"><span aria-hidden="true">⌕</span><span>SEARCH</span><kbd id="searchShortcut">Ctrl K</kbd></button>
-      <span id="modelStatus" class="model-status" hidden></span>
-      <time id="clock" class="clock">--:--</time>
-      <button id="reindex" class="hud-action square-action" type="button" aria-label="Reindicizza Nexus" title="Reindicizza Nexus">↻</button>
-      <button id="settingsButton" class="hud-action square-action" type="button" aria-label="Apri impostazioni" title="Apri impostazioni">⚙</button>
-    </div>
-
-    <aside id="systemHud" class="system-hud" aria-label="Informazioni di sistema" hidden>
-      <div><span>VAULT</span><strong id="metricNotes">—</strong><small>NOTE</small></div>
-      <div><span>CONTEXT</span><strong id="metricChunks">—</strong><small>CHUNK</small></div>
-      <div><span>SOURCE</span><strong id="vaultSource">—</strong></div>
-    </aside>
-
-    <aside id="contextPanel" class="context-panel" hidden inert aria-labelledby="contextTitle">
-      <button id="contextClose" class="panel-close" type="button" aria-label="Chiudi dettagli">×</button>
-      <span id="contextCategory" class="eyebrow">NODE</span>
-      <h2 id="contextTitle">Nexus Core</h2>
-      <p id="contextDescription"></p>
-      <dl id="contextConnections"></dl>
-      <div id="contextFiles"></div>
-      <button id="openSelectedNote" class="primary-action" type="button" hidden>Apri nota ↗</button>
-    </aside>
-
-    <section id="chatOverlay" class="chat-overlay" data-state="closed" aria-label="Chat Nexus">
-      <header id="chatHeader" class="chat-header">
-        <div><span class="chat-mark" aria-hidden="true">N</span><div><strong>NEXUS</strong><span id="cognitiveState" role="status">IDLE</span></div></div>
-        <div><button id="newChat" type="button" aria-label="Nuova conversazione" title="Nuova conversazione">＋</button><button id="chatMinimize" type="button" aria-label="Minimizza chat" title="Minimizza chat">—</button></div>
-      </header>
-      <section id="messages" class="messages" aria-live="polite">
-        <div class="welcome-message"><span>N</span><p>Canale cognitivo pronto. Scrivi una domanda per esplorare la conoscenza locale.</p></div>
-      </section>
-      <form id="composer" class="composer">
-        <div class="composer-meta">
-          <label>MODE<select id="reasoningMode" aria-label="Modalità di ragionamento"><option value="fast">QUICK</option><option value="deep">DEEP</option></select></label>
-          <label id="modelPicker" hidden>MODEL<select id="headerModel" aria-label="Modello attivo"></select></label>
-          <span id="thinkingIndicator" class="thinking-indicator" hidden><i></i> PROCESSING</span>
-        </div>
-        <div class="composer-input">
-          <button id="chatExpand" type="button" aria-label="Espandi chat" aria-expanded="false" title="Espandi chat">⌃</button>
-          <textarea id="question" rows="1" placeholder="Ask Nexus…" aria-label="Messaggio a Nexus"></textarea>
-          <button id="send" class="send-action" type="submit" aria-label="Invia messaggio" title="Invia messaggio">↑</button>
-        </div>
-      </form>
-    </section>
-
-    <section id="commandPalette" class="command-palette" role="dialog" aria-modal="true" aria-labelledby="paletteTitle" hidden inert>
-      <h2 id="paletteTitle" class="sr-only">Ricerca e comandi</h2>
-      <label class="palette-input"><span aria-hidden="true">⌕</span><input id="graphSearch" type="search" placeholder="Search nodes and actions…" autocomplete="off" aria-controls="searchResults"></label>
-      <div class="palette-hint"><span>NODES &amp; AVAILABLE ACTIONS</span><kbd>ESC</kbd></div>
-      <div id="searchResults" class="search-results" role="listbox"></div>
-      <p id="searchStatus" class="search-status" role="status"></p>
-    </section>
-
-    <nav id="floatingDock" class="floating-dock" aria-label="Navigazione Nexus">
-      <button class="dock-item active" type="button" data-action="core" data-label="Core" aria-label="Core" title="Core"><span>◉</span></button>
-      <button class="dock-item" type="button" data-action="memory" data-label="Memory · non disponibile" aria-label="Memory, non disponibile" title="Memory · non disponibile" disabled><span>◌</span></button>
-      <button class="dock-item" type="button" data-action="search" data-label="Search" aria-label="Search" title="Search"><span>⌕</span></button>
-      <button class="dock-item" type="button" data-action="agents" data-label="Agents · non disponibile" aria-label="Agents, non disponibile" title="Agents · non disponibile" disabled><span>✦</span></button>
-      <button class="dock-item" type="button" data-action="projects" data-label="Projects" aria-label="Projects" title="Projects"><span>⬡</span></button>
-      <button class="dock-item" type="button" data-action="models" data-label="Models" aria-label="Models" title="Models"><span>◇</span></button>
-      <button id="dockSettings" class="dock-item" type="button" data-action="settings" data-label="Settings" aria-label="Settings" title="Settings"><span>⚙</span></button>
-    </nav>
-
-    <dialog id="settingsDialog" aria-labelledby="settingsTitle">
-      <form id="settingsForm" method="dialog">
-        <header><div><span class="eyebrow">SYSTEM CONFIGURATION</span><h2 id="settingsTitle">Local intelligence</h2></div><button id="settingsClose" type="button" aria-label="Chiudi" title="Chiudi impostazioni">×</button></header>
-        <label>LOCAL ENDPOINT<input id="baseUrl" placeholder="http://127.0.0.1:11434/v1" required></label>
-        <label>AI MODEL<input id="model" list="modelCatalog" placeholder="qwen3:8b" required><datalist id="modelCatalog"></datalist></label>
-        <button id="detectModels" class="secondary-action" type="button">Scan local models</button>
-        <label>TEMPERATURE<input id="temperature" type="number" min="0" max="1" step="0.1"></label>
-        <p>Solo motori locali. Nessun contenuto del vault viene inviato a Internet.</p>
-        <p id="settingsError" class="error" role="alert"></p>
-        <button class="primary-action" value="default">Apply configuration</button>
-      </form>
-    </dialog>
-
-    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
-    <div id="fatalErrorRegion" class="fatal-error" role="alert" hidden></div>
-  </main>
-  <script type="module" src="app.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/main.tsx"></script>
 </body>
 </html>

@@ -1,0 +1,82 @@
+plugins {
+    id "com.android.application"
+}
+
+def consoleUrl = providers.gradleProperty("NEXUS_CONSOLE_URL")
+    .orElse(providers.environmentVariable("NEXUS_CONSOLE_URL"))
+    .orElse("")
+    .get()
+// La Console privata non eredita il fallback Funnel del client AI pubblico.
+// Un eventuale secondo ingresso deve essere configurato esplicitamente e
+// restare un endpoint privato con le stesse garanzie del primario.
+def fallbackUrl = providers.gradleProperty("NEXUS_CONSOLE_FALLBACK_URL")
+    .orElse(providers.environmentVariable("NEXUS_CONSOLE_FALLBACK_URL"))
+    .orElse("")
+    .get()
+def localNexusUrl = providers.gradleProperty("NEXUS_LAN_URL")
+    .orElse(providers.environmentVariable("NEXUS_LAN_URL"))
+    .orElse("")
+    .get()
+def quotedBuildValue = { value -> '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"' }
+def requireHttpsEndpoint = { name, value, allowedPaths ->
+    if (!value) return
+    URI endpoint
+    try { endpoint = new URI(value) }
+    catch (Exception ignored) { throw new GradleException("$name deve essere un URL HTTPS valido.") }
+    if (!"https".equalsIgnoreCase(endpoint.scheme) || !endpoint.host || endpoint.userInfo || endpoint.query || endpoint.fragment || !(endpoint.path in allowedPaths)) {
+        throw new GradleException("$name deve essere un endpoint HTTPS previsto, senza credenziali o query.")
+    }
+}
+requireHttpsEndpoint("NEXUS_CONSOLE_URL", consoleUrl, ["", "/", "/console"])
+requireHttpsEndpoint("NEXUS_CONSOLE_FALLBACK_URL", fallbackUrl, ["", "/"])
+requireHttpsEndpoint("NEXUS_LAN_URL", localNexusUrl, ["", "/"])
+
+dependencies {
+    implementation "androidx.activity:activity:1.10.1"
+    implementation "androidx.core:core:1.16.0"
+}
+
+android {
+    namespace "local.nexus.console"
+    compileSdkVersion "android-36.1"
+
+    defaultConfig {
+        applicationId "local.nexus.console"
+        minSdk 26
+        targetSdk 36
+        versionCode 32
+        versionName "1.18.1-nexus-control"
+        buildConfigField "String", "NEXUS_URL", quotedBuildValue(consoleUrl)
+        buildConfigField "String", "NEXUS_FALLBACK_URL", quotedBuildValue(fallbackUrl)
+        buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)
+        buildConfigField "String", "APP_MODE", '"console"'
+    }
+
+    buildFeatures { buildConfig true }
+    sourceSets { main.java.srcDir("../../shared-motion/src/main/java") }
+    def nexusKeystore = System.getenv("NEXUS_ANDROID_KEYSTORE")
+    signingConfigs {
+        nexusRelease {
+            if (nexusKeystore) {
+                storeFile file(nexusKeystore)
+                storePassword System.getenv("NEXUS_ANDROID_STORE_PASSWORD")
+                keyAlias System.getenv("NEXUS_ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("NEXUS_ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            if (nexusKeystore) signingConfig signingConfigs.nexusRelease
+        }
+        preview {
+            initWith release
+            signingConfig signingConfigs.debug
+            debuggable false
+            matchingFallbacks = ["release"]
+        }
+    }
+}

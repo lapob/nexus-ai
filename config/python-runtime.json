@@ -1,0 +1,34 @@
+{
+  "provider": "astral-sh/python-build-standalone",
+  "pythonVersion": "3.13.15",
+  "release": "20260814",
+  "platform": "x86_64-pc-windows-msvc",
+  "flavor": "install_only",
+  "runtimeDirectory": "vendor/python/cpython-3.13.15+20260814-windows-x86_64-none",
+  "asset": "cpython-3.13.15+20260814-x86_64-pc-windows-msvc-install_only.tar.gz",
+  "downloadUrl": "https://github.com/astral-sh/python-build-standalone/releases/download/20260814/cpython-3.13.15%2B20260814-x86_64-pc-windows-msvc-install_only.tar.gz",
+  "sha256": "4ca61e4b09c2240cc50cc6910c90664051e93ab7caa2f48b3c6b3c070670c0bd",
+  "production": {
+    "approved": true,
+    "minimumPythonVersion": "3.13.15",
+    "voiceEngine": "kokoro-onnx 0.5.0",
+    "phonemizer": "phonemizer-fork 3.3.2",
+    "validatedAt": "2026-08-22"
+  },
+  "runtimeFiles": {
+    "python.exe": "d51d0abb19bcd5cf31d0af567c861ae9328db40c08a7feb1b245eeb797d92ac6",
+    "pythonw.exe": "823817747628d817be1b235f581b0e35450017a7b3440aaee997152d96fac786",
+    "python313.dll": "f5db7057619d48f0d4f531ae300ae2ae2cf2201193476c8571b5084e7b1eba36",
+    "DLLs/_ssl.pyd": "054c083093835d211148dd17068aa30c98c4dd0f81a4b3f48a42c83f53eef8b5"
+  },
+  "removedComponents": [
+    "DLLs/_sqlite3.pyd",
+    "DLLs/sqlite3.dll",
+    "Lib/sqlite3",
+    "libs/_sqlite3.lib",
+    "libs/sqlite3.lib",
+    "Lib/site-packages/pip",
+    "Lib/site-packages/pip-26.2.1.dist-info",
+    "Lib/ensurepip"
+  ]
+}

@@ -1,0 +1,850 @@
+/**
+ * @module renderer/styles/settings-minimal
+ * @description Tema finale delle impostazioni, caricato dopo lo stile globale.
+ */
+
+/* #region 01 — Superficie e navigazione */
+.settings-scrim {
+  padding: clamp(0.5rem, 1.4vw, 1.2rem);
+  background: rgba(1, 5, 6, 0.985);
+  backdrop-filter: blur(9px);
+}
+
+.settings-overlay.settings-center {
+  grid-template-rows: minmax(0, 1fr) auto;
+  width: min(58rem, calc(100vw - 2rem));
+  height: min(50rem, calc(100vh - 2.5rem));
+  max-width: 100%;
+  max-height: 100%;
+  border: 0;
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 12% 4%, rgba(83, 226, 230, 0.045), transparent 28%),
+    linear-gradient(145deg, #061012, #03090a 68%);
+  box-shadow: 0 2.2rem 8rem rgba(0, 0, 0, 0.56);
+}
+
+.settings-overlay.settings-center::before {
+  display: none;
+}
+
+.settings-close {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  border: 0;
+  background: transparent;
+}
+/* #endregion */
+
+/* #region 02 — Contenuto e azioni */
+.settings-content {
+  grid-row: 1;
+  padding: 0.45rem clamp(1.2rem, 4.4vw, 3.6rem) 2rem;
+  scroll-padding-bottom: 2rem;
+  mask-image: linear-gradient(to bottom, transparent, black 0.8rem, black calc(100% - 0.8rem), transparent);
+  scrollbar-gutter: stable;
+}
+
+/* La fascia superiore replica la profondità del footer: quando il contenuto
+   scorre, testo e controlli attraversano vetro sfocato prima di dissolversi. */
+.settings-scroll-blur {
+  display: block;
+  grid-column: 1 / -1;
+  position: sticky;
+  z-index: 18;
+  height: 1.65rem;
+  margin: -0.45rem 0 -1.65rem;
+  top: -0.45rem;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(to bottom, rgba(4, 12, 13, 0.96), rgba(4, 12, 13, 0.46) 54%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  backdrop-filter: blur(10px) saturate(1.08);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 32%, rgba(0, 0, 0, 0.72) 62%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0 32%, rgba(0, 0, 0, 0.72) 62%, transparent 100%);
+  transition: opacity 180ms ease;
+}
+
+.settings-content[data-scrolled="true"] > .settings-scroll-blur { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-scroll-blur { transition: none; }
+}
+
+.knowledge-maintenance > div {
+  align-items: center;
+}
+
+.knowledge-maintenance .settings-secondary {
+  min-width: 10.5rem;
+}
+
+.settings-panel {
+  gap: clamp(0.85rem, 1.6vh, 1.05rem);
+  padding: clamp(0.9rem, 2vh, 1.25rem) 0 1.8rem;
+}
+
+/* Un solo contenitore scorrevole: con molti device virtuali il vecchio
+   nested-scroll tagliava l'elenco sotto il footer e nascondeva i controlli. */
+.settings-overlay .microphone-picker {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.settings-section-copy {
+  margin: 0.35rem 0 0.15rem;
+  padding: 0;
+}
+
+.settings-section-copy::before {
+  display: none;
+}
+
+.settings-section-copy strong {
+  font-size: 1.05rem;
+  font-weight: 480;
+}
+
+.settings-section-copy p {
+  max-width: 38rem;
+  margin-top: 0.35rem;
+  color: rgba(186, 215, 217, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.evaluation-metrics {
+  display: grid;
+  width: min(28rem, 100%);
+  margin-top: 0.72rem;
+  grid-template-columns: minmax(5rem, 1fr) auto auto;
+  align-items: center;
+  gap: 0.55rem 0.8rem;
+  color: rgba(145, 183, 185, 0.52);
+  font-size: 0.66rem;
+}
+
+.evaluation-metrics > i {
+  grid-column: 1 / -1;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1rem;
+  background:
+    linear-gradient(90deg, rgba(91, 220, 210, 0.76) var(--evaluation-score), rgba(92, 139, 142, 0.12) var(--evaluation-score));
+  box-shadow: 0 0 0.7rem rgba(74, 205, 199, 0.08);
+}
+
+.evaluation-metrics b {
+  color: rgba(202, 229, 230, 0.72);
+  font-weight: 470;
+}
+
+.evaluation-metrics em {
+  font-style: normal;
+}
+
+.settings-danger-subtle {
+  color: rgba(222, 145, 137, 0.68) !important;
+}
+
+.local-integrations {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.3rem 0;
+}
+
+.local-integrations > span {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.local-integrations > span strong {
+  color: rgba(218, 239, 240, 0.82);
+  font-size: 0.8rem;
+  font-weight: 470;
+}
+
+.local-integrations > span small {
+  color: rgba(155, 188, 190, 0.48);
+  font-size: 0.69rem;
+}
+
+.local-integrations > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.local-integrations i {
+  border-radius: 2rem;
+  padding: 0.26rem 0.52rem;
+  background: rgba(78, 179, 180, 0.06);
+  color: rgba(153, 207, 208, 0.64);
+  font-size: 0.64rem;
+  font-style: normal;
+}
+
+.performance-observatory {
+  display: grid;
+  gap: 0.72rem;
+  padding: 0.35rem 0;
+}
+
+.performance-observatory > span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.performance-observatory > span strong {
+  color: rgba(217, 239, 240, 0.82);
+  font-size: 0.8rem;
+  font-weight: 470;
+}
+
+.performance-observatory > span small {
+  color: rgba(151, 185, 187, 0.48);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.performance-observatory > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.performance-observatory i {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.58rem 0;
+  font-style: normal;
+}
+
+.performance-observatory b {
+  color: rgba(171, 224, 224, 0.78);
+  font: 470 0.88rem/1.2 "JetBrains Mono Variable", monospace;
+}
+
+.performance-observatory i small {
+  color: rgba(145, 180, 182, 0.44);
+  font-size: 0.63rem;
+}
+
+.settings-overlay .microphone-picker > button,
+.settings-overlay .voice-profile-section,
+.settings-overlay .voice-choice-grid > button,
+.settings-overlay .settings-field input:not([type="range"]),
+.settings-overlay .settings-field textarea,
+.settings-overlay .nexus-select-trigger {
+  border-color: transparent;
+  background: linear-gradient(105deg, rgba(133, 209, 212, 0.045), rgba(133, 209, 212, 0.018));
+  box-shadow: none;
+}
+
+.settings-overlay .microphone-picker > button,
+.settings-overlay .voice-profile-section,
+.settings-overlay .voice-choice-grid > button,
+.personal-evaluation-card,
+.action-history,
+.action-policy-grid > button {
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.settings-overlay .microphone-picker > button:hover,
+.action-policy-grid > button:hover {
+  transform: translateY(-1px);
+  background: rgba(133, 209, 212, 0.06);
+}
+
+.settings-overlay .nexus-select-trigger {
+  min-height: 2.9rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.65rem;
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.settings-overlay .nexus-select-trigger:hover {
+  background: rgba(133, 209, 212, 0.075);
+  box-shadow: inset 0 0 0 1px rgba(117, 225, 228, 0.08);
+}
+
+.settings-overlay :is(button, input, textarea, .nexus-select-trigger):focus-visible {
+  outline: 1px solid rgba(107, 229, 233, 0.62);
+  outline-offset: 2px;
+}
+
+.settings-overlay .nexus-select[data-open="true"] .nexus-select-trigger {
+  border-color: transparent;
+  background: rgba(133, 209, 212, 0.055);
+  box-shadow: none;
+}
+
+.settings-overlay .nexus-select-menu {
+  top: calc(100% + 0.3rem);
+  gap: 0.1rem;
+  border: 0;
+  border-radius: 0.7rem;
+  padding: 0.3rem;
+  background: #071012;
+  box-shadow: 0 1rem 2.8rem rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(105, 210, 213, 0.07);
+  backdrop-filter: blur(14px);
+  width: max(100%, min(30rem, calc(100vw - 3rem)));
+  right: auto;
+  left: 0;
+  transform-origin: top left;
+}
+
+.settings-overlay .nexus-select[data-align="right"] .nexus-select-menu {
+  right: 0;
+  left: auto;
+  transform-origin: top right;
+}
+
+.settings-overlay .nexus-select-menu > button {
+  min-height: 2.7rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border-radius: 0.5rem;
+  padding: 0.48rem 0.65rem;
+}
+
+.settings-overlay .nexus-select-menu > button:hover,
+.settings-overlay .nexus-select-menu > button:focus-visible {
+  background: rgba(133, 209, 212, 0.075);
+  transform: translateX(0.12rem);
+}
+
+@media (max-width: 700px) {
+  .settings-overlay .nexus-select-menu { width: 100%; }
+}
+
+.settings-overlay .nexus-select-menu > button[aria-selected="true"] {
+  background: rgba(82, 238, 240, 0.065);
+}
+
+.settings-overlay .microphone-picker > button[data-selected="true"],
+.settings-overlay .voice-choice-grid > button[data-selected="true"] {
+  border-color: transparent;
+  background: rgba(82, 238, 240, 0.075);
+  box-shadow: none;
+}
+
+.settings-overlay .voice-choice-grid {
+  gap: 0.75rem;
+}
+
+.action-policy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.settings-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.settings-inline-actions .settings-secondary {
+  min-width: 10rem;
+}
+
+.personal-evaluation-card,
+.action-history {
+  display: grid;
+  gap: 0.4rem;
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.9rem;
+  background: rgba(133, 209, 212, 0.035);
+}
+
+.personal-evaluation-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.personal-evaluation-card > div,
+.action-history > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.personal-evaluation-card small,
+.action-history small {
+  color: rgba(170, 204, 206, 0.5);
+  font-size: 0.68rem;
+}
+
+.personal-evaluation-card em {
+  color: rgba(177, 207, 209, 0.5);
+  font-size: 0.67rem;
+  font-style: normal;
+}
+
+.personal-evaluation-card em[data-ready="true"] {
+  color: rgba(82, 238, 240, 0.78);
+}
+
+.action-history > div {
+  padding: 0.45rem 0;
+}
+
+.action-history > div + div {
+  border-top: 1px solid rgba(125, 224, 228, 0.055);
+}
+
+.action-history span {
+  color: rgba(220, 241, 242, 0.72);
+  font-size: 0.75rem;
+}
+
+.remote-session-settings > span small:last-child {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.remote-session-settings > div .settings-secondary {
+  min-height: 2rem;
+  border: 0;
+  padding-inline: 0.45rem;
+  background: transparent;
+}
+
+.remote-session-settings > div .settings-secondary:hover,
+.remote-session-settings > div .settings-secondary:focus-visible {
+  background: rgba(92, 204, 207, 0.045);
+}
+
+.remote-pairing-code strong {
+  color: rgba(103, 239, 241, 0.9);
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  letter-spacing: 0.22em;
+}
+
+.remote-pairing-code {
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1.15rem;
+  padding: 0.35rem 0;
+  border: 0;
+  background: transparent;
+}
+
+.remote-pairing-code img {
+  width: min(100%, 7.5rem);
+  aspect-ratio: 1;
+  border-radius: 0.35rem;
+  image-rendering: pixelated;
+}
+
+.remote-pairing-code > div {
+  display: grid;
+  justify-items: start;
+  gap: 0.65rem;
+}
+
+.remote-addresses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.remote-addresses button {
+  min-height: 1.8rem;
+  padding: 0.32rem 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(173, 216, 218, 0.62);
+  background: rgba(111, 219, 222, 0.045);
+}
+
+.remote-addresses button[data-selected="true"] {
+  color: rgba(151, 241, 243, 0.92);
+  background: rgba(82, 238, 240, 0.1);
+}
+
+.remote-copy-link.settings-secondary { min-height: 1.8rem; padding-inline: 0; border: 0; background: transparent; }
+.remote-connection-paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
+.remote-connection-paths > div { display: flex; min-height: 3.7rem; padding: 0.25rem 0; align-items: center; justify-content: space-between; gap: 0.7rem; border-radius: 0; background: transparent; }
+.remote-connection-paths span { display: grid; gap: 0.18rem; }
+.remote-connection-paths small { color: rgba(170, 204, 206, 0.5); font-size: 0.68rem; line-height: 1.35; }
+.remote-connection-paths .settings-secondary { flex: 0 0 auto; min-height: 2rem; border: 0; padding-inline: 0.35rem; background: transparent; }
+@media (max-width: 760px) { .remote-connection-paths { grid-template-columns: 1fr; } }
+
+@media (max-width: 560px) {
+  .remote-pairing-code { grid-template-columns: 1fr; }
+  .remote-pairing-code img { width: 8.5rem; }
+}
+
+.remote-devices > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.remote-devices .settings-secondary {
+  min-height: 1.9rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.action-policy-grid > button {
+  position: relative;
+  min-height: 4.4rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  text-align: left;
+  color: rgba(206, 232, 233, 0.78);
+  background: rgba(133, 209, 212, 0.035);
+}
+
+.action-policy-grid > button[data-selected="true"] {
+  background: rgba(82, 238, 240, 0.065);
+  box-shadow: inset 2px 0 rgba(82, 238, 240, 0.52);
+}
+
+.action-policy-grid span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.action-policy-grid strong {
+  color: rgba(231, 249, 250, 0.92);
+  font-size: 0.9rem;
+  font-weight: 480;
+}
+
+.action-policy-grid em {
+  color: rgba(116, 208, 212, 0.62);
+  font-size: 0.58rem;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.action-policy-grid > button[data-policy="full-access"] em {
+  color: rgba(116, 208, 212, 0.62);
+}
+
+.action-policy-note {
+  margin-top: -0.25rem;
+  color: rgba(155, 192, 194, 0.52);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.settings-overlay .voice-choice-grid > button {
+  min-height: 5.15rem;
+  grid-template-columns: 2.65rem minmax(0, 1fr);
+  gap: 0.85rem;
+  overflow: hidden;
+  padding: 0.95rem 5.35rem 0.95rem 0.9rem;
+  border-radius: 0.85rem;
+  transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.settings-overlay .voice-choice-grid > button::after {
+  position: absolute;
+  inset: auto 18% -2.4rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  background: rgba(82, 238, 240, 0.08);
+  filter: blur(1.5rem);
+  content: "";
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.settings-overlay .voice-choice-grid > button:hover,
+.settings-overlay .voice-choice-grid > button:focus-visible {
+  background: rgba(133, 209, 212, 0.055);
+  transform: translateY(-1px);
+}
+
+.settings-overlay .voice-choice-grid > button[data-selected="true"] {
+  background: linear-gradient(115deg, rgba(82, 238, 240, 0.085), rgba(82, 238, 240, 0.025));
+  box-shadow: inset 2px 0 rgba(82, 238, 240, 0.52);
+}
+
+.settings-overlay .voice-choice-grid > button[data-selected="true"]::after {
+  opacity: 1;
+}
+
+.settings-overlay .voice-choice-grid em {
+  top: 0.72rem;
+  right: 0.72rem;
+  padding: 0.2rem 0.38rem;
+  border-radius: 999px;
+  background: rgba(82, 238, 240, 0.055);
+  color: rgba(130, 232, 235, 0.72);
+  font-size: 0.51rem;
+  letter-spacing: 0.09em;
+}
+
+.settings-overlay .voice-choice-icon {
+  position: relative;
+  width: 2.55rem;
+  height: 2.55rem;
+  border: 0;
+  background: radial-gradient(circle, rgba(82, 238, 240, 0.09), transparent 68%);
+  box-shadow: inset 0 0 0 1px rgba(82, 238, 240, 0.18);
+}
+
+.voice-choice-icon--flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.16rem;
+}
+
+.voice-choice-icon--flow i {
+  width: 2px;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(107, 233, 236, 0.84);
+  box-shadow: 0 0 0.4rem rgba(82, 238, 240, 0.24);
+}
+
+.voice-choice-icon--flow i:nth-child(2) {
+  height: 0.82rem;
+}
+
+.voice-choice-icon--natural i:first-child {
+  position: absolute;
+  width: 0.44rem;
+  height: 0.44rem;
+  border-radius: 50%;
+  background: rgba(113, 236, 239, 0.9);
+  box-shadow: 0 0 0.7rem rgba(82, 238, 240, 0.5);
+}
+
+.voice-choice-icon--natural i:last-child {
+  position: absolute;
+  width: 1.15rem;
+  height: 0.62rem;
+  border: 1px solid rgba(113, 236, 239, 0.58);
+  border-radius: 50%;
+  transform: rotate(-24deg);
+}
+
+.settings-overlay small,
+.settings-overlay .settings-field small,
+.settings-overlay .settings-switch small {
+  color: rgba(180, 211, 213, 0.64);
+  font-size: max(var(--text-caption), 0.74rem);
+}
+
+.settings-footer {
+  grid-row: 2;
+  align-self: end;
+  width: 100%;
+  min-height: 4.4rem;
+  border: 0;
+  padding: 0.7rem clamp(1rem, 3vw, 2.25rem);
+  background: linear-gradient(transparent, rgba(3, 9, 10, 0.96) 34%);
+  backdrop-filter: none;
+}
+
+.settings-footer p {
+  max-width: min(34rem, 62vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-footer > div {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+
+.settings-footer button,
+.settings-footer .settings-save {
+  display: inline-flex;
+  height: 2.75rem;
+  min-width: auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.65rem;
+  padding: 0 0.95rem;
+  line-height: 1;
+}
+
+.settings-footer .settings-save {
+  min-width: 6.5rem;
+  gap: 0.6rem;
+}
+
+.nexus-confirm-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  border-radius: inherit;
+  background: rgba(1, 5, 6, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.nexus-confirm-card {
+  width: min(27rem, 100%);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  padding: 1.35rem;
+  border: 1px solid rgba(106, 225, 229, 0.14);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(82, 238, 240, 0.08), transparent 42%),
+    rgba(5, 13, 15, 0.98);
+  box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.52);
+}
+
+.nexus-confirm-mark {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  color: #79e5e8;
+  border-radius: 50%;
+  background: rgba(82, 238, 240, 0.07);
+}
+
+.nexus-confirm-card strong {
+  color: rgba(226, 245, 246, 0.94);
+  font-size: 1rem;
+}
+
+.nexus-confirm-card p {
+  margin-top: 0.42rem;
+  color: rgba(175, 205, 207, 0.64);
+  line-height: 1.55;
+}
+
+.nexus-confirm-card footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+}
+
+.nexus-confirm-card button {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 0.65rem;
+  color: rgba(198, 225, 227, 0.78);
+  background: rgba(125, 189, 192, 0.07);
+}
+
+.nexus-confirm-card button:hover,
+.nexus-confirm-card button:focus-visible {
+  color: #e8ffff;
+  background: rgba(82, 238, 240, 0.12);
+}
+
+.nexus-confirm-card .danger-subtle {
+  color: rgba(255, 178, 169, 0.88);
+  background: rgba(225, 89, 76, 0.09);
+}
+/* #endregion */
+
+/* #region 03 — Layout compatto */
+@media (max-width: 760px) {
+  .settings-overlay.settings-center {
+    width: calc(100vw - 1rem);
+    height: calc(100vh - 1.5rem);
+    border-radius: 0.8rem;
+  }
+
+  .action-policy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-policy-grid > button {
+    min-height: auto;
+  }
+
+  .settings-content {
+    padding-inline: clamp(0.9rem, 4vw, 1.25rem);
+  }
+
+  .settings-footer p {
+    display: none;
+  }
+}
+
+@media (max-height: 680px) {
+  .settings-overlay.settings-center {
+    height: calc(100vh - 1rem);
+    border-radius: 0.9rem;
+  }
+
+  .settings-content {
+    padding-bottom: 4.8rem;
+  }
+
+  .settings-panel {
+    gap: 0.78rem;
+    padding-top: 0.72rem;
+  }
+
+  .settings-overlay .voice-choice-grid > button {
+    min-height: 4.7rem;
+    padding-block: 0.72rem;
+  }
+
+  .settings-footer {
+    min-height: 3.9rem;
+    padding-block: 0.48rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-scrim {
+    padding: 0;
+  }
+
+  .settings-overlay.settings-center {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .settings-tabs {
+    padding-right: 2.8rem;
+  }
+
+  .voice-diagnostics {
+    grid-template-columns: 1fr;
+  }
+
+  .microphone-test-indicator {
+    grid-template-columns: auto minmax(4rem, 1fr);
+  }
+
+  .microphone-test-indicator small {
+    grid-column: 1 / -1;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .settings-footer {
+    padding-inline: 0.8rem;
+  }
+
+  .settings-footer .settings-cancel {
+    display: none;
+  }
+}
+/* #endregion */

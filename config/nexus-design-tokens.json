@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "colors": {
+    "ink": "#020405",
+    "surface": "#121718",
+    "surfaceRaised": "#242B2C",
+    "ice": "#F7FBFB",
+    "mist": "#ABBABB",
+    "cyan": "#4BE7E9",
+    "hairline": "#5B696A",
+    "success": "#58E8BD",
+    "attention": "#D69A58"
+  },
+  "typography": {
+    "interface": "Inter Variable",
+    "technical": "JetBrains Mono Variable",
+    "maximumFamilies": 2,
+    "compactUppercasePolicy": "status-only"
+  },
+  "cosmicGlass": {
+    "usage": ["floating-controls", "temporary-menus", "contextual-overlays"],
+    "blurPx": { "minimum": 14, "preferred": 18, "maximum": 20 },
+    "surfaceOpacity": { "minimum": 0.60, "maximum": 0.72 },
+    "cyanBorderOpacity": { "minimum": 0.08, "maximum": 0.14 },
+    "fullPageGlass": false
+  },
+  "motion": {
+    "authority": "android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java",
+    "surfaceTransition": "fade-scale",
+    "modeEnterMs": 260,
+    "modeExitMs": 180,
+    "modeScaleIn": 0.987,
+    "modeScaleOut": 1,
+    "quickMs": 170,
+    "contentSwapMs": 320,
+    "contentTravelDp": 16,
+    "emphasizedCurve": [0.2, 0, 0, 1],
+    "standardCurve": [0.2, 0, 0.2, 1],
+    "thinkingPulseMs": 760,
+    "cursorPulseMs": 520,
+    "voiceWaveMs": 1050,
+    "skeletonPulseMs": 820,
+    "adaptivePolicy": "system-animator-scale + reduced-motion + power-save + low-ram + refresh-rate"
+  },
+  "layout": {
+    "contentMaxDp": 680,
+    "topBarDp": 64,
+    "touchTargetDp": 48,
+    "compactMaxDp": 599,
+    "mediumMaxDp": 839,
+    "expandedMinDp": 840,
+    "persistentNavigation": false
+  },
+  "qualityProfiles": {
+    "lite": { "targetFps": 30, "core": "2d", "parallax": false, "dynamicBlur": false },
+    "balanced": { "targetFps": 60, "core": "adaptive", "parallax": false, "dynamicBlur": true },
+    "ultra": { "targetFps": 60, "core": "full", "parallax": true, "dynamicBlur": true },
+    "reducedMotion": { "targetFps": 0, "core": "static", "parallax": false, "dynamicBlur": false }
+  }
+}

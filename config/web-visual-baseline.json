@@ -1,0 +1,96 @@
+{
+  "site-desktop": {
+    "title": "NexusNXS — AI privata, protetta e connessa",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "overflowX": 0,
+    "logo": {
+      "x": 0.015277777777777777,
+      "y": 0.024444444444444446,
+      "width": 0.02638888888888889,
+      "height": 0.042222222222222223,
+      "loaded": true,
+      "ratio": 1
+    },
+    "core": null,
+    "interactiveCount": 20,
+    "undersizedTargets": 0,
+    "bodyTextLength": 2310,
+    "screenshotBytes": 314493
+  },
+  "site-mobile": {
+    "title": "NexusNXS — AI privata, protetta e connessa",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "overflowX": 0,
+    "logo": {
+      "x": 0.04487179487179487,
+      "y": 0.020734597156398103,
+      "width": 0.08974358974358974,
+      "height": 0.041469194312796206,
+      "loaded": true,
+      "ratio": 1
+    },
+    "core": null,
+    "interactiveCount": 20,
+    "undersizedTargets": 0,
+    "bodyTextLength": 2303,
+    "screenshotBytes": 127821
+  },
+  "ai-desktop": {
+    "title": "NexusNXS AI",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "overflowX": 0,
+    "logo": {
+      "x": 0.12083333333333333,
+      "y": 0.024444444444444446,
+      "width": 0.025,
+      "height": 0.04,
+      "loaded": true,
+      "ratio": 1
+    },
+    "core": {
+      "x": 0.4173611111111111,
+      "y": 0.17883680555555556,
+      "width": 0.16527777777777777,
+      "height": 0.2644444444444444
+    },
+    "interactiveCount": 7,
+    "undersizedTargets": 3,
+    "bodyTextLength": 296,
+    "screenshotBytes": 178129
+  },
+  "ai-mobile": {
+    "title": "NexusNXS AI",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "overflowX": 0,
+    "logo": {
+      "x": 0.046153846153846156,
+      "y": 0.027251184834123223,
+      "width": 0.08717948717948718,
+      "height": 0.04028436018957346,
+      "loaded": true,
+      "ratio": 1
+    },
+    "core": {
+      "x": 0.26001602564102566,
+      "y": 0.20829013625592416,
+      "width": 0.47996794871794873,
+      "height": 0.22178613744075829
+    },
+    "interactiveCount": 7,
+    "undersizedTargets": 3,
+    "bodyTextLength": 288,
+    "screenshotBytes": 96892
+  }
+}

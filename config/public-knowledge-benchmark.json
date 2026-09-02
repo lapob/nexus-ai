@@ -1,0 +1,20 @@
+[
+  { "query": "media mediana probabilita condizionata correlazione causalita", "expectedPath": "04_Cultura_Generale/Matematica essenziale" },
+  { "query": "Bayes distribuzioni intervallo confidenza rischio decisione", "expectedPath": "04_Cultura_Generale/Statistica probabilita rischio e decisione" },
+  { "query": "misura incertezza ripetibilita riproducibilita esperimento", "expectedPath": "04_Cultura_Generale/Fisica scienze" },
+  { "query": "astronomia tettonica clima rischio naturale Terra", "expectedPath": "04_Cultura_Generale/Astronomia scienze della Terra" },
+  { "query": "biologia chimica ecosistemi salute pubblica clima metodo scientifico", "expectedPath": "04_Cultura_Generale/Biologia chimica ambiente e salute pubblica" },
+  { "query": "psicologia neuroscienze memoria apprendimento comportamento", "expectedPath": "04_Cultura_Generale/Psicologia neuroscienze comportamento e apprendimento" },
+  { "query": "scrittura tecnica prerequisiti rollback comunicazione incidente", "expectedPath": "04_Cultura_Generale/Italiano comunicazione" },
+  { "query": "media piattaforme ranking pubblicita disinformazione verifica", "expectedPath": "04_Cultura_Generale/Comunicazione media alfabetizzazione digitale" },
+  { "query": "AI uso responsabile allucinazioni privacy verifica output", "expectedPath": "04_Cultura_Generale/Alfabetizzazione AI uso responsabile" },
+  { "query": "PIL inflazione istituzioni territorio periodo storia geografia", "expectedPath": "04_Cultura_Generale/Storia geografia" },
+  { "query": "diritti costituzione cittadinanza istituzioni democratiche", "expectedPath": "04_Cultura_Generale/Diritto cittadinanza" },
+  { "query": "economia finanza personale politiche pubbliche interesse inflazione", "expectedPath": "04_Cultura_Generale/Economia finanza personale" },
+  { "query": "filosofia etica logica storia delle idee argomento", "expectedPath": "04_Cultura_Generale/Filosofia etica logica" },
+  { "query": "arte musica letteratura patrimonio culturale interpretazione", "expectedPath": "04_Cultura_Generale/Arte musica letteratura" },
+  { "query": "antropologia religioni lingue culture del mondo comparazione", "expectedPath": "04_Cultura_Generale/Antropologia religioni lingue" },
+  { "query": "fonti primarie bias conferma disinformazione verifica", "expectedPath": "04_Cultura_Generale/Pensiero critico" },
+  { "query": "metodo di studio memoria pratica ricerca recupero spaziato", "expectedPath": "04_Cultura_Generale/Metodo di studio memoria pratica e ricerca" },
+  { "query": "mappa discipline scienze formali naturali umanistiche tecnologia", "expectedPath": "00_Indice/Mappa enciclopedica delle discipline" }
+]

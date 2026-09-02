@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "artifactMaximumAgeHours": {
+    "productSlo": 24,
+    "backupRecoveryDrill": 168,
+    "androidDeviceMatrix": 336,
+    "externalPenetrationTest": 4320
+  },
+  "android": {
+    "requiredProfiles": 5,
+    "maximumJankyPercent": 18,
+    "minimumFramesPerProfile": 20
+  },
+  "externalControls": [
+    {
+      "id": "offsite-backup",
+      "environment": "NEXUS_OFFSITE_BACKUP_CONFIRMED",
+      "description": "Una copia cifrata e verificata esiste su un supporto fisicamente separato."
+    },
+    {
+      "id": "power-continuity",
+      "environment": "NEXUS_UPS_CONFIRMED",
+      "description": "Workstation e rete sono protette da un UPS provato."
+    },
+    {
+      "id": "network-failover",
+      "environment": "NEXUS_NETWORK_FAILOVER_CONFIRMED",
+      "description": "Una seconda connettività è stata provata senza modificare l’ingresso pubblico."
+    },
+    {
+      "id": "key-rotation",
+      "environment": "NEXUS_KEY_ROTATION_CONFIRMED",
+      "description": "Le chiavi attive hanno proprietario, data di rotazione e procedura di revoca registrati fuori dal repository."
+    },
+    {
+      "id": "clean-device-upgrade",
+      "environment": "NEXUS_CLEAN_DEVICE_UPGRADE_CONFIRMED",
+      "description": "Installazione, aggiornamento, conservazione dati e disinstallazione sono stati provati su un profilo Windows pulito."
+    },
+    {
+      "id": "incident-rehearsal",
+      "environment": "NEXUS_INCIDENT_REHEARSAL_CONFIRMED",
+      "description": "Pausa rollout, revoca, contenimento e rollback sono stati provati e verbalizzati fuori dal repository."
+    }
+  ],
+  "penetrationTestReportEnvironment": "NEXUS_EXTERNAL_PENTEST_REPORT"
+}

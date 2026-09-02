@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "dataset": {
+    "minimumSftExamples": 1000,
+    "minimumDpoPreferences": 250,
+    "minimumValidationExamples": 20,
+    "minimumTestExamples": 20,
+    "minimumPreferenceValidationExamples": 10,
+    "minimumPreferenceTestExamples": 10
+  },
+  "promotion": {
+    "maximumPassRateDrop": 2,
+    "maximumMedianLatencyIncreasePercent": 25,
+    "maximumP95LatencyIncreasePercent": 25,
+    "requireAllMustPass": true,
+    "requireMatchingEvalSuite": true
+  },
+  "evaluation": {
+    "excludeBenchmarkPromptsFromTraining": true,
+    "requireFreshCanarySet": true,
+    "tracks": ["reasoning", "coding", "retrieval", "web-research", "multimodal-evidence", "voice", "safety", "latency"]
+  },
+  "methods": {
+    "supervised": "QLoRA-SFT",
+    "preference": "DPO-after-SFT"
+  },
+  "policy": {
+    "rawConversationTraining": false,
+    "humanApprovalRequired": true,
+    "quarantinePublicFeedback": true,
+    "automaticProductionPromotion": false,
+    "rollbackRequired": true
+  }
+}

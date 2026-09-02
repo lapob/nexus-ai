@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!--
+      Simbolo intenzionalmente più piccolo della safe zone Android (66x66).
+      One UI applica una propria maschera e un ulteriore ingrandimento ottico:
+      questo margine evita tagli e deformazioni nell'app drawer e nelle cartelle.
+    -->
+    <path android:fillColor="#00000000" android:strokeColor="#08C7E5"
+        android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M40,42 C33,47 31,56 34,64 C37,72 45,77 54,77 C63,77 71,72 74,64 C77,56 75,47 68,42" />
+    <path android:fillColor="#00000000" android:strokeColor="#08C7E5"
+        android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M54,31 L54,53" />
+</vector>

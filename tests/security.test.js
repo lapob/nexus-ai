@@ -1,16 +1,29 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { assertLocalUrl, resolveVaultNotePath } = require('../src/security');
+const { assertLocalUrl, assertOllamaUrl, resolveVaultNotePath } = require('../src/core/security');
 
 test('accetta soltanto endpoint HTTP locali', () => {
-  assert.equal(assertLocalUrl('http://127.0.0.1:11434/v1/'), 'http://127.0.0.1:11434/v1');
-  assert.equal(assertLocalUrl('http://localhost:1234/v1'), 'http://localhost:1234/v1');
-  assert.throws(() => assertLocalUrl('https://example.com/v1'), /soltanto endpoint locali/);
-  assert.throws(() => assertLocalUrl('http://localhost.evil.test/v1'), /soltanto endpoint locali/);
-  assert.throws(() => assertLocalUrl('http://localhost@evil.test/v1'), /soltanto endpoint locali/);
-  assert.throws(() => assertLocalUrl('file:///C:/segreto'), /soltanto endpoint locali/);
+  assert.equal(assertLocalUrl('http://127.0.0.1:11434/'), 'http://127.0.0.1:11434');
+  assert.equal(assertLocalUrl('http://localhost:1234'), 'http://localhost:1234');
+  assert.equal(assertLocalUrl('http://127.0.0.1:11434/v1'), 'http://127.0.0.1:11434');
+  assert.throws(() => assertLocalUrl('https://example.com/v1'), /endpoint locali/);
+  assert.throws(() => assertLocalUrl('http://localhost.evil.test/v1'), /endpoint locali/);
+  assert.throws(() => assertLocalUrl('http://localhost@evil.test/v1'), /endpoint locali/);
+  assert.throws(() => assertLocalUrl('http://user:pass@localhost:11434'), /soltanto protocollo/);
+  assert.throws(() => assertLocalUrl('http://localhost:11434/api'), /soltanto protocollo/);
+  assert.throws(() => assertLocalUrl('file:///C:/segreto'), /endpoint locali/);
   assert.throws(() => assertLocalUrl('not-a-url'), /non valido/);
+});
+
+test('consente Ollama LAN soltanto con opt-in e IP RFC1918', () => {
+  assert.equal(assertOllamaUrl('http://192.168.1.50:11434', { allowLan: true }), 'http://192.168.1.50:11434');
+  assert.equal(assertOllamaUrl('https://10.20.30.40:11434/', { allowLan: true }), 'https://10.20.30.40:11434');
+  assert.equal(assertOllamaUrl('http://172.31.1.2:11434', { allowLan: true }), 'http://172.31.1.2:11434');
+  assert.throws(() => assertOllamaUrl('http://192.168.1.50:11434'), /abilita esplicitamente la LAN/);
+  assert.throws(() => assertOllamaUrl('http://172.32.1.2:11434', { allowLan: true }), /IPv4 privati/);
+  assert.throws(() => assertOllamaUrl('http://ollama.local:11434', { allowLan: true }), /IPv4 privati/);
+  assert.throws(() => assertOllamaUrl('https://8.8.8.8:11434', { allowLan: true }), /IPv4 privati/);
 });
 
 test('impedisce path traversal fuori dalla vault', () => {

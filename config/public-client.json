@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "mode": "public",
+  "channel": "stable",
+  "updatesUrl": "",
+  "serviceUrl": "https://ai.nexusnxs.com",
+  "fallbackUrls": []
+}

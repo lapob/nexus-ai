@@ -1,0 +1,20 @@
+[
+  {
+    "file": "audio/it-quiet-01.wav",
+    "kind": "speech",
+    "text": "Nexus, apri la conversazione corrente",
+    "language": "it",
+    "speaker": "speaker-a",
+    "device": "usb-microphone",
+    "environment": "quiet"
+  },
+  {
+    "file": "audio/it-noise-01.wav",
+    "kind": "noise",
+    "text": "",
+    "language": "it",
+    "speaker": "none",
+    "device": "usb-microphone",
+    "environment": "fan-and-keyboard"
+  }
+]

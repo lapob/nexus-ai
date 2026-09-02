@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "service": "NexusNXS",
+  "windowDays": 30,
+  "objectives": {
+    "availabilityTargetPercent": 99.5,
+    "aiQuick": {
+      "minimumBestPassRate": 90,
+      "maximumBestP95LatencyMs": 4000
+    },
+    "aiDeep": {
+      "minimumBestPassRate": 85,
+      "maximumBestP95LatencyMs": 30000
+    },
+    "aiLab": {
+      "minimumPassRate": 80,
+      "maximumMustPassFailures": 0
+    },
+    "voice": {
+      "maximumColdStartMs": 5000,
+      "maximumWarmMedianMs": 1200
+    },
+    "gateway": {
+      "maximumP95LatencyMs": 500
+    },
+    "desktopMotion": {
+      "maximumFrameP95Ms": 16.7,
+      "maximumSlowFrameRatio": 0.02
+    },
+    "availability": {
+      "minimumSamplesPerEndpoint": 1000,
+      "minimumCoveragePercent": 95
+    },
+    "readiness": {
+      "maximumLatencyMs": 5000,
+      "endpoints": [
+        "https://nexusnxs.com/",
+        "https://ai.nexusnxs.com/healthz",
+        "https://ai.nexusnxs.com/readyz"
+      ]
+    }
+  }
+}

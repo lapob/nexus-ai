@@ -1,0 +1,34 @@
+// Policy privata di esempio. Sostituire gli indirizzi con quelli mostrati da
+// `tailscale status`, quindi convalidare nella console Tailscale prima di salvare.
+{
+  "grants": [
+    {
+      // Solo il telefono approvato raggiunge il gateway privato tramite Serve HTTPS.
+      "src": ["<TAILSCALE_IP_TELEFONO>"],
+      "dst": ["<TAILSCALE_IP_WORKSTATION>"],
+      "ip": [
+        "tcp:443"
+      ]
+    },
+    {
+      // Il relay WoL è un nodo distinto e sempre acceso. Espone soltanto Serve HTTPS.
+      "src": ["<TAILSCALE_IP_TELEFONO>"],
+      "dst": ["<TAILSCALE_IP_RELAY_WOL>"],
+      "ip": ["tcp:443"]
+    }
+  ],
+  "tests": [
+    {
+      "src": "<TAILSCALE_IP_TELEFONO>",
+      "accept": [
+        "<TAILSCALE_IP_WORKSTATION>:443"
+      ],
+      "deny": ["<TAILSCALE_IP_WORKSTATION>:22", "<TAILSCALE_IP_WORKSTATION>:32145"]
+    },
+    {
+      "src": "<TAILSCALE_IP_TELEFONO>",
+      "accept": ["<TAILSCALE_IP_RELAY_WOL>:443"],
+      "deny": ["<TAILSCALE_IP_RELAY_WOL>:22", "<TAILSCALE_IP_RELAY_WOL>:32147"]
+    }
+  ]
+}

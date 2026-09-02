@@ -1,0 +1,10 @@
+HSPLlocal/nexus/remote/NexusMainActivity;-><init>()V
+HSPLlocal/nexus/remote/NexusMainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLlocal/nexus/remote/NexusMainActivity;->onResume()V
+HSPLlocal/nexus/remote/NexusMainActivity;->dispatch(Ljava/lang/String;Ljava/lang/String;)V
+HSPLlocal/nexus/remote/LocalChatStore;-><init>(Landroid/content/Context;)V
+HSPLlocal/nexus/remote/LocalChatStore;->list()Lorg/json/JSONArray;
+HSPLlocal/nexus/remote/LocalChatStore;->get(Ljava/lang/String;)Lorg/json/JSONObject;
+HSPLlocal/nexus/remote/SecureTokenStore;-><init>(Landroid/content/Context;)V
+HSPLlocal/nexus/remote/SecureChatCodec;-><init>(Landroid/content/Context;)V
+HSPLlocal/nexus/remote/AndroidCrashStore;->install(Landroid/content/Context;)V

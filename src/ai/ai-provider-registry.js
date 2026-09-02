@@ -1,3 +1,7 @@
+/**
+ * @module ai/ai-provider-registry
+ * @description Contratto o servizio del runtime AI indipendente dal provider.
+ */
 const { AIError, AI_ERROR_CODES } = require('./ai-errors');
 const { assertAIProvider } = require('./ai-provider');
 

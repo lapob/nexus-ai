@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "defaultProfile": "public-beta",
+  "profiles": {
+    "public-beta": {
+      "audience": "public",
+      "commercialMetering": "observe",
+      "dailySafetyMultiplier": 1,
+      "priority": 0
+    },
+    "trusted-preview": {
+      "audience": "invited",
+      "commercialMetering": "observe",
+      "dailySafetyMultiplier": 4,
+      "priority": 1
+    },
+    "developer": {
+      "audience": "internal",
+      "commercialMetering": "unmetered",
+      "dailySafetyMultiplier": null,
+      "priority": 2
+    }
+  },
+  "invariants": {
+    "clientCannotSelectProfile": true,
+    "abuseProtectionAlwaysEnabled": true,
+    "capacityProtectionAlwaysEnabled": true,
+    "developerBypassRequiresServerBinding": true
+  }
+}

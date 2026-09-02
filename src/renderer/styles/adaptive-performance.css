@@ -1,0 +1,65 @@
+/**
+ * @module renderer/styles/adaptive-performance
+ * @description Composizione fluida e limiti automatici per ogni classe hardware.
+ */
+/* #region 01 — Overlay sopra WebGL */
+
+/* Un backdrop blur sopra un canvas WebGL forza Electron a ricampionare tutta
+   la scena a ogni frame. Le superfici NEXUSNXS sono già quasi opache: rimuovere
+   il filtro mantiene lo stesso contrasto evitando scatti ad apertura/chiusura. */
+.settings-scrim,
+.settings-overlay,
+.model-switcher-scrim,
+.model-switcher,
+.conversation-history-scrim,
+.conversation-history,
+.command-input,
+.permission-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* #endregion */
+/* #region 02 — Protezione GPU integrata */
+
+/* Il blur composito forza spesso copie GPU costose nelle finestre Electron.
+   Le superfici Lite restano opache e pulite senza cambiare il layout. */
+.entity-shell[data-hardware-tier="lite"] *,
+.entity-shell[data-hardware-tier="lite"] *::before,
+.entity-shell[data-hardware-tier="lite"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.entity-shell[data-hardware-tier="lite"] .settings-aura,
+.entity-shell[data-hardware-tier="lite"] .visualizer-vignette,
+.entity-shell[data-hardware-tier="lite"] .voice-visualizer::after,
+.entity-shell[data-hardware-tier="lite"] .visualizer-ambient,
+.entity-shell[data-hardware-tier="lite"] .visualizer-transition,
+.entity-shell[data-hardware-tier="lite"] .answer-surface::before {
+  display: none !important;
+}
+
+/* Il livello 1 privilegia la risposta ai comandi: niente loop CSS o lunghe
+   interpolazioni. WebGL usa già il preset minimo e viene sospeso durante AI. */
+.entity-shell[data-performance-level="1"] *,
+.entity-shell[data-performance-level="1"] *::before,
+.entity-shell[data-performance-level="1"] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 100ms !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Mantiene leggibili le superfici che sui profili superiori affidano parte
+   della separazione al vetro traslucido. */
+.entity-shell[data-hardware-tier="lite"] .command-input,
+.entity-shell[data-hardware-tier="lite"] .settings-overlay,
+.entity-shell[data-hardware-tier="lite"] .model-switcher,
+.entity-shell[data-hardware-tier="lite"] .conversation-history,
+.entity-shell[data-hardware-tier="lite"] .permission-card {
+  background-color: rgba(3, 9, 11, 0.985) !important;
+}
+
+/* #endregion */

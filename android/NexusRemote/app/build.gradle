@@ -1,0 +1,97 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.plugin.compose"
+}
+
+def publicNexusUrl = providers.gradleProperty("NEXUS_URL")
+    .orElse(providers.environmentVariable("NEXUS_URL"))
+    .orElse("")
+    .get()
+def localNexusUrl = providers.gradleProperty("NEXUS_LAN_URL")
+    .orElse(providers.environmentVariable("NEXUS_LAN_URL"))
+    .orElse("")
+    .get()
+def fallbackNexusUrl = providers.gradleProperty("NEXUS_FALLBACK_URL")
+    .orElse(providers.environmentVariable("NEXUS_FALLBACK_URL"))
+    .orElse("")
+    .get()
+def quotedBuildValue = { value -> '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"' }
+def requireHttpsEndpoint = { name, value ->
+    if (!value) return
+    URI endpoint
+    try { endpoint = new URI(value) }
+    catch (Exception ignored) { throw new GradleException("$name deve essere un URL HTTPS valido.") }
+    if (!"https".equalsIgnoreCase(endpoint.scheme) || !endpoint.host || endpoint.userInfo || endpoint.query || endpoint.fragment || !(endpoint.path in ["", "/"])) {
+        throw new GradleException("$name deve essere un'origine HTTPS senza credenziali, query o percorso.")
+    }
+}
+requireHttpsEndpoint("NEXUS_URL", publicNexusUrl)
+requireHttpsEndpoint("NEXUS_LAN_URL", localNexusUrl)
+requireHttpsEndpoint("NEXUS_FALLBACK_URL", fallbackNexusUrl)
+
+dependencies {
+    implementation(platform("androidx.compose:compose-bom:2025.05.01"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2025.05.01"))
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+}
+
+android {
+    namespace = "local.nexus.remote"
+    // Android 16 SDK installed on this workstation uses the 36.1 platform id.
+    compileSdkVersion "android-36.1"
+
+    defaultConfig {
+        applicationId = "local.nexus.remote"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 79
+        versionName = "6.4.0"
+        buildConfigField "String", "NEXUS_URL", quotedBuildValue(publicNexusUrl)
+        buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)
+        buildConfigField "String", "NEXUS_FALLBACK_URL", quotedBuildValue(fallbackNexusUrl)
+        buildConfigField "String", "APP_MODE", '"remote"'
+        manifestPlaceholders = [nexusHost: publicNexusUrl ? new URI(publicNexusUrl).host : "nexus.invalid"]
+    }
+
+    buildFeatures {
+        buildConfig = true
+        compose = true
+    }
+
+    sourceSets {
+        main.java.srcDir("../../shared-motion/src/main/java")
+    }
+
+    def nexusKeystore = System.getenv("NEXUS_ANDROID_KEYSTORE")
+    signingConfigs {
+        nexusRelease {
+            if (nexusKeystore) {
+                storeFile = file(nexusKeystore)
+                storePassword = System.getenv("NEXUS_ANDROID_STORE_PASSWORD")
+                keyAlias = System.getenv("NEXUS_ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("NEXUS_ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            if (nexusKeystore) signingConfig = signingConfigs.nexusRelease
+        }
+        preview {
+            initWith(release)
+            signingConfig = signingConfigs.debug
+            debuggable = false
+            matchingFallbacks = ["release"]
+        }
+    }
+}

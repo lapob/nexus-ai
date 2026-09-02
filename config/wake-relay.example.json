@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 32147
+  },
+  "trustedTailnetUsers": [
+    "owner@example.com"
+  ],
+  "targets": [
+    {
+      "id": "workstation",
+      "label": "Workstation NexusNXS",
+      "mac": "02:11:22:33:44:55",
+      "address": "192.168.1.255",
+      "port": 9
+    }
+  ],
+  "statePath": "../.nexus-data/wake-relay/state.json",
+  "auditPath": "../.nexus-data/wake-relay/logs/security-audit.jsonl"
+}

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "currency": "EUR",
+  "launch": {
+    "mode": "interest-list",
+    "collectPayments": false,
+    "maximumFounderCustomers": 50,
+    "founderFirstYearPrice": 69
+  },
+  "plans": [
+    {
+      "id": "free",
+      "monthlyPrice": 0,
+      "unlimited": false,
+      "quotaStatus": "capacity-test-required"
+    },
+    {
+      "id": "pro",
+      "monthlyPrice": 12.99,
+      "unlimited": false,
+      "quotaStatus": "capacity-test-required"
+    },
+    {
+      "id": "power",
+      "monthlyPrice": 24.99,
+      "unlimited": false,
+      "quotaStatus": "capacity-test-required"
+    }
+  ],
+  "unitEconomics": {
+    "targetGrossMarginPercent": 70,
+    "stripeEuropeanCardPercent": 1.5,
+    "stripeFixedFee": 0.25
+  },
+  "paidLaunchControls": [
+    {
+      "id": "billing-live-mode-reviewed",
+      "environment": "NEXUS_BILLING_LIVE_REVIEWED",
+      "description": "Checkout, webhook, idempotenza, rimborso e cancellazione sono stati provati in produzione controllata."
+    },
+    {
+      "id": "fiscal-and-consumer-review",
+      "environment": "NEXUS_COMMERCIAL_LEGAL_REVIEWED",
+      "description": "Inquadramento fiscale, IVA, fatturazione, recesso, rinnovo e condizioni sono stati revisionati da un professionista."
+    },
+    {
+      "id": "support-and-refund-runbook",
+      "environment": "NEXUS_SUPPORT_RUNBOOK_REVIEWED",
+      "description": "Assistenza, rimborsi, disdetta, incidenti e tempi di risposta hanno un proprietario e una procedura provata."
+    },
+    {
+      "id": "capacity-and-availability",
+      "environment": "NEXUS_PAID_CAPACITY_REVIEWED",
+      "description": "Concorrenza, quote, latenza e almeno 30 giorni di disponibilità rispettano gli SLO pubblicati."
+    },
+    {
+      "id": "privacy-and-training-consent",
+      "environment": "NEXUS_PRIVACY_CONSENT_REVIEWED",
+      "description": "Privacy, cancellazione, esportazione e consenso separato al miglioramento sono stati verificati end-to-end."
+    }
+  ]
+}

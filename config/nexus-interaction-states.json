@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "contractId": "nexusnxs-interaction-state",
+  "states": {
+    "booting": { "color": "#527B80", "rgb": [82, 123, 128], "energy": 0.08, "motion": "materialize" },
+    "idle": { "color": "#3A9CA1", "rgb": [58, 156, 161], "energy": 0.17, "motion": "breathe" },
+    "listening": { "color": "#45C89D", "rgb": [69, 200, 157], "energy": 0.42, "motion": "listen-wave" },
+    "speaking": { "color": "#55DBE1", "rgb": [85, 219, 225], "energy": 0.76, "motion": "voice-pulse" },
+    "thinking": { "color": "#668FBD", "rgb": [102, 143, 189], "energy": 0.58, "motion": "reason-orbit" },
+    "responding": { "color": "#8FD6E5", "rgb": [143, 214, 229], "energy": 0.68, "motion": "stream" },
+    "executing": { "color": "#BD9F4F", "rgb": [189, 159, 79], "energy": 0.76, "motion": "execute-scan" },
+    "permission": { "color": "#C59458", "rgb": [197, 148, 88], "energy": 0.46, "motion": "consent-hold" },
+    "offline": {
+      "color": "#53686A",
+      "rgb": [83, 104, 106],
+      "energy": 0.04,
+      "motion": "quiet",
+      "inputPolicy": "blocked-until-online",
+      "allowedActions": ["retry-connection", "read-status"]
+    },
+    "error": { "color": "#D69A58", "rgb": [214, 154, 88], "energy": 0.42, "motion": "amber-contract" }
+  },
+  "aliases": {
+    "connecting": "booting",
+    "understanding": "thinking",
+    "planning": "thinking",
+    "research": "thinking",
+    "researching": "thinking",
+    "searching": "thinking",
+    "reasoning": "thinking",
+    "verifying": "thinking",
+    "validating": "thinking",
+    "ready": "listening",
+    "consent": "permission",
+    "failed": "error"
+  },
+  "presentation": {
+    "semanticMotionOnly": true,
+    "continuum": {
+      "id": "nexus-cosmic-continuum-v1",
+      "primitive": "neural-particle-field",
+      "singleClock": true,
+      "stateTransitionsPreservePhase": true,
+      "secondaryIndicators": "derive-from-core",
+      "suspendWhenHidden": true
+    },
+    "publicActivity": {
+      "allowed": ["understanding", "planning", "web-research", "document-analysis", "tool-use", "verification", "responding"],
+      "internalReasoningVisible": false
+    },
+    "motionDurationsMs": {
+      "appearanceMinimum": 220,
+      "appearanceMaximum": 320,
+      "screenChangeMinimum": 280,
+      "screenChangeMaximum": 380
+    },
+    "chrome": {
+      "persistentBars": false,
+      "floatingIdentity": true,
+      "temporaryFullscreenSettings": true,
+      "composerFromBottom": true
+    },
+    "viewportClasses": {
+      "compactMaxDp": 599,
+      "mediumMaxDp": 839
+    },
+    "qualityTiers": {
+      "efficient": { "targetFps": 30, "particleScale": 0.42, "pointerScale": 0.35 },
+      "balanced": { "targetFps": 60, "particleScale": 0.72, "pointerScale": 0.62 },
+      "full": { "targetFps": 60, "particleScale": 1, "pointerScale": 1 }
+    },
+    "accessibility": {
+      "respectReducedMotion": true,
+      "respectFontScale": true,
+      "minimumTouchTargetDp": 48
+    }
+  },
+  "privacy": {
+    "publicLabelsOnly": true,
+    "exposeChainOfThought": false
+  }
+}

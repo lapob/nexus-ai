@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { sanitizeWindowState } = require('../src/window-state');
+const { sanitizeWindowState } = require('../src/infrastructure/electron/window-state');
 
 const displays = [{ x: 0, y: 0, width: 1920, height: 1080 }];
 

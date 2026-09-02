@@ -1,0 +1,14 @@
+# Mantiene deterministici i sorgenti tra Windows e gli ambienti CI.
+* text=auto eol=lf
+
+# Gli script eseguiti direttamente dalle shell Windows usano CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Gli asset binari non devono subire normalizzazioni.
+*.ico binary
+*.png binary
+*.woff2 binary
+*.exe binary
+*.dll binary

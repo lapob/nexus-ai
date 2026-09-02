@@ -1,0 +1,1369 @@
+/**
+ * @module renderer/styles/final-polish
+ * @description Rifinitura trasversale: gerarchia leggibile e spazi coerenti senza
+ * trasformare l'interfaccia in una dashboard tradizionale.
+ */
+/* #region 01 — Scala tipografica e ritmo */
+:root {
+  --nexus-caption-size: clamp(0.7rem, 0.18vw + 0.66rem, 0.76rem);
+  --nexus-control-size: clamp(0.78rem, 0.2vw + 0.73rem, 0.86rem);
+  --nexus-body-size: clamp(0.94rem, 0.22vw + 0.88rem, 1.04rem);
+  --nexus-reading-width: 54rem;
+}
+
+/* Metadati discreti, ma mai microscopici su display ad alta densità. */
+.settings-overlay small,
+.settings-overlay em,
+.settings-navigation button,
+.history-date,
+.history-count,
+.conversation-transcript time,
+.conversation-transcript-turns small,
+.response-actions button,
+.status-log,
+.shortcut-hint,
+.approval-chip small {
+  font-size: var(--nexus-caption-size);
+}
+
+.settings-overlay button,
+.settings-overlay select,
+.settings-overlay input,
+.settings-overlay textarea,
+.conversation-history button {
+  font-size: var(--nexus-control-size);
+}
+
+.conversation-transcript-turns p,
+.conversation-transcript-turns li,
+.conversation-transcript-turns pre,
+.response-content,
+.settings-overlay p {
+  font-size: var(--nexus-body-size);
+}
+
+/* Il ritmo verticale resta arioso, senza vuoti che separano artificialmente
+   i messaggi della stessa conversazione. */
+.conversation-transcript h1 {
+  margin-bottom: clamp(1.35rem, 3vh, 2.25rem);
+}
+
+.conversation-transcript-turns {
+  gap: clamp(1rem, 2.2vh, 1.55rem);
+}
+
+.conversation-transcript-turns article {
+  max-width: var(--nexus-reading-width);
+}
+
+.settings-content {
+  gap: clamp(0.72rem, 1.25vh, 0.95rem);
+}
+
+.settings-overlay .voice-choice-grid > button {
+  min-height: 4.75rem;
+  padding-block: 0.8rem;
+}
+
+/* La cronologia resta una superficie laterale quieta, ma con contrasto reale:
+   in precedenza i livelli trasparenti la rendevano quasi invisibile. */
+.conversation-history-scrim {
+  place-items: stretch start;
+  padding: 0;
+  background:
+    linear-gradient(90deg, rgba(1, 6, 7, 0.98) 0, rgba(1, 6, 7, 0.9) 28rem, rgba(0, 3, 4, 0.58) 58rem, rgba(0, 2, 3, 0.36));
+}
+
+.conversation-history {
+  width: min(23rem, calc(100vw - 0.75rem));
+  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+  padding: clamp(1.1rem, 3vh, 2rem) clamp(1rem, 3vw, 2rem);
+  border-right: 1px solid rgba(112, 207, 210, 0.075);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(52, 188, 192, 0.075), transparent 30rem),
+    rgba(2, 9, 10, 0.97);
+  box-shadow: 1.5rem 0 5rem rgba(0, 0, 0, 0.36);
+  grid-template-rows: max-content minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.conversation-history[data-density="sparse"] {
+  min-height: 100%;
+  height: 100%;
+}
+
+.conversation-history-controls {
+  min-height: 0;
+  padding-top: 3.15rem;
+}
+
+.conversation-history-search {
+  display: block;
+  width: calc(100% - 5.5rem);
+  margin: 0 0 0.55rem;
+}
+
+.conversation-history-search input {
+  min-height: 2.35rem;
+  border-radius: 0.75rem;
+  padding-inline: 0.9rem;
+  color: rgba(232, 249, 250, 0.92);
+  background: rgba(113, 214, 218, 0.045);
+}
+
+.conversation-history-search input:focus {
+  background: rgba(113, 214, 218, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(93, 221, 225, 0.13);
+}
+
+.conversation-history-filters { display: flex; margin: -0.08rem 0 0.38rem; gap: 0.08rem; flex-wrap: wrap; }
+.conversation-history-filters button { min-height: 1.55rem; border: 0; border-radius: 999px; padding: 0 0.42rem; color: rgba(157,190,192,.4); background: transparent; font-size: .59rem; cursor: pointer; }
+.conversation-history-filters button:hover,.conversation-history-filters button:focus-visible { color: rgba(218,240,241,.84); background: rgba(101,183,186,.065); outline: none; }
+.conversation-history-filters button[data-active="true"] { color: rgba(194,229,231,.68); background: transparent; }
+
+.conversation-history-list {
+  width: 100%;
+  align-content: start;
+  grid-auto-rows: max-content;
+  padding-inline: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.conversation-history-list article {
+  align-self: start;
+  min-height: 0;
+  border-radius: 0.62rem;
+}
+
+.conversation-history-list article > button:first-child { gap: 0.12rem; padding: 0.46rem 0.6rem; }
+.conversation-history-list strong { font-size: 0.79rem; line-height: 1.28; }
+.conversation-history-list small { margin-top: 0.1rem; font-size: 0.58rem; line-height: 1.25; }
+.conversation-history-group { margin: 0.65rem 0 0.22rem; font-size: 0.59rem; }
+.conversation-history-list .conversation-delete { opacity: 0; }
+.conversation-history-list article:hover .conversation-delete,
+.conversation-history-list article:focus-within .conversation-delete { opacity: 1; }
+
+.conversation-history-list article:hover,
+.conversation-history-list article[data-current="true"] {
+  background: rgba(96, 210, 214, 0.065);
+}
+
+.conversation-history-list strong { color: rgba(235, 250, 251, 0.94); }
+.conversation-history-list small { color: rgba(177, 211, 213, 0.46); }
+.conversation-history-group { color: rgba(115, 205, 208, 0.72); }
+
+.conversation-history-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.28rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: color 150ms ease;
+}
+
+.conversation-history-list article:hover .conversation-history-meta,
+.conversation-history-list article:focus-within .conversation-history-meta {
+  color: rgba(183, 216, 218, 0.66);
+}
+
+.conversation-history-signals {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0.08rem;
+}
+
+.conversation-history-signals i {
+  width: 0.23rem;
+  height: 0.23rem;
+  border-radius: 50%;
+  background: rgba(144, 190, 192, 0.38);
+}
+
+.conversation-history-signals i[data-kind="active"] { background: rgba(82, 224, 228, 0.72); }
+.conversation-history-signals i[data-kind="incomplete"] { background: rgba(237, 181, 121, 0.68); }
+.conversation-history-signals i[data-kind="activity"] { background: rgba(142, 214, 191, 0.55); }
+
+/* Lettura più densa: i turni restano distinti senza sembrare pagine separate. */
+.conversation-transcript-scroll {
+  width: min(56rem, calc(100vw - clamp(4rem, 14vw, 15rem)));
+  margin-left: clamp(1.5rem, 7vw, 7.5rem);
+  padding-top: clamp(6.25rem, 14vh, 7.5rem);
+}
+
+.conversation-transcript h1 {
+  max-width: 38rem;
+  font-size: clamp(1.35rem, 1.9vw, 1.95rem);
+}
+
+.conversation-transcript-turns article[data-role="user"] {
+  max-width: 40rem;
+  margin-left: clamp(0.35rem, 1vw, 0.8rem);
+}
+
+.conversation-transcript-turns small { margin-bottom: 0.24rem; color: rgba(125, 189, 192, 0.43); transition: color 150ms ease; }
+.conversation-transcript-turns article:hover > small { color: rgba(139, 207, 210, 0.66); }
+.conversation-transcript-turns p { line-height: 1.58; }
+.conversation-transcript-turns .answer-markdown { line-height: 1.58; }
+.conversation-turn-actions button { min-height: 2.15rem; padding: 0.38rem 0.58rem; font-size: 0.66rem; }
+.conversation-turn-actions { opacity: 0; }
+
+@media (hover: none), (pointer: coarse) {
+  .conversation-turn-actions { opacity: 0.38; }
+}
+.settings-overlay :is(.settings-copy, .settings-hint, .settings-field > small, .settings-tabs small) {
+  color: rgba(190, 211, 212, 0.74);
+}
+.settings-overlay :is(button, .nexus-select-trigger) { min-height: 40px; }
+@media (prefers-contrast: more) {
+  .settings-overlay :is(.settings-copy, .settings-hint, .settings-field > small, .settings-tabs small) {
+    color: rgba(238, 249, 249, 0.9);
+  }
+}
+
+/* Le fasi sono un resoconto osservabile, non una trascrizione del ragionamento. */
+.task-panel .task-active-label {
+  display: block;
+  max-width: 20rem;
+  margin-top: 0.42rem;
+  color: rgba(220, 241, 242, 0.86);
+  font-size: 0.82rem;
+  font-weight: 480;
+  line-height: 1.35;
+}
+
+.task-phase-rail {
+  display: flex;
+  width: min(13rem, 100%);
+  gap: 0.28rem;
+  margin-top: 0.58rem;
+}
+
+.task-phase-rail > i {
+  height: 2px;
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(119, 170, 172, 0.12);
+  transition: background-color 220ms ease, box-shadow 220ms ease;
+}
+
+.task-phase-rail > i[data-status="complete"] { background: rgba(100, 207, 195, 0.48); }
+.task-phase-rail > i[data-status="active"] {
+  background: rgba(108, 225, 221, 0.82);
+  box-shadow: 0 0 0.65rem rgba(75, 209, 207, 0.26);
+  animation: nexus-phase-breathe 1.7s ease-in-out infinite;
+}
+
+.task-panel ol { margin-top: 0.4rem; gap: 0.22rem; }
+.task-panel li { min-height: 1.35rem; font-size: 0.68rem; }
+.task-panel li[data-status="complete"] { display: none; }
+
+@keyframes nexus-phase-breathe {
+  50% { opacity: 0.58; box-shadow: 0 0 0.35rem rgba(75, 209, 207, 0.12); }
+}
+
+/* #region 05 — Consenso contestuale */
+
+/* Il consenso resta modale sul piano funzionale, ma non oscura l'intera app:
+   appare come una richiesta contestuale vicina al composer. */
+.permission-overlay {
+  place-items: end center;
+  padding: 1rem max(1rem, env(safe-area-inset-right)) max(1.15rem, env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, rgba(0, 3, 4, 0.38), transparent 38%);
+  backdrop-filter: none;
+}
+
+.permission-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: min(32rem, calc(100vw - 2rem));
+  gap: 0.58rem 0.85rem;
+  padding: 0.82rem 0.85rem 0.78rem;
+  border: 1px solid rgba(104, 218, 220, 0.1);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 7% 0%, rgba(74, 211, 212, 0.065), transparent 15rem),
+    rgba(4, 12, 14, 0.985);
+  box-shadow: 0 1.1rem 3.8rem rgba(0, 0, 0, 0.52), inset 0 1px rgba(233, 255, 255, 0.018);
+}
+
+.permission-heading {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1.8rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.62rem;
+}
+
+.permission-heading > div { display: grid; min-width: 0; gap: 0.12rem; }
+.permission-heading small {
+  color: rgba(123, 192, 194, 0.58);
+  font: 0.58rem/1.2 var(--font-mono);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+.permission-heading strong {
+  overflow: hidden;
+  color: rgba(232, 247, 248, 0.94);
+  font-size: 0.92rem;
+  font-weight: 570;
+  line-height: 1.28;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-orbit {
+  position: relative;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 1px solid rgba(83, 221, 217, 0.16);
+  border-radius: 50%;
+  background: rgba(69, 210, 207, 0.035);
+}
+.permission-orbit::before,
+.permission-orbit i {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: rgba(91, 225, 220, 0.84);
+  box-shadow: 0 0 0.7rem rgba(69, 220, 217, 0.28);
+  content: "";
+  transform: translate(-50%, -50%);
+}
+.permission-orbit::before { width: 0.82rem; height: 0.82rem; background: transparent; border: 1px solid rgba(94, 218, 215, 0.12); box-shadow: none; }
+.permission-orbit[data-risk="high"] { border-color: rgba(244, 174, 113, 0.18); }
+.permission-orbit[data-risk="high"] i { background: rgba(245, 180, 121, 0.9); box-shadow: 0 0 0.7rem rgba(244, 161, 93, 0.3); }
+
+.permission-reason {
+  grid-column: 1 / -1;
+  margin: 0 0 0 2.42rem !important;
+  color: rgba(177, 204, 206, 0.66) !important;
+  font-size: 0.73rem !important;
+  line-height: 1.42 !important;
+}
+
+.permission-preview {
+  grid-column: 1 / -1;
+  gap: 0;
+  margin-left: 2.42rem;
+  padding: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+}
+.permission-preview summary {
+  width: max-content;
+  color: rgba(143, 187, 190, 0.58);
+  font-size: 0.65rem;
+  cursor: pointer;
+  list-style: none;
+}
+.permission-preview summary::-webkit-details-marker { display: none; }
+.permission-preview summary::after { margin-left: 0.36rem; content: "· · ·"; letter-spacing: 0.06em; }
+.permission-preview[open] summary::after { content: "−"; }
+.permission-preview pre {
+  max-height: 5.2rem;
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.62rem;
+  border-radius: 0.55rem;
+  background: rgba(111, 183, 186, 0.04);
+  color: rgba(204, 226, 227, 0.76);
+  font-size: 0.68rem;
+  line-height: 1.42;
+}
+
+.permission-footer-copy { display: grid; align-self: center; gap: 0.08rem; margin-left: 2.42rem; }
+.permission-footer-copy span { color: rgba(177, 211, 212, 0.7); font-size: 0.65rem; }
+.permission-footer-copy small { color: rgba(129, 166, 168, 0.46); font-size: 0.57rem; }
+.permission-card footer { gap: 0.3rem; margin: 0; }
+.permission-card footer button { min-height: 2.15rem; border-radius: 0.65rem; padding: 0.42rem 0.72rem; font-size: 0.68rem; cursor: pointer; }
+.permission-deny:hover,
+.permission-deny:focus-visible { color: rgba(224, 241, 242, 0.9); background: rgba(152, 194, 196, 0.045); outline: none; }
+.permission-approve { min-width: 5.2rem; background: rgba(66, 200, 202, 0.13); }
+.permission-approve:hover,
+.permission-approve:focus-visible { background: rgba(72, 214, 216, 0.2); box-shadow: inset 0 0 0 1px rgba(102, 231, 233, 0.16), 0 0 1.2rem rgba(57, 201, 204, 0.08); outline: none; }
+
+@media (max-width: 640px) {
+  .permission-card { grid-template-columns: 1fr; width: calc(100vw - 1rem); }
+  .permission-footer-copy { margin-left: 2.42rem; }
+  .permission-card footer { justify-content: flex-end; }
+}
+
+/* #endregion */
+
+.update-notice {
+  position: fixed;
+  z-index: 90;
+  right: clamp(0.8rem, 2vw, 1.4rem);
+  bottom: clamp(0.8rem, 2vh, 1.25rem);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  width: min(31rem, calc(100vw - 1.6rem));
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.68rem 0.72rem;
+  border: 1px solid rgba(118, 211, 212, 0.11);
+  border-radius: 1rem;
+  color: rgba(226, 244, 245, 0.92);
+  background: rgba(4, 13, 14, 0.98);
+  box-shadow: 0 1.1rem 3rem rgba(0, 0, 0, 0.32);
+}
+.update-notice > i { width: 0.46rem; height: 0.46rem; border-radius: 50%; background: #65d8d5; box-shadow: 0 0 0.7rem rgba(76, 213, 210, 0.42); }
+.update-notice div { display: grid; min-width: 0; gap: 0.08rem; }
+.update-notice strong { font-size: 0.78rem; font-weight: 570; }
+.update-notice small { color: rgba(166, 195, 196, 0.62); font-size: 0.65rem; }
+.update-notice button { min-height: 2rem; border: 0; border-radius: 0.65rem; padding: 0 0.65rem; color: rgba(223, 246, 246, 0.9); background: rgba(82, 192, 191, 0.12); font-size: 0.68rem; cursor: pointer; }
+.update-notice button:hover,.update-notice button:focus-visible { background: rgba(82, 192, 191, 0.2); outline: none; }
+.update-notice .update-notice-later { color: rgba(166, 193, 194, 0.62); background: transparent; }
+
+@media (max-width: 620px) {
+  .update-notice { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .update-notice .update-notice-later { grid-column: 2 / -1; justify-self: end; min-height: 1.5rem; }
+}
+
+/* #endregion */
+
+/* Autorità conclusiva: preserva ricerca e descrizioni dopo gli override legacy. */
+@media (min-width: 701px) {
+  .settings-overlay.settings-center { width: min(66rem, calc(100vw - 2rem)); }
+  .settings-content { grid-template-columns: clamp(12rem, 21vw, 14.5rem) minmax(0, 1fr); }
+  .settings-navigation {
+    max-height: calc(100vh - 8.5rem);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .settings-navigation::-webkit-scrollbar { display: none; }
+  .settings-overlay .settings-tabs button { min-height: 3.15rem; padding: 0.58rem 0.72rem; }
+  .settings-overlay .settings-tabs button > small { display: block; }
+  .settings-overlay .settings-tabs button > small {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* #endregion */
+
+.settings-feature-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.75rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(104, 213, 216, 0.12);
+  border-radius: 1.1rem;
+  background: rgba(8, 20, 22, 0.72);
+}
+.settings-feature-card > span { display: grid; gap: 0.3rem; }
+.settings-feature-card small { color: rgba(174, 204, 206, 0.72); }
+.settings-feature-card .settings-inline-actions { margin: 0; width: auto; }
+@media (max-width: 720px) {
+  .settings-feature-card { align-items: stretch; flex-direction: column; }
+}
+
+/* La schermata pronta deve sembrare disponibile, non disattivata. La quiete
+   riduce il rumore visivo senza nascondere stato e accessi principali. */
+.entity-shell[data-presence-quiet="true"] .ui-overlay {
+  opacity: 0.5;
+  filter: saturate(0.9);
+}
+.entity-shell[data-presence-quiet="true"] .interaction-hint {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.45rem);
+}
+.entity-shell[data-presence-quiet="true"] .interaction-hint:hover,
+.entity-shell[data-presence-quiet="true"] .interaction-hint:focus-within { opacity: 0; }
+
+/* Il footer è persistente: l'ultimo controllo deve poter scorrere interamente
+   sopra di esso anche con finestre basse e scaling Windows elevato. */
+.settings-panel { padding-bottom: 5.25rem; }
+
+.settings-overlay .settings-navigation .settings-search input[type="search"] {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Il modello è una preferenza primaria, non un controllo tecnico nascosto. */
+.model-settings-field {
+  padding: 0.78rem;
+  border: 1px solid rgba(132, 195, 197, 0.08);
+  border-radius: 0.78rem;
+  background: rgba(133, 190, 192, 0.025);
+}
+.model-settings-field > span {
+  color: rgba(208, 229, 230, 0.82);
+  font-size: 0.77rem;
+  font-weight: 560;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.model-settings-field > small { max-width: 39rem; line-height: 1.45; }
+.model-settings-field .nexus-select-trigger { background: rgba(2, 10, 11, 0.34); }
+.settings-model-empty {
+  display: flex;
+  min-height: 3.7rem;
+  padding: 0.72rem 0.8rem;
+  align-items: center;
+  border-radius: 0.76rem;
+  background: rgba(130, 179, 181, 0.025);
+}
+.settings-model-empty span,
+.settings-model-empty strong,
+.settings-model-empty small { display: block; }
+.settings-model-empty strong { color: rgba(196, 217, 218, 0.74); font-size: 0.76rem; font-weight: 540; }
+.settings-model-empty small { margin-top: 0.18rem; color: rgba(139, 168, 169, 0.48); font-size: 0.68rem; }
+
+.settings-overlay .settings-search input[type="search"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  padding: 0.52rem 0.45rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* #region 05 — Indice professionale e ricerca impostazioni */
+.settings-search {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 2.25rem;
+  align-items: center;
+  border: 1px solid rgba(143, 195, 197, 0.08);
+  border-radius: 0.65rem;
+  background: rgba(154, 205, 207, 0.026);
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.settings-search:focus-within {
+  border-color: rgba(93, 216, 218, 0.25);
+  background: rgba(154, 205, 207, 0.045);
+  box-shadow: 0 0 0 3px rgba(77, 204, 207, 0.045);
+}
+.settings-search > i {
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-left: 0.72rem;
+  border: 1px solid rgba(169, 202, 203, 0.48);
+  border-radius: 50%;
+}
+.settings-search > i::after {
+  display: block;
+  width: 0.28rem;
+  height: 1px;
+  margin: 0.53rem 0 0 0.49rem;
+  background: rgba(169, 202, 203, 0.48);
+  content: '';
+  transform: rotate(45deg);
+}
+.settings-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 0.52rem 0.45rem;
+  color: rgba(218, 236, 237, 0.82);
+  background: transparent;
+  font: 500 0.72rem/1 var(--font-sans);
+}
+.settings-search input::placeholder { color: rgba(137, 171, 172, 0.42); }
+.settings-search input::-webkit-search-cancel-button { display: none; }
+.settings-search button {
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-right: 0.2rem;
+  border-radius: 50%;
+  color: rgba(154, 187, 188, 0.48);
+  background: transparent;
+  font-size: 1rem;
+}
+.settings-search button:hover { color: rgba(225, 240, 240, 0.86); background: rgba(188, 223, 224, 0.05); }
+.settings-search-empty {
+  margin: 0.65rem;
+  color: rgba(144, 177, 178, 0.48);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+.settings-page-intro {
+  margin: 0 0 0.55rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(147, 192, 194, 0.07);
+}
+.settings-page-intro > span,
+.settings-panel > .settings-section-copy:first-child > span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: rgba(91, 210, 212, 0.62);
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.settings-page-intro > strong,
+.settings-panel > .settings-section-copy:first-child > strong {
+  display: block;
+  max-width: 34rem;
+  color: rgba(232, 244, 244, 0.94);
+  font-size: clamp(1.08rem, 1.8vw, 1.34rem);
+  font-weight: 540;
+  letter-spacing: -0.025em;
+  line-height: 1.18;
+}
+.settings-page-intro > p,
+.settings-panel > .settings-section-copy:first-child > p {
+  max-width: 38rem;
+  margin-top: 0.42rem;
+  color: rgba(155, 181, 182, 0.58);
+  font-size: 0.77rem;
+  line-height: 1.52;
+}
+.settings-subsection-title {
+  display: flex;
+  margin: 0.15rem 0 -0.15rem;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.settings-subsection-title strong { color: rgba(204, 225, 226, 0.78); font-size: 0.78rem; font-weight: 560; }
+.settings-subsection-title small { color: rgba(137, 166, 167, 0.44); font-size: 0.67rem; }
+
+@media (min-width: 701px) {
+  .settings-overlay.settings-center { width: min(66rem, calc(100vw - 2rem)); }
+  .settings-content { grid-template-columns: clamp(12rem, 21vw, 14.5rem) minmax(0, 1fr); }
+  .settings-navigation { max-height: none; overflow: hidden; scrollbar-width: none; }
+  .settings-navigation::-webkit-scrollbar { display: none; }
+  .settings-overlay .settings-tabs button { min-height: 3.15rem; padding: 0.58rem 0.72rem; }
+  .settings-overlay .settings-tabs button > small { display: block; }
+  .settings-overlay .settings-tabs button > small { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media (max-width: 700px) {
+  .settings-search { width: min(16rem, calc(100% - 4.2rem)); }
+  .settings-page-intro { padding-bottom: 0.8rem; }
+  .settings-subsection-title { align-items: flex-start; flex-direction: column; gap: 0.15rem; }
+}
+/* #endregion */
+
+/* #region 03 — Impostazioni professionali e accesso remoto */
+
+/* Le impostazioni privilegiano gerarchia e leggibilità: gli effetti ambientali
+   appartengono al visualizer e non competono con i controlli. */
+.settings-overlay.settings-center { background: rgba(3, 10, 11, 0.985); }
+.settings-overlay.settings-center::before,
+.settings-overlay .settings-ambient,
+.settings-section-copy::before { display: none !important; }
+.settings-section-copy { padding-left: 0 !important; }
+
+.remote-overview {
+  display: flex;
+  min-height: 5.4rem;
+  padding: 1rem 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2rem;
+  border-bottom: 1px solid rgba(127, 190, 192, 0.1);
+}
+.remote-overview-copy,
+.remote-overview-copy > span {
+  display: flex;
+  min-width: 0;
+}
+.remote-overview-copy { align-items: flex-start; gap: 0.72rem; }
+.remote-overview-copy > span { flex-direction: column; gap: 0.24rem; }
+.remote-overview-copy > i {
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-top: 0.32rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgba(143, 174, 175, 0.4);
+  box-shadow: 0 0 0 0.22rem rgba(109, 177, 179, 0.04);
+}
+.remote-overview[data-ready="true"] .remote-overview-copy > i {
+  background: rgba(91, 225, 220, 0.88);
+  box-shadow: 0 0 0 0.22rem rgba(91, 225, 220, 0.07), 0 0 0.8rem rgba(91, 225, 220, 0.2);
+}
+.remote-overview-copy strong,
+.remote-pairing-code > div > strong,
+.remote-devices > strong {
+  color: rgba(220, 235, 235, 0.9);
+  font-size: 0.83rem;
+  font-weight: 560;
+}
+.remote-overview-copy small,
+.remote-pairing-code small,
+.remote-devices small,
+.remote-privacy-note {
+  color: rgba(152, 183, 184, 0.5);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+.remote-overview-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.7rem; }
+.settings-primary.remote-connect {
+  min-height: 2.45rem;
+  border: 1px solid rgba(108, 218, 218, 0.2);
+  border-radius: 0.62rem;
+  padding: 0.55rem 0.9rem;
+  background: rgba(87, 196, 198, 0.12);
+  color: rgba(210, 242, 242, 0.94);
+  font: 540 0.76rem/1 var(--font-sans);
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+.settings-primary.remote-connect:hover,
+.settings-primary.remote-connect:focus-visible {
+  border-color: rgba(117, 230, 229, 0.34);
+  background: rgba(91, 208, 209, 0.18);
+}
+.settings-primary.remote-connect:active { transform: translateY(1px); }
+.settings-primary.remote-connect:disabled { opacity: 0.48; }
+.settings-quiet-action {
+  border: 0;
+  padding: 0.35rem 0.1rem;
+  background: transparent;
+  color: rgba(148, 184, 185, 0.58);
+  font: 500 0.7rem/1 var(--font-sans);
+}
+.settings-quiet-action:hover,
+.settings-quiet-action:focus-visible { color: rgba(213, 234, 234, 0.86); }
+.settings-reset-appearance {
+  justify-self: start;
+  width: auto;
+  min-height: 2.25rem !important;
+  padding-inline: 0;
+  text-align: left;
+}
+
+.entity-shell[data-accent="blue"] { --accent: #68a9ff; --accent-rgb: 104, 169, 255; }
+.entity-shell[data-accent="violet"] { --accent: #aa8cff; --accent-rgb: 170, 140, 255; }
+.entity-shell[data-accent="emerald"] { --accent: #66d9ae; --accent-rgb: 102, 217, 174; }
+
+.remote-pairing-code {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 1.25rem;
+  padding: 1rem 0 1.15rem;
+  align-items: center;
+  border-bottom: 1px solid rgba(127, 190, 192, 0.1);
+}
+.remote-pairing-code img {
+  width: 9rem;
+  height: 9rem;
+  padding: 0.38rem;
+  border-radius: 0.75rem;
+  background: rgba(234, 248, 247, 0.96);
+}
+.remote-pairing-code > div { display: flex; align-items: flex-start; flex-direction: column; gap: 0.5rem; }
+.remote-pairing-code b {
+  color: rgba(204, 235, 235, 0.86);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 560;
+  letter-spacing: 0.08em;
+}
+.remote-copy-link.settings-secondary {
+  min-height: 1.8rem;
+  margin-top: 0.1rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: rgba(111, 213, 213, 0.72);
+}
+
+.remote-pairing-layer {
+  position: absolute;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(0, 4, 5, .68);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.remote-pairing-card {
+  position: relative;
+  width: min(25rem, calc(100vw - 2rem));
+  padding: 1.7rem 1.8rem 1.35rem;
+  border: 1px solid rgba(118, 203, 204, .13);
+  border-radius: 1.55rem;
+  text-align: center;
+  background: radial-gradient(circle at 50% 22%, rgba(57, 168, 171, .1), transparent 42%), rgba(5, 14, 15, .985);
+  box-shadow: 0 2rem 6rem rgba(0, 0, 0, .58), inset 0 1px rgba(255,255,255,.025);
+  overflow: hidden;
+}
+
+.remote-pairing-close { position: absolute; top: .75rem; right: .75rem; width: 2.35rem; height: 2.35rem; border: 0; border-radius: 50%; color: rgba(167,194,195,.6); background: rgba(105,172,174,.045); font-size: 1.35rem; }
+.remote-pairing-close:hover,.remote-pairing-close:focus-visible { color: rgba(226,240,240,.92); background: rgba(105,190,192,.1); outline: none; }
+.remote-pairing-eyebrow { color: rgba(91, 185, 188, .7); font: 600 .63rem/1 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; }
+.remote-pairing-card h2 { margin: .6rem 0 .35rem; color: rgba(230,241,241,.96); font-size: 1.42rem; font-weight: 480; letter-spacing: -.035em; }
+.remote-pairing-card > p { margin: 0; color: rgba(149,174,175,.62); font-size: .78rem; }
+.remote-qr-orbit { position: relative; display: grid; width: 13.5rem; height: 13.5rem; margin: 1.35rem auto 1rem; place-items: center; }
+.remote-qr-orbit:before,.remote-qr-orbit:after,.remote-qr-orbit > i { content: ''; position: absolute; inset: .15rem; border: 1px solid rgba(76,207,207,.13); border-radius: 2.1rem; transform: rotate(4deg); }
+.remote-qr-orbit:after { inset: .65rem; border-color: rgba(76,207,207,.08); transform: rotate(-5deg); }
+.remote-qr-orbit > i { inset: -.25rem; border-style: dashed; border-color: rgba(81,224,220,.11); border-radius: 50%; animation:remote-orbit 14s linear infinite; }
+.remote-qr-orbit img { z-index: 1; width: 11.6rem; height: 11.6rem; padding: .65rem; border-radius: 1.35rem; background: #031010; box-shadow: 0 0 2.2rem rgba(68,210,209,.1); image-rendering: pixelated; }
+.remote-pairing-card > small { display: block; color: rgba(126,153,154,.48); font-size: .66rem; }
+.remote-manual-code { display: block; margin: .35rem 0 .9rem; color: rgba(207,234,234,.9); font: 560 .9rem/1.2 var(--font-mono); letter-spacing: .23em; }
+.remote-pairing-actions { display: flex; justify-content: center; gap: .35rem; }
+.remote-pairing-actions button { min-height: 2.15rem; border: 0; border-radius: .7rem; padding: 0 .7rem; color: rgba(142,204,204,.72); background: rgba(80,174,176,.065); font-size: .68rem; }
+.remote-pairing-actions button:hover,.remote-pairing-actions button:focus-visible { color: rgba(213,238,237,.94); background: rgba(80,190,192,.12); outline: none; }
+.remote-pairing-actions button:active { transform: scale(.97); filter: brightness(1.25); }
+.remote-pairing-card > footer { display: flex; align-items: center; justify-content: center; gap: .38rem; margin-top: 1.1rem; color: rgba(104,133,134,.42); font-size: .61rem; }
+.remote-pairing-card > footer i { width: .35rem; height: .35rem; border-radius: 50%; background: rgba(83,211,175,.78); box-shadow: 0 0 .6rem rgba(83,211,175,.32); }
+@keyframes remote-orbit { to { transform: rotate(364deg); } }
+@media (prefers-reduced-motion: reduce) { .remote-qr-orbit > i { animation: none; } }
+
+.remote-devices { display: grid; gap: 0.25rem; padding-top: 0.85rem; }
+.remote-devices > strong { margin-bottom: 0.2rem; }
+.remote-devices > div {
+  display: flex;
+  min-height: 3.2rem;
+  padding: 0.5rem 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.remote-devices > div > span { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 0.55rem; }
+.remote-devices > div > span > i {
+  grid-row: 1 / 3;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: rgba(91, 225, 220, 0.66);
+}
+.remote-devices b { color: rgba(201, 222, 223, 0.82); font-size: 0.76rem; font-weight: 520; }
+.remote-privacy-note { margin: 0.65rem 0 0; }
+
+@media (max-width: 620px) {
+  .remote-overview { align-items: flex-start; flex-direction: column; }
+  .remote-overview-actions { width: 100%; justify-content: space-between; }
+  .remote-pairing-code { grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.9rem; }
+  .remote-pairing-code img { width: 7.5rem; height: 7.5rem; }
+}
+
+@media (max-width: 430px) {
+  .remote-pairing-code { grid-template-columns: 1fr; }
+}
+
+/* #endregion */
+
+/* #region 03 — Centro impostazioni a due pannelli */
+.settings-overlay.settings-center { width: min(64rem, calc(100vw - 2rem)); }
+
+.settings-content {
+  display: grid;
+  grid-template-columns: clamp(10.5rem, 20vw, 13.5rem) minmax(0, 1fr);
+  column-gap: clamp(1.4rem, 3vw, 2.8rem);
+  align-items: start;
+  padding: 1.35rem clamp(1.15rem, 3.2vw, 2.6rem) 2rem;
+}
+
+.settings-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  min-height: calc(100vh - 12rem);
+  margin: 0;
+  padding: 0.35rem 0 1rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.settings-navigation-heading {
+  display: flex;
+  margin: 0 0 0.55rem;
+  padding: 0 0.65rem;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+.settings-navigation-heading strong {
+  color: rgba(232, 249, 249, 0.94);
+  font-size: clamp(1.15rem, 2vw, 1.42rem);
+  font-weight: 520;
+  letter-spacing: -0.025em;
+}
+.settings-navigation-heading small {
+  color: rgba(135, 183, 186, 0.48);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.settings-overlay .settings-tabs {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+.settings-overlay .settings-tabs button {
+  display: flex;
+  width: 100%;
+  min-height: 3.15rem;
+  border: 0;
+  border-radius: 0.72rem;
+  padding: 0.62rem 0.72rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.12rem;
+  background: transparent;
+  text-align: left;
+}
+.settings-overlay .settings-tabs button::after { display: none; }
+.settings-overlay .settings-tabs button > span {
+  color: inherit;
+  font-size: 0.86rem;
+  font-weight: 540;
+  letter-spacing: -0.005em;
+}
+.settings-overlay .settings-tabs button > small {
+  color: rgba(139, 177, 179, 0.42);
+  font-size: 0.67rem;
+  font-weight: 420;
+  letter-spacing: 0;
+}
+.settings-overlay .settings-tabs button:hover,
+.settings-overlay .settings-tabs button:focus-visible { background: rgba(92, 204, 207, 0.045); }
+.settings-overlay .settings-tabs button[aria-selected="true"] {
+  background: linear-gradient(105deg, rgba(76, 205, 209, 0.115), rgba(76, 205, 209, 0.025));
+  box-shadow: inset 2px 0 rgba(105, 229, 232, 0.72);
+}
+.settings-overlay .settings-tabs button[aria-selected="true"] > small { color: rgba(156, 205, 207, 0.62); }
+.settings-panel {
+  grid-column: 2;
+  min-width: 0;
+  padding-top: 0.25rem;
+}
+
+@media (max-width: 700px) {
+  .settings-content { grid-template-columns: 1fr; padding-top: 0.85rem; }
+  .settings-navigation {
+    position: static;
+    min-height: 0;
+    padding: 0 2.8rem 0.35rem 0;
+    gap: 0.55rem;
+  }
+  .settings-navigation-heading { margin-bottom: 0.2rem; }
+  .settings-navigation-heading small,
+  .settings-overlay .settings-tabs button > small { display: none; }
+  .settings-overlay .settings-tabs {
+    overflow-x: auto;
+    flex-direction: row;
+    gap: 0.25rem;
+    scrollbar-width: none;
+  }
+  .settings-overlay .settings-tabs::-webkit-scrollbar { display: none; }
+  .settings-overlay .settings-tabs button {
+    width: auto;
+    min-width: max-content;
+    min-height: 2.35rem;
+    border-radius: 999px;
+    padding: 0.45rem 0.75rem;
+  }
+  .settings-overlay .settings-tabs button[aria-selected="true"] { box-shadow: none; }
+  .settings-panel { grid-column: 1; }
+}
+/* #endregion */
+
+/* #region 02 — Adattamento viewport e accessibilità */
+
+@media (max-height: 700px) {
+  .conversation-transcript-turns { gap: 1.3rem; }
+  .conversation-transcript h1 { margin-bottom: 1.8rem; }
+  .settings-content { gap: 0.62rem; }
+}
+
+@media (max-width: 680px) {
+  :root {
+    --nexus-caption-size: 0.72rem;
+    --nexus-control-size: 0.8rem;
+    --nexus-body-size: 0.95rem;
+  }
+  .conversation-transcript-turns article[data-role="user"] { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-overlay *,
+  .conversation-history *,
+  .conversation-transcript * {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Gli override conclusivi restano dopo il layout responsive: la densità desktop
+   non viene così annullata dalle regole strutturali condivise. */
+@media (min-width: 701px) {
+  .settings-overlay.settings-center {
+    width: min(59rem, calc(100vw - 2rem));
+    height: min(50rem, calc(100vh - 2.5rem));
+    border-radius: 1.05rem;
+  }
+  .settings-content {
+    grid-template-columns: 9.8rem minmax(0, 1fr);
+    column-gap: clamp(1.25rem, 2.4vw, 2rem);
+    padding: 1.15rem clamp(1.1rem, 2.8vw, 2.15rem) 1.45rem;
+  }
+  .settings-navigation { min-height: calc(100vh - 11.5rem); gap: 0.65rem; }
+  .settings-navigation-heading { margin-bottom: 0.35rem; padding-inline: 0.58rem; }
+  .settings-navigation-heading strong { font-size: 1.18rem; }
+  .settings-overlay .settings-tabs { gap: 0.12rem; }
+  .settings-overlay .settings-tabs button { min-height: 2.45rem; border-radius: 0.58rem; padding: 0.48rem 0.62rem; }
+  .settings-overlay .settings-tabs button { color: rgba(177, 209, 211, 0.52); }
+  .settings-overlay .settings-tabs button > span { font-size: 0.8rem; }
+  .settings-overlay .settings-tabs button > small { display: none; }
+  .settings-panel { gap: 0.72rem; padding-top: 0.12rem; padding-bottom: 1.25rem; }
+  .settings-section-copy { margin-top: 0.18rem; }
+  .settings-section-copy strong { font-size: 0.98rem; }
+  .settings-section-copy p { margin-top: 0.22rem; font-size: 0.78rem; line-height: 1.45; }
+  .settings-overlay .nexus-select-trigger { min-height: 2.55rem; border-radius: 0.58rem; padding-block: 0.45rem; }
+  .personal-evaluation-card,
+  .action-history { border-radius: 0.7rem; padding: 0.7rem 0.78rem; }
+  .action-policy-grid > button { min-height: 3.85rem; border-radius: 0.68rem; padding: 0.7rem 0.8rem; }
+  .settings-footer { min-height: 3.8rem; padding-block: 0.45rem; }
+  .settings-footer button,
+  .settings-footer .settings-save { height: 2.45rem; border-radius: 0.58rem; }
+}
+
+/* #endregion */
+
+/* Gli stili legacy del QR non devono alterare la tipografia conclusiva. */
+.settings-overlay .remote-pairing-code > div > strong {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.settings-overlay .remote-privacy-note {
+  margin: 0.65rem 0 0;
+  color: rgba(142, 174, 175, 0.42);
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.settings-health-check {
+  display: flex;
+  min-height: 4.4rem;
+  border: 1px solid rgba(124, 190, 193, 0.12);
+  border-radius: 0.82rem;
+  padding: 0.72rem 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: linear-gradient(110deg, rgba(83, 181, 184, 0.045), rgba(83, 181, 184, 0.012));
+  transition: border-color 180ms ease, background 180ms ease;
+}
+.settings-health-check > span {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.62rem;
+  align-items: center;
+}
+.settings-health-check > span > i {
+  grid-row: 1 / 3;
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  background: rgba(140, 177, 179, 0.48);
+  box-shadow: 0 0 0 0.22rem rgba(104, 179, 182, 0.055);
+}
+.settings-health-check strong,
+.settings-health-check small { display: block; }
+.settings-health-check strong { color: rgba(214, 235, 236, 0.86); font-size: 0.78rem; font-weight: 560; }
+.settings-health-check small { margin-top: 0.2rem; color: rgba(142, 174, 175, 0.52); font-size: 0.68rem; line-height: 1.4; }
+.settings-health-check[data-state="running"] > span > i { animation: settings-health-pulse 1.1s ease-in-out infinite; }
+.settings-health-check[data-state="ready"] { border-color: rgba(85, 222, 190, 0.2); background: rgba(78, 199, 171, 0.045); }
+.settings-health-check[data-state="ready"] > span > i { background: rgba(85, 224, 190, 0.9); box-shadow: 0 0 0 0.22rem rgba(85, 224, 190, 0.075), 0 0 0.9rem rgba(85, 224, 190, 0.25); }
+.settings-health-check[data-state="attention"] { border-color: rgba(230, 179, 95, 0.2); }
+.settings-health-check[data-state="attention"] > span > i { background: rgba(230, 179, 95, 0.82); }
+@keyframes settings-health-pulse { 50% { opacity: 0.42; transform: scale(0.78); } }
+@media (max-width: 620px) {
+  .settings-health-check { align-items: stretch; flex-direction: column; }
+  .settings-health-check > button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-health-check[data-state="running"] > span > i { animation: none; }
+}
+
+/* #region 04 — Densità conclusiva di impostazioni e composer */
+
+/* La colonna laterale si comporta come un indice compatto: nessun elemento
+   viene spinto artificialmente sul fondo della finestra. */
+@media (min-width: 701px) {
+  .settings-navigation {
+    min-height: 0;
+    align-self: start;
+  }
+
+  .settings-overlay .settings-tabs button {
+    min-height: 2.35rem;
+    border-radius: 0.62rem;
+    padding: 0.48rem 0.7rem;
+    transition: color 150ms ease, background 150ms ease, transform 150ms ease;
+  }
+
+  .settings-overlay .settings-tabs button:hover,
+  .settings-overlay .settings-tabs button:focus-visible {
+    color: rgba(218, 237, 238, 0.82);
+    background: rgba(205, 236, 237, 0.045);
+    transform: translateX(1px);
+  }
+
+  .settings-overlay .settings-tabs button[aria-selected="true"] {
+    color: rgba(232, 246, 246, 0.94);
+    background: rgba(132, 188, 190, 0.085);
+    box-shadow: none;
+  }
+
+  .settings-overlay .settings-tabs button[aria-selected="true"]::before {
+    position: absolute;
+    top: 50%;
+    left: 0.18rem;
+    width: 0.2rem;
+    height: 0.85rem;
+    border-radius: 999px;
+    background: rgba(99, 218, 218, 0.78);
+    content: '';
+    transform: translateY(-50%);
+  }
+
+}
+
+/* Le impostazioni remote sono una sequenza di righe, non una pagina tecnica. */
+.remote-startup {
+  min-height: 3.55rem;
+  margin-top: 0.15rem;
+  border-radius: 0.78rem;
+  padding: 0.72rem 0.78rem;
+  align-items: center;
+  background: rgba(150, 202, 204, 0.028);
+  transition: background 150ms ease;
+}
+.remote-startup:hover { background: rgba(150, 202, 204, 0.052); }
+.remote-startup > input[type="checkbox"] { margin-top: 0; }
+.remote-startup > span { gap: 0.18rem; }
+.remote-privacy-note { padding-top: 0.75rem; border-top: 1px solid rgba(139, 192, 194, 0.07); }
+
+/* Prova microfono: un unico controllo leggibile, con stato e segnale raccolti. */
+.microphone-actions {
+  grid-template-columns: auto minmax(13rem, 1fr);
+  gap: 0.8rem;
+}
+.settings-test-microphone {
+  min-height: 2.55rem;
+  border-color: rgba(128, 205, 207, 0.13);
+  background: rgba(122, 190, 192, 0.035);
+}
+.microphone-test-indicator {
+  min-height: 2.55rem;
+  grid-template-columns: auto minmax(7rem, 1fr) minmax(6.8rem, auto);
+  border-radius: 0.7rem;
+  padding: 0 0.72rem;
+  background: rgba(118, 178, 180, 0.025);
+}
+.microphone-test-wave { height: 1.2rem; justify-content: flex-start; }
+.microphone-test-wave span { width: 0.12rem; background: rgba(78, 205, 207, 0.58); }
+.microphone-test-indicator small { text-align: right; }
+
+/* Il permesso nel composer resta discreto finché chiuso; il menu aperto si
+   ancora al controllo e usa la densità delle app desktop moderne. */
+.approval-chip .nexus-select-trigger {
+  min-height: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  padding-inline: 0.48rem;
+}
+.approval-chip .nexus-select-trigger:hover,
+.approval-chip .nexus-select-trigger:focus-visible { background: rgba(160, 206, 208, 0.055); }
+.approval-chip .nexus-select-menu {
+  bottom: calc(100% + 0.45rem);
+  width: min(18rem, calc(100vw - 2rem));
+  border: 1px solid rgba(133, 194, 196, 0.11);
+  border-radius: 0.82rem;
+  padding: 0.35rem;
+  background: rgba(7, 14, 15, 0.985);
+  box-shadow: 0 1.25rem 3.4rem rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.02);
+}
+.approval-chip .nexus-select-menu > button {
+  min-height: 2.65rem;
+  border-radius: 0.58rem;
+  padding: 0.48rem 0.62rem;
+  color: rgba(185, 208, 209, 0.68);
+}
+.approval-chip .nexus-select-menu > button:hover,
+.approval-chip .nexus-select-menu > button:focus-visible {
+  color: rgba(226, 240, 240, 0.9);
+  background: rgba(151, 205, 207, 0.065);
+}
+.approval-chip .nexus-select-menu > button[aria-selected="true"] {
+  color: rgba(225, 242, 242, 0.92);
+  background: rgba(100, 200, 202, 0.085);
+}
+.approval-chip .nexus-select-menu strong { color: inherit; }
+.approval-chip .nexus-select-menu small { color: rgba(137, 166, 167, 0.52); }
+
+@media (max-width: 620px) {
+  .microphone-actions { grid-template-columns: 1fr; }
+  .microphone-test-indicator { grid-template-columns: auto minmax(5rem, 1fr) auto; }
+}
+
+/* #endregion */
+
+/* I menu delle impostazioni crescono verso l'interno della finestra. */
+.settings-overlay .settings-panel .nexus-select-menu {
+  right: 0;
+  left: auto;
+  width: max(100%, min(27rem, calc(100vw - 3rem)));
+  max-width: calc(100vw - 3rem);
+  transform-origin: top right;
+}
+
+/* Contrasto funzionale: le descrizioni restano secondarie, ma non diventano
+   illeggibili su pannelli HDR, display economici o luminosità ridotta. */
+.settings-overlay .settings-tabs button {
+  color: rgba(201, 225, 226, 0.78);
+}
+
+.settings-overlay .settings-tabs button > small,
+.settings-overlay .settings-section-copy p,
+.settings-overlay .settings-subsection-title small,
+.settings-overlay .settings-field > small,
+.settings-overlay .settings-switch small {
+  color: rgba(174, 204, 206, 0.72);
+}
+
+.settings-overlay .settings-save:disabled {
+  color: rgba(164, 191, 192, 0.62);
+  border-color: rgba(105, 173, 175, 0.12);
+  background: rgba(75, 132, 134, 0.035);
+  opacity: 1;
+}
+
+.settings-overlay .nexus-select-menu > button[aria-selected="true"] {
+  box-shadow: inset 2px 0 rgba(93, 223, 227, 0.58);
+}
+
+/* Autorità finale dell'indice impostazioni: deve seguire tutti gli stili legacy. */
+@media (min-width: 701px) {
+  .settings-overlay.settings-center { width: min(60rem, calc(100vw - 2rem)); }
+  .settings-content {
+    grid-template-columns: clamp(10.2rem, 18vw, 11.5rem) minmax(0, 1fr);
+    column-gap: clamp(1.15rem, 2.2vw, 1.75rem);
+    padding: 1rem clamp(1rem, 2.4vw, 1.8rem) 1.2rem;
+  }
+  .settings-navigation { max-height: calc(100vh - 8.5rem); overflow-y: auto; scrollbar-width: none; }
+  .settings-navigation::-webkit-scrollbar { display: none; }
+  .settings-overlay .settings-tabs button { min-height: 2.7rem; padding: 0.48rem 0.62rem; }
+  .settings-overlay .settings-tabs button > small { display: block; }
+  .settings-overlay .settings-tabs button > small {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: 0.62rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* #region 05 — Ritmo visivo finale
+   Un solo sistema di densità per composer, cronologia e contenuti. */
+
+.command-input {
+  width: min(40rem, calc(100vw - 2rem));
+  min-height: 6.6rem;
+  gap: 0.4rem;
+  border-radius: 1rem;
+  padding: 0.82rem;
+  box-shadow: 0 1.2rem 3.8rem rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(104, 205, 209, 0.022);
+}
+.command-input[data-expanded="false"] { min-height: 5.65rem; padding-block: 0.68rem; }
+.command-input > textarea {
+  width: 100%;
+  min-height: 3rem;
+  max-height: min(9.5rem, 22vh);
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: rgba(232, 248, 249, 0.92);
+  caret-color: var(--cyan);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  scrollbar-width: none;
+}
+.command-input > textarea::-webkit-scrollbar { display: none; }
+.command-input > textarea::placeholder { color: rgba(161, 194, 196, 0.35); }
+
+.conversation-history {
+  width: min(31rem, calc(100vw - 1.5rem));
+  padding: clamp(0.9rem, 2.4vh, 1.4rem) clamp(0.85rem, 2.4vw, 1.35rem);
+}
+.conversation-history-controls { gap: 0.4rem; }
+.conversation-history-list { gap: 0.1rem; }
+.conversation-history-list article { border-radius: 0.52rem; }
+.conversation-history-list article > button:first-child { padding: 0.46rem 0.52rem; }
+
+.conversation-transcript-scroll { width: min(64rem, calc(100vw - 4rem)); }
+.conversation-transcript-turns { gap: 1.15rem; }
+.conversation-transcript-turns article { padding-block: 0.08rem; }
+.conversation-transcript-turns p,
+.conversation-transcript-turns .answer-markdown { line-height: 1.52; }
+
+.settings-overlay :is(.settings-field, .settings-switch, .settings-subsection-title) {
+  border-radius: 0.68rem;
+}
+.settings-panel { gap: 0.62rem; }
+.settings-footer { box-sizing: border-box; min-height: 3.45rem; max-width: 100%; }
+
+/* La spaziatura conclusiva del pannello viene definita qui, dopo gli override
+   legacy. Allinea la fascia di vetro al padding reale e impedisce alle ultime
+   lettere dell'introduzione di riaffiorare sopra la dissolvenza durante lo
+   scroll, senza oscurare il titolo quando il pannello e' fermo in alto. */
+.settings-content[data-scrolled="true"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 1.4rem, black calc(100% - 0.8rem), transparent);
+  mask-image: linear-gradient(to bottom, transparent, black 1.4rem, black calc(100% - 0.8rem), transparent);
+}
+
+.settings-content > .settings-scroll-blur {
+  top: -1rem;
+  height: 2.45rem;
+  margin: -1rem 0 -2.45rem;
+  background: linear-gradient(to bottom, rgba(4, 12, 13, 0.985), rgba(4, 12, 13, 0.72) 48%, transparent);
+  -webkit-backdrop-filter: blur(13px) saturate(1.06);
+  backdrop-filter: blur(13px) saturate(1.06);
+}
+
+@media (max-width: 700px) {
+  .command-input { width: calc(100vw - 1rem); top: max(7rem, calc(50% - env(safe-area-inset-bottom) / 2)); bottom: auto; }
+  .conversation-transcript-scroll { width: calc(100vw - 1rem); }
+  .settings-content > .settings-scroll-blur {
+    top: -0.85rem;
+    margin-top: -0.85rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-input > textarea { scroll-behavior: auto; transition: none; }
+}
+
+/* #endregion */

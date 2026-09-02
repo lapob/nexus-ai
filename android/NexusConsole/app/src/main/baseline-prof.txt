@@ -1,0 +1,12 @@
+HSPLlocal/nexus/console/NativeMainActivity;-><init>()V
+HSPLlocal/nexus/console/NativeMainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLlocal/nexus/console/NativeMainActivity;->onResume()V
+HSPLlocal/nexus/console/NativeMainActivity;->createShell()V
+HSPLlocal/nexus/console/NativeMainActivity;->bootstrapConsole()V
+HSPLlocal/nexus/console/NativeMainActivity;->loadDashboard()V
+HSPLlocal/nexus/console/NativeMainActivity;->refreshDashboard()V
+HSPLlocal/nexus/console/NativeMainActivity;->showDashboard(Lorg/json/JSONObject;)V
+HSPLlocal/nexus/console/NativeMainActivity;->renderDashboard(Lorg/json/JSONObject;)V
+HSPLlocal/nexus/console/NativeMainActivity;->applyDesktopControlState()V
+HSPLlocal/nexus/console/SecureTokenStore;-><init>(Landroid/content/Context;)V
+HSPLlocal/nexus/console/DeviceIdentityStore;-><init>(Landroid/content/Context;)V

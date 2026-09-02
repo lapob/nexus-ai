@@ -1,0 +1,14 @@
+title = "NexusNXS secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated, packaged, and third-party runtime artifacts"
+paths = [
+  '''(^|[\\/])node_modules([\\/]|$)''',
+  '''(^|[\\/])vendor([\\/]|$)''',
+  '''(^|[\\/])release(?:-android)?([\\/]|$)''',
+  '''(^|[\\/])renderer-dist([\\/]|$)''',
+  '''(^|[\\/])android[\\/][^\\/]+[\\/](?:\.gradle|build)([\\/]|$)'''
+]

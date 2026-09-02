@@ -1,3 +1,7 @@
+/**
+ * @module ai/ai-errors
+ * @description Contratto o servizio del runtime AI indipendente dal provider.
+ */
 const AI_ERROR_CODES = Object.freeze({
   PROVIDER_UNAVAILABLE: 'AI_PROVIDER_UNAVAILABLE', PROVIDER_TIMEOUT: 'AI_PROVIDER_TIMEOUT',
   PROVIDER_INVALID_RESPONSE: 'AI_PROVIDER_INVALID_RESPONSE', MODEL_NOT_FOUND: 'AI_MODEL_NOT_FOUND',
@@ -18,7 +22,7 @@ function normalizeAIError(error, provider = 'unknown') {
   if (error instanceof AIError) return error;
   if (error?.name === 'AbortError' || error?.code === 'ABORT_ERR') return new AIError(AI_ERROR_CODES.REQUEST_CANCELLED, 'Richiesta AI annullata.', { provider, retryable: true, cause: error });
   if (error?.name === 'TimeoutError') return new AIError(AI_ERROR_CODES.PROVIDER_TIMEOUT, 'Il provider AI non ha risposto entro il timeout.', { provider, retryable: true, cause: error });
-  if (error instanceof TypeError && /fetch|network|connect/i.test(error.message)) return new AIError(AI_ERROR_CODES.PROVIDER_UNAVAILABLE, 'Il runtime AI locale non è raggiungibile.', { provider, retryable: true, cause: error });
+  if (error instanceof TypeError && /fetch|network|connect/i.test(error.message)) return new AIError(AI_ERROR_CODES.PROVIDER_UNAVAILABLE, 'NEXUSNXS non è disponibile in questo momento.', { provider, retryable: true, cause: error });
   return new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, 'Il provider AI ha restituito una risposta non valida.', { provider, cause: error });
 }
 
