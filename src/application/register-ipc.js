@@ -12,6 +12,7 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { createHash, randomUUID } = require('node:crypto');
 const { compactConversationHistory } = require('./context-compaction');
+const { continuationDelta, continuationMessages } = require('./response-continuation');
 const { fileURLToPath } = require('node:url');
 const { resolveVaultNotePath } = require('../core/security');
 const { conversationalGuidance, deriveSearchQueries, parsePlannerOutput, mergeSources } = require('./reasoning');
@@ -1668,12 +1669,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         // risposta completa: proseguiamo nello stesso stream visivo, senza
         // aggiungere un finto turno utente o archiviare testo troncato.
         for (let continuation = 0; result.finishReason === 'length' && continuation < 3; continuation += 1) {
-          const continuationMessages = [
-            ...prepared.messages,
-            { role: 'assistant', content: combinedAnswer.slice(-12_000) },
-            { role: 'user', content: 'Continua esattamente dal punto interrotto. Non ripetere testo già scritto e completa la risposta.' }
-          ];
-          result = await streamWithModel(model, continuationMessages, false, `${requestId}-continuation-${continuation + 1}`);
+          const nextMessages = continuationMessages(prepared.messages, combinedAnswer);
+          result = await streamWithModel(model, nextMessages, false, `${requestId}-continuation-${continuation + 1}`);
           combinedAnswer += String(result.message?.content || '');
         }
         inferenceCompletedAt = performance.now();
@@ -1868,25 +1865,51 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       const messages = attachments.images?.length ? prepared.messages.map((message, index) => index === prepared.messages.length - 1 && message.role === 'user' ? { ...message, images: attachments.images } : message) : prepared.messages;
       report(resolvedMode === 'deep' ? 'Ragiono e collego i dettagli…' : 'Formulo la risposta…');
       remoteInferenceStartedAt = performance.now();
-      let result = await aiRuntime.streamChat({
-        requestId,
+      const remoteTokenLimit = resolvedMode === 'deep'
+        ? Math.min(runtimeTuning.deepTokens, 1_536)
+        : Math.min(runtimeTuning.quickTokens, 768);
+      const streamRemoteSegment = (segmentRequestId, segmentMessages, onSegmentToken) => aiRuntime.streamChat({
+        requestId: segmentRequestId,
         model: selectedModel,
-        messages,
+        messages: segmentMessages,
         mode: resolvedMode === 'deep' ? 'deep' : 'quick',
         ...(!explicitModel && !attachments.images?.length ? residencyOptions(settings, resolvedMode) : {}),
         think: deliberateThinking,
         temperature: settings.temperature,
-        // I client pubblici privilegiano una risposta completa ma interattiva:
-        // un turno approfondito puo continuare nel messaggio successivo, mentre
-        // un tetto enorme terrebbe occupata l'unica GPU per minuti.
-        maxTokens: resolvedMode === 'deep'
-          ? Math.min(runtimeTuning.deepTokens, 1_536)
-          : Math.min(runtimeTuning.quickTokens, 768),
+        // Il primo segmento resta rapido; se raggiunge il limite, il server lo
+        // prosegue senza trasformare una risposta parziale in un falso successo.
+        maxTokens: remoteTokenLimit,
         numCtx: runtimeTuning.contextTokens,
         keepAlive: runtimeTuning.keepAlive,
         timeoutMs: requestTimeout(resolvedMode),
         signal: controller.signal
-      }, { onToken: bufferModelOutput ? () => {} : publishRemoteToken, onThinking: () => report('Ragiono e collego i dettagli…'), onStart: () => report('Genero la risposta…') });
+      }, {
+        onToken: onSegmentToken,
+        onThinking: () => report('Ragiono e collego i dettagli…'),
+        onStart: () => report('Genero la risposta…')
+      });
+      let result = await streamRemoteSegment(requestId, messages, bufferModelOutput ? () => {} : publishRemoteToken);
+      let combinedRemoteAnswer = String(result.message?.content || '');
+      const maximumContinuations = resolvedMode === 'deep' ? 4 : 6;
+      for (let continuation = 0; result.finishReason === 'length' && continuation < maximumContinuations; continuation += 1) {
+        throwIfRequestAborted(controller.signal);
+        report(`Completo la risposta · parte ${continuation + 2}…`);
+        const nextMessages = continuationMessages(messages, combinedRemoteAnswer);
+        result = await streamRemoteSegment(`${requestId}-continuation-${continuation + 1}`, nextMessages, () => {});
+        const delta = continuationDelta(combinedRemoteAnswer, result.message?.content);
+        combinedRemoteAnswer += delta;
+        if (!bufferModelOutput && delta) publishRemoteToken(delta);
+      }
+      result = {
+        ...result,
+        message: { ...result.message, content: combinedRemoteAnswer },
+        incomplete: result.finishReason === 'length'
+      };
+      if (result.incomplete) {
+        throw Object.assign(new Error('Il modello non ha raggiunto una conclusione naturale entro il limite di sicurezza.'), {
+          code: 'REMOTE_RESPONSE_INCOMPLETE'
+        });
+      }
       remoteInferenceCompletedAt = performance.now();
       let secured = secureModelOutput(result.message?.content, prepared.security);
       let grounded = enforcePublicCitationUrls(secured.text, prepared.publicSources);

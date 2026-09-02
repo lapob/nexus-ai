@@ -46,6 +46,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /function stopGeneration\(\)/);
   assert.match(html, /\/api\/guest\/messages\/cancel/);
   assert.match(html, /Riprendo la risposta/);
+  assert.match(html, /verified!==rawAnswer/);
   assert.match(html, /async function memoryRead\(\)\{return\[\]/);
   assert.doesNotMatch(html, /answer\.textContent\+=pendingAnswer/);
   for (const [index, match] of [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].entries()) {

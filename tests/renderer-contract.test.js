@@ -440,6 +440,8 @@ test('le generazioni al limite continuano prima di essere archiviate', () => {
   assert.match(registerIpc, /`\$\{requestId\}-continuation-\$\{continuation \+ 1\}`/);
   assert.match(registerIpc, /result: \{ \.\.\.result, requestId \}/);
   assert.match(registerIpc, /incomplete: result\.finishReason === 'length'/);
+  assert.match(registerIpc, /maximumContinuations = resolvedMode === 'deep' \? 4 : 6/);
+  assert.match(registerIpc, /REMOTE_RESPONSE_INCOMPLETE/);
 });
 
 test('il warmup pubblico prepara soltanto la sessione remota senza inferenza', () => {
