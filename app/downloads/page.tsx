@@ -24,7 +24,7 @@ const releases = [
     requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
-    sha256: "84F0036284F24C1D5F16753A6660521532F787F48382406455905DC83554050F",
+    sha256: "94FAFBD68EFA749FC6F6B99FA20C94CB7071FBCA5208E5CE7C314BB3C8B23EE5",
     url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.5-preview.1/NexusNXS-0.3.5-Setup.exe",
   },
   {
@@ -39,7 +39,7 @@ const releases = [
     requirements: "Android 10 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
-    sha256: "ED5638545C92252D611EA23C066D41280CA6FD8F9337070D03E304ECE50C59DE",
+    sha256: "ADB165FBA8E6EBCE0569273EB7401306AEB1F3C2D79DCDEBB58807F84C151186",
     url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.5-preview.1/NexusNXS-Android-6.4.0.apk",
   },
 ];
