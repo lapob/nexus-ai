@@ -3445,8 +3445,11 @@ private fun readableMathNotation(value: String): String {
         "\\alpha" to "α", "\\beta" to "β", "\\gamma" to "γ", "\\delta" to "δ", "\\theta" to "θ", "\\lambda" to "λ",
         "\\mu" to "μ", "\\pi" to "π", "\\rho" to "ρ", "\\sigma" to "σ", "\\phi" to "φ", "\\omega" to "ω",
         "\\Delta" to "Δ", "\\Omega" to "Ω", "\\rightarrow" to "→", "\\to" to "→", "\\leftarrow" to "←",
-        "\\in" to "∈", "\\notin" to "∉", "\\subset" to "⊂", "\\subseteq" to "⊆", "\\forall" to "∀", "\\exists" to "∃"
+        "\\in" to "∈", "\\notin" to "∉", "\\subset" to "⊂", "\\subseteq" to "⊆", "\\forall" to "∀", "\\exists" to "∃",
+        "\\quad" to " ", "\\," to " ", "\\;" to " "
     )
+    val superscripts = mapOf('0' to '⁰', '1' to '¹', '2' to '²', '3' to '³', '4' to '⁴', '5' to '⁵', '6' to '⁶', '7' to '⁷', '8' to '⁸', '9' to '⁹', '+' to '⁺', '-' to '⁻')
+    val subscripts = mapOf('0' to '₀', '1' to '₁', '2' to '₂', '3' to '₃', '4' to '₄', '5' to '₅', '6' to '₆', '7' to '₇', '8' to '₈', '9' to '₉', '+' to '₊', '-' to '₋')
     var result = value.trim()
     repeat(4) {
         result = Regex("\\\\frac\\s*\\{([^{}]+)}\\s*\\{([^{}]+)}").replace(result, "($1)/($2)")
@@ -3454,6 +3457,8 @@ private fun readableMathNotation(value: String): String {
     }
     symbols.entries.sortedByDescending { it.key.length }.forEach { (source, symbol) -> result = result.replace(source, symbol) }
     return result
+        .replace(Regex("\\^\\{?([0-9+-]+)}?")) { match -> match.groupValues[1].map { superscripts[it] ?: it }.joinToString("") }
+        .replace(Regex("_\\{?([0-9+-]+)}?")) { match -> match.groupValues[1].map { subscripts[it] ?: it }.joinToString("") }
         .replace(Regex("\\\\(?:left|right|mathrm|text|operatorname)\\b"), "")
         .replace(Regex("[{}]"), "")
         .replace(Regex("\\s+"), " ")

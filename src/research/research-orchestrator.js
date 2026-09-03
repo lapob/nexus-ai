@@ -94,7 +94,6 @@ function canonicalCitationUrl(value) {
 
 function enforcePublicCitationUrls(text, citations = []) {
   const value = String(text || '');
-  if (!citations.length) return { text: value, changed: false, rejected: 0, accepted: 0 };
   const allowed = new Set(citations.map((source) => canonicalCitationUrl(source.url)).filter(Boolean));
   const citationByUrl = new Map(citations.map((source) => [canonicalCitationUrl(source.url), source]).filter(([url]) => Boolean(url)));
   let rejected = 0;
@@ -115,13 +114,23 @@ function enforcePublicCitationUrls(text, citations = []) {
     rejected += 1;
     return String(label || '').trim();
   });
-  const safe = normalized.replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/giu, (match, label, url) => {
+  const linked = normalized.replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/giu, (match, label, url) => {
     if (allowed.has(canonicalCitationUrl(url))) {
       accepted += 1;
       return match;
     }
     rejected += 1;
     return String(label || '').trim();
+  });
+  const safe = linked.replace(/(?<!\]\()https:\/\/[^\s<>()\]]+/giu, (match) => {
+    const punctuation = match.match(/[.,;!?]+$/u)?.[0] || '';
+    const url = punctuation ? match.slice(0, -punctuation.length) : match;
+    if (allowed.has(canonicalCitationUrl(url))) {
+      accepted += 1;
+      return match;
+    }
+    rejected += 1;
+    return punctuation;
   });
   return { text: safe, changed: safe !== value, rejected, accepted };
 }

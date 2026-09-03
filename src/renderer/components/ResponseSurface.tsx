@@ -44,8 +44,12 @@ const MATH_SYMBOLS: Record<string, string> = {
   '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\theta': 'θ', '\\lambda': 'λ',
   '\\mu': 'μ', '\\pi': 'π', '\\rho': 'ρ', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω',
   '\\Delta': 'Δ', '\\Omega': 'Ω', '\\rightarrow': '→', '\\to': '→', '\\leftarrow': '←',
-  '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆', '\\forall': '∀', '\\exists': '∃'
+  '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆', '\\forall': '∀', '\\exists': '∃',
+  '\\quad': ' ', '\\,': ' ', '\\;': ' '
 };
+
+const SUPERSCRIPTS: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻' };
+const SUBSCRIPTS: Record<string, string> = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉', '+': '₊', '-': '₋' };
 
 function readableMath(value: string) {
   let result = value.trim();
@@ -58,6 +62,8 @@ function readableMath(value: string) {
   }
   for (const [source, symbol] of Object.entries(MATH_SYMBOLS).sort(([left], [right]) => right.length - left.length)) result = result.replaceAll(source, symbol);
   return result
+    .replace(/\^\{?([0-9+-]+)\}?/g, (_, value: string) => [...value].map((character) => SUPERSCRIPTS[character] || character).join(''))
+    .replace(/_\{?([0-9+-]+)\}?/g, (_, value: string) => [...value].map((character) => SUBSCRIPTS[character] || character).join(''))
     .replace(/\\(?:left|right|mathrm|text|operatorname)\b/g, '')
     .replace(/[{}]/g, '')
     .replace(/\s+/g, ' ')
@@ -237,7 +243,7 @@ function RichLink({ label, url }: { label: string; url: string }) {
 }
 
 function inlineMarkup(text: string): ReactNode[] {
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\$([^$\n]+)\$|\\\(([^\n]+?)\\\)|\[([^\]]+)\]\((https:\/\/[^)\s]+)\))/g;
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\$\$([^$\n]+)\$\$|\$([^$\n]+)\$|\\\(([^\n]+?)\\\)|\[([^\]]+)\]\((https:\/\/[^)\s]+)\))/g;
   const nodes: ReactNode[] = [];
   let cursor = 0;
   let match: RegExpExecArray | null;
@@ -247,9 +253,10 @@ function inlineMarkup(text: string): ReactNode[] {
     if (token.startsWith('`')) nodes.push(<code key={match.index}>{token.slice(1, -1)}</code>);
     else if (token.startsWith('**')) nodes.push(<strong key={match.index}>{token.slice(2, -2)}</strong>);
     else if (token.startsWith('*')) nodes.push(<em key={match.index}>{token.slice(1, -1)}</em>);
-    else if (token.startsWith('$')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[2])}</span>);
-    else if (token.startsWith('\\(')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[3])}</span>);
-    else nodes.push(<RichLink key={match.index} label={match[4]} url={match[5]} />);
+    else if (token.startsWith('$$')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[2])}</span>);
+    else if (token.startsWith('$')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[3])}</span>);
+    else if (token.startsWith('\\(')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[4])}</span>);
+    else nodes.push(<RichLink key={match.index} label={match[5]} url={match[6]} />);
     cursor = match.index + token.length;
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));

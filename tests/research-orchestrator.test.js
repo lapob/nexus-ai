@@ -44,6 +44,15 @@ test('mantiene soltanto URL realmente restituiti dal provider', () => {
   assert.equal(result.rejected, 1);
 });
 
+test('non pubblica URL inventati quando la ricerca non restituisce fonti', () => {
+  const result = enforcePublicCitationUrls(
+    'Consulta [questa guida](https://invented.example/guide) oppure https://invented.example/raw.'
+  );
+  assert.doesNotMatch(result.text, /https:\/\//);
+  assert.match(result.text, /questa guida/);
+  assert.equal(result.rejected, 2);
+});
+
 test('aggiunge una fonte reale quando il modello omette il link', () => {
   const result = ensurePublicCitation('Risposta verificata.', [{ title: 'Documento', url: 'https://example.com/docs' }]);
   assert.equal(result.added, true);

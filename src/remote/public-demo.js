@@ -322,11 +322,13 @@ function publicAnswerPresentationRuntime(answer) {
     return safe;
   };
   const readableMath = (value) => {
-    const symbols = { '\\times': '×', '\\cdot': '·', '\\div': '÷', '\\pm': '±', '\\mp': '∓', '\\neq': '≠', '\\leq': '≤', '\\le': '≤', '\\geq': '≥', '\\ge': '≥', '\\approx': '≈', '\\infty': '∞', '\\sum': '∑', '\\prod': '∏', '\\int': '∫', '\\partial': '∂', '\\nabla': '∇', '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\pi': 'π', '\\rho': 'ρ', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω', '\\Delta': 'Δ', '\\Omega': 'Ω', '\\rightarrow': '→', '\\to': '→', '\\leftarrow': '←', '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆', '\\forall': '∀', '\\exists': '∃' };
+    const symbols = { '\\times': '×', '\\cdot': '·', '\\div': '÷', '\\pm': '±', '\\mp': '∓', '\\neq': '≠', '\\leq': '≤', '\\le': '≤', '\\geq': '≥', '\\ge': '≥', '\\approx': '≈', '\\infty': '∞', '\\sum': '∑', '\\prod': '∏', '\\int': '∫', '\\partial': '∂', '\\nabla': '∇', '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\pi': 'π', '\\rho': 'ρ', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω', '\\Delta': 'Δ', '\\Omega': 'Ω', '\\rightarrow': '→', '\\to': '→', '\\leftarrow': '←', '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆', '\\forall': '∀', '\\exists': '∃', '\\quad': ' ', '\\,': ' ', '\\;': ' ' };
+    const superscripts = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻' };
+    const subscripts = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉', '+': '₊', '-': '₋' };
     let result = String(value || '').trim();
     for (let pass = 0; pass < 4; pass += 1) result = result.replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '($1)/($2)').replace(/\\sqrt\s*\{([^{}]+)\}/g, '√($1)');
     for (const [source, symbol] of Object.entries(symbols).sort(([left], [right]) => right.length - left.length)) result = result.replaceAll(source, symbol);
-    return result.replace(/\\(?:left|right|mathrm|text|operatorname)\b/g, '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+    return result.replace(/\^\{?([0-9+-]+)\}?/g, (_, value) => [...value].map(character => superscripts[character] || character).join('')).replace(/_\{?([0-9+-]+)\}?/g, (_, value) => [...value].map(character => subscripts[character] || character).join('')).replace(/\\(?:left|right|mathrm|text|operatorname)\b/g, '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
   };
   const appendMath = (parent, value, block = false) => {
     const node = document.createElement(block ? 'div' : 'span');
@@ -337,7 +339,7 @@ function publicAnswerPresentationRuntime(answer) {
     parent.append(node);
   };
   const appendInline = (parent, text) => {
-    const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\$([^$\n]+)\$|\\\(([^\n]+?)\\\)|\[([^\]]+)\]\((https:\/\/[^)\s]+)\)|https:\/\/[^\s<>()]+)/g;
+    const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\$\$([^$\n]+)\$\$|\$([^$\n]+)\$|\\\(([^\n]+?)\\\)|\[([^\]]+)\]\((https:\/\/[^)\s]+)\)|https:\/\/[^\s<>()]+)/g;
     let cursor = 0;
     for (const match of String(text).matchAll(pattern)) {
       if (match.index > cursor) parent.append(document.createTextNode(text.slice(cursor, match.index)));
@@ -346,9 +348,10 @@ function publicAnswerPresentationRuntime(answer) {
       if (raw.startsWith('`')) { node = document.createElement('code'); node.textContent = raw.slice(1, -1); }
       else if (raw.startsWith('**')) { node = document.createElement('strong'); node.textContent = raw.slice(2, -2); }
       else if (raw.startsWith('*')) { node = document.createElement('em'); node.textContent = raw.slice(1, -1); }
-      else if (raw.startsWith('$')) { appendMath(parent, match[2]); cursor = match.index + raw.length; continue; }
-      else if (raw.startsWith('\\(')) { appendMath(parent, match[3]); cursor = match.index + raw.length; continue; }
-      else { node = document.createElement('a'); node.href = match[5] || raw; node.target = '_blank'; node.rel = 'noopener noreferrer'; node.textContent = match[4] || raw; }
+      else if (raw.startsWith('$$')) { appendMath(parent, match[2]); cursor = match.index + raw.length; continue; }
+      else if (raw.startsWith('$')) { appendMath(parent, match[3]); cursor = match.index + raw.length; continue; }
+      else if (raw.startsWith('\\(')) { appendMath(parent, match[4]); cursor = match.index + raw.length; continue; }
+      else { node = document.createElement('a'); node.href = match[6] || raw; node.target = '_blank'; node.rel = 'noopener noreferrer'; node.textContent = match[5] || raw; }
       parent.append(node);
       cursor = match.index + raw.length;
     }
