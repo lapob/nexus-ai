@@ -1241,7 +1241,7 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.equal(serviceWorker.status, 200);
     assert.equal(serviceWorker.headers.get('service-worker-allowed'), '/');
     const serviceWorkerSource = await serviceWorker.text();
-    assert.match(serviceWorkerSource, /nexusnxs-ai-shell-v3/);
+    assert.match(serviceWorkerSource, /nexusnxs-ai-shell-v4/);
     assert.match(serviceWorkerSource, /if\(!response\.ok\)return/);
     assert.match(serviceWorkerSource, /cache\.put\('\/',response\.clone\(\)\)/);
     assert.equal((await fetch(`${baseUrl}/api/system/telemetry`)).status, 404);
