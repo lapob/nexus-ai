@@ -1,7 +1,7 @@
 {
   "name": "nexusnxs",
   "productName": "NexusNXS",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "description": "Privacy-focused AI assistant for Windows with native Android clients, voice, projects and consent-based computer actions.",
   "author": "NexusNXS",
@@ -327,9 +327,9 @@
       }
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "NexusNXS",

@@ -8,10 +8,10 @@ import { basename, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const repository = process.env.NEXUS_GITHUB_REPOSITORY || 'lapob/nexus-ai';
-const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || 'v0.3.5-preview.1';
+const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || 'v0.3.6-preview.1';
 const root = resolve(import.meta.dirname, '..');
 const assets = [
-  { path: resolve(root, 'release', 'NexusNXS-0.3.5-Setup.exe'), type: 'application/vnd.microsoft.portable-executable' },
+  { path: resolve(root, 'release', 'NexusNXS-0.3.6-Setup.exe'), type: 'application/vnd.microsoft.portable-executable' },
   { path: resolve(root, 'release-android', 'NexusNXS-Android-6.4.0.apk'), type: 'application/vnd.android.package-archive' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'CHECKSUMS.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'release-manifest.preview.json'), type: 'application/json' },
@@ -96,7 +96,7 @@ const releaseBody = [
   '',
   'Build pubbliche per la prova controllata con amici. I client usano i servizi NexusNXS e non distribuiscono modelli o knowledge private.',
   '',
-  '- Windows 11 x64: NexusNXS 0.3.5 Preview (non firmata Authenticode)',
+  '- Windows 11 x64: NexusNXS 0.3.6 Preview (non firmata Authenticode)',
   '- Android 10+: NexusNXS 6.4.0 Preview (firma Android Debug, non Play Store)',
   '- Impronte complete: `CHECKSUMS.sha256`',
   '- Manifest pubblico: `release-manifest.preview.json`',
@@ -110,7 +110,7 @@ await request(`${apiRoot}/releases/${release.id}`, token, {
   method: 'PATCH',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    name: 'NexusNXS Founder Preview 0.3.5',
+    name: 'NexusNXS Founder Preview 0.3.6',
     body: releaseBody,
     prerelease: true,
     draft: false,
