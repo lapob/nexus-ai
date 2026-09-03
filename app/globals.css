@@ -488,6 +488,8 @@ body {
   100% { transform: translate3d(-.4%, 1.1%, 0) scale(1.04); }
 }
 
+@keyframes nxs-hero-orbit-spin{to{transform:translate(-50%,-50%) rotate(1turn)}}
+
 .aurora::before {
   content: "";
   position: absolute;
@@ -522,11 +524,14 @@ body {
     transform-origin: 70% 48%;
   }
 
+  .aurora i:nth-child(1),.aurora i:nth-child(2){border-top-color:#72f4ff8c;animation:nxs-hero-orbit-spin 22s linear infinite}
+  .aurora i:nth-child(2){animation-duration:15s;animation-direction:reverse}
+
   /* Ambient loops are dormant off-screen and while the tab is hidden. */
   .presence-grid article > i,
   .network-pill i,
   .status i,
-  .aurora i:nth-child(3),
+  .aurora i,
   .aurora::before,
   .aurora::after {
     animation-play-state: paused;
@@ -535,7 +540,7 @@ body {
   .nxs-ambient-active .presence-grid article > i,
   .nxs-ambient-active .network-pill i,
   .nxs-ambient-active .status i,
-  .hero.nxs-ambient-active .aurora i:nth-child(3),
+  .hero.nxs-ambient-active .aurora i,
   .hero.nxs-ambient-active .aurora::before,
   .hero.nxs-ambient-active .aurora::after {
     animation-play-state: running;
@@ -548,7 +553,7 @@ body {
   .nxs-motion-lite .presence-grid article > i,
   .nxs-motion-lite .network-pill i,
   .nxs-motion-lite .status i,
-  .nxs-motion-lite .aurora i:nth-child(3),
+  .nxs-motion-lite .aurora i,
   .nxs-motion-lite .aurora::before,
   .nxs-motion-lite .aurora::after {
     animation: none;

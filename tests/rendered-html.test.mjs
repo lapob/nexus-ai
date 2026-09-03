@@ -81,6 +81,8 @@ test("animates initially visible product cards after the prepared frame", async 
   assert.match(runtime, /requestAnimationFrame\(\(\) => initiallyVisible\.forEach\(showTarget\)\)/);
   assert.match(runtime, /target\.matches\(IMMEDIATE_REVEAL_SELECTOR\)/, "product heroes must remain immediately readable");
   assert.match(styles, /@keyframes nxs-hero-field-drift/);
+  assert.match(styles, /@keyframes nxs-hero-orbit-spin/);
+  assert.match(styles, /hero\.nxs-ambient-active \.aurora i/);
   assert.match(styles, /hero\.nxs-ambient-active \.aurora::before/);
   assert.match(styles, /nxs-motion-lite \.aurora::before/);
 });
