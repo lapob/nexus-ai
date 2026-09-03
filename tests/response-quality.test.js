@@ -36,6 +36,13 @@ test('una richiesta semplice mantiene un controllo breve', () => {
   assert.match(responseQualityDirective('Ciao'), /rispondi direttamente/i);
 });
 
+test('le richieste matematiche chiedono simboli leggibili e delimitatori coerenti', () => {
+  const directive = responseQualityDirective('Risolvi questa equazione di secondo grado: x^2 - 5x + 6 = 0');
+  assert.match(directive, /simboli matematici Unicode leggibili/);
+  assert.match(directive, /±/);
+  assert.match(directive, /\$\.\.\.\$/);
+});
+
 test('valida vincoli osservabili senza affidarsi al giudizio del modello', () => {
   assert.equal(validateResponse('Rispondi solo con JSON valido', '{"ok":true}').valid, true);
   assert.deepEqual(validateResponse('Rispondi solo con JSON valido', '```json\n{"ok":true}\n```').issues, ['invalid-json']);

@@ -19,6 +19,10 @@ test('desktop rende Markdown semantico anche durante lo streaming', () => {
   assert.match(styles, /\.response-callout/);
   assert.match(styles, /\.response-table-wrap/);
   assert.match(styles, /\.code-card-meta/);
+  assert.match(surface, /kind: 'formula'/);
+  assert.match(surface, /className="math-inline"/);
+  assert.match(surface, /className="math-block"/);
+  assert.match(styles, /Cambria Math/);
 });
 
 test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () => {
@@ -33,6 +37,9 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /className = 'web-code-card'/);
   assert.match(html, /className = 'web-callout'/);
   assert.match(html, /className = 'web-table-wrap'/);
+  assert.match(html, /className = block \? 'web-math-block' : 'math-inline'/);
+  assert.match(html, /role', 'math'/);
+  assert.match(html, /Cambria Math/);
   assert.match(html, /id="copyResponse"/);
   assert.match(html, /id="deepenResponse"/);
   assert.match(html, /id="exportResponse"/);
@@ -65,6 +72,10 @@ test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
   assert.match(activity, /LinkAnnotation\.Url\(url/);
   assert.match(activity, /TextLinkStyles\(style = SpanStyle\(color = Cyan/);
   assert.match(activity, /horizontalScroll\(rememberScrollState\(\)\)/);
+  assert.match(activity, /private fun readableMathNotation/);
+  assert.match(activity, /private fun normalizeInlineMath/);
+  assert.match(activity, /§NEXUS_MATH§/);
+  assert.match(activity, /fontFamily = FontFamily\.Serif/);
 });
 
 test('il prompt impedisce marcatori incompleti e abilita blocchi semantici', () => {

@@ -118,6 +118,7 @@ test('il prompt RAG non espone percorsi o nomi dei documenti interni', () => {
 test('la lingua della risposta segue l’italiano anche con termini tecnici inglesi', () => {
   assert.match(responseLanguageDirective('Puoi aprire Visual Studio Code e sistemare il bug?'), /italiano naturale/i);
   assert.match(responseLanguageDirective('Come faccio il deploy con Docker?'), /italiano naturale/i);
+  assert.match(responseLanguageDirective('Cerca sul web le ultime informazioni stabili su Node.js, spiegale in breve e cita le fonti.'), /italiano naturale/i);
   assert.match(responseLanguageDirective('What is the safest way to open this file?'), /natural English/i);
   assert.match(responseLanguageDirective('¿Cómo puedo corregir este error de seguridad?'), /español natural/i);
   assert.match(responseLanguageDirective('Comment puis-je corriger cette erreur de sécurité ?'), /français naturel/i);
@@ -137,6 +138,14 @@ test('adatta il dialogo a conferme, correzioni e problemi persistenti', () => {
   assert.match(conversationalGuidance('No, intendevo la versione precedente', history), /correzione/i);
   assert.match(conversationalGuidance('Ancora non funziona, è sempre uguale', history), /problema persistente/i);
   assert.match(conversationalGuidance('Suggerisci altri miglioramenti', history), /alto impatto/i);
+});
+
+test('una domanda informativa breve evita il formato enciclopedico decorativo', () => {
+  const guidance = conversationalGuidance('Il Darién Gap');
+  assert.match(guidance, /100-220 parole/i);
+  assert.match(guidance, /niente titoli/i);
+  assert.match(guidance, /emoji/i);
+  assert.doesNotMatch(conversationalGuidance('Spiega in modo approfondito il Darién Gap'), /100-220 parole/i);
 });
 
 test('riconosce direttamente Notion quando è nel catalogo applicazioni', () => {

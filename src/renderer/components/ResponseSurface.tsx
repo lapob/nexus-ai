@@ -26,6 +26,7 @@ interface ResponseSurfaceProps {
 
 type MarkdownBlock =
   | { kind: 'code'; language: string; content: string }
+  | { kind: 'formula'; content: string }
   | { kind: 'heading'; level: number; content: string }
   | { kind: 'list'; ordered: boolean; items: string[] }
   | { kind: 'table'; headers: string[]; rows: string[][] }
@@ -35,6 +36,33 @@ type MarkdownBlock =
   | { kind: 'paragraph'; content: string };
 
 type ResponseKind = 'answer' | 'plan' | 'research' | 'code';
+
+const MATH_SYMBOLS: Record<string, string> = {
+  '\\times': '×', '\\cdot': '·', '\\div': '÷', '\\pm': '±', '\\mp': '∓',
+  '\\neq': '≠', '\\leq': '≤', '\\le': '≤', '\\geq': '≥', '\\ge': '≥', '\\approx': '≈',
+  '\\infty': '∞', '\\sum': '∑', '\\prod': '∏', '\\int': '∫', '\\partial': '∂', '\\nabla': '∇',
+  '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\theta': 'θ', '\\lambda': 'λ',
+  '\\mu': 'μ', '\\pi': 'π', '\\rho': 'ρ', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω',
+  '\\Delta': 'Δ', '\\Omega': 'Ω', '\\rightarrow': '→', '\\to': '→', '\\leftarrow': '←',
+  '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆', '\\forall': '∀', '\\exists': '∃'
+};
+
+function readableMath(value: string) {
+  let result = value.trim();
+  for (let pass = 0; pass < 4; pass += 1) {
+    const next = result
+      .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '($1)/($2)')
+      .replace(/\\sqrt\s*\{([^{}]+)\}/g, '√($1)');
+    if (next === result) break;
+    result = next;
+  }
+  for (const [source, symbol] of Object.entries(MATH_SYMBOLS).sort(([left], [right]) => right.length - left.length)) result = result.replaceAll(source, symbol);
+  return result
+    .replace(/\\(?:left|right|mathrm|text|operatorname)\b/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function responseKind(text: string): ResponseKind {
   if (/```|\b(?:function|class|const|SELECT|CREATE TABLE|def )\b/u.test(text)) return 'code';
@@ -82,6 +110,25 @@ function parseBlocks(markdown: string): MarkdownBlock[] {
       while (index < lines.length && !/^```\s*$/.test(lines[index])) code.push(lines[index++]);
       if (index < lines.length) index += 1;
       blocks.push({ kind: 'code', language: fence[1] || 'text', content: code.join('\n') });
+      continue;
+    }
+
+    const formulaStart = line.trim().match(/^(\$\$|\\\[)([\s\S]*)$/);
+    if (formulaStart) {
+      const closing = formulaStart[1] === '$$' ? '$$' : '\\]';
+      const formula: string[] = [];
+      let first = formulaStart[2];
+      if (first.endsWith(closing)) {
+        first = first.slice(0, -closing.length);
+        formula.push(first);
+        index += 1;
+      } else {
+        if (first) formula.push(first);
+        index += 1;
+        while (index < lines.length && !lines[index].trim().endsWith(closing)) formula.push(lines[index++]);
+        if (index < lines.length) formula.push(lines[index++].trim().slice(0, -closing.length));
+      }
+      blocks.push({ kind: 'formula', content: readableMath(formula.join(' ')) });
       continue;
     }
 
@@ -190,7 +237,7 @@ function RichLink({ label, url }: { label: string; url: string }) {
 }
 
 function inlineMarkup(text: string): ReactNode[] {
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\[([^\]]+)\]\((https:\/\/[^)\s]+)\))/g;
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*|\$([^$\n]+)\$|\\\(([^\n]+?)\\\)|\[([^\]]+)\]\((https:\/\/[^)\s]+)\))/g;
   const nodes: ReactNode[] = [];
   let cursor = 0;
   let match: RegExpExecArray | null;
@@ -200,7 +247,9 @@ function inlineMarkup(text: string): ReactNode[] {
     if (token.startsWith('`')) nodes.push(<code key={match.index}>{token.slice(1, -1)}</code>);
     else if (token.startsWith('**')) nodes.push(<strong key={match.index}>{token.slice(2, -2)}</strong>);
     else if (token.startsWith('*')) nodes.push(<em key={match.index}>{token.slice(1, -1)}</em>);
-    else nodes.push(<RichLink key={match.index} label={match[2]} url={match[3]} />);
+    else if (token.startsWith('$')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[2])}</span>);
+    else if (token.startsWith('\\(')) nodes.push(<span className="math-inline" key={match.index}>{readableMath(match[3])}</span>);
+    else nodes.push(<RichLink key={match.index} label={match[4]} url={match[5]} />);
     cursor = match.index + token.length;
   }
   if (cursor < text.length) nodes.push(text.slice(cursor));
@@ -324,6 +373,7 @@ export const MarkdownContent = memo(function MarkdownContent({ text, streaming =
     <div className={`answer-markdown${streaming ? ' answer-stream-text' : ''}`}>
       {blocks.map((block, index) => {
         if (block.kind === 'code') return <CodeBlock key={index} language={block.language} content={block.content} />;
+        if (block.kind === 'formula') return <div className="math-block" key={index} role="math" aria-label={block.content}>{block.content}</div>;
         if (block.kind === 'heading') {
           const Heading = `h${Math.min(block.level + 1, 4)}` as 'h2' | 'h3' | 'h4';
           return <Heading key={index}>{inlineMarkup(block.content)}</Heading>;

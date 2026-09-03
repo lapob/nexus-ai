@@ -57,6 +57,14 @@ function conversationalGuidance(question, history = []) {
     .filter((turn) => turn && ['user', 'assistant'].includes(turn.role) && String(turn.content || '').trim())
     .slice(-6);
   const signals = [];
+  const asksForDepth = /\b(?:approfond\w*|dettagliat\w*|complet\w*|esaustiv\w*|guida|passo\s+passo|elenca|confronta|analizza|spiega\s+bene)\b/iu.test(normalized);
+  const shortInformationalTurn = text.length > 0 && text.length <= 180
+    && !asksForDepth
+    && !/```|(?:^|\s)(?:[-*]|\d+[.)])\s+/mu.test(text)
+    && !/\b(?:crea|scrivi|modifica|elimina|installa|esegui|progetta|implementa|debug|correggi)\b/iu.test(normalized);
+  if (shortInformationalTurn) {
+    signals.push('È una richiesta informativa breve: dai subito la risposta più probabile in linguaggio naturale e fermati quando è soddisfatta. Punta a circa 100-220 parole; niente titoli, conclusione separata, emoji o liste salvo che una lista renda davvero più chiaro un confronto. Se il termine è ambiguo, chiarisci in una sola frase quale significato stai usando.');
+  }
   if (/^(?:ok|okay|va bene|s[iì]|vai|perfetto|d'accordo)(?:[,;:]?\s*(?:fallo|procedi|continua|applicalo))?[.!…\s]*$/iu.test(normalized)
     || /^(?:fallo|procedi|continua|applicalo)[.!…\s]*$/iu.test(normalized)) {
     signals.push('È una conferma breve: collegala all’ultima proposta concreta della conversazione, senza chiedere di ripetere il contesto. Non estendere però autorizzazioni oltre l’azione già proposta.');

@@ -25,6 +25,9 @@ function publicQuerySeed(question) {
     .replace(/^(?:e\s+)?(?:spiegami|dimmi|mostrami|indicami|tell\s+me|explain|show\s+me)\b\s*/iu, '')
     .replace(/^(?:in\s+una\s+sola\s+frase|in\s+breve|brevemente)\b\s*/iu, '')
     .replace(/^(?:che\s+cosa\s+significa|cosa\s+significa|che\s+cos['’]?è|cos['’]?è|qual\s+è|what\s+is|what\s+does)\b\s*/iu, '')
+    .replace(/[,;]\s*(?:e\s+)?(?:spiega(?:mi|le)?|riassumi|descrivi|mostra|indica)\b[\s\S]*$/iu, '')
+    .replace(/[,;]?\s*(?:e\s+)?cita\s+(?:la|le)?\s*font[ei]\b[\s\S]*$/iu, '')
+    .replace(/^(?:le?\s+)?(?:ultim[aei]|pi[uù]\s+recenti)\s+(?:informazioni|notizie|dati)(?:\s+stabili)?\s+(?:su|di)\s+/iu, '')
     .replace(/[,;]?\s*\b(?:citando\s+(?:la|le)\s+font[ei]|con\s+(?:una|le)\s+font[ei]|with\s+(?:a\s+)?citation)\b[\s\S]*$/iu, '')) || original;
 }
 

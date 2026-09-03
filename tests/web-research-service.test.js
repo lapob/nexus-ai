@@ -48,6 +48,23 @@ test('usa Brave soltanto lato server e non restituisce la credenziale', async ()
   assert.doesNotMatch(JSON.stringify(result), /server-secret/);
 });
 
+test('in modalita auto ripiega su Wikipedia se Brave non risponde', async () => {
+  const calls = [];
+  const service = new WebResearchService({
+    provider: 'auto',
+    braveApiKey: 'server-secret',
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (String(url).includes('api.search.brave.com')) return jsonResponse({}, 401);
+      return jsonResponse({ query: { search: [{ title: 'Node.js', snippet: 'Runtime JavaScript' }] } });
+    }
+  });
+  const result = await service.search('Node.js', { language: 'it' });
+  assert.equal(result.provider, 'wikipedia');
+  assert.equal(result.results[0].title, 'Node.js');
+  assert.equal(calls.length, 2);
+});
+
 test('rifiuta URL pubblici non HTTPS e risposte non JSON', async () => {
   assert.equal(safePublicUrl('http://127.0.0.1/private'), '');
   assert.equal(safePublicUrl('https://user:pass@example.com'), '');

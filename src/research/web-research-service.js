@@ -78,12 +78,12 @@ class WebResearchService {
       this.cache.delete(key);
       return null;
     }
-    return cached.results.map((item) => ({ ...item }));
+    return { provider: cached.provider, results: cached.results.map((item) => ({ ...item })) };
   }
 
-  writeCache(key, results) {
+  writeCache(key, results, provider = '') {
     if (this.cache.size >= 128) this.cache.delete(this.cache.keys().next().value);
-    this.cache.set(key, { expiresAt: this.now() + this.cacheTtlMs, results: results.map((item) => ({ ...item })) });
+    this.cache.set(key, { expiresAt: this.now() + this.cacheTtlMs, provider, results: results.map((item) => ({ ...item })) });
   }
 
   async requestJson(url, { headers = {}, signal } = {}) {
@@ -170,13 +170,26 @@ class WebResearchService {
     const boundedLimit = Math.max(1, Math.min(8, Number(limit) || 4));
     const key = this.cacheKey(provider, normalizedQuery, wikipediaLanguage(language), boundedLimit);
     const cached = this.readCache(key);
-    if (cached) return { provider, cached: true, results: cached };
-    const results = provider === 'brave'
-      ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal })
-      : await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
-    this.writeCache(key, results);
-    this.logger?.info?.('Ricerca web completata.', { provider, results: results.length });
-    return { provider, cached: false, results };
+    if (cached) return { provider: cached.provider || provider, cached: true, results: cached.results };
+    let completedProvider = provider;
+    let results;
+    try {
+      results = provider === 'brave'
+        ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal })
+        : await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
+    } catch (error) {
+      // In modalita auto una credenziale Brave scaduta o un guasto temporaneo
+      // non deve disattivare tutta la ricerca pubblica. Wikipedia resta un
+      // fallback dichiarato e senza credenziali; la modalita brave esplicita,
+      // invece, conserva l'errore per rendere visibile la configurazione errata.
+      if (this.provider !== 'auto' || provider !== 'brave' || signal?.aborted) throw error;
+      this.logger?.warn?.('Provider Brave non disponibile; uso il fallback Wikipedia.', { error });
+      completedProvider = 'wikipedia';
+      results = await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
+    }
+    this.writeCache(key, results, completedProvider);
+    this.logger?.info?.('Ricerca web completata.', { provider: completedProvider, results: results.length });
+    return { provider: completedProvider, cached: false, results };
   }
 }
 

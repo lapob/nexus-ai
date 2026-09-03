@@ -90,6 +90,9 @@ function responseRequirements(question = '') {
   }
   if (/\b(?:una|un')\s+(?:sola\s+)?frase\b|\bin one sentence\b/iu.test(text)) requirements.push('Usa una sola frase completa.');
   if (/```|\b(?:codice|javascript|typescript|python|java|c\+\+|sql|regex)\b/iu.test(text)) requirements.push('Verifica sintassi, risultato e casi limite del codice prima di presentarlo.');
+  if (/\b(?:equazione|formula|matemat|algebra|geometri|derivat|integral|probabilit|statistic)\w*\b|[=+−×÷√∑∫±≤≥]/iu.test(text)) {
+    requirements.push('Scrivi le formule con simboli matematici Unicode leggibili (×, ÷, ±, √, ≤, ≥) oppure con delimitatori LaTeX $...$ e $$...$$; non usare comandi LaTeX fuori dai delimitatori.');
+  }
   if (requiresClarification(text)) requirements.push('Non indovinare il riferimento ambiguo: chiedi una conferma breve e specifica.');
   if (/\b(?:rispondi|restituisci|scrivi)\s+(?:soltanto|solo|esclusivamente)\s+(?:con\s+)?(?:l['’])?output\b/iu.test(text)) requirements.push('Restituisci soltanto l’output richiesto, senza prefissi, spiegazioni o Markdown.');
   if (/\b(?:fonte|fonti|citazione|riferiment|documentazione|verifica sul web)\b/iu.test(text)) requirements.push('Distingui fatti verificati, inferenze e fonti; non inventare riferimenti.');

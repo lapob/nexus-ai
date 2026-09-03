@@ -5,7 +5,7 @@
 const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'qa-artifacts', 'web-visual-regression');
@@ -106,6 +106,18 @@ async function evaluateWhenReady(client, expression, timeoutMs = 20_000) {
   throw lastError || new Error('Contesto pagina non pronto.');
 }
 
+async function removeTemporaryPath(target, attempts = 15) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      fs.rmSync(target, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!['EBUSY', 'ENOTEMPTY', 'EPERM'].includes(error?.code) || attempt === attempts - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 160 + attempt * 80));
+    }
+  }
+}
+
 // #endregion
 // #region 02 - Cattura e criteri visivi
 
@@ -177,9 +189,14 @@ async function capture(entry) {
     if (child.exitCode === null) child.kill();
     await Promise.race([
       new Promise((resolve) => child.once('exit', resolve)),
-      new Promise((resolve) => setTimeout(resolve, 2_000))
+      new Promise((resolve) => setTimeout(resolve, 3_000))
     ]);
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
+    if (child.exitCode === null && process.platform === 'win32' && Number.isInteger(child.pid)) {
+      // Termina soltanto il browser headless creato da questo test e i suoi
+      // renderer: Chromium puo mantenere il profilo bloccato dopo Browser.close.
+      spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+    }
+    await removeTemporaryPath(profile);
   }
 }
 
@@ -231,7 +248,7 @@ async function main() {
     compare(results, JSON.parse(fs.readFileSync(baselinePath, 'utf8')));
     console.log('Regressione web superata.');
   } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
+    await removeTemporaryPath(temporaryRoot);
   }
 }
 
@@ -239,4 +256,4 @@ if (require.main === module) main().catch((error) => { console.error(error.messa
 
 // #endregion
 
-module.exports = { browserExecutable, Cdp, compare, evaluateWhenReady, freePort, validate, waitForTarget };
+module.exports = { browserExecutable, Cdp, compare, evaluateWhenReady, freePort, removeTemporaryPath, validate, waitForTarget };

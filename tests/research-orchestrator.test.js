@@ -29,6 +29,7 @@ test('mantiene query e lingua deterministiche', () => {
   assert.equal(publicQuerySeed('Modifica il progetto e poi cerca la versione corrente di Node'), 'la versione corrente di Node');
   assert.equal(publicQuerySeed('Cerca sul web e spiegami che cosa significa intelligenza artificiale, citando la fonte.'), 'intelligenza artificiale');
   assert.equal(publicQuerySeed('Cerca sul web e spiegami in una sola frase che cosa significa intelligenza artificiale, citando la fonte.'), 'intelligenza artificiale');
+  assert.equal(publicQuerySeed('Cerca sul web le ultime informazioni stabili su Node.js, spiegale in breve e cita le fonti.'), 'Node.js');
   assert.equal(researchLanguage('Qual è la versione attuale?'), 'it');
   assert.equal(researchLanguage('What is the current version?'), 'en');
 });

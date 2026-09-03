@@ -3437,6 +3437,35 @@ private fun streamSafeMarkdown(value: String): String {
     return safe
 }
 
+private fun readableMathNotation(value: String): String {
+    val symbols = mapOf(
+        "\\times" to "×", "\\cdot" to "·", "\\div" to "÷", "\\pm" to "±", "\\mp" to "∓",
+        "\\neq" to "≠", "\\leq" to "≤", "\\le" to "≤", "\\geq" to "≥", "\\ge" to "≥", "\\approx" to "≈",
+        "\\infty" to "∞", "\\sum" to "∑", "\\prod" to "∏", "\\int" to "∫", "\\partial" to "∂", "\\nabla" to "∇",
+        "\\alpha" to "α", "\\beta" to "β", "\\gamma" to "γ", "\\delta" to "δ", "\\theta" to "θ", "\\lambda" to "λ",
+        "\\mu" to "μ", "\\pi" to "π", "\\rho" to "ρ", "\\sigma" to "σ", "\\phi" to "φ", "\\omega" to "ω",
+        "\\Delta" to "Δ", "\\Omega" to "Ω", "\\rightarrow" to "→", "\\to" to "→", "\\leftarrow" to "←",
+        "\\in" to "∈", "\\notin" to "∉", "\\subset" to "⊂", "\\subseteq" to "⊆", "\\forall" to "∀", "\\exists" to "∃"
+    )
+    var result = value.trim()
+    repeat(4) {
+        result = Regex("\\\\frac\\s*\\{([^{}]+)}\\s*\\{([^{}]+)}").replace(result, "($1)/($2)")
+        result = Regex("\\\\sqrt\\s*\\{([^{}]+)}").replace(result, "√($1)")
+    }
+    symbols.entries.sortedByDescending { it.key.length }.forEach { (source, symbol) -> result = result.replace(source, symbol) }
+    return result
+        .replace(Regex("\\\\(?:left|right|mathrm|text|operatorname)\\b"), "")
+        .replace(Regex("[{}]"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
+
+private fun normalizeInlineMath(value: String): String = Regex("\\x24([^\\x24\\n]+)\\x24|\\\\\\(([^\\n]+?)\\\\\\)")
+    .replace(value) { match -> readableMathNotation(match.groups[1]?.value ?: match.groups[2]?.value.orEmpty()) }
+
+private fun normalizeMathBlocks(value: String): String = Regex("(?s)\\x24\\x24(.+?)\\x24\\x24|\\\\\\[(.+?)\\\\\\]")
+    .replace(value) { match -> "\n§NEXUS_MATH§${readableMathNotation(match.groups[1]?.value ?: match.groups[2]?.value.orEmpty())}\n" }
+
 @Composable private fun ResponseContextHeader(value: String, streaming: Boolean, reduceMotion: Boolean = false) {
     if (value.isBlank()) return
     val kind = remember(value) { responsePresentationKind(value) }
@@ -3810,8 +3839,11 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 Surface(color = Color(0xFF0B1217), shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF9CB5FF).copy(alpha = .14f)), modifier = Modifier.fillMaxWidth()) {
                     Column { Row(Modifier.fillMaxWidth().background(Color(0xFF141D25)).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text(raw.lineSequence().firstOrNull()?.takeIf { !it.contains(' ') }.orEmpty().ifBlank { nexusCopy("codice", "code") }.uppercase(), color = Color(0xFF8298B2), fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); IconButton({ context.copyToClipboard(code) }, Modifier.size(32.dp)) { Icon(Icons.Rounded.ContentCopy, nexusCopy("Copia codice", "Copy code"), tint = Color(0xFFA8B8C8), modifier = Modifier.size(15.dp)) } }; HighlightedCodeText(code, Modifier.padding(13.dp)) }
                 }
-            } else raw.lines().forEach { line ->
+            } else normalizeMathBlocks(raw).lines().forEach { line ->
                 when {
+                    line.startsWith("§NEXUS_MATH§") -> Surface(color = Color(0xFF071415), shape = RoundedCornerShape(15.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .14f)), modifier = Modifier.fillMaxWidth()) {
+                        Text(line.removePrefix("§NEXUS_MATH§"), color = Color(0xFFE7FEFF), fontFamily = FontFamily.Serif, fontSize = 17.sp, lineHeight = 27.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp))
+                    }
                     line.startsWith("### ") -> InlineMarkdownText(line.removePrefix("### "), MaterialTheme.typography.titleMedium, Ice, if (line == lastContentLine) streamingTailChars else 0, tailColor)
                     line.startsWith("## ") -> InlineMarkdownText(line.removePrefix("## "), MaterialTheme.typography.titleLarge, Ice, if (line == lastContentLine) streamingTailChars else 0, tailColor)
                     line.startsWith("# ") -> InlineMarkdownText(line.removePrefix("# "), MaterialTheme.typography.headlineMedium, Ice, if (line == lastContentLine) streamingTailChars else 0, tailColor)
@@ -3864,11 +3896,12 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
 }
 
 @Composable private fun InlineMarkdownText(value: String, style: TextStyle, color: Color, accentTailChars: Int = 0, accentColor: Color = color, modifier: Modifier = Modifier) {
-    val annotated = remember(value, color, accentTailChars, accentColor) {
+    val displayValue = remember(value) { normalizeInlineMath(value) }
+    val annotated = remember(displayValue, color, accentTailChars, accentColor) {
         buildAnnotatedString {
             var cursor = 0
-            Regex("(\\*\\*[^*]+\\*\\*|`[^`]+`|\\*[^*\\n]+\\*|\\[[^]]+]\\(https://[^)\\s]+\\))").findAll(value).forEach { match ->
-                append(value.substring(cursor, match.range.first))
+            Regex("(\\*\\*[^*]+\\*\\*|`[^`]+`|\\*[^*\\n]+\\*|\\[[^]]+]\\(https://[^)\\s]+\\))").findAll(displayValue).forEach { match ->
+                append(displayValue.substring(cursor, match.range.first))
                 val raw = match.value
                 if (raw.startsWith("**")) {
                     pushStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = color)); append(raw.removeSurrounding("**")); pop()
@@ -3883,7 +3916,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 }
                 cursor = match.range.last + 1
             }
-            append(value.substring(cursor))
+            append(displayValue.substring(cursor))
             if (accentTailChars > 0 && length > 0) addStyle(SpanStyle(color = accentColor), (length - accentTailChars).coerceAtLeast(0), length)
         }
     }

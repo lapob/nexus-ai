@@ -387,6 +387,10 @@ test('le richieste complesse mostrano fasi comprensibili senza nomi tecnici dei 
   assert.doesNotMatch(taskPanel, /qwen|ollama|token|runtime/i);
 });
 
+test('anche il client pubblico riceve la guida conversazionale compatta', () => {
+  assert.match(registerIpc, /\{ role: 'system', content: conversationalGuidance\(question, history\) \}/);
+});
+
 test('le fasi desktop seguono eventi reali del backend senza esporre il ragionamento interno', () => {
   const registration = fs.readFileSync(path.join(root, 'src/application/register-ipc.js'), 'utf8');
   assert.match(registration, /type: 'phase'/);

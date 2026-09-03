@@ -6,7 +6,7 @@
 // #region 01 — Rilevamento conservativo
 
 const LANGUAGE_PROFILES = Object.freeze([
-  { id: 'italiano', pattern: /\b(?:il|lo|la|gli|una|del|della|che|come|cosa|per|con|non|puoi|vorrei|devo|sono|hai|apri|sistema|spiega|perché|più|così|già)\b/g, orthography: /[àèéìòù]/, strong: /^(?:ciao|salve|buongiorno|buonasera|grazie)(?:\s|[!?.]|$)/u },
+  { id: 'italiano', pattern: /\b(?:il|lo|la|le|gli|un|una|del|della|delle|che|come|cosa|per|con|non|puoi|vorrei|devo|sono|hai|apri|sistema|cerca|ultim[oei]|informazioni|spiega(?:mi|le)?|breve|cita|fonti|perché|più|così|già)\b/g, orthography: /[àèéìòù]/, strong: /^(?:ciao|salve|buongiorno|buonasera|grazie)(?:\s|[!?.]|$)/u },
   { id: 'inglese', pattern: /\b(?:the|an|of|to|and|is|are|what|how|why|can|could|please|explain|open|fix|with|should)\b/g, strong: /^(?:hello|hi|hey|thanks|thank you)(?:\s|[!?.]|$)/u },
   { id: 'spagnolo', pattern: /\b(?:el|los|las|una|del|que|cómo|por|para|con|puedes|quiero|debo|explica|abre|corrige|seguridad)\b/g, orthography: /[¿¡ñ]|[áéíóú]/, strong: /^(?:hola|gracias|buenos días|buenas tardes|buenas noches)(?:\s|[!?.]|$)/u },
   { id: 'francese', pattern: /\b(?:le|les|une|des|que|comment|pourquoi|avec|peux|voudrais|dois|explique|ouvre|corrige|sécurité)\b/g, orthography: /[çœ]|[àâæéèêëîïôùûüÿ]/, strong: /^(?:bonjour|bonsoir|salut|merci)(?:\s|[!?.]|$)/u },
