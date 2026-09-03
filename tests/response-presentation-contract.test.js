@@ -74,6 +74,8 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /contains\('conversation-active'\)\)\{const collapsed=document\.body\.classList\.toggle\('composer-collapsed'\)/);
   assert.match(html, /\.conversation-active:not\(\.request-active\) \.dock/);
   assert.match(html, /\.conversation-active\.composer-collapsed:not\(\.request-active\) \.dock/);
+  assert.match(html, /grid-template-columns:58px 58px 0fr 0/);
+  assert.match(html, /transition:grid-template-columns \.28s cubic-bezier\(\.22,1,\.36,1\)/);
   assert.match(html, /function dismissIdleKeyboard\(\)/);
   assert.match(html, /event\.key==='Escape'/);
   assert.match(html, /event\.target\.closest\?\.\('\.dock,dialog'\)/);

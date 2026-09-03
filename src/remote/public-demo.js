@@ -41,8 +41,13 @@ body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-a
 body:not(.request-active):not(.conversation-active) .privacy{position:fixed;z-index:29;top:auto;right:18px;bottom:max(14px,env(safe-area-inset-bottom));left:18px;margin:0 auto}
 .conversation-active:not(.request-active) .dock,.request-active .dock{top:auto;bottom:calc(var(--nxs-privacy-height) + max(10px,env(safe-area-inset-bottom)));transform:none;width:min(720px,calc(100% - 36px));padding:16px 0 8px;background:linear-gradient(transparent,rgba(2,6,7,.96) 30%)}
 .conversation-active.composer-collapsed:not(.request-active) .dock{width:min(148px,calc(100% - 28px));background:none}
-.conversation-active.composer-collapsed:not(.request-active) .composer{grid-template-columns:58px 58px;justify-content:center;gap:12px}
-.conversation-active.composer-collapsed:not(.request-active) .composer-box,.conversation-active.composer-collapsed:not(.request-active) .send{display:none}
+.composer{transition:grid-template-columns .28s cubic-bezier(.22,1,.36,1),gap .28s cubic-bezier(.22,1,.36,1)}
+.composer-box,.send{transition:opacity .2s ease,transform .24s cubic-bezier(.22,1,.36,1),width .28s cubic-bezier(.22,1,.36,1),padding .28s cubic-bezier(.22,1,.36,1),border-color .18s ease,background .18s ease,box-shadow .18s ease}
+.conversation-active.composer-collapsed:not(.request-active) .composer{grid-template-columns:58px 58px 0fr 0;justify-content:center;gap:10px}
+.conversation-active.composer-collapsed:not(.request-active) .composer-box{display:block;min-width:0;width:0;padding-inline:0;border-color:transparent;overflow:hidden;opacity:0;pointer-events:none;transform:translateY(8px) scale(.96)}
+.conversation-active.composer-collapsed:not(.request-active) .send{display:grid;width:0;margin:0;border-color:transparent;overflow:hidden;opacity:0;pointer-events:none;transform:translateY(8px) scale(.96)}
+.attachment-tray{transition:max-height .28s cubic-bezier(.22,1,.36,1),margin .28s cubic-bezier(.22,1,.36,1),opacity .2s ease,transform .28s cubic-bezier(.22,1,.36,1)}
+.conversation-active.composer-collapsed:not(.request-active) .attachment-tray{max-height:0;margin-top:0;margin-bottom:0;opacity:0;pointer-events:none;transform:translateY(8px)}
 .conversation-active .stage{align-content:start;padding-top:clamp(68px,10vh,110px)}
 .conversation-active .core,.conversation-active .copy{opacity:0;max-height:0;margin:0;overflow:hidden;pointer-events:none;transform:scale(.82)}
 .conversation-active .exchange{margin-top:0}
