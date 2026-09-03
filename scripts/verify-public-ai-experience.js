@@ -49,9 +49,11 @@ async function exercise(client, { stop = false } = {}) {
     prompt.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: prompt.value }));
     const startedAt = performance.now();
     const initialY = scrollY;
-    const dockInset = innerHeight - dock.getBoundingClientRect().bottom;
+    let idleDockCenter = null;
     let maxY = initialY;
     let dockDrift = 0;
+    let activeDockInset = null;
+    let finishedAt = 0;
     let stopped = false;
     const frames = [];
     let previousFrame = performance.now();
@@ -65,7 +67,12 @@ async function exercise(client, { stop = false } = {}) {
     raf = requestAnimationFrame(frame);
     const sample = setInterval(() => {
       maxY = Math.max(maxY, scrollY);
-      dockDrift = Math.max(dockDrift, Math.abs((innerHeight - dock.getBoundingClientRect().bottom) - dockInset));
+      const requestActive = document.body.classList.contains('request-active');
+      const currentDockInset = innerHeight - dock.getBoundingClientRect().bottom;
+      if (requestActive && performance.now() - startedAt >= 650) {
+        if (activeDockInset === null) activeDockInset = currentDockInset;
+        else dockDrift = Math.max(dockDrift, Math.abs(currentDockInset - activeDockInset));
+      }
       if (${stop ? 'true' : 'false'} && !stopped && answer.textContent.trim().length >= 140 && send.dataset.mode === 'stop') {
         stopped = true;
         send.click();
@@ -74,15 +81,22 @@ async function exercise(client, { stop = false } = {}) {
       const stoppedCleanly = stopped && /interrotta/i.test(phase.textContent);
       const completedCleanly = !${stop ? 'true' : 'false'} && !actions.hidden && /pronta/i.test(phase.textContent);
       if (finished && (stoppedCleanly || completedCleanly)) {
+        if (!finishedAt) finishedAt = performance.now();
+        if (performance.now() - finishedAt < 360) return;
         clearInterval(sample);
         cancelAnimationFrame(raf);
         const sorted = frames.filter(Number.isFinite).sort((a, b) => a - b);
         const p95 = sorted[Math.floor(sorted.length * 0.95)] || 0;
+        const finalDockRect = dock.getBoundingClientRect();
         resolve({
           stopped,
           initialY,
           maxY,
           dockDrift,
+          idleDockCenter,
+          finalDockCenter: finalDockRect.top + finalDockRect.height / 2,
+          bodyClass: document.body.className,
+          returnedToCenter: Number.isFinite(idleDockCenter) && Math.abs((finalDockRect.top + finalDockRect.height / 2) - idleDockCenter) <= 2,
           finalBottomGap: document.documentElement.scrollHeight - innerHeight - scrollY,
           answerLength: answer.textContent.trim().length,
           elapsedMs: Math.round(performance.now() - startedAt),
@@ -104,8 +118,35 @@ async function exercise(client, { stop = false } = {}) {
         online: navigator.onLine
       })));
     }, ${stop ? '45_000' : '90_000'});
-    setTimeout(() => send.click(), 80);
+    setTimeout(() => { const rect = dock.getBoundingClientRect(); idleDockCenter = rect.top + rect.height / 2; }, 360);
+    setTimeout(() => send.click(), 420);
   })`, stop ? 50_000 : 95_000);
+}
+
+async function verifySessionContinuity(client) {
+  return evaluateWhenReady(client, `new Promise((resolve, reject) => {
+    const prompt = document.querySelector('#prompt');
+    const send = document.querySelector('#send');
+    const history = document.querySelector('#sessionHistory');
+    const answer = document.querySelector('#answer');
+    if (!prompt || !send || !history || !answer) return reject(new Error('Continuità di sessione non disponibile'));
+    prompt.value = 'Riassumi la risposta precedente in una sola frase.';
+    prompt.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: prompt.value }));
+    send.click();
+    let stopped = false;
+    const timer = setInterval(() => {
+      const entries = history.querySelectorAll('.session-turn').length;
+      if (!stopped && answer.textContent.trim().length >= 80 && send.dataset.mode === 'stop') {
+        stopped = true;
+        send.click();
+      }
+      if (entries >= 2 && answer.textContent.trim() && !answer.classList.contains('streaming') && !document.body.classList.contains('request-active')) {
+        clearInterval(timer);
+        resolve({ entries, returnedToCenter: document.body.classList.contains('keyboard-open') });
+      }
+    }, 60);
+    setTimeout(() => { clearInterval(timer); reject(new Error('Continuità di sessione non verificata: '+JSON.stringify({ entries: history.querySelectorAll('.session-turn').length, answerLength: answer.textContent.trim().length, mode: send.dataset.mode, bodyClass: document.body.className }))); }, 45_000);
+  })`, 50_000);
 }
 
 function assertExperience(result, { stop = false, label }) {
@@ -116,6 +157,7 @@ function assertExperience(result, { stop = false, label }) {
     throw new Error(`${label}: risposta lunga troppo breve (${result.answerLength} caratteri).`);
   }
   if (result.dockDrift > 2) throw new Error(`${label}: dock instabile di ${result.dockDrift.toFixed(1)}px.`);
+  if (!result.returnedToCenter) throw new Error(`${label}: il composer non è tornato al centro dopo la risposta (${JSON.stringify({ idle: result.idleDockCenter, final: result.finalDockCenter, bodyClass: result.bodyClass })}).`);
   if (result.longFrameRatio > 0.2) throw new Error(`${label}: troppi frame oltre 40ms (${(result.longFrameRatio * 100).toFixed(1)}%).`);
   if (!stop) {
     for (const action of ['copyResponse', 'deepenResponse', 'exportResponse', 'feedbackAction']) {
@@ -141,6 +183,10 @@ async function main() {
     await viewport(client, 1180, 860, false);
     const desktop = await exercise(client);
     assertExperience(desktop, { label: 'Desktop' });
+    const continuity = await verifySessionContinuity(client);
+    if (continuity.entries < 2 || !continuity.returnedToCenter) {
+      throw new Error('Desktop: i turni della sessione o il ritorno del composer non sono coerenti.');
+    }
 
     await viewport(client, 390, 844, true);
     const mobile = await exercise(client, { stop: true });
@@ -157,7 +203,7 @@ async function main() {
     })`, 10_000);
     if (forgotten.answer || forgotten.prompt) throw new Error('La sessione web è sopravvissuta alla riapertura della pagina.');
 
-    console.log(`Web AI verificata: desktop ${desktop.answerLength} caratteri/${desktop.elapsedMs}ms, p95 ${desktop.frameP95}ms; mobile stop ${mobile.answerLength} caratteri, p95 ${mobile.frameP95}ms; dock stabile e memoria temporanea.`);
+    console.log(`Web AI verificata: desktop ${desktop.answerLength} caratteri/${desktop.elapsedMs}ms, p95 ${desktop.frameP95}ms; continuità ${continuity.entries} turni; mobile stop ${mobile.answerLength} caratteri, p95 ${mobile.frameP95}ms; dock stabile e memoria temporanea.`);
   } finally {
     try { await client?.command('Browser.close'); } catch {}
     client?.close();

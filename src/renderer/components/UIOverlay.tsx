@@ -31,6 +31,7 @@ interface UIOverlayProps {
   onTogglePrivacy: () => void;
   onToggleVoice: () => void;
   onOpenCommand: () => void;
+  onOpenSettings: () => void;
   shortcuts: InterfacePreferences['shortcuts'];
 }
 
@@ -38,7 +39,7 @@ interface UIOverlayProps {
 
 // #region 02 — Superfici contestuali
 
-export function UIOverlay({ state, steps, logs, transcript, voiceNotice, voiceEnabled, audioLevel, generating, bargeInListening, queuedVoicePrompt, runtimePreparing, fatalError, onToggleVoiceAccess, privacyMode, onTogglePrivacy, onToggleVoice, onOpenCommand, shortcuts }: UIOverlayProps) {
+export function UIOverlay({ state, steps, logs, transcript, voiceNotice, voiceEnabled, audioLevel, generating, bargeInListening, queuedVoicePrompt, runtimePreparing, fatalError, onToggleVoiceAccess, privacyMode, onTogglePrivacy, onToggleVoice, onOpenCommand, onOpenSettings, shortcuts }: UIOverlayProps) {
   // Il registro è contestuale: emerge durante attività e anomalie, poi lascia
   // nuovamente il centro della scena al NexusNXS Core.
   const revealLogs = ['executing', 'permission', 'offline', 'error'].includes(state);
@@ -122,6 +123,7 @@ export function UIOverlay({ state, steps, logs, transcript, voiceNotice, voiceEn
       <div className="interaction-hint">
         <button type="button" className="shortcut-item" onClick={onToggleVoice}><kbd>{shortcutLabel(shortcuts.voice)}</kbd><small>PARLA</small></button>
         <button type="button" className="shortcut-item" onClick={onOpenCommand}><kbd>{shortcutLabel(shortcuts.composer)}</kbd><small>SCRIVI</small></button>
+        <button type="button" className="shortcut-item" onClick={onOpenSettings}><kbd>{shortcutLabel(shortcuts.settings)}</kbd><small>IMPOSTAZIONI</small></button>
       </div>
       <div className="sr-only" aria-label="Capacità disponibili a voce">
         Puoi chiedere a NexusNXS di mostrare cronologia, modelli, impostazioni, privacy o collegamento del telefono.

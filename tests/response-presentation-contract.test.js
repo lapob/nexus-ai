@@ -29,7 +29,7 @@ test('desktop rende Markdown semantico anche durante lo streaming', () => {
 
 test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () => {
   const { enhancePublicAiHtml } = require('../src/remote/public-demo');
-  const base = '<!doctype html><html><head></head><body><p id="answer" class="answer"></p><script>legacy()</script></body></html>';
+  const base = '<!doctype html><html><head></head><body><div class="exchange" aria-live="polite"><p id="userPrompt" class="prompt-copy"></p><p id="answer" class="answer"></p></div><p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p><script>legacy()</script></body></html>';
   const html = enhancePublicAiHtml({ base, coreStyle: '', coreScript: '' });
   assert.match(html, /id="answerContext"/);
   assert.match(html, /class="web-answer-context"/);
@@ -56,9 +56,17 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /data-mode=stop/);
   assert.match(html, /function stopGeneration\(\)/);
   assert.match(html, /\/api\/guest\/messages\/cancel/);
+  assert.match(html, /setPhase\('Risposta interrotta'\)/);
   assert.match(html, /Riprendo la risposta/);
   assert.match(html, /verified!==rawAnswer/);
   assert.match(html, /async function memoryRead\(\)\{return\[\]/);
+  assert.match(html, /id="sessionHistory"/);
+  assert.match(html, /function renderSessionHistory\(\)/);
+  assert.match(html, /classList\.add\('request-active','keyboard-open'\)/);
+  assert.match(html, /finally\{busy=false;setSendMode\(false\);leaveRequestLayout\(\)\}/);
+  assert.match(html, /visualViewport/);
+  assert.match(html, /language:spokenLanguage\(text\)/);
+  assert.match(html, /NexusNXS può commettere errori/);
   assert.doesNotMatch(html, /answer\.textContent\+=pendingAnswer/);
   for (const [index, match] of [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].entries()) {
     assert.doesNotThrow(() => new vm.Script(match[1]), `script Web generato ${index + 1}`);
@@ -81,6 +89,9 @@ test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
   assert.match(activity, /val superscripts/);
   assert.match(activity, /§NEXUS_MATH§/);
   assert.match(activity, /fontFamily = FontFamily\.Serif/);
+  assert.match(activity, /private fun spokenLocale\(/);
+  assert.match(activity, /val language = spokenLocale\(text/);
+  assert.match(activity, /textToSpeech\?\.language = spokenLocale\(text/);
 });
 
 test('il prompt impedisce marcatori incompleti e abilita blocchi semantici', () => {

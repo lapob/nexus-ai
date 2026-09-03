@@ -234,6 +234,23 @@ function speechLocale(language: string): string {
   return navigator.language || 'en-US';
 }
 
+function spokenTextLocale(text: string, fallback: string): string {
+  const sample = ` ${String(text || '').toLocaleLowerCase()} `;
+  const candidates: Array<[string, RegExp]> = [
+    ['it-IT', /\b(?:che|chi|come|cosa|questo|questa|sono|puoi|deve|della|degli|perché|anche|risposta|ecco)\b|[àèéìòù]/g],
+    ['es-ES', /\b(?:que|cómo|qué|esto|esta|puedes|debe|para|porque|respuesta|también)\b|[áéíóúñ¿¡]/g],
+    ['fr-FR', /\b(?:que|comment|quoi|ceci|cette|vous|peut|pour|parce|réponse|aussi)\b|[àâçéèêëîïôûùüÿœ]/g],
+    ['de-DE', /\b(?:und|der|die|das|wie|was|diese|kann|für|weil|antwort|auch)\b|[äöüß]/g],
+    ['en-US', /\b(?:the|and|how|what|this|that|you|can|should|because|answer|also)\b/g]
+  ];
+  let best = { locale: speechLocale(fallback), score: 0 };
+  for (const [locale, pattern] of candidates) {
+    const score = (sample.match(pattern) || []).length;
+    if (score > best.score) best = { locale, score };
+  }
+  return best.score >= 2 ? best.locale : speechLocale(fallback);
+}
+
 function initialVoiceEnabled(): boolean {
   // Ogni avvio parte pronto alla voce. La pausa con V vale soltanto per la
   // sessione corrente e non deve sorprendere l'utente al riavvio successivo.
@@ -481,7 +498,8 @@ export function useNexusController() {
     // Sul livello hardware minimo la voce di sistema evita di caricare un
     // secondo runtime neurale mentre il modello linguistico usa la RAM. Sugli
     // altri livelli la voce naturale resta automatica e mantiene il fallback.
-    const outputLocale = speechLocale(activeSpeechLanguage.current);
+    const outputLocale = spokenTextLocale(clean, activeSpeechLanguage.current);
+    activeSpeechLanguage.current = outputLocale;
     const outputLanguage = outputLocale.split('-')[0];
     const voiceEngine = interfacePreferencesRef.current.voiceEngine === 'system'
       ? 'neural'

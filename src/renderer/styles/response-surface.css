@@ -21,8 +21,6 @@
   background: transparent;
   filter: drop-shadow(0 0.9rem 1.8rem rgba(0, 0, 0, 0.76));
   backdrop-filter: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.2rem, #000 calc(100% - 1.2rem), transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 1.2rem, #000 calc(100% - 1.2rem), transparent);
   transition:
     width 220ms cubic-bezier(.22, 1, .36, 1),
     max-height 220ms cubic-bezier(.22, 1, .36, 1),
@@ -88,8 +86,6 @@
   bottom: clamp(4rem, 8vh, 6rem);
   width: min(64rem, calc(100vw - 6rem));
   max-height: calc(100vh - clamp(4.5rem, 11vh, 8rem) - clamp(4rem, 8vh, 6rem));
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 2.2rem, #000 calc(100% - 2.2rem), transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 2.2rem, #000 calc(100% - 2.2rem), transparent);
 }
 
 .answer-surface[data-size="expanded"]::before {
@@ -111,6 +107,8 @@
 
 .answer-surface[data-size="expanded"] .answer-scroll {
   padding: clamp(1.5rem, 4vh, 3rem) clamp(1rem, 4vw, 3rem);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 0.58rem, #000 calc(100% - 0.58rem), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 0.58rem, #000 calc(100% - 0.58rem), transparent);
   transition: opacity 220ms ease;
 }
 
@@ -618,7 +616,7 @@
   gap: 0.15rem;
   padding: 0 1rem 0.7rem;
   justify-content: center;
-  opacity: 0.2;
+  opacity: 0.62;
   transform: translateY(0.22rem);
   transition: opacity 180ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
 }
@@ -650,7 +648,7 @@
   border-radius: 0.58rem;
   padding: 0.42rem 0.68rem;
   background: transparent;
-  color: rgba(170, 207, 209, 0.42);
+  color: rgba(188, 219, 220, 0.66);
   font-size: 0.68rem;
   cursor: pointer;
 }

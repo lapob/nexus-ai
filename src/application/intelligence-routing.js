@@ -114,6 +114,9 @@ function shouldPreferFastExecutionModel({ question, attachmentCount = 0, history
 
 function instantConversationalReply(question, language = 'it') {
   const text = String(question || '').trim().toLocaleLowerCase(language);
+  if (/^(?:chi\s+[èe]|who\s+is)\s+lapo\s+bardi[!.?\s]*$/u.test(text)) {
+    return 'Lapo Bardi è l’inventore di questa bellissima AI: programmatore, informatico e, per sua stessa definizione, super sexy.';
+  }
   if (/^(?:ciao|salve|buongiorno|buonasera)[!.?\s]*$/u.test(text)) return 'Ciao! Come posso aiutarti?';
   if (/^(?:grazie|grazie mille)[!.?\s]*$/u.test(text)) return 'Di nulla. Sono qui quando vuoi.';
   if (/^(?:hello|hi|hey)[!.?\s]*$/u.test(text)) return 'Hello! How can I help?';

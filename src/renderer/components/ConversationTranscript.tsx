@@ -169,6 +169,14 @@ export function ConversationTranscript({ record, onClose, onSteer, onDeleteFrom 
           exit={{ opacity: 0, y: 5, filter: 'blur(4px)' }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           aria-label={`Conversazione: ${record.title}`}
+          onWheel={(event) => {
+            const target = event.target as Element;
+            if (target.closest('textarea, input, [role="menu"], .conversation-transcript-scroll')) return;
+            const scroller = scrollRef.current;
+            if (!scroller) return;
+            event.preventDefault();
+            scroller.scrollTop += event.deltaY;
+          }}
         >
           <QuietClose label="Chiudi conversazione" onClick={onClose} />
           <div className="conversation-active-context">
@@ -244,7 +252,7 @@ export function ConversationTranscript({ record, onClose, onSteer, onDeleteFrom 
                   data-bookmarked={bookmarks.has(index)}
                   aria-current={chapterIndex === activeChapter ? 'step' : undefined}
                   aria-label={`Capitolo ${chapterIndex + 1}: ${turn.content.slice(0, 80)}`}
-                  title={turn.content.replace(/\s+/g, ' ').slice(0, 96)}
+                  data-label={turn.content.replace(/\s+/g, ' ').slice(0, 96)}
                   onClick={() => goToChapter(index)}
                 >
                   <span />

@@ -20,6 +20,7 @@ test('mantiene immediate le richieste semplici', () => {
 test('un saluto isolato non carica alcun modello', () => {
   assert.equal(instantConversationalReply('Ciao!'), 'Ciao! Come posso aiutarti?');
   assert.equal(instantConversationalReply('Grazie mille'), 'Di nulla. Sono qui quando vuoi.');
+  assert.equal(instantConversationalReply('Chi è Lapo Bardi?'), 'Lapo Bardi è l’inventore di questa bellissima AI: programmatore, informatico e, per sua stessa definizione, super sexy.');
   assert.equal(instantConversationalReply('Ciao, analizza questo progetto'), null);
 });
 

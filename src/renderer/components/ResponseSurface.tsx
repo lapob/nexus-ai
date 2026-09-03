@@ -439,7 +439,7 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
     };
   }, [actionsOpen]);
   const visible = Boolean(response || error);
-  const substantial = response.length > 260 || response.includes('```') || response.split('\n').length > 7;
+  const expanded = visible;
   const kind = useMemo(() => responseKind(response), [response]);
   const kindLabel = { answer: 'Risposta', plan: 'Percorso', research: 'Ricerca', code: 'Codice' }[kind];
   useEffect(() => {
@@ -459,17 +459,17 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
         followFrame.current = null;
       }
     };
-  }, [active, response, substantial]);
+  }, [active, response, expanded]);
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.article
           className="answer-surface"
-          data-size={substantial ? 'expanded' : 'compact'}
+          data-size="expanded"
           data-streaming={active}
           data-reveal="ready"
-          initial={{ opacity: 0, y: substantial ? 10 : 7 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 5 }}
           transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}

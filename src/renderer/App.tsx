@@ -151,7 +151,7 @@ export function App() {
       data-core={nexus.interfacePreferences.coreAppearance}
       data-density={density}
       data-window-active={windowActive}
-      data-focus={nexus.response.length > 260 || nexus.response.includes('```') || nexus.response.split('\n').length > 7}
+      data-focus={Boolean(nexus.response)}
       data-command-open={nexus.commandOpen}
       data-generating={nexus.generating}
       data-barge-in={nexus.bargeInListening || Boolean(nexus.queuedVoicePrompt)}
@@ -208,6 +208,12 @@ export function App() {
           nexus.setModelSwitcherOpen(false);
           nexus.setSettingsOpen(false);
           nexus.setCommandOpen(true);
+        }}
+        onOpenSettings={() => {
+          nexus.setCommandOpen(false);
+          nexus.setHistoryOpen(false);
+          nexus.setModelSwitcherOpen(false);
+          nexus.setSettingsOpen(true);
         }}
       />
 

@@ -61,13 +61,13 @@ test('il movimento ridotto governa anche le animazioni Framer Motion', () => {
   assert.doesNotMatch(appCss, /\.companion-surface/);
 });
 
-test('la superficie quotidiana espone soltanto voce e scrittura, mentre le capacità restano richiamabili', () => {
+test('la superficie quotidiana espone voce, scrittura e la scorciatoia impostazioni richiesta', () => {
   const overlay = fs.readFileSync(require.resolve('../src/renderer/components/UIOverlay.tsx'), 'utf8');
   const switcher = fs.readFileSync(require.resolve('../src/renderer/components/ModelSwitcher.tsx'), 'utf8');
   assert.match(overlay, /<small>PARLA<\/small>/);
   assert.match(overlay, /<small>SCRIVI<\/small>/);
   assert.doesNotMatch(overlay, /<small>MODELLI<\/small>/);
-  assert.doesNotMatch(overlay, /<small>IMPOSTAZIONI<\/small>/);
+  assert.match(overlay, /<small>IMPOSTAZIONI<\/small>/);
   assert.match(overlay, /Capacità disponibili a voce/);
   assert.doesNotMatch(overlay, /<small>risposta<\/small>/);
   assert.match(switcher, />Modelli<\/h2>/);

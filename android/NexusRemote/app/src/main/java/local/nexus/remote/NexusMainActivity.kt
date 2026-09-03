@@ -185,6 +185,19 @@ private fun nexusCopy(italian: String, english: String): String =
 private fun Context.nexusCopy(italian: String, english: String): String =
     if (resources.configuration.locales[0].language == Locale.ITALIAN.language) italian else english
 
+private fun spokenLocale(text: String, fallback: Locale): Locale {
+    val sample = " ${text.lowercase(Locale.ROOT)} "
+    val candidates = listOf(
+        Locale.ITALIAN to Regex("\\b(che|chi|come|cosa|questo|questa|sono|puoi|deve|della|perché|anche|risposta|ecco)\\b|[àèéìòù]"),
+        Locale("es", "ES") to Regex("\\b(que|cómo|qué|esto|esta|puedes|para|porque|respuesta|también)\\b|[áéíóúñ¿¡]"),
+        Locale.FRENCH to Regex("\\b(que|comment|quoi|ceci|vous|pour|parce|réponse|aussi)\\b|[àâçéèêëîïôûùüÿœ]"),
+        Locale.GERMAN to Regex("\\b(und|der|die|das|wie|was|kann|für|weil|antwort|auch)\\b|[äöüß]"),
+        Locale.ENGLISH to Regex("\\b(the|and|how|what|this|that|you|can|because|answer|also)\\b")
+    )
+    val best = candidates.map { (locale, pattern) -> locale to pattern.findAll(sample).count() }.maxByOrNull { it.second }
+    return if (best != null && best.second >= 2) best.first else fallback
+}
+
 /** Traduce le fasi pubbliche del Core senza affidare al modello la lingua UI. */
 private fun Context.localizedServerActivity(raw: String): String {
     val text = raw.trim()
@@ -1601,7 +1614,7 @@ class NexusMainActivity : ComponentActivity() {
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.setRequestProperty("Accept", "audio/wav")
                 connection.setRequestProperty("Authorization", "Bearer $token")
-                val language = resources.configuration.locales[0].toLanguageTag().ifBlank { "it" }
+                val language = spokenLocale(text, resources.configuration.locales[0]).toLanguageTag().ifBlank { "it" }
                 val payload = JSONObject().put("text", text.take(4_000)).put("language", language).put("gender", "male")
                 connection.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
                 if (connection.responseCode !in 200..299) throw IllegalStateException("Voce server non disponibile")
@@ -1643,6 +1656,7 @@ class NexusMainActivity : ComponentActivity() {
     }
 
     private fun speakWithDeviceVoice(text: String) {
+        textToSpeech?.language = spokenLocale(text, resources.configuration.locales[0])
         textToSpeech?.speak(text.take(12_000), TextToSpeech.QUEUE_FLUSH, Bundle(), "nexus-${System.currentTimeMillis()}")
     }
 
