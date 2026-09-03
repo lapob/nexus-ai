@@ -8,11 +8,15 @@ import { basename, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const repository = process.env.NEXUS_GITHUB_REPOSITORY || 'lapob/nexus-ai';
-const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || 'v0.3.6-preview.1';
 const root = resolve(import.meta.dirname, '..');
+const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
+const androidGradle = await readFile(resolve(root, 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
+const androidVersion = androidGradle.match(/versionName\s*(?:=\s*)?["']([^"']+)["']/)?.[1];
+if (!androidVersion) throw new Error('Versione Android pubblica non rilevata.');
+const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || `v${packageJson.version}-preview.1`;
 const assets = [
-  { path: resolve(root, 'release', 'NexusNXS-0.3.6-Setup.exe'), type: 'application/vnd.microsoft.portable-executable' },
-  { path: resolve(root, 'release-android', 'NexusNXS-Android-6.4.0.apk'), type: 'application/vnd.android.package-archive' },
+  { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), type: 'application/vnd.microsoft.portable-executable' },
+  { path: resolve(root, 'release-android', `NexusNXS-Android-${androidVersion}.apk`), type: 'application/vnd.android.package-archive' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'CHECKSUMS.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'release-manifest.preview.json'), type: 'application/json' },
 ];
@@ -36,16 +40,18 @@ function githubCredential() {
 }
 
 async function request(url, token, init = {}) {
+  const { allowNotFound = false, ...requestInit } = init;
   const response = await fetch(url, {
-    ...init,
+    ...requestInit,
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'NexusNXS-release-publisher',
-      ...(init.headers || {}),
+      ...(requestInit.headers || {}),
     },
   });
+  if (allowNotFound && response.status === 404) return null;
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 800);
     throw new Error(`GitHub ${response.status} ${response.statusText}: ${detail}`);
@@ -68,7 +74,14 @@ async function inspectAsset(asset) {
 const token = githubCredential();
 const prepared = await Promise.all(assets.map(inspectAsset));
 const apiRoot = `https://api.github.com/repos/${repository}`;
-const release = await request(`${apiRoot}/releases/tags/${encodeURIComponent(tag)}`, token);
+let release = await request(`${apiRoot}/releases/tags/${encodeURIComponent(tag)}`, token, { allowNotFound: true });
+if (!release) {
+  release = await request(`${apiRoot}/releases`, token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag_name: tag, name: `NexusNXS Founder Preview ${packageJson.version}`, prerelease: true, draft: true })
+  });
+}
 const replaceNames = new Set(prepared.map((asset) => asset.name));
 const obsoleteAndroid = /^NexusNXS-Android-.*\.apk$/i;
 
@@ -96,8 +109,8 @@ const releaseBody = [
   '',
   'Build pubbliche per la prova controllata con amici. I client usano i servizi NexusNXS e non distribuiscono modelli o knowledge private.',
   '',
-  '- Windows 11 x64: NexusNXS 0.3.6 Preview (non firmata Authenticode)',
-  '- Android 10+: NexusNXS 6.4.0 Preview (firma Android Debug, non Play Store)',
+  `- Windows 11 x64: NexusNXS ${packageJson.version} Preview (non firmata Authenticode)`,
+  `- Android 8+: NexusNXS ${androidVersion} Preview (firma Android Debug, non Play Store)`,
   '- Impronte complete: `CHECKSUMS.sha256`',
   '- Manifest pubblico: `release-manifest.preview.json`',
   '',
@@ -110,7 +123,7 @@ await request(`${apiRoot}/releases/${release.id}`, token, {
   method: 'PATCH',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    name: 'NexusNXS Founder Preview 0.3.6',
+    name: `NexusNXS Founder Preview ${packageJson.version}`,
     body: releaseBody,
     prerelease: true,
     draft: false,

@@ -563,6 +563,17 @@ test('NexusNXS per Android Compose conserva la coda offline e autorizza Cuore pr
   assert.match(activity, /metrics\.fontScale/);
 });
 
+test('NexusNXS Android condivide la palette slash e salva comandi personali sul dispositivo', () => {
+  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
+  assert.match(activity, /data class SlashCommandRow/);
+  assert.match(activity, /builtinSlashCommands\(\)/);
+  assert.match(activity, /loadCustomSlashCommands\(\)/);
+  assert.match(activity, /persistCustomSlashCommands/);
+  assert.match(activity, /COMANDI NEXUSNXS/);
+  assert.match(activity, /resolveSlashInput/);
+  assert.match(activity, /Cerca sul web informazioni aggiornate/);
+});
+
 test('la chat temporanea non persiste contenuti e protegge anteprime e allegati', () => {
   const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
   const manifest = read('android', 'NexusRemote', 'app', 'src', 'main', 'AndroidManifest.xml');

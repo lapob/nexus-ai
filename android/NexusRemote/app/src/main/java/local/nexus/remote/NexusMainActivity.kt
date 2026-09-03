@@ -185,6 +185,10 @@ private fun nexusCopy(italian: String, english: String): String =
 private fun Context.nexusCopy(italian: String, english: String): String =
     if (resources.configuration.locales[0].language == Locale.ITALIAN.language) italian else english
 
+/** Variante non-Compose per comandi e persistenza, coerente con la lingua del dispositivo. */
+private fun slashCopy(italian: String, english: String): String =
+    if (Locale.getDefault().language == Locale.ITALIAN.language) italian else english
+
 private fun spokenLocale(text: String, fallback: Locale): Locale {
     val sample = " ${text.lowercase(Locale.ROOT)} "
     val candidates = listOf(
@@ -393,6 +397,19 @@ private enum class NexusAuthorizationKind { NONE, WORK, WAKE }
 @Immutable data class WorkArtifact(val title: String, val subtitle: String, val language: String, val content: String, val added: Int, val removed: Int)
 @Immutable data class Turn(val role: String, val content: String, val artifacts: List<WorkArtifact> = emptyList())
 @Immutable data class ModelRow(val id: String, val name: String, val size: Long = 0L, val available: Boolean = true)
+@Immutable data class SlashCommandRow(val name: String, val label: String, val description: String, val template: String, val custom: Boolean = false)
+private data class SlashResolution(val text: String = "", val handled: Boolean = false, val message: String = "", val commands: List<SlashCommandRow>? = null)
+
+private fun builtinSlashCommands() = listOf(
+    SlashCommandRow("web", slashCopy("Ricerca web", "Web search"), slashCopy("Informazioni aggiornate con fonti", "Current information with sources"), "Cerca sul web informazioni aggiornate e cita fonti affidabili: {testo}"),
+    SlashCommandRow("ragiona", slashCopy("Ragionamento profondo", "Deep reasoning"), slashCopy("Analizza e verifica i passaggi", "Analyze and verify each step"), "Analizza in modo approfondito, verifica i passaggi importanti e proponi la soluzione migliore: {testo}"),
+    SlashCommandRow("immagine", slashCopy("Genera immagine", "Generate image"), slashCopy("Crea un’immagine dalla descrizione", "Create an image from the description"), "Genera un’immagine di alta qualità seguendo questa descrizione: {testo}"),
+    SlashCommandRow("riassumi", slashCopy("Riassumi", "Summarize"), slashCopy("Riduce ai punti essenziali", "Reduce to the essential points"), "Riassumi in modo chiaro, fedele e ben strutturato: {testo}"),
+    SlashCommandRow("traduci", slashCopy("Traduci", "Translate"), slashCopy("Traduzione naturale e fedele", "Natural and faithful translation"), "Traduci il seguente contenuto nella lingua che indico, conservando tono e significato: {testo}"),
+    SlashCommandRow("codice", slashCopy("Scrivi o correggi codice", "Write or fix code"), slashCopy("Codice completo e verificabile", "Complete, verifiable code"), "Affronta questa richiesta di programmazione. Fornisci codice completo, controlli e istruzioni d’uso: {testo}"),
+    SlashCommandRow("nuovo", slashCopy("Nuovo comando", "New command"), "/nuovo brief = Riassumi in 5 punti {testo}", ""),
+    SlashCommandRow("rimuovi", slashCopy("Rimuovi comando", "Remove command"), "/rimuovi brief", "")
+)
 private data class WakeRelayDescriptor(val endpoint: String, val pairing: Boolean)
 private class NexusHttpException(val statusCode: Int, message: String) : IllegalStateException(message)
 @Immutable data class NexusUiState(
@@ -445,7 +462,8 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val wakeStatus: String = "",
     val wakeBusy: Boolean = false,
     val wakeAwaiting: Boolean = false,
-    val assistantInvocation: Long = 0L
+    val assistantInvocation: Long = 0L,
+    val slashCommands: List<SlashCommandRow> = emptyList()
 )
 
 /**
@@ -497,7 +515,8 @@ private data class NexusComposerState(
     val model: String,
     val remoteWorkAvailable: Boolean,
     val reduceMotion: Boolean,
-    val hapticsEnabled: Boolean
+    val hapticsEnabled: Boolean,
+    val slashCommands: List<SlashCommandRow>
 )
 
 private fun NexusUiState.composerState() = NexusComposerState(
@@ -514,7 +533,8 @@ private fun NexusUiState.composerState() = NexusComposerState(
     model = model,
     remoteWorkAvailable = remoteWorkAvailable,
     reduceMotion = reduceMotion,
-    hapticsEnabled = hapticsEnabled
+    hapticsEnabled = hapticsEnabled,
+    slashCommands = slashCommands
 )
 
 private fun NexusUiState.presence(): NexusPresence = when {
@@ -843,7 +863,7 @@ class NexusMainActivity : ComponentActivity() {
         if (restoredWork == null) secureTokens.clear("workProposal")
         // Work resta chiuso finché il server autenticato non pubblica una
         // capability esplicita. Una preferenza salvata non può riattivarlo da sola.
-        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "")
+        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", slashCommands = loadCustomSlashCommands())
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
                 NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
@@ -1050,6 +1070,56 @@ class NexusMainActivity : ComponentActivity() {
         state = state.copy(screen = NexusScreen.CHAT, drawer = false, temporary = false, conversationId = id, turns = turns, draft = prefs.getString("draft:$id", "").orEmpty(), streaming = "", error = null, conversationSearchOpen = false, conversationSearch = "")
     }
 
+    private fun loadCustomSlashCommands(): List<SlashCommandRow> = runCatching {
+        val values = JSONArray(prefs.getString("slashCommands", "[]").orEmpty())
+        buildList {
+            for (index in 0 until values.length()) {
+                val item = values.optJSONObject(index) ?: continue
+                val name = item.optString("name").lowercase(Locale.ROOT)
+                val template = item.optString("template").trim()
+                if (!Regex("^[a-z0-9][a-z0-9-]{0,23}$").matches(name) || template.isBlank() || builtinSlashCommands().any { it.name == name }) continue
+                add(SlashCommandRow(name, item.optString("label", name).take(48), nexusCopy("Comando personale", "Personal command"), template.take(2_000), true))
+                if (size == 24) break
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    private fun persistCustomSlashCommands(commands: List<SlashCommandRow>) {
+        val values = JSONArray()
+        commands.filter { it.custom }.take(24).forEach { command ->
+            values.put(JSONObject().put("name", command.name).put("label", command.label).put("template", command.template))
+        }
+        prefs.edit { putString("slashCommands", values.toString()) }
+    }
+
+    private fun resolveSlashInput(value: String): SlashResolution {
+        val raw = value.trim()
+        val definition = Regex("^(?:/nuovo\\s+|(?:crea|aggiungi|salva|imposta)\\s+(?:il\\s+)?comando\\s+/?)([a-z0-9][a-z0-9-]{0,23})\\s*(?:=|:|come\\s+)\\s*([\\s\\S]+)$", RegexOption.IGNORE_CASE).find(raw)
+        if (definition != null) {
+            val name = definition.groupValues[1].lowercase(Locale.ROOT)
+            if (builtinSlashCommands().any { it.name == name }) return SlashResolution(handled = true, message = nexusCopy("/$name è un comando integrato e non può essere sostituito.", "/$name is built in and cannot be replaced."))
+            val command = SlashCommandRow(name, name, nexusCopy("Comando personale", "Personal command"), definition.groupValues[2].trim().take(2_000), true)
+            val commands = listOf(command) + state.slashCommands.filterNot { it.name == name }
+            persistCustomSlashCommands(commands)
+            return SlashResolution(handled = true, message = nexusCopy("Comando /$name salvato su questo dispositivo.", "Command /$name saved on this device."), commands = commands)
+        }
+        val removal = Regex("^(?:/rimuovi\\s+|(?:rimuovi|elimina|cancella)\\s+(?:il\\s+)?comando\\s+/?)([a-z0-9][a-z0-9-]{0,23})\\s*$", RegexOption.IGNORE_CASE).find(raw)
+        if (removal != null) {
+            val name = removal.groupValues[1].lowercase(Locale.ROOT)
+            val commands = state.slashCommands.filterNot { it.name == name }
+            if (commands.size == state.slashCommands.size) return SlashResolution(handled = true, message = nexusCopy("Il comando /$name non esiste.", "Command /$name does not exist."))
+            persistCustomSlashCommands(commands)
+            return SlashResolution(handled = true, message = nexusCopy("Comando /$name rimosso.", "Command /$name removed."), commands = commands)
+        }
+        val invocation = Regex("^/([a-z0-9][a-z0-9-]{0,23})(?:\\s+([\\s\\S]*))?$", RegexOption.IGNORE_CASE).find(raw) ?: return SlashResolution(text = raw)
+        val name = invocation.groupValues[1].lowercase(Locale.ROOT)
+        val command = (state.slashCommands + builtinSlashCommands()).firstOrNull { it.name == name }
+            ?: return SlashResolution(handled = true, message = nexusCopy("Comando /$name non riconosciuto. Scrivi / per vedere quelli disponibili.", "Unknown command /$name. Type / to see available commands."))
+        if (command.template.isBlank()) return SlashResolution(handled = true, message = command.description)
+        val argument = invocation.groupValues.getOrNull(2).orEmpty().trim().ifBlank { nexusCopy("il contenuto della richiesta precedente", "the content of the previous request") }
+        return SlashResolution(text = if (command.template.contains("{testo}")) command.template.replace("{testo}", argument) else listOf(command.template, argument).filter(String::isNotBlank).joinToString(" "))
+    }
+
     private fun sendMessage() {
         if (state.connection != NexusConnection.ONLINE) {
             state = state.copy(
@@ -1059,10 +1129,18 @@ class NexusMainActivity : ComponentActivity() {
             if (appVisible) probeConnection()
             return
         }
-        ensureNotificationPermission()
         val enteredText = state.draft.trim().replace(Regex("%20", RegexOption.IGNORE_CASE), " ")
         if ((enteredText.isBlank() && state.attachment == null) || state.busy) return
-        val text = enteredText.ifBlank { nexusCopy("Analizza questo allegato.", "Analyze this attachment.") }
+        val inputText = enteredText.ifBlank { nexusCopy("Analizza questo allegato.", "Analyze this attachment.") }
+        val slashResolution = resolveSlashInput(inputText)
+        if (slashResolution.handled) {
+            val id = state.conversationId
+            if (!state.temporary && id.isNotBlank()) discardDraftPersistence(id)
+            state = state.copy(draft = "", activity = slashResolution.message, slashCommands = slashResolution.commands ?: state.slashCommands)
+            return
+        }
+        ensureNotificationPermission()
+        val text = slashResolution.text
         val speakReply = speakNextAnswer.also { speakNextAnswer = false }
         val inferredWork = state.remoteWorkAvailable && explicitDesktopIntent(text)
         if ((state.work || inferredWork) && !state.temporary) { planWork(text); return }
@@ -2532,6 +2610,16 @@ private fun JSONArray?.toTurns() = buildList {
         (latestPrompt.isBlank() && latestAnswer.isBlank()) ||
             (latestPrompt.length <= 180 && latestAnswer.isNotBlank() && latestAnswer.length <= 560)
         )
+    val instantSlashSuggestions = remember(state.draft, state.slashCommands) {
+        val match = Regex("^/([^\\s]*)$").find(state.draft.trim())
+        if (match == null) emptyList() else {
+            val query = match.groupValues[1].lowercase(Locale.ROOT)
+            (state.slashCommands + builtinSlashCommands())
+                .distinctBy { it.name }
+                .filter { query.isBlank() || it.name.startsWith(query) || it.label.lowercase(Locale.getDefault()).contains(query) }
+                .take(4)
+        }
+    }
 
     LaunchedEffect(state.assistantInvocation, interactionAvailable) {
         if (state.assistantInvocation <= 0L) return@LaunchedEffect
@@ -2638,7 +2726,35 @@ private fun JSONArray?.toTurns() = buildList {
                             AttachmentPreview(state.composerState(), { dispatch("attach", "") })
                         }
                         AnimatedContent(textMode, transitionSpec = { nexusTransform(reduceMotion) }, label = "instantComposer") { typing ->
-                            if (typing) {
+                            if (typing) Column(Modifier.fillMaxWidth()) {
+                        AnimatedVisibility(instantSlashSuggestions.isNotEmpty(), enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
+                            Surface(
+                                color = Surface.copy(alpha = .985f),
+                                shape = RoundedCornerShape(20.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .14f)),
+                                shadowElevation = 10.dp,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                            ) {
+                                Column(Modifier.padding(7.dp)) {
+                                    Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(nexusCopy("COMANDI NEXUSNXS", "NEXUSNXS COMMANDS"), color = Mist, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
+                                        Text(nexusCopy("Tocca per inserire", "Tap to insert"), color = Mist.copy(alpha = .62f), fontSize = 10.sp)
+                                    }
+                                    instantSlashSuggestions.forEach { command ->
+                                        Row(
+                                            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { dispatch("draft", "/${command.name} ") }.padding(horizontal = 11.dp, vertical = 9.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("/${command.name}", color = Cyan, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 88.dp))
+                                            Column(Modifier.weight(1f)) {
+                                                Text(command.label, color = Ice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(command.description, color = Mist, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         Surface(
                             color = Surface.copy(alpha = .96f),
                             shape = RoundedCornerShape(28.dp),
@@ -4109,12 +4225,51 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     val composerTextTop by animateDpAsState(when { workExpanded -> 18.dp; composerExpanded -> 10.dp; else -> 18.dp }, tween(if (state.reduceMotion) NexusFlow.REDUCED else NexusFlow.COMPOSER_RESIZE, easing = NexusFlow.emphasized), label = "composerTextTop")
     val composerTextBottom by animateDpAsState(if (composerExpanded) 52.dp else 6.dp, tween(if (state.reduceMotion) NexusFlow.REDUCED else NexusFlow.COMPOSER_RESIZE, easing = NexusFlow.emphasized), label = "composerTextBottom")
     val composerTrailingOffset by animateDpAsState(if (composerExpanded) (-4).dp else (-6).dp, tween(if (state.reduceMotion) NexusFlow.REDUCED else NexusFlow.COMPOSER_RESIZE, easing = NexusFlow.emphasized), label = "composerTrailingOffset")
+    val slashSuggestions = remember(state.draft, state.slashCommands) {
+        val match = Regex("^/([^\\s]*)$").find(state.draft.trim())
+        if (match == null) emptyList() else {
+            val query = match.groupValues[1].lowercase(Locale.ROOT)
+            (state.slashCommands + builtinSlashCommands())
+                .distinctBy { it.name }
+                .filter { query.isBlank() || it.name.startsWith(query) || it.label.lowercase(Locale.getDefault()).contains(query) }
+                .take(6)
+        }
+    }
     Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .96f)), startY = 0f, endY = 34f))) {
     Column(Modifier.fillMaxWidth().widthIn(max = metrics.contentMaxWidth).wrapContentWidth(Alignment.CenterHorizontally).navigationBarsPadding().imePadding().padding(start = metrics.horizontalPadding, end = metrics.horizontalPadding, top = 13.dp, bottom = 10.dp)) {
         AnimatedVisibility(visible = state.connection != NexusConnection.ONLINE && !state.temporary, enter = nexusEnter(state.reduceMotion), exit = nexusExit(state.reduceMotion)) {
             ConnectionStatusStrip(state.connection, state.pendingCount) { dispatch("probe", "") }
         }
         AnimatedVisibility(state.attachment != null, enter = nexusEnter(state.reduceMotion), exit = nexusExit(state.reduceMotion)) { AttachmentPreview(state, { dispatch("attach", "") }) }
+        AnimatedVisibility(slashSuggestions.isNotEmpty(), enter = nexusEnter(state.reduceMotion), exit = nexusExit(state.reduceMotion)) {
+            Surface(
+                color = Surface.copy(alpha = .985f),
+                shape = RoundedCornerShape(22.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .14f)),
+                shadowElevation = 12.dp,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp)
+            ) {
+                Column(Modifier.padding(7.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(nexusCopy("COMANDI NEXUSNXS", "NEXUSNXS COMMANDS"), color = Mist, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
+                        Text(nexusCopy("Tocca per inserire", "Tap to insert"), color = Mist.copy(alpha = .62f), fontSize = 10.sp)
+                    }
+                    slashSuggestions.forEach { command ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).clickable { dispatch("draft", "/${command.name} ") }.padding(horizontal = 11.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("/${command.name}", color = Cyan, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 92.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(command.label, color = Ice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(command.description, color = Mist, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            if (command.custom) Text(nexusCopy("TUO", "YOURS"), color = Mist.copy(alpha = .66f), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth().height(composerViewportHeight), verticalAlignment = Alignment.Bottom) {
         Surface(color = Surface.copy(alpha = .94f), shape = CircleShape, shadowElevation = 3.dp, border = androidx.compose.foundation.BorderStroke(1.dp, Hairline.copy(alpha = .68f)), modifier = Modifier.size(56.dp)) {
             IconButton({ attachmentSheet = true }, Modifier.fillMaxSize(), enabled = interactionAvailable) { Icon(Icons.Rounded.Add, nexusCopy("Allega", "Attach"), tint = if (interactionAvailable) Ice else Mist.copy(alpha = .52f), modifier = Modifier.size(30.dp)) }

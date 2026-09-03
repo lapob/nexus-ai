@@ -1311,6 +1311,80 @@
   line-height: 1.5;
   scrollbar-width: none;
 }
+
+.slash-command-palette {
+  position: absolute;
+  z-index: 8;
+  right: 0;
+  bottom: calc(100% + 10px);
+  left: 0;
+  max-height: min(430px, 52vh);
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(106, 220, 217, 0.14);
+  border-radius: 20px;
+  color: rgba(225, 242, 241, 0.94);
+  background: linear-gradient(155deg, rgba(8, 22, 23, 0.98), rgba(3, 10, 11, 0.985));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48), inset 0 1px rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(18px);
+  scrollbar-width: thin;
+}
+
+.slash-command-palette-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 10px 9px;
+  color: rgba(113, 151, 151, 0.82);
+  font: 650 0.62rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.slash-command-palette-head small { font: inherit; letter-spacing: 0.035em; text-transform: none; }
+.slash-command-palette > button {
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease, transform 150ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.slash-command-palette > button[data-active="true"],
+.slash-command-palette > button:hover,
+.slash-command-palette > button:focus-visible {
+  outline: 0;
+  color: #efffff;
+  background: rgba(69, 177, 177, 0.105);
+  transform: translateX(2px);
+}
+
+.slash-command-palette code { color: #83dedb; font: 650 0.78rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.slash-command-palette button > span { min-width: 0; display: grid; gap: 3px; }
+.slash-command-palette strong { overflow: hidden; font-size: 0.82rem; font-weight: 610; text-overflow: ellipsis; white-space: nowrap; }
+.slash-command-palette button small { overflow: hidden; color: rgba(124, 153, 154, 0.82); font-size: 0.7rem; font-weight: 430; text-overflow: ellipsis; white-space: nowrap; }
+.slash-command-palette em { color: rgba(125, 174, 174, 0.72); font: 600 0.58rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; font-style: normal; letter-spacing: 0.06em; text-transform: uppercase; }
+
+@media (max-width: 620px) {
+  .slash-command-palette-head small { display: none; }
+  .slash-command-palette > button { grid-template-columns: 78px minmax(0, 1fr); }
+  .slash-command-palette em { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slash-command-palette > button { transition: none; }
+  .slash-command-palette { backdrop-filter: none; }
+}
 .command-input > textarea::-webkit-scrollbar { display: none; }
 .command-input > textarea::placeholder { color: rgba(161, 194, 196, 0.35); }
 

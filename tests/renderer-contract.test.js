@@ -74,6 +74,18 @@ test('la superficie quotidiana espone voce, scrittura e la scorciatoia impostazi
   assert.match(switcher, /Nessun modello disponibile/);
 });
 
+test('il composer desktop espone una palette slash accessibile e comandi personali locali', () => {
+  const composer = fs.readFileSync(path.join(root, 'src/renderer/components/CommandInput.tsx'), 'utf8');
+  const commands = fs.readFileSync(path.join(root, 'src/renderer/systems/SlashCommands.ts'), 'utf8');
+  assert.match(composer, /className="slash-command-palette"/);
+  assert.match(composer, /role="listbox"/);
+  assert.match(composer, /ArrowDown/);
+  assert.match(commands, /nexusnxs\.slash-commands\.v1/);
+  assert.match(commands, /name: 'web'/);
+  assert.match(commands, /crea\|aggiungi\|salva\|imposta/);
+  assert.match(commands, /\/rimuovi/);
+});
+
 test('voce e testo possono aprire le superfici nascoste e avviare il collegamento telefono', () => {
   assert.match(controller, /(?:collega\|associa\|connetti\|pair\|connect)/);
   assert.match(controller, /nexus:start-pairing/);

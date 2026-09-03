@@ -8,6 +8,7 @@ const path = require('node:path');
 const { isProcessAlive, readLock } = require('./process-lock');
 const WAKE_WORD_ARGUMENT_PREFIX = '--wake-word-voice=';
 const AMBIENT_VOICE_ARGUMENT = '--ambient-voice';
+const PRESENCE_ARGUMENT = '--presence';
 
 // #region 01 — Stato e argomenti
 
@@ -22,6 +23,13 @@ function interactiveLaunchArguments({
     args.push(`${WAKE_WORD_ARGUMENT_PREFIX}${activationTicket}`);
   }
   return args;
+}
+
+function presenceLaunchArguments({
+  defaultApp = process.defaultApp,
+  appRoot = path.resolve(__dirname, '..', '..', '..')
+} = {}) {
+  return defaultApp ? [appRoot, PRESENCE_ARGUMENT] : [PRESENCE_ARGUMENT];
 }
 
 function processLockState(filePath, { processAlive = isProcessAlive } = {}) {
@@ -62,6 +70,41 @@ function launchInteractiveDesktop({
   });
 }
 
-module.exports = { AMBIENT_VOICE_ARGUMENT, WAKE_WORD_ARGUMENT_PREFIX, interactiveLaunchArguments, launchInteractiveDesktop, processLockState };
+function launchSystemPresence({
+  executable = process.execPath,
+  defaultApp = process.defaultApp,
+  appRoot = path.resolve(__dirname, '..', '..', '..'),
+  launch = spawn,
+  env = process.env
+} = {}) {
+  if (!executable || (path.isAbsolute(executable) && !fs.existsSync(executable))) {
+    return Promise.reject(new Error('Eseguibile NexusNXS non disponibile.'));
+  }
+  return new Promise((resolve, reject) => {
+    const child = launch(executable, presenceLaunchArguments({ defaultApp, appRoot }), {
+      cwd: appRoot,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      env: { ...env, NEXUS_MANAGED_OLLAMA: '0' }
+    });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref?.();
+      resolve({ launched: true, pid: Number(child.pid) || null });
+    });
+  });
+}
+
+module.exports = {
+  AMBIENT_VOICE_ARGUMENT,
+  PRESENCE_ARGUMENT,
+  WAKE_WORD_ARGUMENT_PREFIX,
+  interactiveLaunchArguments,
+  launchInteractiveDesktop,
+  launchSystemPresence,
+  presenceLaunchArguments,
+  processLockState
+};
 
 // #endregion

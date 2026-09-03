@@ -4,7 +4,21 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
-const { ManagedOllamaRuntime } = require('../src/ai/managed-ollama-runtime');
+const {
+  ManagedOllamaRuntime,
+  parseExcludedTcpPortRanges,
+  selectManagedRuntimePort
+} = require('../src/ai/managed-ollama-runtime');
+
+test('sceglie una porta runtime fuori dagli intervalli riservati da Windows', () => {
+  const netsh = `\nProtocol tcp Port Exclusion Ranges\n\nStart Port    End Port\n----------    --------\n     12813       12912\n     12913       13012\n     50000       50059     *\n`;
+  assert.deepEqual(parseExcludedTcpPortRanges(netsh), [[12813, 12912], [12913, 13012], [50000, 50059]]);
+  const port = selectManagedRuntimePort(872, {
+    platform: 'win32',
+    runProcess() { return { status: 0, stdout: netsh }; }
+  });
+  assert.equal(port, 13013);
+});
 
 test('shutdown termina soltanto il runtime Ollama posseduto e ne vieta il riavvio', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-managed-runtime-'));

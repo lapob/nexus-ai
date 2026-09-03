@@ -5,6 +5,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { LocalAttachment, NexusSettings, WorkspaceContext } from '../types/nexus';
+import { loadSlashCommands, resolveSlashSubmission, saveSlashCommands, slashSuggestions } from '../systems/SlashCommands';
 import { NexusSelect } from './NexusSelect';
 
 // #region 01 — Contratto e stato locale
@@ -26,7 +27,11 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const [attachmentMessage, setAttachmentMessage] = useState('');
+  const [customCommands, setCustomCommands] = useState(() => loadSlashCommands());
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashDismissed, setSlashDismissed] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
+  const suggestions = slashDismissed ? [] : slashSuggestions(value, customCommands);
 
   useLayoutEffect(() => {
     if (open) input.current?.focus({ preventScroll: true });
@@ -34,6 +39,7 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
       setValue('');
       setAttachments([]);
       setAttachmentMessage('');
+      setSlashDismissed(false);
     }
   }, [open]);
 
@@ -55,6 +61,27 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
     } catch {
       setAttachmentMessage('Non riesco a leggere questo elemento.');
     }
+  };
+
+  const selectSlashCommand = (name: string) => {
+    setValue(`/${name} `);
+    setSlashDismissed(true);
+    requestAnimationFrame(() => input.current?.focus());
+  };
+
+  const submitValue = () => {
+    const resolution = resolveSlashSubmission(value, customCommands);
+    if (resolution.kind !== 'prompt') {
+      if (resolution.commands) {
+        setCustomCommands(resolution.commands);
+        saveSlashCommands(resolution.commands);
+      }
+      setAttachmentMessage(resolution.text);
+      setValue('');
+      setSlashDismissed(false);
+      return;
+    }
+    if (resolution.text) onSubmit(resolution.text, attachments);
   };
 
   // #endregion
@@ -79,7 +106,7 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
           }}
           onSubmit={(event) => {
             event.preventDefault();
-            if (value.trim()) onSubmit(value, attachments);
+            if (value.trim()) submitValue();
           }}
         >
           {conversation && (
@@ -127,12 +154,66 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
               ))}
             </div>
           )}
+          <AnimatePresence>
+            {suggestions.length > 0 && (
+              <motion.div
+                className="slash-command-palette"
+                role="listbox"
+                aria-label="Comandi NexusNXS"
+                initial={{ opacity: 0, y: 7, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 5, scale: 0.995 }}
+                transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="slash-command-palette-head"><span>Comandi</span><small>↑↓ seleziona · Invio inserisce</small></div>
+                {suggestions.map((command, index) => (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={index === slashIndex}
+                    data-active={index === slashIndex}
+                    key={command.name}
+                    onMouseEnter={() => setSlashIndex(index)}
+                    onClick={() => selectSlashCommand(command.name)}
+                  >
+                    <code>/{command.name}</code>
+                    <span><strong>{command.label}</strong><small>{command.description}</small></span>
+                    {command.custom && <em>Personale</em>}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
           <textarea
             ref={input}
             rows={1}
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              setValue(event.target.value);
+              setSlashIndex(0);
+              setSlashDismissed(false);
+            }}
             onKeyDown={(event) => {
+              if (suggestions.length && event.key === 'ArrowDown') {
+                event.preventDefault();
+                setSlashIndex((current) => (current + 1) % suggestions.length);
+                return;
+              }
+              if (suggestions.length && event.key === 'ArrowUp') {
+                event.preventDefault();
+                setSlashIndex((current) => (current - 1 + suggestions.length) % suggestions.length);
+                return;
+              }
+              if (suggestions.length && (event.key === 'Tab' || event.key === 'Enter')) {
+                event.preventDefault();
+                selectSlashCommand(suggestions[slashIndex]?.name || suggestions[0].name);
+                return;
+              }
+              if (suggestions.length && event.key === 'Escape') {
+                event.preventDefault();
+                setSlashDismissed(true);
+                return;
+              }
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 event.currentTarget.form?.requestSubmit();

@@ -1,11 +1,12 @@
 /**
  * @module scripts/verify-app-shutdown
- * @description Verifica reale che la chiusura della finestra termini l'albero Electron posseduto.
+ * @description Verifica reale che la X termini la UI ma conservi la Presence leggera.
  */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
+const { isProcessAlive, readLock, requestProcessShutdown } = require('../src/infrastructure/electron/process-lock');
 
 const root = path.resolve(__dirname, '..');
 const electronBinary = require('electron');
@@ -95,8 +96,24 @@ function waitForExit(child, timeoutMs = 15_000) {
   if (child.exitCode !== null) return Promise.resolve(child.exitCode);
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`NexusNXS non si è chiuso entro ${timeoutMs / 1000} secondi.`)), timeoutMs);
-    child.once('close', (code) => { clearTimeout(timeout); resolve(code); });
+    // La Presence è deliberatamente detached. Attendere `close` può restare
+    // legato a pipe ereditate da processi Chromium; `exit` misura invece il
+    // processo UI proprietario, che è ciò che la X deve terminare.
+    child.once('exit', (code) => { clearTimeout(timeout); resolve(code); });
   });
+}
+
+async function waitForProcessLock(lockPath, running, timeoutMs = 8_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const descriptor = readLock(lockPath);
+    const active = Boolean(descriptor && isProcessAlive(descriptor.pid));
+    if (active === running) return descriptor;
+    await delay(75);
+  }
+  throw new Error(running
+    ? 'La Presence non è rimasta disponibile dopo la chiusura della UI.'
+    : 'La Presence di prova non si è arrestata in tempo.');
 }
 
 async function removeProfile() {
@@ -132,17 +149,26 @@ async function removeProfile() {
     const owned = new Set([child.pid, ...descendantsOf(before, child.pid)]);
     await closePage(target);
     const code = await waitForExit(child);
-    await delay(500);
+    const presenceLockPath = path.join(profile, 'system-presence.lock');
+    const presenceDescriptor = await waitForProcessLock(presenceLockPath, true);
+    await delay(350);
     const normalizedProfile = path.resolve(profile).toLowerCase();
-    const remaining = processSnapshot().filter((item) => owned.has(item.pid)
-      || item.commandLine.toLowerCase().includes(normalizedProfile));
+    const afterUiClose = processSnapshot();
+    const allowedPresence = new Set([presenceDescriptor.pid, ...descendantsOf(afterUiClose, presenceDescriptor.pid)]);
+    const remainingUi = afterUiClose.filter((item) => (owned.has(item.pid)
+      || item.commandLine.toLowerCase().includes(normalizedProfile))
+      && !allowedPresence.has(item.pid));
     if (code !== 0) throw new Error(stderr.trim() || `NexusNXS è terminato con codice ${code}.`);
-    if (remaining.length) throw new Error(`Processi rimasti dopo la chiusura: ${remaining.map((item) => item.pid).join(', ')}.`);
-    console.log('Chiusura finestra verificata: processo Electron e figli posseduti terminati.');
+    if (remainingUi.length) throw new Error(`Processi UI rimasti dopo la chiusura: ${remainingUi.map((item) => item.pid).join(', ')}.`);
+    if (!requestProcessShutdown(presenceLockPath)) throw new Error('Arresto della Presence di prova non richiesto.');
+    await waitForProcessLock(presenceLockPath, false);
+    console.log('Chiusura finestra verificata: UI terminata, Presence leggera mantenuta e arrestabile dal tray/controllo.');
   } catch (error) {
+    requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     terminateTestTree(child);
     throw error;
   } finally {
+    requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     await removeProfile();
   }
 })().catch((error) => {

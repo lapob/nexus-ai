@@ -640,7 +640,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -716,6 +716,7 @@ class RemoteSessionGateway {
     this.publicPort = Number.isInteger(Number(publicPort)) && Number(publicPort) >= 1024 && Number(publicPort) <= 65535
       ? Number(publicPort)
       : 0;
+    this.qaSecret = String(qaSecret || '').length >= 32 ? String(qaSecret) : '';
     this.pairing = null;
     this.failedPairings = new Map();
     this.requestBuckets = new Map();
@@ -1700,6 +1701,7 @@ class RemoteSessionGateway {
   }
 
   guestDailyAllowed(guest, capability, cost, baseLimit) {
+    if (guest?.qa === true) return true;
     const limit = profileSafetyLimit(guest?.accessProfile, baseLimit);
     return limit === null || this.persistentQuotas.allow(
       `${String(capability || 'request')}:${guest.installationHash}`,
@@ -1729,6 +1731,15 @@ class RemoteSessionGateway {
       const parsed = new URL(origin);
       return ['http:', 'https:'].includes(parsed.protocol) && parsed.host === String(request.headers.host || '');
     } catch { return false; }
+  }
+
+  isQaRequest(request, publicIngress) {
+    if (!publicIngress || !this.qaSecret) return false;
+    const supplied = String(request.headers['x-nexus-qa-key'] || '');
+    if (!supplied || supplied.length > 512) return false;
+    const expectedHash = crypto.createHash('sha256').update(this.qaSecret).digest();
+    const suppliedHash = crypto.createHash('sha256').update(supplied).digest();
+    return crypto.timingSafeEqual(expectedHash, suppliedHash);
   }
 
   async handle(request, response, { publicIngress: forcedPublicIngress = false } = {}) {
@@ -1878,7 +1889,8 @@ class RemoteSessionGateway {
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/bootstrap') {
         const address = requestAddress(request);
-        if (!this.persistentQuotas.allow(`bootstrap:${address}`, { limit: 80 })) {
+        const qaRequest = this.isQaRequest(request, publicIngress);
+        if (!qaRequest && !this.persistentQuotas.allow(`bootstrap:${address}`, { limit: 80 })) {
           this.securityEvents.append('guest.bootstrap.blocked', { severity: 'warning', address, detail: 'Quota giornaliera superata' });
           return this.json(response, 429, { error: 'Limite giornaliero raggiunto. Riprova più tardi.' });
         }
@@ -1895,7 +1907,7 @@ class RemoteSessionGateway {
           secret: process.env.NEXUS_ACCESS_PROFILE_SECRET,
           bindings: process.env.NEXUS_ACCESS_PROFILE_BINDINGS
         });
-        const session = { id: crypto.randomUUID(), installationHash: tokenHash(installationId), accessProfile, expiresAt: Date.now() + GUEST_TOKEN_TTL_MS, extractionWarnings: 0 };
+        const session = { id: crypto.randomUUID(), installationHash: tokenHash(installationId), accessProfile, qa: qaRequest, expiresAt: Date.now() + GUEST_TOKEN_TTL_MS, extractionWarnings: 0 };
         if (this.guestSessions.size >= MAX_GUEST_SESSIONS) {
           for (const [hash, candidate] of this.guestSessions) if (candidate.expiresAt < Date.now()) this.guestSessions.delete(hash);
         }

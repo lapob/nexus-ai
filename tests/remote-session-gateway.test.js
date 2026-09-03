@@ -6,7 +6,11 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const packageMetadata = require('../package.json');
 const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed } = require('../src/remote/remote-session-gateway');
+
+const androidGradle = fs.readFileSync(path.join(__dirname, '..', 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
+const androidVersion = androidGradle.match(/versionName\s*=\s*"([^"]+)"/)?.[1];
 
 test('l osservabilità privata riconosce soltanto loopback e pseudonimizza gli accessi', () => {
   const secret = Buffer.alloc(32, 7);
@@ -335,6 +339,24 @@ function fixture() {
   });
   return { root, gateway, powerActions, serviceActions, requestedModels, conversationStore };
 }
+
+test('il canale QA richiede un segreto server-side e non disattiva i limiti pubblici', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-qa-'));
+  const qaSecret = 'qa-private-browser-secret-0123456789abcdef';
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (value) => value },
+    qaSecret,
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    assert.equal(gateway.isQaRequest({ headers: { 'x-nexus-qa-key': qaSecret } }, true), true);
+    assert.equal(gateway.isQaRequest({ headers: { 'x-nexus-qa-key': 'wrong' } }, true), false);
+    assert.equal(gateway.isQaRequest({ headers: { 'x-nexus-qa-key': qaSecret } }, false), false);
+    assert.equal(gateway.guestDailyAllowed({ qa: true }, 'message', 999, 1), true);
+    assert.equal(gateway.guestDailyAllowed({ qa: false, installationHash: 'public-test' }, 'message', 2, 1), false);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
 
 async function pair(baseUrl, code, scope = 'chat') {
   const response = await fetch(`${baseUrl}/api/pair`, {
@@ -1198,14 +1220,20 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /rel="icon" href="\/nexus-icon\.png"/);
     assert.match(publicHtml, /class="brand-mark" src="\/nexus-icon\.png"/);
     assert.match(publicHtml, /api\/guest\/voice\/transcribe/);
-    assert.match(publicHtml, /NexusNXS-0\.3\.6-Setup\.exe/);
-    assert.match(publicHtml, /NexusNXS-Android-6\.4\.0\.apk/);
+    assert.match(publicHtml, new RegExp(`NexusNXS-${packageMetadata.version.replaceAll('.', '\\.')}\\-Setup\\.exe`));
+    assert.ok(androidVersion);
+    assert.match(publicHtml, new RegExp(`NexusNXS-Android-${androidVersion.replaceAll('.', '\\.')}\\.apk`));
     assert.match(publicHtml, /id="keyboard"/);
     assert.match(publicHtml, /id="downloadSheet"/);
     assert.match(publicHtml, /id="imageResult"/);
     assert.match(publicHtml, /id="attachmentInput"/);
     assert.match(publicHtml, /attachments:pendingAttachments/);
     assert.match(publicHtml, /id="feedbackAction"/);
+    assert.match(publicHtml, /id="slashMenu"/);
+    assert.match(publicHtml, /Comandi NexusNXS/);
+    assert.match(publicHtml, /nexusnxs\.slash-commands\.v1/);
+    assert.match(publicHtml, /resolveSlashInput/);
+    assert.match(publicHtml, /Ricerca web/);
     assert.match(publicHtml, /\/api\/guest\/feedback/);
     assert.match(publicHtml, /consent:true/);
     assert.match(publicHtml, /In revisione/);

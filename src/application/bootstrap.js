@@ -35,14 +35,14 @@ const { registerIpcHandlers } = require('./register-ipc');
 const { createMainWindow } = require('../infrastructure/electron/create-main-window');
 const { createSafeStorageSecretProtection } = require('../infrastructure/electron/safe-storage-secret');
 const { shouldKeepApplicationAlive, startAppLifecycle } = require('../infrastructure/electron/app-lifecycle');
-const { AMBIENT_VOICE_ARGUMENT, WAKE_WORD_ARGUMENT_PREFIX } = require('../infrastructure/electron/desktop-launcher');
+const { AMBIENT_VOICE_ARGUMENT, WAKE_WORD_ARGUMENT_PREFIX, launchSystemPresence } = require('../infrastructure/electron/desktop-launcher');
 const { RENDERER_ENTRY_URL, registerRendererProtocol } = require('../infrastructure/electron/renderer-protocol');
 recordModuleStage('electron');
 const { AIProviderRegistry } = require('../ai/ai-provider-registry');
 const { AIRuntime } = require('../ai/ai-runtime');
 const { OllamaProvider } = require('../ai/providers/ollama-provider');
 const { NexusServiceProvider } = require('../ai/providers/nexus-service-provider');
-const { ManagedOllamaRuntime } = require('../ai/managed-ollama-runtime');
+const { ManagedOllamaRuntime, selectManagedRuntimePort } = require('../ai/managed-ollama-runtime');
 const { detectHardware, runtimeTuning } = require('../ai/hardware-profile');
 const {
   MODEL_PROFILES,
@@ -108,7 +108,7 @@ function bootstrapElectron({ env = process.env } = {}) {
   // Una porta per-sessione impedisce a installazioni Ollama globali, processi
   // orfani o un secondo profilo NexusNXS di essere scambiati per il runtime
   // posseduto dall'app. Il range resta esclusivamente loopback.
-  const managedPort = 12000 + (process.pid % 1000);
+  const managedPort = selectManagedRuntimePort(process.pid);
   const managedBaseUrl = `http://127.0.0.1:${managedPort}`;
   const runtimeEnvironment = publicClientMode
     ? { ...env, NEXUS_AI_PROVIDER: 'nexus-service', NEXUS_SERVICE_URL: serviceUrl, NEXUS_SERVICE_FALLBACK_URLS: serviceFallbackUrls, NEXUS_AI_CHAT_MODEL: 'automatic', NEXUS_AI_FAST_MODEL: 'automatic', NEXUS_AI_EMBEDDING_MODEL: '' }
@@ -390,6 +390,11 @@ function bootstrapElectron({ env = process.env } = {}) {
           return;
         }
         attachUiShutdownRequest(desktopUiLock);
+        // La UI completa resta un processo on-demand. Avviando qui la shell
+        // leggera, la X può liberare WebGL, voce e richieste AI mentre tray e
+        // visualizer continuano a rappresentare NexusNXS senza duplicare il Core.
+        launchSystemPresence({ appRoot, env })
+          .catch((error) => logger.warn('Presence non avviata insieme alla UI; il client resta comunque utilizzabile.', { error }));
       }
       const coreDescriptor = readLock(path.join(sharedDataRoot, 'headless-server.lock'));
       const independentCoreRunning = !headlessMode && Boolean(coreDescriptor && isProcessAlive(coreDescriptor.pid));

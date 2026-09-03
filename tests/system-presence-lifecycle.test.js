@@ -6,7 +6,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { AMBIENT_VOICE_ARGUMENT, WAKE_WORD_ARGUMENT_PREFIX, interactiveLaunchArguments, processLockState } = require('../src/infrastructure/electron/desktop-launcher');
+const {
+  AMBIENT_VOICE_ARGUMENT,
+  PRESENCE_ARGUMENT,
+  WAKE_WORD_ARGUMENT_PREFIX,
+  interactiveLaunchArguments,
+  launchSystemPresence,
+  presenceLaunchArguments,
+  processLockState
+} = require('../src/infrastructure/electron/desktop-launcher');
 const { CHATGPT_WINDOWS_APP_ID, activateFromWakeWord, closeChatGptDesktop, isChatGptDesktopRunning, openChatGptDesktop, presenceCapabilities } = require('../src/application/presence-bootstrap');
 const { startupCapability } = require('../src/application/register-ipc');
 const { continuityTaskScript } = require('../src/infrastructure/windows/continuity-task');
@@ -22,9 +30,35 @@ test('Core, presenza e UI hanno ruoli non sovrapposti', () => {
   });
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: false, appRoot: 'C:\\Nexus' }), ['--ui']);
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: true, appRoot: 'C:\\Nexus' }), ['C:\\Nexus', '--ui']);
+  assert.deepEqual(presenceLaunchArguments({ defaultApp: false, appRoot: 'C:\\Nexus' }), [PRESENCE_ARGUMENT]);
+  assert.deepEqual(presenceLaunchArguments({ defaultApp: true, appRoot: 'C:\\Nexus' }), ['C:\\Nexus', PRESENCE_ARGUMENT]);
   const ticket = 'A'.repeat(120);
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: false, activationTicket: ticket }), ['--ui', AMBIENT_VOICE_ARGUMENT, `${WAKE_WORD_ARGUMENT_PREFIX}${ticket}`]);
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: false, activationTicket: 'not-valid' }), ['--ui']);
+});
+
+test('la UI avvia la Presence in un processo nascosto privo di runtime AI', async () => {
+  const calls = [];
+  const result = await launchSystemPresence({
+    executable: process.execPath,
+    defaultApp: false,
+    appRoot: root,
+    env: { NEXUS_MANAGED_OLLAMA: '1', NEXUS_SHARED_DATA_ROOT: 'Z:\\NexusData' },
+    launch: (file, args, options) => {
+      calls.push({ file, args, options });
+      return {
+        pid: 8124,
+        once(event, callback) { if (event === 'spawn') queueMicrotask(callback); return this; },
+        unref() {}
+      };
+    }
+  });
+  assert.deepEqual(result, { launched: true, pid: 8124 });
+  assert.deepEqual(calls[0].args, [PRESENCE_ARGUMENT]);
+  assert.equal(calls[0].options.windowsHide, true);
+  assert.equal(calls[0].options.detached, true);
+  assert.equal(calls[0].options.env.NEXUS_MANAGED_OLLAMA, '0');
+  assert.equal(calls[0].options.env.NEXUS_SHARED_DATA_ROOT, 'Z:\\NexusData');
 });
 
 test('la capability startup documenta Core persistente e UI on-demand', () => {
@@ -88,6 +122,7 @@ test('la Presence apre la UI on-demand e ne segue la visibilità', () => {
   assert.match(presence, /openPrimaryWindow:\s*activateFullUi/);
   assert.match(presence, /activateVoice:\s*\(\)\s*=>\s*activateFromWakeWord/);
   assert.match(presence, /manager\.setApplicationVisible\?\.\(state\.running\)/);
+  assert.match(source, /launchSystemPresence\(\{ appRoot, env \}\)/);
 });
 
 test('il richiamo vocale torna idle quando la UI non acquisisce il lock', async () => {

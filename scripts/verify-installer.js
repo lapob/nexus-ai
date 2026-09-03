@@ -23,9 +23,9 @@ if (pkg.build?.productName !== 'NexusNXS' || pkg.build?.win?.artifactName !== 'N
   throw new Error('Nome prodotto o artefatto installer non coerente.');
 }
 if (pkg.build?.nsis?.deleteAppDataOnUninstall !== false) throw new Error('La disinstallazione deve preservare i dati personali.');
-if (pkg.build?.nsis?.oneClick !== true || pkg.build?.nsis?.perMachine !== false
-  || pkg.build?.nsis?.allowToChangeInstallationDirectory !== false) {
-  throw new Error('Il setup pubblico deve essere immediato, per utente corrente e senza scelte tecniche.');
+if (pkg.build?.nsis?.oneClick !== false || pkg.build?.nsis?.perMachine !== false
+  || pkg.build?.nsis?.allowToChangeInstallationDirectory !== true) {
+  throw new Error('Il setup pubblico deve essere assistito, per utente corrente e consentire la directory di installazione.');
 }
 if (pkg.build?.nsis?.include || fs.existsSync(path.join(root, 'build', 'installer.nsh'))) {
   throw new Error('Il setup pubblico non deve esporre pagine per motori o componenti locali.');

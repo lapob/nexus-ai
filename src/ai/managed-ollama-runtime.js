@@ -14,6 +14,36 @@ const RUNTIME_ENV_KEYS = Object.freeze([
   'USERPROFILE', 'HOME', 'LOCALAPPDATA', 'APPDATA', 'LANG', 'LC_ALL'
 ]);
 
+function parseExcludedTcpPortRanges(output) {
+  return String(output || '').split(/\r?\n/).map((line) => {
+    const match = /^\s*(\d+)\s+(\d+)\s*\*?\s*$/.exec(line);
+    return match ? [Number(match[1]), Number(match[2])] : null;
+  }).filter(Boolean);
+}
+
+/** Evita le porte riservate dinamicamente da Hyper-V, WSL o servizi Windows. */
+function selectManagedRuntimePort(pid = process.pid, {
+  platform = process.platform,
+  runProcess = spawnSync
+} = {}) {
+  const rangeStart = 12_000;
+  const rangeSize = 8_000;
+  const preferred = rangeStart + (Math.abs(Number(pid) || 0) % rangeSize);
+  if (platform !== 'win32') return preferred;
+  let excluded = [];
+  try {
+    const result = runProcess('netsh.exe', ['interface', 'ipv4', 'show', 'excludedportrange', 'protocol=tcp'], {
+      encoding: 'utf8', windowsHide: true, timeout: 5_000, maxBuffer: 512 * 1024
+    });
+    if (result?.status === 0) excluded = parseExcludedTcpPortRanges(result.stdout);
+  } catch { /* Un sistema senza netsh usa comunque il fallback deterministico. */ }
+  for (let offset = 0; offset < rangeSize; offset += 1) {
+    const candidate = rangeStart + ((preferred - rangeStart + offset) % rangeSize);
+    if (!excluded.some(([start, end]) => candidate >= start && candidate <= end)) return candidate;
+  }
+  return 11_435;
+}
+
 function sanitizedRuntimeEnvironment(source = process.env) {
   const safe = {};
   for (const key of RUNTIME_ENV_KEYS) {
@@ -237,6 +267,11 @@ class ManagedOllamaRuntime {
   // #endregion
 }
 
-module.exports = { ManagedOllamaRuntime, sanitizedRuntimeEnvironment };
+module.exports = {
+  ManagedOllamaRuntime,
+  parseExcludedTcpPortRanges,
+  sanitizedRuntimeEnvironment,
+  selectManagedRuntimePort
+};
 
 // #endregion
