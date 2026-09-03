@@ -27,6 +27,13 @@ test('desktop rende Markdown semantico anche durante lo streaming', () => {
   assert.match(styles, /Cambria Math/);
 });
 
+test('una ricerca live indisponibile termina con una risposta deterministica senza fatti obsoleti', () => {
+  const source = fs.readFileSync(path.join(root, 'src/application/register-ipc.js'), 'utf8');
+  assert.match(source, /function publicResearchUnavailableAnswer/);
+  assert.match(source, /prepared\.research\.unavailable && prepared\.research\.policy\.level === 'required'/);
+  assert.match(source, /Non ti darò un dato potenzialmente superato come se fosse attuale/);
+});
+
 test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () => {
   const { enhancePublicAiHtml } = require('../src/remote/public-demo');
   const base = '<!doctype html><html><head></head><body><div class="exchange" aria-live="polite"><p id="userPrompt" class="prompt-copy"></p><p id="answer" class="answer"></p></div><p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p><script>legacy()</script></body></html>';
@@ -62,7 +69,19 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /async function memoryRead\(\)\{return\[\]/);
   assert.match(html, /id="sessionHistory"/);
   assert.match(html, /function renderSessionHistory\(\)/);
-  assert.match(html, /classList\.add\('request-active','keyboard-open'\)/);
+  assert.match(html, /classList\.add\('request-active','conversation-active','keyboard-open'\)/);
+  assert.match(html, /classList\.add\('conversation-active','keyboard-open'\)/);
+  assert.match(html, /contains\('conversation-active'\)\)\{const collapsed=document\.body\.classList\.toggle\('composer-collapsed'\)/);
+  assert.match(html, /\.conversation-active:not\(\.request-active\) \.dock/);
+  assert.match(html, /\.conversation-active\.composer-collapsed:not\(\.request-active\) \.dock/);
+  assert.match(html, /function dismissIdleKeyboard\(\)/);
+  assert.match(html, /event\.key==='Escape'/);
+  assert.match(html, /event\.target\.closest\?\.\('\.dock,dialog'\)/);
+  assert.match(html, /--nxs-privacy-height/);
+  assert.match(html, /new ResizeObserver\(\(\)=>syncPrivacyHeight\(\)\)/);
+  assert.match(html, /contains\('conversation-active'\)\)\)return/);
+  assert.match(html, /classList\.toggle\('status-active',Boolean\(value\)\)/);
+  assert.match(html, /\.status-active \.dock/);
   assert.match(html, /finally\{busy=false;setSendMode\(false\);leaveRequestLayout\(\)\}/);
   assert.match(html, /visualViewport/);
   assert.match(html, /language:spokenLanguage\(text\)/);

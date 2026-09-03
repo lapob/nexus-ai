@@ -169,6 +169,12 @@ function buildPublicResearchPrompt(sources, unavailable = false) {
   return '';
 }
 
+function publicResearchUnavailableAnswer(question = '') {
+  return researchLanguage(question) === 'it'
+    ? 'Non posso verificare questa informazione in tempo reale perché il servizio di ricerca web non è disponibile. Non ti darò un dato potenzialmente superato come se fosse attuale: riprova tra poco.'
+    : 'I cannot verify this information in real time because web search is unavailable. I will not present a potentially outdated fact as current; please try again shortly.';
+}
+
 function validateGroundedResponse(question, text, security, publicSources = []) {
   const quality = validateResponse(question, text, security);
   if (!publicSources.length) return quality;
@@ -1499,6 +1505,9 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       throwIfRequestAborted(controller.signal);
       const attachmentContext = resolveAttachmentContext(attachmentIds, event.sender.id);
       const prepared = await prepare({ question, mode, history, settings, signal: controller.signal, attachmentContext });
+      if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
+        return { answer: publicResearchUnavailableAnswer(question), sources: [], mode, requestId, usage: { promptTokens: 0, completionTokens: 0 } };
+      }
       await ensureRuntime(settings);
       const selectedModel = shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
         ? settings.fastModel
@@ -1617,6 +1626,16 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         if (prepared.publicSources.length) emit(event, { type: 'sources', requestId, sources: prepared.publicSources });
       } else {
         emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: 'Preparo il contesto utile' } });
+      }
+      if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
+        const answer = publicResearchUnavailableAnswer(question);
+        const result = { requestId, message: { role: 'assistant', content: answer }, finishReason: 'unavailable', sources: [], usage: { promptTokens: 0, completionTokens: 0 } };
+        emit(event, { type: 'start', requestId, metadata: { mode: 'verified-unavailable' } });
+        emit(event, { type: 'token', requestId, token: answer });
+        emit(event, { type: 'complete', requestId, result });
+        firstTokenAt = performance.now();
+        recordPerformance({ success: true, modelClass: 'instant' });
+        return result;
       }
       await ensureRuntime(settings);
       selectedModel = shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
@@ -1853,6 +1872,25 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       if (prepared.research?.searched) {
         report(prepared.research.unavailable ? 'Ricerca web non disponibile: evito dati non verificati…' : `Confronto ${prepared.publicSources.length} fonti pubbliche…`);
       } else report('Preparo l’intelligenza più adatta…');
+      if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
+        const answer = publicResearchUnavailableAnswer(parsed.question);
+        publishRemoteToken(answer);
+        report('Risposta pronta');
+        const now = Date.now();
+        const completed = {
+          ...conversation,
+          updatedAt: now,
+          incomplete: false,
+          turns: [
+            ...conversation.turns,
+            { role: 'user', content: parsed.question, createdAt: now },
+            { role: 'assistant', content: answer, createdAt: now }
+          ]
+        };
+        const updated = ephemeral ? completed : conversationStore.save(completed);
+        recordRemotePerformance(true);
+        return updated;
+      }
       await ensureRuntime(settings);
       const explicitModel = requestedModel !== 'automatic'
         ? (await aiRuntime.listModels()).find((model) => model.id === requestedModel && model.capabilities?.chat !== false)?.id

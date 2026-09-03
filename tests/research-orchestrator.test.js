@@ -13,15 +13,19 @@ test('deduplica le fonti e pubblica solo riferimenti esterni', () => {
 });
 
 test('orchestra query limitate e segnala il fallback indisponibile', async () => {
-  const service = { search: async (query) => ({ provider: 'test', results: [{ title: query, url: `https://example.com/${encodeURIComponent(query)}`, snippet: 'Fonte', sourceKind: 'web', status: 'external' }] }) };
+  const options = [];
+  const service = { search: async (query, settings) => { options.push(settings); return { provider: 'test', results: [{ title: query, url: `https://example.com/${encodeURIComponent(query)}`, snippet: 'Fonte', sourceKind: 'web', status: 'external' }] }; } };
   const result = await researchQuestion({ question: 'Approfondisci e cerca sul web i transformer', mode: 'deep', service });
   assert.equal(result.searched, true);
   assert.ok(result.sources.length >= 1 && result.sources.length <= 6);
   assert.equal(result.citations[0].sourceKind, 'web');
+  assert.equal(options[0].freshOnly, false);
 
-  const unavailable = await researchQuestion({ question: 'Cerca sul web un dato attuale', service: { search: async () => { throw new Error('offline'); } } });
+  let freshOnly = false;
+  const unavailable = await researchQuestion({ question: 'Cerca sul web un dato attuale', service: { search: async (_query, settings) => { freshOnly = settings.freshOnly; throw new Error('offline'); } } });
   assert.equal(unavailable.unavailable, true);
   assert.equal(unavailable.provider, 'unavailable');
+  assert.equal(freshOnly, true);
 });
 
 test('mantiene query e lingua deterministiche', () => {

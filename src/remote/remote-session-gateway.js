@@ -551,7 +551,7 @@ const PUBLIC_AI_MANIFEST = JSON.stringify({
   icons: [{ src: '/nexus-icon.png', sizes: '1024x1024', type: 'image/png', purpose: 'any maskable' }]
 });
 const PUBLIC_AI_SERVICE_WORKER = `'use strict';
-const CACHE='nexusnxs-ai-shell-v3';
+const CACHE='nexusnxs-ai-shell-v4';
 const SHELL=['/','/manifest.webmanifest','/nexus-icon.png','/inter-latin.woff2'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

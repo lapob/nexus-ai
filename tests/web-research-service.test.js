@@ -65,6 +65,33 @@ test('in modalita auto ripiega su Wikipedia se Brave non risponde', async () => 
   assert.equal(calls.length, 2);
 });
 
+test('non spaccia Wikipedia per ricerca in tempo reale', async () => {
+  const withoutLiveProvider = new WebResearchService({
+    provider: 'auto',
+    fetchImpl: async () => { throw new Error('non deve essere chiamato'); }
+  });
+  await assert.rejects(
+    () => withoutLiveProvider.search('versione corrente Node.js', { freshOnly: true }),
+    /provider live/
+  );
+
+  const calls = [];
+  const failingLiveProvider = new WebResearchService({
+    provider: 'auto',
+    braveApiKey: 'server-secret',
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      return jsonResponse({}, 503);
+    }
+  });
+  await assert.rejects(
+    () => failingLiveProvider.search('versione corrente Node.js', { freshOnly: true }),
+    /503/
+  );
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /api\.search\.brave\.com/);
+});
+
 test('rifiuta URL pubblici non HTTPS e risposte non JSON', async () => {
   assert.equal(safePublicUrl('http://127.0.0.1/private'), '');
   assert.equal(safePublicUrl('https://user:pass@example.com'), '');

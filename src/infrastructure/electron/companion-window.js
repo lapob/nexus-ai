@@ -11,6 +11,7 @@ const PRESENCE_SIZE = 168;
 const DISPLAY_MARGIN = 18;
 const PRESENCE_POINTER_CHANNEL = 'nexus:system-presence-pointer';
 const PRESENCE_OPEN_CHANNEL = 'nexus:system-presence-open';
+const PRESENCE_VOICE_CHANNEL = 'nexus:system-presence-voice';
 const PRESENCE_STATE_CHANNEL = 'nexus:system-presence-state';
 const PRESENCE_CONFIG_CHANNEL = 'nexus:system-presence-config';
 const PRESENCE_STATES = new Set([
@@ -121,12 +122,12 @@ function ambientPresenceBounds(display) {
 function systemPresenceDocument({ interactive = false, locale = 'en', configuration = {} } = {}) {
   const language = /^it(?:-|$)/i.test(String(locale || '')) ? 'it' : 'en';
   const copy = language === 'it' ? {
-    open: 'Apri NexusNXS', idle: 'NexusNXS', booting: 'Avvio', listening: 'In ascolto',
+    open: 'Apri NexusNXS', talk: 'Parla con NexusNXS', idle: 'NexusNXS', booting: 'Avvio', listening: 'In ascolto',
     speaking: 'Sto parlando', thinking: 'Sto pensando', responding: 'Sto rispondendo',
     executing: 'Sto lavorando', permission: 'Conferma richiesta', offline: 'Non raggiungibile',
     error: 'Attenzione', wake: 'Richiamo vocale locale attivo'
   } : {
-    open: 'Open NexusNXS', idle: 'NexusNXS', booting: 'Starting', listening: 'Listening',
+    open: 'Open NexusNXS', talk: 'Talk to NexusNXS', idle: 'NexusNXS', booting: 'Starting', listening: 'Listening',
     speaking: 'Speaking', thinking: 'Thinking', responding: 'Responding',
     executing: 'Working', permission: 'Confirmation required', offline: 'Unavailable',
     error: 'Attention', wake: 'Local wake word active'
@@ -171,14 +172,14 @@ ${stateColorStyles}
 <meta name="viewport" content="width=device-width,initial-scale=1"><style>${contextualStateStyles}</style>
 <style>
 :root{color-scheme:dark;--accent:86,222,224}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent;font-family:Inter,system-ui,sans-serif;user-select:none}.presence{position:relative;display:grid;width:100%;height:100%;place-items:center;isolation:isolate;opacity:.72;transition:opacity .28s ease}.presence:hover,.presence:focus-within,.presence:not([data-state=idle]){opacity:1}.aura{position:absolute;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(var(--accent),.105),rgba(var(--accent),.025) 46%,transparent 72%);filter:blur(2px);animation:breathe 6s ease-in-out infinite;pointer-events:none}.drag-ring{position:relative;width:118px;height:118px;border-radius:50%;transform:translateZ(0);filter:drop-shadow(0 15px 26px rgba(0,0,0,.34));transition:filter .2s ease,transform .2s ease}.drag-ring[data-interactive=true]{-webkit-app-region:drag;cursor:grab}.drag-ring[data-interactive=true]:active{cursor:grabbing}.visual{position:absolute;inset:0;border-radius:50%;transition:opacity .26s ease,transform .26s ease}.neural{opacity:0;background:radial-gradient(circle at 43% 38%,rgba(237,255,255,.96) 0 2%,rgba(var(--accent),.82) 5%,rgba(35,134,143,.62) 25%,rgba(4,23,26,.94) 61%,rgba(0,4,5,.76) 72%);box-shadow:inset 0 0 0 1px rgba(var(--accent),.18),inset 0 0 28px rgba(var(--accent),.16),0 0 22px rgba(var(--accent),.16)}.neural:before,.neural:after{content:'';position:absolute;inset:12px;border-radius:47% 53% 42% 58%;border:1px solid rgba(218,255,255,.22);animation:neural-flow 9s linear infinite}.neural:after{inset:25px;border-color:rgba(var(--accent),.28);animation-direction:reverse;animation-duration:6.5s}.saturn{opacity:0;transform:rotate(-13deg);background:radial-gradient(circle,rgba(226,255,255,.96) 0 2%,rgba(var(--accent),.72) 5%,rgba(15,69,74,.85) 18%,rgba(1,10,12,.97) 34%,transparent 36%)}.saturn:before,.saturn:after{content:'';position:absolute;left:2px;right:2px;top:42px;height:31px;border:2px solid rgba(var(--accent),.62);border-left-color:rgba(225,255,255,.9);border-radius:50%;box-shadow:0 0 10px rgba(var(--accent),.28),inset 0 0 9px rgba(var(--accent),.12);animation:orbit-pulse 4.8s ease-in-out infinite}.saturn:after{left:17px;right:17px;top:48px;height:20px;border-width:1px;border-color:rgba(207,252,253,.36);animation-delay:-1.4s}.reactor{opacity:0;background:repeating-conic-gradient(from 4deg,rgba(var(--accent),.8) 0 5deg,transparent 5deg 19deg);mask:radial-gradient(circle,transparent 0 24%,#000 25% 37%,transparent 38% 50%,#000 51% 54%,transparent 55%);filter:drop-shadow(0 0 7px rgba(var(--accent),.34));animation:reactor-spin 18s linear infinite}.reactor:before,.reactor:after{content:'';position:absolute;inset:17px;border-radius:50%;border:1px solid rgba(218,255,255,.34);border-left-color:transparent;border-bottom-color:transparent;animation:reactor-spin 7s linear infinite reverse}.reactor:after{inset:35px;border-color:rgba(var(--accent),.58);border-right-color:transparent;animation-duration:4.8s;animation-direction:normal}.presence[data-appearance=neural] .neural,.presence[data-appearance=saturn-experimental] .saturn,.presence[data-appearance=jarvis-reactor] .reactor{opacity:1}.core{position:absolute;z-index:5;left:50%;top:50%;width:48px;height:48px;border:0;border-radius:50%;padding:0;background:radial-gradient(circle,rgba(236,255,255,.98) 0 5%,rgba(var(--accent),.9) 9%,rgba(8,42,45,.96) 49%,rgba(1,8,9,.98) 72%);box-shadow:0 0 0 1px rgba(var(--accent),.22),0 0 17px rgba(var(--accent),.27);outline:0;transform:translate(-50%,-50%);cursor:default;-webkit-app-region:no-drag;-webkit-tap-highlight-color:transparent;transition:transform .18s ease,filter .18s ease}.core[data-interactive=true]{cursor:pointer}.core[data-interactive=true]:hover,.core[data-interactive=true]:focus-visible{filter:brightness(1.18);transform:translate(-50%,-50%) scale(1.07)}.core[data-interactive=true]:focus-visible{outline:2px solid rgba(var(--accent),.62);outline-offset:5px}.state{position:absolute;z-index:6;bottom:3px;max-width:156px;padding:5px 9px;border-radius:999px;color:rgba(215,239,240,.82);background:rgba(3,12,13,.72);font-size:9px;letter-spacing:.075em;text-transform:uppercase;white-space:nowrap;opacity:0;transform:translateY(3px);transition:opacity .18s ease,transform .18s ease;backdrop-filter:blur(9px);pointer-events:none}.presence:hover .state,.presence:focus-within .state{opacity:1;transform:none}.wake-indicator{position:absolute;z-index:7;right:21px;top:21px;width:8px;height:8px;border-radius:50%;background:rgb(var(--accent));box-shadow:0 0 0 3px rgba(var(--accent),.11),0 0 10px rgba(var(--accent),.52);opacity:0;transform:scale(.72);pointer-events:none}.presence[data-interactive=true][data-wake-listening=true] .wake-indicator{opacity:.92;transform:scale(1);animation:wake-pulse 2.2s ease-in-out infinite}.presence:is([data-state=thinking],[data-state=responding],[data-state=executing]) .drag-ring{animation:work 1.45s ease-in-out infinite}.presence[data-state=listening] .visual{filter:brightness(1.15) saturate(1.08)}.presence[data-state=speaking] .visual{animation-duration:.72s}.presence[data-state=permission]{--accent:255,195,93}.presence[data-state=offline] .drag-ring{filter:saturate(.18);opacity:.55}.presence[data-state=error]{--accent:235,112,103}.presence[data-quality=efficient] .aura,.presence[data-quality=efficient] .visual:after{display:none}.presence[data-motion=reduced] *{animation:none!important;transition:none!important}@keyframes breathe{50%{opacity:.58;transform:scale(.94)}}@keyframes neural-flow{to{transform:rotate(360deg)}}@keyframes orbit-pulse{50%{transform:scaleX(.95);opacity:.68}}@keyframes reactor-spin{to{transform:rotate(360deg)}}@keyframes work{50%{filter:brightness(1.18) drop-shadow(0 15px 26px rgba(0,0,0,.34));transform:scale(1.025)}}@keyframes wake-pulse{50%{opacity:.5;transform:scale(.78)}}@media(prefers-reduced-motion:reduce){.presence[data-motion=system] *{animation:none!important;transition:none!important}}
-</style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}"><div class="aura" aria-hidden="true"></div><span class="presence-particles" aria-hidden="true">${presenceParticles}</span><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><span class="visual neural" aria-hidden="true"></span><span class="visual saturn" aria-hidden="true"></span><span class="visual reactor" aria-hidden="true"></span><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.open}" title="${copy.open}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main>
-<script>(()=>{const copy=${JSON.stringify(copy)};const bridge=window.nexusPresence;const root=document.querySelector('.presence');const core=document.querySelector('.core');const ring=document.querySelector('.drag-ring');if(!bridge)return;bridge.onState((value)=>{const state=String(value||'idle');root.dataset.state=state;document.querySelector('.state').textContent=copy[state]||copy.idle});bridge.onConfiguration((value)=>{const next=value&&typeof value==='object'?value:{};root.dataset.appearance=['neural','saturn-experimental','jarvis-reactor'].includes(String(next.appearance))?String(next.appearance):'saturn-experimental';root.dataset.motion=['system','reduced','full'].includes(String(next.motion))?String(next.motion):'system';root.dataset.quality=['auto','efficient','balanced','ultra','super'].includes(String(next.quality))?String(next.quality):'auto';root.dataset.wakeListening=String(next.wakeWordListening===true)});if(core.dataset.interactive==='true'){let active=false;const update=(event)=>{const box=ring.getBoundingClientRect();const inside=event.clientX>=box.left-9&&event.clientX<=box.right+9&&event.clientY>=box.top-9&&event.clientY<=box.bottom+9;if(inside!==active){active=inside;bridge.setInteractive(inside)}};addEventListener('mousemove',update,{passive:true});addEventListener('mouseleave',()=>{active=false;bridge.setInteractive(false)});core.addEventListener('click',()=>bridge.openMain());core.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();bridge.openMain()}})}})()</script></body></html>`;
+</style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}"><div class="aura" aria-hidden="true"></div><span class="presence-particles" aria-hidden="true">${presenceParticles}</span><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><span class="visual neural" aria-hidden="true"></span><span class="visual saturn" aria-hidden="true"></span><span class="visual reactor" aria-hidden="true"></span><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.talk}" title="${copy.talk}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main>
+<script>(()=>{const copy=${JSON.stringify(copy)};const bridge=window.nexusPresence;const root=document.querySelector('.presence');const core=document.querySelector('.core');const ring=document.querySelector('.drag-ring');if(!bridge)return;bridge.onState((value)=>{const state=String(value||'idle');root.dataset.state=state;document.querySelector('.state').textContent=copy[state]||copy.idle});bridge.onConfiguration((value)=>{const next=value&&typeof value==='object'?value:{};root.dataset.appearance=['neural','saturn-experimental','jarvis-reactor'].includes(String(next.appearance))?String(next.appearance):'saturn-experimental';root.dataset.motion=['system','reduced','full'].includes(String(next.motion))?String(next.motion):'system';root.dataset.quality=['auto','efficient','balanced','ultra','super'].includes(String(next.quality))?String(next.quality):'auto';root.dataset.wakeListening=String(next.wakeWordListening===true)});if(core.dataset.interactive==='true'){let active=false;let clickTimer=null;const update=(event)=>{const box=ring.getBoundingClientRect();const inside=event.clientX>=box.left-9&&event.clientX<=box.right+9&&event.clientY>=box.top-9&&event.clientY<=box.bottom+9;if(inside!==active){active=inside;bridge.setInteractive(inside)}};addEventListener('mousemove',update,{passive:true});addEventListener('mouseleave',()=>{active=false;bridge.setInteractive(false)});core.addEventListener('click',()=>{clearTimeout(clickTimer);clickTimer=setTimeout(()=>bridge.startVoice(),210)});core.addEventListener('dblclick',()=>{clearTimeout(clickTimer);bridge.openMain()});core.addEventListener('keydown',(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();bridge.startVoice()}else if(event.key==='ArrowUp'){event.preventDefault();bridge.openMain()}})}})()</script></body></html>`;
 }
 
 // #endregion
 // #region 03 - Ciclo di vita deterministico della Presence
 
-function createSystemPresenceManager({ logger, openPrimaryWindow, defaultSystemPresence = false }) {
+function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice, defaultSystemPresence = false }) {
   const presenceStatePath = path.join(app.getPath('userData'), 'system-presence.json');
   const presencePreload = path.join(__dirname, 'system-presence-preload.js');
   let displayListenersAttached = false;
@@ -289,8 +290,29 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, defaultSystemP
       .finally(() => { openingPromise = null; });
   }
 
+  function onPresenceVoice(event) {
+    if (!presenceSender(event) || openingPromise) return;
+    openingPromise = Promise.resolve()
+      .then(() => activateVoice?.())
+      .then((result) => {
+        if (result?.error || result?.launched === false) {
+          schedulePresenceState('idle');
+          logger?.warn?.('Attivazione vocale dalla Presence non riuscita.', { code: result?.error?.code, reason: result?.reason });
+          return false;
+        }
+        return true;
+      })
+      .catch((error) => {
+        schedulePresenceState('idle');
+        logger?.warn?.('Attivazione vocale dalla Presence non riuscita.', { error });
+        return false;
+      })
+      .finally(() => { openingPromise = null; });
+  }
+
   ipcMain.on(PRESENCE_POINTER_CHANNEL, onPresencePointer);
   ipcMain.on(PRESENCE_OPEN_CHANNEL, onPresenceOpen);
+  ipcMain.on(PRESENCE_VOICE_CHANNEL, onPresenceVoice);
 
   function savePresencePosition(entry) {
     if (!entry || entry.window.isDestroyed() || entry.ambientCentered) return;
@@ -575,6 +597,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, defaultSystemP
     detachDisplayListeners();
     ipcMain.removeListener(PRESENCE_POINTER_CHANNEL, onPresencePointer);
     ipcMain.removeListener(PRESENCE_OPEN_CHANNEL, onPresenceOpen);
+    ipcMain.removeListener(PRESENCE_VOICE_CHANNEL, onPresenceVoice);
     return { enabled: false };
   }
 

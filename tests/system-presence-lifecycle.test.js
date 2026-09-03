@@ -86,6 +86,7 @@ test('la Presence apre la UI on-demand e ne segue la visibilità', () => {
   const presence = fs.readFileSync(path.join(root, 'src', 'application', 'presence-bootstrap.js'), 'utf8');
   assert.doesNotMatch(source, /attachPrimaryWindow/);
   assert.match(presence, /openPrimaryWindow:\s*activateFullUi/);
+  assert.match(presence, /activateVoice:\s*\(\)\s*=>\s*activateFromWakeWord/);
   assert.match(presence, /manager\.setApplicationVisible\?\.\(state\.running\)/);
 });
 

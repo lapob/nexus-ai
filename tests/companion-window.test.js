@@ -41,7 +41,9 @@ test('la Presence usa solo i tre visualizer, CSS leggero e un hotspot esplicito'
   const document = systemPresenceDocument({ interactive: true, locale: 'it-IT', configuration: { appearance: 'jarvis-reactor', state: 'listening', motion: 'full' } });
   assert.match(document, /data-appearance="jarvis-reactor"/);
   assert.match(document, /data-state="listening"/);
-  assert.match(document, /aria-label="Apri NexusNXS"/);
+  assert.match(document, /aria-label="Parla con NexusNXS"/);
+  assert.match(document, /bridge\.startVoice\(\)/);
+  assert.match(document, /dblclick[\s\S]*bridge\.openMain\(\)/);
   assert.match(document, /class="visual neural"/);
   assert.match(document, /class="visual saturn"/);
   assert.match(document, /class="visual reactor"/);
@@ -79,6 +81,8 @@ test('il manager usa una sola Presence selezionabile, trascinabile e sospesa con
   assert.match(source, /displaySelectionMode/);
   assert.match(source, /automaticPresenceDisplayId/);
   assert.match(source, /AMBIENT_CENTER_STATES/);
+  assert.match(source, /PRESENCE_VOICE_CHANNEL/);
+  assert.match(source, /activateVoice/);
   assert.match(source, /entry\.ambientCentered/);
   assert.match(source, /const selectedDescriptor = descriptors\.find/);
   assert.match(source, /const activeIds = new Set\(selectedDescriptor \? \[selectedDescriptor\.displayId\] : \[\]\)/);

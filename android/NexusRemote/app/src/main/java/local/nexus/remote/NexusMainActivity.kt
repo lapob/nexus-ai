@@ -444,7 +444,8 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val wakeRisk: String = "",
     val wakeStatus: String = "",
     val wakeBusy: Boolean = false,
-    val wakeAwaiting: Boolean = false
+    val wakeAwaiting: Boolean = false,
+    val assistantInvocation: Long = 0L
 )
 
 /**
@@ -2420,6 +2421,17 @@ class NexusMainActivity : ComponentActivity() {
 
     private fun handleIncomingIntent(incoming: Intent?) {
         incoming ?: return
+        if (incoming.action == Intent.ACTION_ASSIST) {
+            state = state.copy(
+                screen = NexusScreen.CHAT,
+                work = false,
+                assistantInvocation = System.currentTimeMillis()
+            )
+            incoming.replaceExtras(Bundle())
+            incoming.data = null
+            incoming.action = null
+            return
+        }
         if (incoming.action == Intent.ACTION_VIEW) {
             incoming.data?.let(::handleDeepLink)
             incoming.data = null
@@ -2520,6 +2532,16 @@ private fun JSONArray?.toTurns() = buildList {
         (latestPrompt.isBlank() && latestAnswer.isBlank()) ||
             (latestPrompt.length <= 180 && latestAnswer.isNotBlank() && latestAnswer.length <= 560)
         )
+
+    LaunchedEffect(state.assistantInvocation, interactionAvailable) {
+        if (state.assistantInvocation <= 0L) return@LaunchedEffect
+        keyboard?.hide()
+        focusManager.clearFocus(force = true)
+        textMode = false
+        typedSession = false
+        attachmentSheet = false
+        if (interactionAvailable) voiceMode = true else dispatch("probe", "")
+    }
 
     LaunchedEffect(state.connection) {
         if (!interactionAvailable) {

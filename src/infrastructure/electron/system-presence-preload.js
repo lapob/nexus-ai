@@ -6,12 +6,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const POINTER_CHANNEL = 'nexus:system-presence-pointer';
 const OPEN_CHANNEL = 'nexus:system-presence-open';
+const VOICE_CHANNEL = 'nexus:system-presence-voice';
 const STATE_CHANNEL = 'nexus:system-presence-state';
 const CONFIG_CHANNEL = 'nexus:system-presence-config';
 
 contextBridge.exposeInMainWorld('nexusPresence', Object.freeze({
   setInteractive: (enabled) => ipcRenderer.send(POINTER_CHANNEL, enabled === true),
   openMain: () => ipcRenderer.send(OPEN_CHANNEL),
+  startVoice: () => ipcRenderer.send(VOICE_CHANNEL),
   onState: (listener) => {
     if (typeof listener !== 'function') return () => {};
     const handler = (_event, value) => listener(String(value || 'idle'));

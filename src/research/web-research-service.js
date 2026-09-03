@@ -162,11 +162,14 @@ class WebResearchService {
     }).filter((item) => item.title && item.url && item.snippet);
   }
 
-  async search(query, { limit = 4, language = 'it', signal } = {}) {
+  async search(query, { limit = 4, language = 'it', signal, freshOnly = false } = {}) {
     const normalizedQuery = cleanText(query, 500);
     if (!this.enabled || normalizedQuery.length < 2) return { provider: 'off', results: [] };
     const provider = this.activeProvider();
     if (provider === 'unavailable') throw new Error('La ricerca Brave è configurata senza credenziale server.');
+    if (freshOnly && provider !== 'brave') {
+      throw new Error('La ricerca web in tempo reale richiede un provider live configurato sul server.');
+    }
     const boundedLimit = Math.max(1, Math.min(8, Number(limit) || 4));
     const key = this.cacheKey(provider, normalizedQuery, wikipediaLanguage(language), boundedLimit);
     const cached = this.readCache(key);
@@ -182,7 +185,7 @@ class WebResearchService {
       // non deve disattivare tutta la ricerca pubblica. Wikipedia resta un
       // fallback dichiarato e senza credenziali; la modalita brave esplicita,
       // invece, conserva l'errore per rendere visibile la configurazione errata.
-      if (this.provider !== 'auto' || provider !== 'brave' || signal?.aborted) throw error;
+      if (freshOnly || this.provider !== 'auto' || provider !== 'brave' || signal?.aborted) throw error;
       this.logger?.warn?.('Provider Brave non disponibile; uso il fallback Wikipedia.', { error });
       completedProvider = 'wikipedia';
       results = await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });

@@ -167,7 +167,8 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
     const batches = await Promise.all(queries.map((query) => service.search(query, {
       limit: Math.max(2, Math.ceil(policy.maxResults / queries.length)),
       language,
-      signal
+      signal,
+      freshOnly: policy.reason === 'time-sensitive'
     })));
     const sources = deduplicateSources(batches.map((batch) => batch.results), policy.maxResults);
     return {

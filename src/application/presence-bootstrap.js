@@ -209,6 +209,12 @@ async function bootstrapPresence({ env = process.env } = {}) {
   manager = createSystemPresenceManager({
     logger,
     openPrimaryWindow: activateFullUi,
+    activateVoice: () => activateFromWakeWord({
+      manager,
+      createActivationTicket: (kind) => presenceBridge?.createActivationTicket?.(kind),
+      openFullUi,
+      waitForFullUi
+    }),
     defaultSystemPresence: true
   });
   wakeWordListener = createWakeWordListener({

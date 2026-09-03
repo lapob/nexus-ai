@@ -982,3 +982,13 @@ test('la diagnostica NexusNXS espone solo stato operativo e nessun contenuto pri
   assert.match(activity, /La diagnostica non legge né esporta il contenuto delle conversazioni/);
   assert.match(activity, /Riconnessione automatica/);
 });
+
+test('NexusNXS puo essere selezionato come assistente Android e apre subito la voce', () => {
+  const manifest = read('android', 'NexusRemote', 'app', 'src', 'main', 'AndroidManifest.xml');
+  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
+  assert.match(manifest, /android\.intent\.action\.ASSIST/);
+  assert.match(activity, /incoming\.action == Intent\.ACTION_ASSIST/);
+  assert.match(activity, /assistantInvocation = System\.currentTimeMillis\(\)/);
+  assert.match(activity, /LaunchedEffect\(state\.assistantInvocation, interactionAvailable\)/);
+  assert.match(activity, /if \(interactionAvailable\) voiceMode = true else dispatch\("probe", ""\)/);
+});
