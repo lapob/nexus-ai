@@ -35,6 +35,24 @@ async function main() {
       const statusShot = await client.command('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
       fs.writeFileSync(path.join(output, `status-${width}x${height}.png`), Buffer.from(statusShot.data,'base64'));
       if (status.titleGap < 0 || status.dockGap < 0) throw new Error('Status collision: '+JSON.stringify({width,height,...status}));
+      const typing = await evaluateWhenReady(client, `new Promise(resolve=>{
+        document.body.classList.add('keyboard-open');
+        const prompt=document.querySelector('#prompt'),core=document.querySelector('#core');
+        prompt.value='Bozza da conservare';prompt.focus();
+        const voiceState=globalThis.nexusAiState.voiceState;
+        setTimeout(()=>{
+          core.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));
+          core.click();
+          const preserved=document.body.classList.contains('keyboard-open')&&document.activeElement===prompt&&prompt.value==='Bozza da conservare'&&globalThis.nexusAiState.voiceState===voiceState;
+          const hitTestable=getComputedStyle(core).pointerEvents==='auto';
+          document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));
+          const outsideDismissed=!document.body.classList.contains('keyboard-open');
+          document.body.classList.add('keyboard-open');prompt.focus();
+          window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+          resolve({preserved,hitTestable,outsideDismissed,escapeDismissed:!document.body.classList.contains('keyboard-open')});
+        },400);
+      })`);
+      if(Object.values(typing).some(value=>value!==true))throw new Error('Core typing regression: '+JSON.stringify({width,height,...typing}));
       const result = await evaluateWhenReady(client, `new Promise(resolve => {
         document.body.classList.add('conversation-active','keyboard-open');
         document.querySelector('#answer').innerHTML = Array.from({length:30},(_,i)=>'<p>Paragrafo '+i+': una risposta lunga deve restare leggibile senza attraversare i comandi in fondo.</p>').join('');
@@ -51,7 +69,7 @@ async function main() {
       if (result.gap < 0 || result.backingWidth < width || !result.backing.includes('rgb(0, 0, 0)') || result.padding < result.occupied) throw new Error(JSON.stringify(result));
       const screenshot = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       fs.writeFileSync(path.join(output, `${width}x${height}.png`), Buffer.from(screenshot.data, 'base64'));
-      report.push({ width, height, ...result });
+      report.push({ width, height, typing, ...result });
     }
     fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
     console.log('Bottom bar: sfondo nero continuo, note separate e spazio riservato verificati su tre viewport.');

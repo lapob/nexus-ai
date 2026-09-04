@@ -11,6 +11,8 @@ const EXPERIENCE_STYLE = `<style>
 </style>`;
 
 const INTERACTION_VISIBILITY_STYLE = `<style>
+/* Keep the dimmed Core hit-testable so typing taps cannot fall through to dismissal. */
+body.keyboard-open:not(.request-active):not(.conversation-active) .core{pointer-events:auto}
 html{scrollbar-width:none}
 html::-webkit-scrollbar{display:none}
 *{-webkit-tap-highlight-color:transparent}
@@ -75,6 +77,16 @@ body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock,bo
 const SLASH_COMMAND_STYLE = `<style>
 .composer-box{position:relative}.web-slash-menu{position:absolute;z-index:48;right:-1px;bottom:calc(100% + 12px);left:-1px;max-height:min(410px,48vh);overflow:auto;padding:7px;border:1px solid rgba(105,220,217,.15);border-radius:19px;color:#dceaea;background:linear-gradient(155deg,rgba(8,22,23,.985),rgba(3,10,11,.99));box-shadow:0 26px 78px rgba(0,0,0,.5);backdrop-filter:blur(18px);scrollbar-width:thin}.web-slash-menu[hidden]{display:none}.web-slash-head{display:flex;justify-content:space-between;gap:14px;padding:7px 9px 9px;color:#668687;font:650 .59rem ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.09em;text-transform:uppercase}.web-slash-menu button{width:100%;min-height:55px;padding:8px 10px;border:0;border-radius:13px;display:grid;grid-template-columns:minmax(82px,auto) minmax(0,1fr) auto;align-items:center;gap:11px;color:inherit;background:transparent;text-align:left;cursor:pointer;transition:background .15s ease,color .15s ease,transform .15s cubic-bezier(.22,1,.36,1)}.web-slash-menu button:is(:hover,:focus-visible,[aria-selected=true]){outline:0;color:#efffff;background:rgba(69,177,177,.105);transform:translateX(2px)}.web-slash-menu code{color:#83dedb;font:650 .75rem ui-monospace,SFMono-Regular,Consolas,monospace}.web-slash-copy{min-width:0;display:grid;gap:3px}.web-slash-copy strong,.web-slash-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.web-slash-copy strong{font-size:.79rem;font-weight:610}.web-slash-copy small{color:#789394;font-size:.66rem}.web-slash-menu em{color:#709798;font:600 .55rem ui-monospace,SFMono-Regular,Consolas,monospace;font-style:normal;letter-spacing:.06em;text-transform:uppercase}@media(max-width:560px){.web-slash-menu{position:fixed;right:10px;bottom:calc(var(--nxs-privacy-height) + 82px + env(safe-area-inset-bottom));left:10px;max-height:min(360px,44dvh)}.web-slash-menu button{grid-template-columns:76px minmax(0,1fr)}.web-slash-menu em,.web-slash-head span:last-child{display:none}}@media(prefers-reduced-motion:reduce){.web-slash-menu{backdrop-filter:none}.web-slash-menu button{transition:none}}
 </style>`;
+
+const coreTypingGuardRuntime = `
+function guardCoreWhileTyping(event){
+  if(!document.body.classList.contains('keyboard-open')||!event.target.closest?.('#core'))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+document.addEventListener('pointerdown',guardCoreWhileTyping,{capture:true});
+document.addEventListener('click',guardCoreWhileTyping,{capture:true});
+`;
 
 const ATTACHMENT_STYLE = `<style>
 .attachment-toggle{position:relative}.attachment-toggle:focus{outline:0}.attachment-toggle:focus-visible{border-color:rgba(91,224,220,.34);color:#d7eeee;background:rgba(29,85,86,.23);box-shadow:0 0 0 3px rgba(83,221,216,.055)}
@@ -512,7 +524,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("async function ask(value", "function isImageRequest(text){return /^\\s*(?:genera|crea|disegna|realizza|generate|create|draw)\\b[\\s\\S]{0,80}\\b(?:immagine|foto|illustrazione|image|picture|illustration)\\b/i.test(text)}async function generateImage(text,credential){setVoiceState('thinking');setPhase('Genero l’immagine sul server…');const response=await fetch('/api/guest/images/generate',{method:'POST',headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:JSON.stringify({prompt:text,size:'1024x1024'})});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Generazione immagine non disponibile')}if(imageObjectUrl)URL.revokeObjectURL(imageObjectUrl);imageObjectUrl=URL.createObjectURL(await response.blob());imageOutput.src=imageObjectUrl;imageOutput.alt='Immagine generata da NexusNXS';imageResult.hidden=false;answer.textContent='Immagine generata.';setVoiceState('ready');setPhase('Immagine pronta');return answer.textContent}async function ask(value")
     // Il callback evita che sequenze matematiche come `$'` vengano
     // interpretate come token speciali della replacement string.
-    .replace('function isImageRequest', () => attachmentRuntime + answerFormattingRuntime + artifactRuntime + feedbackRuntime + responseActionsRuntime + streamFollowRuntime + sessionExperienceRuntime + idleKeyboardRuntime + slashCommandRuntime + 'function isImageRequest')
+    .replace('function isImageRequest', () => attachmentRuntime + answerFormattingRuntime + artifactRuntime + feedbackRuntime + responseActionsRuntime + streamFollowRuntime + sessionExperienceRuntime + coreTypingGuardRuntime + idleKeyboardRuntime + slashCommandRuntime + 'function isImageRequest')
     .replace("const text=String(value??prompt.value).trim();", "const rawText=String(value??prompt.value).trim(),slashResolution=resolveSlashInput(rawText);if(slashResolution.handled){prompt.value='';slashMenu.hidden=true;setPhase(slashResolution.message);setTimeout(()=>setPhase(''),1800);return}const text=slashResolution.text;")
     .replace("const allowed=/^(image/(?:jpeg|png|webp)|application/(?:pdf|json|xml)|text/(?:plain|markdown|csv|xml))$/i;if(!allowed.test(file.type))", "const allowed=['image/jpeg','image/png','image/webp','application/pdf','application/json','application/xml','text/plain','text/markdown','text/csv','text/xml'];if(!allowed.includes(String(file.type).toLowerCase()))")
     .replace("const pieces=String(text).split(/(https://[^\\s<>()]+)/g)", "const pieces=String(text).match(/\\S+|\\s+/g)||[]")
