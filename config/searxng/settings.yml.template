@@ -1,0 +1,21 @@
+use_default_settings: true
+
+general:
+  instance_name: NexusNXS Search
+  enable_metrics: false
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json
+
+server:
+  bind_address: 0.0.0.0
+  port: 8080
+  secret_key: __NEXUS_SEARXNG_SECRET__
+  limiter: false
+  image_proxy: true
+
+ui:
+  static_use_hash: true

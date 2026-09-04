@@ -307,6 +307,11 @@ test('il modello rapido segue la policy adattiva e non preriscalda il client pub
   assert.match(bootstrap, /clearInterval\(aiKeepWarm\)/);
 });
 
+test('il server headless preriscalda la voce neurale prima del primo utente', () => {
+  assert.match(bootstrap, /speechWarmup = hardwareProfile\.tier === 'lite' \? null : scheduleIdleTask/);
+  assert.doesNotMatch(bootstrap, /speechWarmup = headlessMode \|\| hardwareProfile\.tier/);
+});
+
 test('il vocabolario vocale corregge localmente soltanto termini quasi identici', () => {
   assert.match(voiceVocabulary, /distanceAtMostOne/);
   assert.match(voiceVocabulary, /normalized\.length >= 5/);
@@ -456,7 +461,8 @@ test('le generazioni al limite continuano prima di essere archiviate', () => {
   assert.match(registerIpc, /`\$\{requestId\}-continuation-\$\{continuation \+ 1\}`/);
   assert.match(registerIpc, /result: \{ \.\.\.result, requestId \}/);
   assert.match(registerIpc, /incomplete: result\.finishReason === 'length'/);
-  assert.match(registerIpc, /maximumContinuations = resolvedMode === 'deep' \? 4 : 6/);
+  assert.match(registerIpc, /remoteTokenLimit = Math\.min\(Math\.max\(runtimeTuning\.deepTokens, 2_048\), 4_096\)/);
+  assert.match(registerIpc, /maximumContinuations = 2/);
   assert.match(registerIpc, /REMOTE_RESPONSE_INCOMPLETE/);
 });
 

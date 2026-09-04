@@ -4,10 +4,19 @@
 #>
 $ErrorActionPreference = 'Stop'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$workspaceRoot = Split-Path $projectRoot -Parent
 $launcher = Join-Path $projectRoot 'scripts\start-electron.js'
 $node = (Get-Command node.exe -ErrorAction Stop).Source
 $env:NEXUS_PUBLIC_PORT = '32147'
 $env:NEXUS_PUBLIC_URL = 'https://ai.nexusnxs.com'
+$env:NEXUS_WEB_SEARCH_PROVIDER = 'auto'
+$env:NEXUS_SEARXNG_URL = 'http://127.0.0.1:8080/'
+$imageRuntimeConfig = [IO.File]::ReadAllText((Join-Path $projectRoot 'config\local-image-runtime.json')) | ConvertFrom-Json
+$env:NEXUS_IMAGE_API_MODE = [string]$imageRuntimeConfig.provider
+$env:NEXUS_IMAGE_API_URL = [string]$imageRuntimeConfig.endpoint
+$env:NEXUS_IMAGE_MODEL = [string]$imageRuntimeConfig.model.name
+$env:NEXUS_IMAGE_TIMEOUT_MS = [string]$imageRuntimeConfig.timeoutMs
+$env:NEXUS_IMAGE_OUTPUT_ROOT = Join-Path $workspaceRoot '.services\comfyui\app\output'
 # The dedicated public listener binds only to loopback behind cloudflared.
 $env:NEXUS_TRUST_PUBLIC_CLOUDFLARE = '1'
 $dataRoot = Join-Path (Split-Path $projectRoot -Parent) '.nexus-data'
@@ -22,6 +31,25 @@ if (-not (Test-Path -LiteralPath $qaSecretPath -PathType Leaf)) {
 }
 $env:NEXUS_QA_SECRET = [System.IO.File]::ReadAllText($qaSecretPath).Trim()
 $env:NEXUS_QA_SECRET_FILE = $qaSecretPath
+
+# Il motore di ricerca e confinato al loopback e viene gestito dallo stesso
+# avvio headless. Un errore del container non deve impedire chat e voce.
+$searchManager = Join-Path $projectRoot 'scripts\manage-self-hosted-search.ps1'
+try {
+  & $searchManager -Action start | Out-Null
+} catch {
+  Write-Warning "Ricerca self-hosted non disponibile: $($_.Exception.Message)"
+}
+
+# Anche il generatore immagini resta loopback-only e parte senza finestre.
+# Se l'accelerazione o il modello non sono pronti, il Core rimane disponibile
+# e dichiara correttamente la capability immagini come degradata.
+$imageManager = Join-Path $projectRoot 'scripts\manage-local-image-service.ps1'
+try {
+  & $imageManager -Action start | Out-Null
+} catch {
+  Write-Warning "Generazione immagini locale non disponibile: $($_.Exception.Message)"
+}
 
 #region Headless gateway
 

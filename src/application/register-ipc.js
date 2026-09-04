@@ -1908,12 +1908,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       const messages = attachments.images?.length ? prepared.messages.map((message, index) => index === prepared.messages.length - 1 && message.role === 'user' ? { ...message, images: attachments.images } : message) : prepared.messages;
       report(resolvedMode === 'deep' ? 'Ragiono e collego i dettagli…' : 'Formulo la risposta…');
       remoteInferenceStartedAt = performance.now();
-      // Il precedente segmento da 768 token interrompeva anche spiegazioni
-      // ordinarie. Sul server pubblico lasciamo abbastanza spazio per chiudere
-      // quasi tutti i turni in una sola inferenza, conservando un tetto rigido.
-      const remoteTokenLimit = resolvedMode === 'deep'
-        ? Math.min(runtimeTuning.deepTokens, 4_096)
-        : Math.min(Math.max(runtimeTuning.quickTokens, 1_536), Math.max(runtimeTuning.deepTokens, 1_536));
+      // Un segmento breve produceva pause percepibili ogni volta che una guida,
+      // una tabella o del codice raggiungevano il limite. Il gateway pubblico
+      // usa quindi lo stesso budget continuo in modalita rapida e profonda:
+      // abbastanza ampio da concludere quasi tutti i turni in una sola
+      // inferenza, ma comunque limitato a 4K token per latenza e memoria.
+      const remoteTokenLimit = Math.min(Math.max(runtimeTuning.deepTokens, 2_048), 4_096);
       const streamRemoteSegment = (segmentRequestId, segmentMessages, onSegmentToken) => aiRuntime.streamChat({
         requestId: segmentRequestId,
         model: selectedModel,
@@ -1936,7 +1936,10 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       });
       let result = await streamRemoteSegment(requestId, messages, bufferModelOutput ? () => {} : publishRemoteToken);
       let combinedRemoteAnswer = String(result.message?.content || '');
-      const maximumContinuations = resolvedMode === 'deep' ? 4 : 6;
+      // Due sole riprese sono una rete di sicurezza per output eccezionali.
+      // Evita cicli molto lunghi e rende un eventuale limite esplicito invece
+      // di lasciare l'interfaccia in generazione per minuti.
+      const maximumContinuations = 2;
       for (let continuation = 0; result.finishReason === 'length' && continuation < maximumContinuations; continuation += 1) {
         throwIfRequestAborted(controller.signal);
         const nextMessages = continuationMessages(messages, combinedRemoteAnswer);

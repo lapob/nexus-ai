@@ -65,6 +65,11 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /\/api\/guest\/messages\/cancel/);
   assert.match(html, /setPhase\('Risposta interrotta'\)/);
   assert.match(html, /Riprendo la risposta/);
+  assert.match(html, /async function authenticatedFetch\(url,options=\{\}\)/);
+  assert.match(html, /if\(response\.status===401\)\{token='';credential=await session\(\);response=await invoke\(\)\}/);
+  assert.match(html, /await authenticatedFetch\('\/api\/guest\/messages\/stream'/);
+  assert.match(html, /await authenticatedFetch\('\/api\/guest\/voice\/synthesize'/);
+  assert.match(html, /await authenticatedFetch\('\/api\/guest\/voice\/transcribe'/);
   assert.match(html, /verified!==rawAnswer/);
   assert.match(html, /async function memoryRead\(\)\{return\[\]/);
   assert.match(html, /id="sessionHistory"/);
@@ -75,9 +80,16 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /\.conversation-active:not\(\.request-active\) \.dock/);
   assert.match(html, /\.conversation-active\.composer-collapsed:not\(\.request-active\) \.dock/);
   assert.match(html, /--nxs-collapse-shift/);
-  assert.match(html, /transform:translate3d\(var\(--nxs-collapse-shift\),0,0\)/);
+  assert.match(html, /\.conversation-active\.composer-collapsed:not\(\.request-active\) \.keyboard-toggle,[^{]+\{transform:translate3d\(var\(--nxs-collapse-shift\),0,0\)\}/);
   assert.match(html, /will-change:transform/);
+  assert.match(html, /nxs-control-reveal/);
+  assert.match(html, /classList\.add\('motion-ready','initial-reveal'\)/);
   assert.match(html, /function dismissIdleKeyboard\(\)/);
+  assert.match(html, /function syncCoreTypingGuard\(\)/);
+  assert.match(html, /core\.setAttribute\('aria-disabled','true'\)/);
+  assert.match(html, /core\.removeAttribute\('aria-disabled'\)/);
+  assert.match(html, /keyboard-open:not\(\.request-active\):not\(\.conversation-active\) \.core\{pointer-events:auto;cursor:default\}/);
+  assert.match(html, /function guardCoreWhileTyping\(event\)/);
   assert.match(html, /event\.key==='Escape'/);
   assert.match(html, /event\.target\.closest\?\.\('\.dock,dialog'\)/);
   assert.match(html, /--nxs-privacy-height/);
@@ -91,6 +103,8 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /visualViewport/);
   assert.match(html, /language:spokenLanguage\(text\)/);
   assert.match(html, /NexusNXS può commettere errori/);
+  assert.match(html, /Parla con Nexus/);
+  assert.match(html, /nexusnxs\.core-hint\.v1/);
   assert.doesNotMatch(html, /answer\.textContent\+=pendingAnswer/);
   for (const [index, match] of [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].entries()) {
     assert.doesNotThrow(() => new vm.Script(match[1]), `script Web generato ${index + 1}`);

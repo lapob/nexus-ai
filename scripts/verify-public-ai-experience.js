@@ -37,6 +37,33 @@ async function viewport(client, width, height, mobile) {
   })`, 10_000);
 }
 
+async function verifyInitialControlReveal(client, label) {
+  const result = await evaluateWhenReady(client, `new Promise((resolve) => setTimeout(() => {
+    const samples = Array.isArray(globalThis.__nxsInitialControlFrames) ? globalThis.__nxsInitialControlFrames : [];
+    const horizontal = samples.map((sample) => sample.groupCenterX).filter(Number.isFinite);
+    const intervals = samples.slice(1).map((sample) => sample.interval).filter(Number.isFinite).sort((a, b) => a - b);
+    let maxStep = 0;
+    for (let index = 1; index < horizontal.length; index += 1) {
+      maxStep = Math.max(maxStep, Math.abs(horizontal[index] - horizontal[index - 1]));
+    }
+    resolve({
+      frames: samples.length,
+      horizontalSpan: horizontal.length ? Math.max(...horizontal) - Math.min(...horizontal) : Infinity,
+      maxStep,
+      endCenterDelta: horizontal.length ? Math.abs(horizontal.at(-1) - innerWidth / 2) : Infinity,
+      endOpacity: samples.at(-1)?.opacity ?? 0,
+      p95: intervals[Math.floor(intervals.length * .95)] || 0
+    });
+  }, 560))`, 5_000);
+  if (result.frames < 10 || result.horizontalSpan > 2 || result.maxStep > 2 || result.endCenterDelta > 2) {
+    throw new Error(`${label}: i controlli attraversano lo schermo al caricamento (${JSON.stringify(result)}).`);
+  }
+  if (result.endOpacity < .95 || result.p95 > 40) {
+    throw new Error(`${label}: comparsa iniziale incompleta o oltre il budget frame (${JSON.stringify(result)}).`);
+  }
+  return result;
+}
+
 async function verifyIdleLayout(client, label) {
   const result = await evaluateWhenReady(client, `new Promise((resolve, reject) => {
     const keyboard = document.querySelector('#keyboard');
@@ -45,7 +72,8 @@ async function verifyIdleLayout(client, label) {
     const privacy = document.querySelector('.privacy');
     const shell = document.querySelector('.shell');
     const phase = document.querySelector('#phase');
-    if (!keyboard || !dock || !copy || !privacy || !shell || !phase) return reject(new Error('Layout iniziale incompleto'));
+    const core = document.querySelector('#core');
+    if (!keyboard || !dock || !copy || !privacy || !shell || !phase || !core) return reject(new Error('Layout iniziale incompleto'));
     const measure = () => {
       const dockRect = dock.getBoundingClientRect();
       const copyRect = copy.getBoundingClientRect();
@@ -62,7 +90,7 @@ async function verifyIdleLayout(client, label) {
         privacyBottom: innerHeight - privacyRect.bottom
       };
     };
-    setTimeout(() => {
+    setTimeout(async () => {
       const geometry = measure();
       phase.textContent = 'SERVIZIO MOMENTANEAMENTE NON DISPONIBILE';
       document.body.classList.add('status-active');
@@ -76,14 +104,21 @@ async function verifyIdleLayout(client, label) {
       phase.textContent = '';
       document.body.classList.remove('status-active');
       keyboard.click();
+      await new Promise(done => requestAnimationFrame(done));
       const opened = document.body.classList.contains('keyboard-open');
       const classAfterOpen = document.body.className;
+      const coreCursor = getComputedStyle(core).cursor;
+      const coreDisabled = core.getAttribute('aria-disabled');
+      const coreStateBefore = core.dataset.state;
+      core.click();
+      const coreStateAfter = core.dataset.state;
+      const remainedOpenAfterCore = document.body.classList.contains('keyboard-open');
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       const closedByEscape = !document.body.classList.contains('keyboard-open');
       keyboard.click();
       shell.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       const closedByOutside = !document.body.classList.contains('keyboard-open');
-      resolve({ ...geometry, ...statusGeometry, opened, classAfterOpen, closedByEscape, closedByOutside });
+      resolve({ ...geometry, ...statusGeometry, opened, classAfterOpen, coreCursor, coreDisabled, coreStateBefore, coreStateAfter, remainedOpenAfterCore, closedByEscape, closedByOutside });
     }, 360);
   })`, 10_000);
   if (result.gapFromHeadline < 16) throw new Error(`${label}: icone troppo vicine al testo (${result.gapFromHeadline.toFixed(1)}px).`);
@@ -91,7 +126,104 @@ async function verifyIdleLayout(client, label) {
   if (result.privacyBottom < 0 || result.privacyBottom > 40) throw new Error(`${label}: nota inferiore non ancorata (${result.privacyBottom.toFixed(1)}px).`);
   if (result.statusGap < 12) throw new Error(`${label}: stato operativo e icone collidono (${result.statusGap.toFixed(1)}px).`);
   if (result.statusPrivacyGap < 12) throw new Error(`${label}: icone stato e nota inferiore collidono (${result.statusPrivacyGap.toFixed(1)}px).`);
+  if (result.coreCursor !== 'default' || result.coreDisabled !== 'true' || result.coreStateAfter !== result.coreStateBefore || !result.remainedOpenAfterCore) {
+    throw new Error(`${label}: il Core resta azionabile durante la scrittura (${JSON.stringify(result)}).`);
+  }
   if (!result.opened || !result.closedByEscape || !result.closedByOutside) throw new Error(`${label}: chiusura tastiera vuota incompleta (${JSON.stringify(result)}).`);
+}
+
+async function verifyIdleComposerSlide(client, label) {
+  const result = await evaluateWhenReady(client, `new Promise((resolve, reject) => {
+    const keyboard = document.querySelector('#keyboard');
+    const attachment = document.querySelector('#attachment');
+    const dock = document.querySelector('.dock');
+    const privacy = document.querySelector('.privacy');
+    const composerBox = document.querySelector('.composer-box');
+    if (!keyboard || !attachment || !dock || !privacy || !composerBox) {
+      return reject(new Error('Transizione composer iniziale non disponibile'));
+    }
+    const capture = (action) => new Promise((done) => {
+      const samples = [];
+      const started = performance.now();
+      let previous = started;
+      const measure = (now) => {
+        const rect = dock.getBoundingClientRect();
+        const keyboardRect = keyboard.getBoundingClientRect();
+        const attachmentRect = attachment.getBoundingClientRect();
+        samples.push({
+          centerY: rect.top + rect.height / 2,
+          width: rect.width,
+          groupCenterDelta: Math.abs((keyboardRect.left + attachmentRect.right) / 2 - innerWidth / 2),
+          composerOpacity: Number(getComputedStyle(composerBox).opacity),
+          position: getComputedStyle(dock).position,
+          interval: now - previous
+        });
+        previous = now;
+      };
+      measure(started);
+      action();
+      const frame = (now) => {
+        measure(now);
+        if (now - started >= 540) return done(samples);
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+    const metrics = (samples, direction) => {
+      const centers = samples.map((sample) => sample.centerY);
+      const intervals = samples.slice(1).map((sample) => sample.interval).filter(Number.isFinite).sort((a, b) => a - b);
+      let reversals = 0;
+      let maxStep = 0;
+      let maxStepPair = null;
+      for (let index = 1; index < centers.length; index += 1) {
+        const delta = centers[index] - centers[index - 1];
+        if (Math.abs(delta) > maxStep) {
+          maxStep = Math.abs(delta);
+          maxStepPair = { index, from: samples[index - 1], to: samples[index] };
+        }
+        if ((direction === 'up' && delta > 2) || (direction === 'down' && delta < -2)) reversals += 1;
+      }
+      return {
+        startCenterY: centers[0] || 0,
+        endCenterY: centers.at(-1) || 0,
+        startWidth: samples[0]?.width || 0,
+        endWidth: samples.at(-1)?.width || 0,
+        endGroupCenterDelta: samples.at(-1)?.groupCenterDelta ?? Infinity,
+        endComposerOpacity: samples.at(-1)?.composerOpacity ?? 0,
+        positions: [...new Set(samples.map((sample) => sample.position))],
+        reversals,
+        maxStep,
+        maxStepPair,
+        p95: intervals[Math.floor(intervals.length * .95)] || 0,
+        frames: samples.length
+      };
+    };
+    setTimeout(async () => {
+      const opening = await capture(() => keyboard.click());
+      const opened = document.body.classList.contains('keyboard-open');
+      const closing = await capture(() => keyboard.click());
+      const closed = !document.body.classList.contains('keyboard-open');
+      const dockRect = dock.getBoundingClientRect();
+      const privacyRect = privacy.getBoundingClientRect();
+      resolve({
+        opened,
+        closed,
+        opening: metrics(opening, 'up'),
+        closing: metrics(closing, 'down'),
+        finalGap: privacyRect.top - dockRect.bottom
+      });
+    }, 420);
+  })`, 12_000);
+  if (!result.opened || !result.closed) throw new Error(`${label}: slide iniziale non reversibile (${JSON.stringify(result)}).`);
+  if (result.opening.positions.some((value) => value !== 'fixed') || result.closing.positions.some((value) => value !== 'fixed')) {
+    throw new Error(`${label}: il dock cambia sistema di coordinate durante lo slide (${JSON.stringify(result)}).`);
+  }
+  if (result.opening.reversals || result.closing.reversals) throw new Error(`${label}: traiettoria slide non monotona (${JSON.stringify(result)}).`);
+  if (result.opening.maxStep > 55 || result.closing.maxStep > 55) throw new Error(`${label}: salto visibile nella traiettoria slide (${JSON.stringify(result)}).`);
+  if (result.opening.p95 > 40 || result.closing.p95 > 40) throw new Error(`${label}: slide iniziale oltre il budget frame (${JSON.stringify(result)}).`);
+  if (result.opening.endComposerOpacity < .92 || result.closing.endComposerOpacity > .08) throw new Error(`${label}: dissolvenza composer incompleta (${JSON.stringify(result)}).`);
+  if (result.closing.endGroupCenterDelta > 2 || result.finalGap < 12) throw new Error(`${label}: controlli compatti finali non centrati o sovrapposti (${JSON.stringify(result)}).`);
+  return result;
 }
 
 async function exercise(client, { stop = false } = {}) {
@@ -196,10 +328,10 @@ async function exercise(client, { stop = false } = {}) {
         streaming: answer.classList.contains('streaming'),
         online: navigator.onLine
       })));
-    }, ${stop ? '45_000' : '90_000'});
+    }, ${stop ? '45_000' : '150_000'});
     setTimeout(() => { const rect = dock.getBoundingClientRect(); idleDockCenter = rect.top + rect.height / 2; }, 360);
     setTimeout(() => send.click(), 420);
-  })`, stop ? 50_000 : 95_000);
+  })`, stop ? 50_000 : 155_000);
 }
 
 async function verifyComposerSlide(client, label) {
@@ -216,8 +348,9 @@ async function verifyComposerSlide(client, label) {
       const frame = (now) => {
         const rect = dock.getBoundingClientRect();
         const keyboardRect = keyboard.getBoundingClientRect();
+        const attachmentRect = document.querySelector('#attachment').getBoundingClientRect();
         const composerBox = document.querySelector('.composer-box');
-        samples.push({ keyboardLeft: keyboardRect.left, composerOpacity: Number(getComputedStyle(composerBox).opacity), bottom: rect.bottom, interval: now - previous });
+        samples.push({ keyboardLeft: keyboardRect.left, groupCenterDelta: Math.abs((keyboardRect.left + attachmentRect.right) / 2 - (rect.left + rect.right) / 2), composerOpacity: Number(getComputedStyle(composerBox).opacity), keyboardTransform: getComputedStyle(keyboard).transform, gridColumns: getComputedStyle(document.querySelector('.composer')).gridTemplateColumns, collapseShift: getComputedStyle(document.documentElement).getPropertyValue('--nxs-collapse-shift').trim(), bottom: rect.bottom, interval: now - previous });
         previous = now;
         if (now - started >= 380) return done(samples);
         requestAnimationFrame(frame);
@@ -238,6 +371,10 @@ async function verifyComposerSlide(client, label) {
           endKeyboardLeft: samples.at(-1)?.keyboardLeft || 0,
           startComposerOpacity: samples[0]?.composerOpacity ?? 0,
           endComposerOpacity: samples.at(-1)?.composerOpacity ?? 0,
+          endKeyboardTransform: samples.at(-1)?.keyboardTransform || '',
+          endGridColumns: samples.at(-1)?.gridColumns || '',
+          endCollapseShift: samples.at(-1)?.collapseShift || '',
+          endGroupCenterDelta: samples.at(-1)?.groupCenterDelta ?? Infinity,
           anchorDrift: bottoms.length ? Math.max(...bottoms) - Math.min(...bottoms) : 0,
           p95: intervals[Math.floor(intervals.length * .95)] || 0,
           frames: samples.length
@@ -247,8 +384,9 @@ async function verifyComposerSlide(client, label) {
     }, 420);
   })`, 12_000);
   if (!result.collapsed || !result.restored) throw new Error(`${label}: stato slide non reversibile.`);
-  if (result.collapse.endKeyboardLeft - result.collapse.startKeyboardLeft < 80 || result.collapse.endComposerOpacity > .08) throw new Error(`${label}: uscita composer senza slide misurabile.`);
-  if (result.restore.startKeyboardLeft - result.restore.endKeyboardLeft < 80 || result.restore.endComposerOpacity < .92) throw new Error(`${label}: rientro composer senza slide misurabile.`);
+  if (result.collapse.endKeyboardLeft - result.collapse.startKeyboardLeft < 80 || result.collapse.endComposerOpacity > .08) throw new Error(`${label}: uscita composer senza slide misurabile (${JSON.stringify(result)}).`);
+  if (result.collapse.endGroupCenterDelta > 2) throw new Error(`${label}: controlli compatti non centrati (${result.collapse.endGroupCenterDelta}px; ${JSON.stringify(result)}).`);
+  if (result.restore.startKeyboardLeft - result.restore.endKeyboardLeft < 80 || result.restore.endComposerOpacity < .92) throw new Error(`${label}: rientro composer senza slide misurabile (${JSON.stringify(result)}).`);
   if (result.collapse.anchorDrift > 3 || result.restore.anchorDrift > 3) throw new Error(`${label}: slide perde l’ancoraggio inferiore (${JSON.stringify(result)}).`);
   if (result.collapse.p95 > 40 || result.restore.p95 > 40) throw new Error(`${label}: slide oltre il budget frame (${JSON.stringify(result)}).`);
   return result;
@@ -316,9 +454,34 @@ async function main() {
       await client.command('Network.enable');
       await client.command('Network.setExtraHTTPHeaders', { headers: { 'X-Nexus-QA-Key': qaSecret } });
     }
+    await client.command('Page.addScriptToEvaluateOnNewDocument', { source: `
+      globalThis.__nxsInitialControlFrames = [];
+      (() => {
+        let started = null;
+        let previous = 0;
+        const sample = (now) => {
+          const keyboard = document.querySelector('#keyboard');
+          const attachment = document.querySelector('#attachment');
+          if (!keyboard || !attachment) return requestAnimationFrame(sample);
+          if (started === null) { started = now; previous = now; }
+          const keyboardRect = keyboard.getBoundingClientRect();
+          const attachmentRect = attachment.getBoundingClientRect();
+          globalThis.__nxsInitialControlFrames.push({
+            groupCenterX: (attachmentRect.left + keyboardRect.right) / 2,
+            opacity: Math.min(Number(getComputedStyle(attachment).opacity), Number(getComputedStyle(keyboard).opacity)),
+            interval: now - previous
+          });
+          previous = now;
+          if (now - started < 500) requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      })();
+    ` });
 
     await viewport(client, 1180, 860, false);
+    const desktopReveal = await verifyInitialControlReveal(client, 'Desktop');
     await verifyIdleLayout(client, 'Desktop');
+    const desktopIdleSlide = await verifyIdleComposerSlide(client, 'Desktop');
     const desktop = await exercise(client);
     assertExperience(desktop, { label: 'Desktop' });
     const desktopSlide = await verifyComposerSlide(client, 'Desktop');
@@ -328,7 +491,9 @@ async function main() {
     }
 
     await viewport(client, 390, 844, true);
+    const mobileReveal = await verifyInitialControlReveal(client, 'Mobile');
     await verifyIdleLayout(client, 'Mobile');
+    const mobileIdleSlide = await verifyIdleComposerSlide(client, 'Mobile');
     const mobile = await exercise(client, { stop: true });
     assertExperience(mobile, { stop: true, label: 'Mobile' });
 
@@ -343,7 +508,7 @@ async function main() {
     })`, 10_000);
     if (forgotten.answer || forgotten.prompt) throw new Error('La sessione web è sopravvissuta alla riapertura della pagina.');
 
-    console.log(`Web AI verificata: desktop ${desktop.answerLength} caratteri/${desktop.elapsedMs}ms, p95 ${desktop.frameP95}ms; slide ${desktopSlide.collapse.frames}+${desktopSlide.restore.frames} frame; continuità ${continuity.entries} turni; mobile stop ${mobile.answerLength} caratteri, p95 ${mobile.frameP95}ms; dock stabile e memoria temporanea.`);
+    console.log(`Web AI verificata: comparsa iniziale ${desktopReveal.frames}/${mobileReveal.frames} frame senza deriva orizzontale; desktop ${desktop.answerLength} caratteri/${desktop.elapsedMs}ms, p95 ${desktop.frameP95}ms; slide idle ${desktopIdleSlide.opening.frames}+${desktopIdleSlide.closing.frames} e conversazione ${desktopSlide.collapse.frames}+${desktopSlide.restore.frames} frame; continuità ${continuity.entries} turni; mobile idle ${mobileIdleSlide.opening.frames}+${mobileIdleSlide.closing.frames}, stop ${mobile.answerLength} caratteri, p95 ${mobile.frameP95}ms; dock stabile e memoria temporanea.`);
   } finally {
     try { await client?.command('Browser.close'); } catch {}
     client?.close();

@@ -1,0 +1,26 @@
+name: nexusnxs-local-services
+
+services:
+  search:
+    image: searxng/searxng@sha256:8bb6a6f677a758cefa4ae2c9f5da1012876e428a4388e3e86f34be4ca715330a
+    container_name: nexusnxs-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - type: bind
+        source: ../../../.services/searxng/config/settings.yml
+        target: /etc/searxng/settings.yml
+        read_only: true
+      - type: bind
+        source: ../../../.services/searxng/cache
+        target: /var/cache/searxng
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8080/
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: local
+      options:
+        max-size: 5m
+        max-file: "2"

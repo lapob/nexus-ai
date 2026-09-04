@@ -811,7 +811,11 @@ function bootstrapElectron({ env = process.env } = {}) {
       // Python/Kokoro parte in una finestra distinta da AI, WebGL e snapshot:
       // era la principale causa dei picchi simultanei subito dopo il paint.
       const speechWarmupDelay = hardwareProfile.performanceLevel >= 3 ? 2_500 : 5_000;
-      speechWarmup = headlessMode || hardwareProfile.tier === 'lite' ? null : scheduleIdleTask(() => {
+      // Anche il server headless espone voce a Web e Android: tenerlo escluso
+      // dal preriscaldamento trasferiva l'intero avvio di Kokoro (circa sette
+      // secondi su questa workstation) al primo utente. Solo il profilo Lite
+      // conserva il fallback senza runtime neurale residente.
+      speechWarmup = hardwareProfile.tier === 'lite' ? null : scheduleIdleTask(() => {
         neuralSpeechService.warmUp();
       }, speechWarmupDelay, { idleSeconds: 1, retryMs: 1_000, maxWaitMs: 30_000 });
 

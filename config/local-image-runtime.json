@@ -1,0 +1,16 @@
+{
+  "provider": "comfyui",
+  "endpoint": "http://127.0.0.1:8188/",
+  "timeoutMs": 180000,
+  "comfyUi": {
+    "repository": "https://github.com/Comfy-Org/ComfyUI.git",
+    "revision": "e80c1570b6b44a2557d5d8e341e05782d18c9bbb"
+  },
+  "model": {
+    "name": "sd_xl_turbo_1.0_fp16.safetensors",
+    "source": "https://huggingface.co/stabilityai/sdxl-turbo",
+    "license": "sai-nc-community",
+    "expectedBytes": 6938081905,
+    "sha256": "e869ac7d6942cb327d68d5ed83a40447aadf20e0c3358d98b2cc9e270db0da26"
+  }
+}
