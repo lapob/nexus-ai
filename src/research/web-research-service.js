@@ -8,7 +8,7 @@ const { createHash } = require('node:crypto');
 // #region 01 — Normalizzazione e cancellazione
 
 const MAX_RESPONSE_BYTES = 1_000_000;
-const PROVIDERS = new Set(['auto', 'brave', 'openai', 'wikipedia']);
+const PROVIDERS = new Set(['auto', 'searxng', 'brave', 'openai', 'wikipedia']);
 const DEFAULT_OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
 function cleanText(value, max = 1200) {
@@ -40,6 +40,18 @@ function safeProviderEndpoint(value, fallback = '') {
   return url.toString();
 }
 
+function safeSelfHostedEndpoint(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const url = new URL(raw);
+  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname.toLowerCase());
+  if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))
+    || url.username || url.password || url.hash || url.search) {
+    throw new Error('NEXUS_SEARXNG_URL deve essere HTTPS oppure loopback HTTP e non contenere credenziali.');
+  }
+  return url.toString();
+}
+
 function wikipediaLanguage(language = '') {
   return String(language || '').toLowerCase().startsWith('it') ? 'it' : 'en';
 }
@@ -57,12 +69,13 @@ function linkAbortSignal(controller, signal) {
 // #region 02 — Provider server-side
 
 class WebResearchService {
-  constructor({ enabled = true, provider = 'auto', braveApiKey = '', openAiApiKey = '', openAiModel = '', openAiEndpoint = DEFAULT_OPENAI_RESPONSES_URL, timeoutMs = 6000, cacheTtlMs = 300_000, fetchImpl = globalThis.fetch, logger = null, now = () => Date.now() } = {}) {
+  constructor({ enabled = true, provider = 'auto', searxngEndpoint = '', braveApiKey = '', openAiApiKey = '', openAiModel = '', openAiEndpoint = DEFAULT_OPENAI_RESPONSES_URL, timeoutMs = 6000, cacheTtlMs = 300_000, fetchImpl = globalThis.fetch, logger = null, now = () => Date.now() } = {}) {
     const normalizedProvider = String(provider || 'auto').toLowerCase();
     if (!PROVIDERS.has(normalizedProvider)) throw new Error('Provider di ricerca web non consentito.');
     if (typeof fetchImpl !== 'function') throw new Error('Runtime fetch non disponibile per la ricerca web.');
     this.enabled = enabled !== false;
     this.provider = normalizedProvider;
+    this.searxngEndpoint = safeSelfHostedEndpoint(searxngEndpoint);
     this.braveApiKey = String(braveApiKey || '').trim();
     this.openAiApiKey = String(openAiApiKey || '').trim();
     this.openAiModel = String(openAiModel || '').trim().slice(0, 160);
@@ -78,9 +91,11 @@ class WebResearchService {
 
   activeProvider() {
     if (!this.enabled) return 'off';
+    if (this.provider === 'searxng') return this.searxngEndpoint ? 'searxng' : 'unavailable';
     if (this.provider === 'brave') return this.braveApiKey ? 'brave' : 'unavailable';
     if (this.provider === 'openai') return this.openAiApiKey && this.openAiModel ? 'openai' : 'unavailable';
     if (this.provider === 'wikipedia') return 'wikipedia';
+    if (this.searxngEndpoint) return 'searxng';
     if (this.braveApiKey) return 'brave';
     if (this.openAiApiKey && this.openAiModel) return 'openai';
     return 'wikipedia';
@@ -167,6 +182,25 @@ class WebResearchService {
     })).filter((item) => item.title && item.url && item.snippet);
   }
 
+  async searchSearxng(query, { limit, language, signal }) {
+    const url = new URL('search', `${this.searxngEndpoint.replace(/\/+$/, '')}/`);
+    url.searchParams.set('q', query);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('language', wikipediaLanguage(language));
+    url.searchParams.set('safesearch', '1');
+    url.searchParams.set('categories', 'general');
+    const payload = await this.requestJson(url, { signal });
+    return (payload?.results || []).slice(0, limit).map((item, index) => ({
+      title: cleanText(item.title, 220),
+      url: safePublicUrl(item.url),
+      snippet: cleanText(item.content || item.snippet, 1200),
+      sourceKind: 'web',
+      status: 'external',
+      provider: 'searxng',
+      score: Math.max(0, limit - index)
+    })).filter((item) => item.title && item.url && item.snippet);
+  }
+
   async searchOpenAI(query, { limit, signal }) {
     const payload = await this.requestJson(this.openAiEndpoint, {
       method: 'POST',
@@ -243,7 +277,7 @@ class WebResearchService {
     if (!this.enabled || normalizedQuery.length < 2) return { provider: 'off', results: [] };
     const provider = this.activeProvider();
     if (provider === 'unavailable') throw new Error('Il provider di ricerca live non dispone di credenziale e modello server-side completi.');
-    if (freshOnly && !['brave', 'openai'].includes(provider)) {
+    if (freshOnly && !['searxng', 'brave', 'openai'].includes(provider)) {
       throw new Error('La ricerca web in tempo reale richiede un provider live configurato sul server.');
     }
     const boundedLimit = Math.max(1, Math.min(8, Number(limit) || 4));
@@ -253,19 +287,20 @@ class WebResearchService {
     let completedProvider = provider;
     let results;
     try {
-      results = provider === 'brave'
-        ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal })
-        : provider === 'openai'
-          ? await this.searchOpenAI(normalizedQuery, { limit: boundedLimit, signal })
-          : await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
-      if (provider === 'brave' || provider === 'openai') this.lastLiveFailureAt = 0;
+      results = provider === 'searxng'
+        ? await this.searchSearxng(normalizedQuery, { limit: boundedLimit, language, signal })
+        : provider === 'brave'
+          ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal })
+          : provider === 'openai'
+            ? await this.searchOpenAI(normalizedQuery, { limit: boundedLimit, signal })
+            : await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
+      if (['searxng', 'brave', 'openai'].includes(provider)) this.lastLiveFailureAt = 0;
     } catch (error) {
-      if ((provider === 'brave' || provider === 'openai') && !signal?.aborted) this.lastLiveFailureAt = this.now();
-      // In modalita auto una credenziale Brave scaduta o un guasto temporaneo
-      // non deve disattivare tutta la ricerca pubblica. Wikipedia resta un
-      // fallback dichiarato e senza credenziali; la modalita brave esplicita,
-      // invece, conserva l'errore per rendere visibile la configurazione errata.
-      if (freshOnly || this.provider !== 'auto' || !['brave', 'openai'].includes(provider) || signal?.aborted) throw error;
+      if (['searxng', 'brave', 'openai'].includes(provider) && !signal?.aborted) this.lastLiveFailureAt = this.now();
+      // In modalita auto il guasto temporaneo di un provider live non deve
+      // disattivare tutta la ricerca pubblica. Wikipedia resta un fallback
+      // dichiarato; la modalita esplicita conserva invece l'errore.
+      if (freshOnly || this.provider !== 'auto' || !['searxng', 'brave', 'openai'].includes(provider) || signal?.aborted) throw error;
       this.logger?.warn?.('Provider live non disponibile; uso il fallback Wikipedia.', { error });
       completedProvider = 'wikipedia';
       results = await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
@@ -278,4 +313,4 @@ class WebResearchService {
 
 // #endregion
 
-module.exports = { DEFAULT_OPENAI_RESPONSES_URL, PROVIDERS, WebResearchService, cleanText, safeProviderEndpoint, safePublicUrl, wikipediaLanguage };
+module.exports = { DEFAULT_OPENAI_RESPONSES_URL, PROVIDERS, WebResearchService, cleanText, safeProviderEndpoint, safePublicUrl, safeSelfHostedEndpoint, wikipediaLanguage };

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { WebResearchService, safeProviderEndpoint, safePublicUrl } = require('../src/research/web-research-service');
+const { WebResearchService, safeProviderEndpoint, safePublicUrl, safeSelfHostedEndpoint } = require('../src/research/web-research-service');
 
 function jsonResponse(payload, status = 200) {
   return {
@@ -47,6 +47,28 @@ test('usa Brave soltanto lato server e non restituisce la credenziale', async ()
   assert.equal(token, 'server-secret');
   assert.equal(result.results[0].url, 'https://example.com/docs');
   assert.doesNotMatch(JSON.stringify(result), /server-secret/);
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
+});
+
+test('usa SearXNG self-hosted come provider live preferito senza credenziali', async () => {
+  let requestUrl = '';
+  const service = new WebResearchService({
+    provider: 'auto',
+    searxngEndpoint: 'http://127.0.0.1:8080/',
+    braveApiKey: 'fallback-secret',
+    fetchImpl: async (url) => {
+      requestUrl = String(url);
+      return jsonResponse({ results: [{ title: 'Documentazione locale', url: 'https://example.com/current', content: 'Risultato aggiornato' }] });
+    }
+  });
+  const result = await service.search('versione corrente', { freshOnly: true, language: 'it', limit: 2 });
+  const url = new URL(requestUrl);
+  assert.equal(service.activeProvider(), 'searxng');
+  assert.equal(result.provider, 'searxng');
+  assert.equal(url.pathname, '/search');
+  assert.equal(url.searchParams.get('format'), 'json');
+  assert.equal(url.searchParams.get('language'), 'it');
+  assert.equal(result.results[0].snippet, 'Risultato aggiornato');
   assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
 });
 
@@ -136,6 +158,10 @@ test('rifiuta URL pubblici non HTTPS e risposte non JSON', async () => {
   assert.equal(safePublicUrl('https://user:pass@example.com'), '');
   assert.throws(() => safeProviderEndpoint('http://api.example/v1/responses'), /non sicuro/);
   assert.throws(() => safeProviderEndpoint('https://api.example/v1/responses?key=secret'), /non sicuro/);
+  assert.equal(safeSelfHostedEndpoint('http://localhost:8080/'), 'http://localhost:8080/');
+  assert.equal(safeSelfHostedEndpoint('https://search.example/'), 'https://search.example/');
+  assert.throws(() => safeSelfHostedEndpoint('http://search.example/'), /HTTPS oppure loopback/);
+  assert.throws(() => safeSelfHostedEndpoint('https://search.example/?token=secret'), /non contenere credenziali/);
   const service = new WebResearchService({
     fetchImpl: async () => ({ ok: true, status: 200, headers: { get: () => 'text/html' }, text: async () => '<html />' })
   });

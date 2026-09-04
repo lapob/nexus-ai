@@ -1,6 +1,6 @@
 /**
  * @module ai/image-generation-service
- * @description Adapter server-side per provider immagini OpenAI-compatible.
+ * @description Adapter server-side per un generatore immagini compatibile con il protocollo Nexus.
  */
 const ALLOWED_SIZES = new Set(['512x512', '768x768', '1024x1024', '1024x1536', '1536x1024']);
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -17,6 +17,12 @@ function cleanEndpoint(value) {
     throw new Error('NEXUS_IMAGE_API_URL deve essere HTTPS oppure loopback HTTP e non contenere credenziali.');
   }
   return endpoint.toString();
+}
+
+function endpointIsLoopback(value) {
+  if (!value) return false;
+  const endpoint = new URL(value);
+  return ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname.toLowerCase());
 }
 
 function detectImageMime(buffer) {
@@ -42,18 +48,17 @@ class ImageGenerationService {
   }
 
   static fromEnvironment(env = process.env) {
-    const apiKey = env.NEXUS_IMAGE_API_KEY || env.NEXUS_OPENAI_API_KEY || env.OPENAI_API_KEY || '';
-    const model = env.NEXUS_IMAGE_MODEL || '';
     return new ImageGenerationService({
-      endpoint: env.NEXUS_IMAGE_API_URL || (apiKey && model ? 'https://api.openai.com/v1/images/generations' : ''),
-      apiKey,
-      model,
+      endpoint: env.NEXUS_IMAGE_API_URL || '',
+      apiKey: env.NEXUS_IMAGE_API_KEY || '',
+      model: env.NEXUS_IMAGE_MODEL || '',
       timeoutMs: env.NEXUS_IMAGE_TIMEOUT_MS
     });
   }
 
   get available() {
-    return Boolean(this.endpoint && this.model && typeof this.fetchImpl === 'function');
+    return Boolean(this.endpoint && this.model && typeof this.fetchImpl === 'function'
+      && (this.apiKey || endpointIsLoopback(this.endpoint)));
   }
 
   capabilities() {
@@ -110,4 +115,4 @@ class ImageGenerationService {
 
 // #endregion
 
-module.exports = { ALLOWED_SIZES, ImageGenerationService, cleanEndpoint, detectImageMime };
+module.exports = { ALLOWED_SIZES, ImageGenerationService, cleanEndpoint, detectImageMime, endpointIsLoopback };

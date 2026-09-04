@@ -31,7 +31,7 @@ const DEFAULTS = Object.freeze({
   }),
   logging: Object.freeze({ level: 'info' }),
   retrieval: Object.freeze({ quickLimit: 6, deepInitialLimit: 5, deepQueryLimit: 5, deepMergedLimit: 8 }),
-  research: Object.freeze({ enabled: true, provider: 'auto', braveApiKey: '', openAiApiKey: '', openAiModel: '', openAiEndpoint: 'https://api.openai.com/v1/responses', timeoutMs: 6000, cacheTtlMs: 300000 }),
+  research: Object.freeze({ enabled: true, provider: 'auto', searxngEndpoint: '', braveApiKey: '', openAiApiKey: '', openAiModel: '', openAiEndpoint: 'https://api.openai.com/v1/responses', timeoutMs: 6000, cacheTtlMs: 300000 }),
   conversation: Object.freeze({ historyLimit: 8, contentLimit: 12000 })
 });
 const LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug']);
@@ -126,10 +126,11 @@ function loadRuntimeConfig(env = process.env) {
   const level = String(env.NEXUS_LOG_LEVEL || DEFAULTS.logging.level).toLowerCase(); if (!LOG_LEVELS.has(level)) throw new Error('NEXUS_LOG_LEVEL deve essere error, warn, info o debug.');
   const settings = validateSettings({ provider: env.NEXUS_AI_PROVIDER, baseUrl: env.NEXUS_OLLAMA_BASE_URL || env.NEXUS_LLM_BASE_URL, allowLan: env.NEXUS_OLLAMA_ALLOW_LAN === '1', timeoutMs: env.NEXUS_OLLAMA_TIMEOUT_MS, service: { baseUrl: env.NEXUS_SERVICE_URL || '', fallbackUrls: String(env.NEXUS_SERVICE_FALLBACK_URLS || '').split(',').map((value) => value.trim()).filter(Boolean), timeoutMs: env.NEXUS_SERVICE_TIMEOUT_MS }, chatModel: env.NEXUS_AI_CHAT_MODEL || env.NEXUS_LLM_MODEL, fastModel: env.NEXUS_AI_FAST_MODEL, embeddingModel: env.NEXUS_AI_EMBEDDING_MODEL, autoSelectModel: env.NEXUS_AI_AUTO_SELECT !== '0', temperature: env.NEXUS_LLM_TEMPERATURE }, DEFAULTS.ai);
   const researchProvider = String(env.NEXUS_WEB_SEARCH_PROVIDER || DEFAULTS.research.provider).toLowerCase();
-  if (!['auto', 'brave', 'openai', 'wikipedia'].includes(researchProvider)) throw new Error('NEXUS_WEB_SEARCH_PROVIDER deve essere auto, brave, openai o wikipedia.');
+  if (!['auto', 'searxng', 'brave', 'openai', 'wikipedia'].includes(researchProvider)) throw new Error('NEXUS_WEB_SEARCH_PROVIDER deve essere auto, searxng, brave, openai o wikipedia.');
   const research = Object.freeze({
     enabled: env.NEXUS_WEB_SEARCH_MODE !== 'off',
     provider: researchProvider,
+    searxngEndpoint: String(env.NEXUS_SEARXNG_URL || ''),
     braveApiKey: String(env.NEXUS_BRAVE_SEARCH_API_KEY || ''),
     openAiApiKey: String(env.NEXUS_OPENAI_API_KEY || env.OPENAI_API_KEY || ''),
     openAiModel: String(env.NEXUS_OPENAI_SEARCH_MODEL || ''),

@@ -62,11 +62,23 @@ NexusNXS lo dichiara invece di presentare come aggiornato un dato non verificato
 - `ai.embeddingModel`: selezionato automaticamente soltanto tra modelli riconosciuti come embedding;
 - `ai.autoSelectModel`: attivo per default e disattivabile dalle impostazioni.
 - `NEXUS_WEB_SEARCH_MODE`: `auto` oppure `off`;
-- `NEXUS_WEB_SEARCH_PROVIDER`: `auto`, `brave`, `openai` o `wikipedia`;
+- `NEXUS_WEB_SEARCH_PROVIDER`: `auto`, `searxng`, `brave`, `openai` o `wikipedia`;
+- `NEXUS_SEARXNG_URL`: endpoint del motore di ricerca self-hosted; in `auto` ha priorita sui provider esterni;
 - `NEXUS_BRAVE_SEARCH_API_KEY`: segreto opzionale solo server;
 - `NEXUS_OPENAI_API_KEY`, `NEXUS_OPENAI_SEARCH_MODEL`: alternativa server-side tramite Responses API con web search; il modello resta obbligatorio per evitare attivazioni e costi impliciti;
 - `NEXUS_OPENAI_RESPONSES_URL`: endpoint HTTPS, predefinito a `https://api.openai.com/v1/responses`;
 - `NEXUS_WEB_SEARCH_TIMEOUT_MS`: budget di rete tra 800 e 15000 ms.
+
+Per una ricerca live senza costo per richiesta, il server puo usare una propria
+istanza SearXNG con output JSON abilitato. Impostare
+`NEXUS_SEARXNG_URL=http://127.0.0.1:8080/`: la modalita `auto` la preferisce e
+mantiene Wikipedia come fallback dichiarato. La UI non riceve endpoint o segreti.
+
+La generazione immagini segue lo stesso confine: `NEXUS_IMAGE_API_URL` punta a
+un servizio locale compatibile con `/v1/images/generations`, mentre
+`NEXUS_IMAGE_MODEL` seleziona il modello. Su loopback la chiave e opzionale; per
+un endpoint remoto `NEXUS_IMAGE_API_KEY` e obbligatoria. Nessun provider esterno
+viene attivato implicitamente.
 
 Sono accettati endpoint loopback e, con opt-in, IP privati RFC1918. La selezione automatica viene
 verificata contro `/api/tags` a ogni bootstrap e adattata ai modelli realmente

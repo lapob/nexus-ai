@@ -48,10 +48,17 @@ test('image provider reports a retrying state after a real failure', async () =>
   assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'server-side' });
 });
 
-test('OpenAI image endpoint is opt-in and uses only server credentials', () => {
-  const off = ImageGenerationService.fromEnvironment({ OPENAI_API_KEY: 'server-secret' });
-  assert.equal(off.available, false, 'il modello esplicito evita costi o attivazioni implicite');
-  const configured = ImageGenerationService.fromEnvironment({ OPENAI_API_KEY: 'server-secret', NEXUS_IMAGE_MODEL: 'image-model' });
-  assert.equal(configured.endpoint, 'https://api.openai.com/v1/images/generations');
-  assert.equal(configured.available, true);
+test('il generatore immagini locale funziona senza chiave e non eredita provider esterni', () => {
+  const off = ImageGenerationService.fromEnvironment({ OPENAI_API_KEY: 'server-secret', NEXUS_IMAGE_MODEL: 'image-model' });
+  assert.equal(off.available, false, 'nessun endpoint esterno viene attivato implicitamente');
+  const local = ImageGenerationService.fromEnvironment({
+    NEXUS_IMAGE_API_URL: 'http://127.0.0.1:8188/v1/images/generations',
+    NEXUS_IMAGE_MODEL: 'nexus-image'
+  });
+  assert.equal(local.available, true);
+  const remoteWithoutKey = ImageGenerationService.fromEnvironment({
+    NEXUS_IMAGE_API_URL: 'https://images.example/v1/images/generations',
+    NEXUS_IMAGE_MODEL: 'nexus-image'
+  });
+  assert.equal(remoteWithoutKey.available, false, 'un endpoint remoto non autenticato resta disabilitato');
 });
