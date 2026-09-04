@@ -101,6 +101,11 @@ test("allows the production domain enough time to converge before rollback", asy
     releaseScript,
     /verifySite\("https:\/\/nexusnxs\.com", candidate\.version_id, \{ attempts: 12 \}\)/,
   );
+  assert.ok(
+    releaseScript.indexOf("await deployTriggers();")
+      < releaseScript.indexOf('await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 12 });'),
+    "production triggers must be deployed before the apex convergence check",
+  );
 });
 
 test("verifies immutable Cloudflare previews before promotion", async () => {

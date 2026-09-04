@@ -380,10 +380,13 @@ async function promote() {
     "--yes", "--message", `production ${sha.slice(0, 12)}`,
   ]);
   try {
+    // Custom-domain and route triggers are non-versioned Cloudflare settings.
+    // Apply them before testing the apex, otherwise the deployment can be at
+    // 100% while the public hostname still resolves the previous trigger.
+    await deployTriggers();
     // Custom-domain propagation can trail the Worker deployment by several
     // tens of seconds. Wait for edge convergence before declaring failure.
     await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 12 });
-    await deployTriggers();
     await verifyAiHealth(candidate.version_id, { attempts: 12 });
   } catch (releaseError) {
     if (!aiRoutePreviouslyAttached) await removeAiRoute();
