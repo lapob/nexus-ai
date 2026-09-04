@@ -15,32 +15,32 @@ const releases = [
   {
     Icon: Laptop,
     name: "NexusNXS per PC",
-    version: "0.3.7",
+    version: "0.3.8",
     platform: "Windows 11 · x64",
-    size: "102,51 MiB · 107.487.396 byte",
-    date: "3 settembre 2026",
+    size: "102,51 MiB · 107.488.849 byte",
+    date: "4 settembre 2026",
     state: "PREVIEW · NON FIRMATA",
     text: "Assistente AI connesso per Windows con voce e strumenti locali.",
     requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
-    sha256: "6606B9910BAD5922F3912FDA0EDC2997F91EC6D39E1C85AD34F0FA45E3B05FCD",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.7-preview.1/NexusNXS-0.3.7-Setup.exe",
+    sha256: "77F17D7AB13B5398E8FF9B30F2473454DECD9E31AF545382D01429B7131DB14E",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.8-preview.1/NexusNXS-0.3.8-Setup.exe",
   },
   {
     Icon: Smartphone,
     name: "NexusNXS per Android",
-    version: "6.4.1",
+    version: "6.4.2",
     platform: "Android 10+",
-    size: "1,24 MiB · 1.303.400 byte",
-    date: "3 settembre 2026",
+    size: "1,28 MiB · 1.336.972 byte",
+    date: "4 settembre 2026",
     state: "PREVIEW · FIRMA DEBUG",
     text: "Esperienza mobile nativa per conversazioni e continuità.",
     requirements: "Android 10 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
-    sha256: "EB2F1329467EBD299A3F4DF029EC547997C548B359F0BF24AC36272A01C7DB44",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.7-preview.1/NexusNXS-Android-6.4.1.apk",
+    sha256: "26BB5F65E4426C33DAA5CFD533040AE87C96652EC7A941E62BE1A0C6E66DD087",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.8-preview.1/NexusNXS-Android-6.4.2.apk",
   },
 ];
 
@@ -74,7 +74,7 @@ export default function Downloads() {
     <section className="verify-guide">
       <div><FileCheck2 /><h2>Come verificare una release</h2></div>
       <ol><li><span>01</span>Avvia il download da <strong>nexusnxs.com</strong>; il file è ospitato nella release GitHub ufficiale.</li><li><span>02</span>Leggi lo stato della firma e gli avvisi della piattaforma.</li><li><span>03</span>Confronta l’impronta SHA-256 completa prima di eseguire il file.</li></ol>
-      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.7-Setup.exe -Algorithm SHA256</code></div>
+      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.8-Setup.exe -Algorithm SHA256</code></div>
       <p><BadgeCheck /> Versioni, avvisi e impronte sono pubblicati insieme ai file.</p>
     </section>
     <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili i client PC e Android con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>
