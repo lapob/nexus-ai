@@ -24,7 +24,10 @@ function check(id, passed, detail, kind = 'automatic') { return { id, status: pa
 
 function artifactCheck({ projectRoot, id, relativePath, maximumAgeHours, predicate, detail, now }) {
   const artifact = readJson(projectRoot, relativePath);
-  const timestamp = artifact?.generatedAt || artifact?.capturedAt || artifact?.evaluatedAt;
+  const timestamp = artifact?.generatedAt
+    || artifact?.capturedAt
+    || artifact?.CapturedAt
+    || artifact?.evaluatedAt;
   return check(id, Boolean(artifact && ageHours(timestamp, now) <= maximumAgeHours && predicate(artifact)), detail);
 }
 

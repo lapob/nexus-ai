@@ -59,3 +59,19 @@ test('la Founder Beta richiede insieme prove automatiche firma dispositivi e res
     assert.equal(report.summary.blocked, 0);
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });
+
+test('accetta il timestamp PowerShell dei report Android fisici', () => {
+  const item = fixture();
+  try {
+    const matrix = {
+      CapturedAt: new Date(item.now).toISOString(),
+      Profiles: [1, 2, 3, 4, 5],
+      FrameMetrics: Array.from({ length: 5 }, () => ({ TotalFrames: 120, JankyPercent: 2 }))
+    };
+    item.write('qa-artifacts/android-control-matrix/manifest.json', matrix);
+    item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
+    const report = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
+    assert.equal(report.checks.find((entry) => entry.id === 'android-control-device').status, 'pass');
+    assert.equal(report.checks.find((entry) => entry.id === 'android-public-device').status, 'pass');
+  } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
+});
