@@ -13,6 +13,10 @@ test('non rallenta domande stabili o operazioni locali', () => {
   assert.equal(webResearchPolicy({ question: 'Spiegami il teorema di Pitagora' }).level, 'none');
   assert.equal(webResearchPolicy({ question: 'Rispondi soltanto con il risultato numerico di 17 per 19.' }).level, 'none');
   assert.equal(webResearchPolicy({ question: 'Modifica questo file del progetto', workspaceActive: true }).reason, 'local-context');
+  assert.equal(webResearchPolicy({ question: 'Spiega come organizzare un piccolo progetto software. Concludi con FINE VERIFICA.' }).level, 'none');
+  assert.equal(webResearchPolicy({ question: 'Verifica il risultato di 17 per 19' }).level, 'none');
+  assert.equal(webResearchPolicy({ question: 'Controlla questo ragionamento matematico' }).level, 'none');
+  assert.equal(webResearchPolicy({ question: 'Verifica online questa informazione' }).level, 'required');
 });
 
 test('non invia sul web richieste che contengono segreti o percorsi locali', () => {

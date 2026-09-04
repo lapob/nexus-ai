@@ -97,10 +97,20 @@ async function evaluateWhenReady(client, expression, timeoutMs = 20_000) {
   const started = Date.now();
   let lastError;
   while (Date.now() - started < timeoutMs) {
+    let ready = false;
     try {
-      const ready = await client.evaluate('document.readyState === "complete"');
-      if (ready) return await client.evaluate(expression);
+      ready = await client.evaluate('document.readyState === "complete"');
     } catch (error) { lastError = error; }
+    if (ready) {
+      // An interaction may submit a request: never replay it after an error.
+      let timer;
+      try {
+        return await Promise.race([
+          client.evaluate(expression),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Scenario browser oltre il timeout.')), Math.max(1, timeoutMs - (Date.now() - started))); })
+        ]);
+      } finally { clearTimeout(timer); }
+    }
     await new Promise((resolve) => setTimeout(resolve, 120));
   }
   throw lastError || new Error('Contesto pagina non pronto.');
@@ -248,7 +258,9 @@ async function main() {
     compare(results, JSON.parse(fs.readFileSync(baselinePath, 'utf8')));
     console.log('Regressione web superata.');
   } finally {
-    await removeTemporaryPath(temporaryRoot);
+    // Other QA runs own sibling profiles; remove only an empty shared root.
+    try { fs.rmdirSync(temporaryRoot); }
+    catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST', 'EPERM', 'EBUSY'].includes(error.code)) throw error; }
   }
 }
 
