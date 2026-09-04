@@ -416,6 +416,8 @@ test('il manifesto pubblico riflette la qualita reale della ricerca web', async 
     conversationStore: { list: () => [], save: (record) => record },
     researchAvailable: true,
     researchCapabilityProvider: () => researchState,
+    imageGenerationService: { available: true, generate: async () => ({}) },
+    imageCapabilityProvider: () => ({ state: 'degraded', mode: 'retrying' }),
     logger: { info() {}, warn() {} }
   });
   try {
@@ -424,6 +426,8 @@ test('il manifesto pubblico riflette la qualita reale della ricerca web', async 
     researchState = { state: 'available', mode: 'live' };
     const available = gateway.capabilityManifest({ publicIngress: true }).capabilities.find(({ id }) => id === 'web-research');
     assert.deepEqual(available, { id: 'web-research', state: 'available', mode: 'live' });
+    const image = gateway.capabilityManifest({ publicIngress: true }).capabilities.find(({ id }) => id === 'image-generation');
+    assert.deepEqual(image, { id: 'image-generation', state: 'degraded', mode: 'retrying' });
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 

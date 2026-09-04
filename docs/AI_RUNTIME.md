@@ -62,8 +62,10 @@ NexusNXS lo dichiara invece di presentare come aggiornato un dato non verificato
 - `ai.embeddingModel`: selezionato automaticamente soltanto tra modelli riconosciuti come embedding;
 - `ai.autoSelectModel`: attivo per default e disattivabile dalle impostazioni.
 - `NEXUS_WEB_SEARCH_MODE`: `auto` oppure `off`;
-- `NEXUS_WEB_SEARCH_PROVIDER`: `auto`, `brave` o `wikipedia`;
+- `NEXUS_WEB_SEARCH_PROVIDER`: `auto`, `brave`, `openai` o `wikipedia`;
 - `NEXUS_BRAVE_SEARCH_API_KEY`: segreto opzionale solo server;
+- `NEXUS_OPENAI_API_KEY`, `NEXUS_OPENAI_SEARCH_MODEL`: alternativa server-side tramite Responses API con web search; il modello resta obbligatorio per evitare attivazioni e costi impliciti;
+- `NEXUS_OPENAI_RESPONSES_URL`: endpoint HTTPS, predefinito a `https://api.openai.com/v1/responses`;
 - `NEXUS_WEB_SEARCH_TIMEOUT_MS`: budget di rete tra 800 e 15000 ms.
 
 Sono accettati endpoint loopback e, con opt-in, IP privati RFC1918. La selezione automatica viene

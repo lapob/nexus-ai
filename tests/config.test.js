@@ -31,8 +31,11 @@ test('valida il provider e il budget della ricerca server-side', () => {
   const config = loadRuntimeConfig({ NEXUS_WEB_SEARCH_PROVIDER: 'wikipedia', NEXUS_WEB_SEARCH_TIMEOUT_MS: '2500' });
   assert.equal(config.research.provider, 'wikipedia');
   assert.equal(config.research.timeoutMs, 2500);
+  const openai = loadRuntimeConfig({ NEXUS_WEB_SEARCH_PROVIDER: 'openai', NEXUS_OPENAI_API_KEY: 'secret', NEXUS_OPENAI_SEARCH_MODEL: 'search-model' });
+  assert.equal(openai.research.openAiApiKey, 'secret');
+  assert.equal(openai.research.openAiModel, 'search-model');
   assert.equal(loadRuntimeConfig({ NEXUS_WEB_SEARCH_MODE: 'off' }).research.enabled, false);
-  assert.throws(() => loadRuntimeConfig({ NEXUS_WEB_SEARCH_PROVIDER: 'custom' }), /auto, brave o wikipedia/);
+  assert.throws(() => loadRuntimeConfig({ NEXUS_WEB_SEARCH_PROVIDER: 'custom' }), /auto, brave, openai o wikipedia/);
 });
 
 test('migra il modello Thinking-only al modello generalista verificato', () => {

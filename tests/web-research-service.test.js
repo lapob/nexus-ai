@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { WebResearchService, safePublicUrl } = require('../src/research/web-research-service');
+const { WebResearchService, safeProviderEndpoint, safePublicUrl } = require('../src/research/web-research-service');
 
 function jsonResponse(payload, status = 200) {
   return {
@@ -47,6 +47,41 @@ test('usa Brave soltanto lato server e non restituisce la credenziale', async ()
   assert.equal(token, 'server-secret');
   assert.equal(result.results[0].url, 'https://example.com/docs');
   assert.doesNotMatch(JSON.stringify(result), /server-secret/);
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
+});
+
+test('usa OpenAI Responses come ricerca live senza esporre la credenziale', async () => {
+  let request;
+  const service = new WebResearchService({
+    provider: 'openai',
+    openAiApiKey: 'server-secret',
+    openAiModel: 'search-model',
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options };
+      return jsonResponse({
+        output_text: 'Risultato verificato',
+        output: [{
+          type: 'web_search_call',
+          action: { sources: [{ title: 'Documentazione ufficiale', url: 'https://example.com/current' }] }
+        }]
+      });
+    }
+  });
+  const result = await service.search('versione corrente', { freshOnly: true });
+  assert.equal(request.url, 'https://api.openai.com/v1/responses');
+  assert.equal(request.options.headers.Authorization, 'Bearer server-secret');
+  const body = JSON.parse(request.options.body);
+  assert.deepEqual(body.tools, [{ type: 'web_search' }]);
+  assert.equal(body.store, false);
+  assert.equal(result.provider, 'openai');
+  assert.equal(result.results[0].url, 'https://example.com/current');
+  assert.doesNotMatch(JSON.stringify(result), /server-secret/);
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
+});
+
+test('auto seleziona OpenAI quando Brave non è configurato', () => {
+  const service = new WebResearchService({ provider: 'auto', openAiApiKey: 'server-secret', openAiModel: 'search-model' });
+  assert.equal(service.activeProvider(), 'openai');
   assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
 });
 
@@ -99,6 +134,8 @@ test('non spaccia Wikipedia per ricerca in tempo reale', async () => {
 test('rifiuta URL pubblici non HTTPS e risposte non JSON', async () => {
   assert.equal(safePublicUrl('http://127.0.0.1/private'), '');
   assert.equal(safePublicUrl('https://user:pass@example.com'), '');
+  assert.throws(() => safeProviderEndpoint('http://api.example/v1/responses'), /non sicuro/);
+  assert.throws(() => safeProviderEndpoint('https://api.example/v1/responses?key=secret'), /non sicuro/);
   const service = new WebResearchService({
     fetchImpl: async () => ({ ok: true, status: 200, headers: { get: () => 'text/html' }, text: async () => '<html />' })
   });

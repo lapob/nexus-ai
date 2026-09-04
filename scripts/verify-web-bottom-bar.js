@@ -8,7 +8,13 @@ const { spawn } = require('node:child_process');
 const { RemoteSessionGateway } = require('../src/remote/remote-session-gateway');
 const { browserExecutable, Cdp, evaluateWhenReady, freePort, waitForTarget, removeTemporaryPath } = require('./web-visual-regression');
 
+// #region 01 - Matrice dispositivi
+
 const VIEWPORTS = [[320,568], [360,420], [360,640], [375,667], [390,844], [412,915], [844,390], [768,1024], [1024,768], [1440,900], [2560,1440]];
+
+// #endregion
+
+// #region 02 - Regressione browser isolata
 
 async function main() {
   const output = path.resolve(__dirname, '../qa-artifacts/web-bottom-bar');
@@ -92,4 +98,7 @@ async function main() {
     await removeTemporaryPath(profile);
   }
 }
+
+// #endregion
+
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode=1; });

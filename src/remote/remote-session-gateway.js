@@ -647,7 +647,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -683,6 +683,7 @@ class RemoteSessionGateway {
     this.readinessProvider = typeof readinessProvider === 'function' ? readinessProvider : null;
     this.researchAvailable = researchAvailable === true;
     this.researchCapabilityProvider = typeof researchCapabilityProvider === 'function' ? researchCapabilityProvider : null;
+    this.imageCapabilityProvider = typeof imageCapabilityProvider === 'function' ? imageCapabilityProvider : null;
     this.performanceStore = performanceStore;
     this.telemetry = telemetry && typeof telemetry.emit === 'function' ? telemetry : null;
     this.communityFeedbackStore = communityFeedbackStore;
@@ -1146,6 +1147,12 @@ class RemoteSessionGateway {
     } catch {
       researchCapability = 'unavailable';
     }
+    let imageCapability = Boolean(this.imageGenerationService?.available);
+    try {
+      if (this.imageGenerationService && this.imageCapabilityProvider) imageCapability = this.imageCapabilityProvider();
+    } catch {
+      imageCapability = 'unavailable';
+    }
     return createCapabilityManifest({
       audience: publicIngress ? 'public' : 'private',
       features: {
@@ -1154,9 +1161,11 @@ class RemoteSessionGateway {
         'voice-input': this.voiceTranscriber ? 'available' : 'degraded',
         'voice-output': this.voiceSynthesizer ? 'available' : 'degraded',
         'web-research': researchCapability,
-        'image-generation': Boolean(this.imageGenerationService?.available),
+        'image-generation': imageCapability,
         artifacts: Boolean(this.onMessage),
-        continuity: publicIngress ? 'degraded' : 'available',
+        continuity: publicIngress
+          ? { state: 'degraded', mode: 'session-resume' }
+          : { state: 'available', mode: 'encrypted-device' },
         'device-actions': { state: privateScope && Boolean(this.onActionPlan && this.onActionExecute) ? 'available' : 'unavailable', requiresConsent: true },
         workflows: { state: workflowsAvailable ? 'available' : 'unavailable', requiresConsent: true },
         plugins: 'unavailable'

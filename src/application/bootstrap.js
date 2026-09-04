@@ -521,6 +521,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         performanceLevel: hardwareProfile.performanceLevel,
         keepAlive: tuning.keepAlive
       });
+      const imageGenerationService = ImageGenerationService.fromEnvironment(env);
       const remoteGateway = new RemoteSessionGateway({
         statePath: path.join(localData.root, 'remote-access.json'),
         conversationStore,
@@ -530,7 +531,8 @@ function bootstrapElectron({ env = process.env } = {}) {
         responseCache,
         securityEventStore,
         modelProvider: () => aiRuntime.listModels(),
-        imageGenerationService: ImageGenerationService.fromEnvironment(env),
+        imageGenerationService,
+        imageCapabilityProvider: () => imageGenerationService.capabilityState(),
         researchAvailable: webResearchService?.enabled !== false,
         researchCapabilityProvider: () => webResearchService.capabilityState(),
         voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 20 }) => speechService.transcribeAudio({

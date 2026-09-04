@@ -30,19 +30,24 @@ function detectImageMime(buffer) {
 // #region 02 - Adapter provider
 
 class ImageGenerationService {
-  constructor({ endpoint = '', apiKey = '', model = '', timeoutMs = 90_000, fetchImpl = globalThis.fetch } = {}) {
+  constructor({ endpoint = '', apiKey = '', model = '', timeoutMs = 90_000, retryWindowMs = 300_000, fetchImpl = globalThis.fetch, now = () => Date.now() } = {}) {
     this.endpoint = cleanEndpoint(endpoint);
     this.apiKey = String(apiKey || '').trim();
     this.model = String(model || '').trim().slice(0, 160);
     this.timeoutMs = Math.max(5_000, Math.min(180_000, Number(timeoutMs) || 90_000));
+    this.retryWindowMs = Math.max(10_000, Math.min(900_000, Number(retryWindowMs) || 300_000));
     this.fetchImpl = fetchImpl;
+    this.now = now;
+    this.lastFailureAt = 0;
   }
 
   static fromEnvironment(env = process.env) {
+    const apiKey = env.NEXUS_IMAGE_API_KEY || env.NEXUS_OPENAI_API_KEY || env.OPENAI_API_KEY || '';
+    const model = env.NEXUS_IMAGE_MODEL || '';
     return new ImageGenerationService({
-      endpoint: env.NEXUS_IMAGE_API_URL,
-      apiKey: env.NEXUS_IMAGE_API_KEY,
-      model: env.NEXUS_IMAGE_MODEL,
+      endpoint: env.NEXUS_IMAGE_API_URL || (apiKey && model ? 'https://api.openai.com/v1/images/generations' : ''),
+      apiKey,
+      model,
       timeoutMs: env.NEXUS_IMAGE_TIMEOUT_MS
     });
   }
@@ -53,6 +58,14 @@ class ImageGenerationService {
 
   capabilities() {
     return { available: this.available, sizes: [...ALLOWED_SIZES] };
+  }
+
+  capabilityState() {
+    if (!this.available) return { state: 'unavailable', mode: 'off' };
+    if (this.lastFailureAt && this.now() - this.lastFailureAt < this.retryWindowMs) {
+      return { state: 'degraded', mode: 'retrying' };
+    }
+    return { state: 'available', mode: 'server-side' };
   }
 
   async generate({ prompt, size = '1024x1024', signal } = {}) {
@@ -82,8 +95,10 @@ class ImageGenerationService {
       const image = Buffer.from(encoded, 'base64');
       const mimeType = detectImageMime(image);
       if (!image.length || image.length > MAX_IMAGE_BYTES || !mimeType) throw Object.assign(new Error('Formato immagine restituito non valido.'), { code: 'IMAGE_RESPONSE_INVALID' });
+      this.lastFailureAt = 0;
       return { image, mimeType };
     } catch (error) {
+      if (error?.name !== 'AbortError' && !signal?.aborted) this.lastFailureAt = this.now();
       if (error?.name === 'AbortError') throw Object.assign(new Error('Generazione immagine scaduta.'), { code: 'IMAGE_TIMEOUT' });
       throw error;
     } finally {

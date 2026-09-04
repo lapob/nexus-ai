@@ -277,6 +277,9 @@ test('classifica conservativamente i modelli embedding', () => {
   assert.equal(inferModelCapabilities('qwen3:8b').chat, true);
   assert.equal(inferModelCapabilities('embeddinggemma:latest').embeddings, true);
   assert.equal(inferModelCapabilities('nomic-embed-text:latest').chat, false);
+  assert.equal(inferModelCapabilities('qwen3-vl:8b').vision, true);
+  assert.equal(inferModelCapabilities('llava:latest').vision, true);
+  assert.equal(inferModelCapabilities('qwen3:8b').vision, false);
 });
 
 test('normalizza il contenuto legacy di Qwen3 senza alterare altri modelli', () => {

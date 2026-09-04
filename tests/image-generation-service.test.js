@@ -14,6 +14,7 @@ test('image provider accepts HTTPS and loopback but rejects unsafe endpoints', (
 test('unconfigured image generation fails closed', async () => {
   const service = new ImageGenerationService();
   assert.equal(service.capabilities().available, false);
+  assert.deepEqual(service.capabilityState(), { state: 'unavailable', mode: 'off' });
   await assert.rejects(() => service.generate({ prompt: 'Nebulosa turchese' }), { code: 'IMAGE_BACKEND_UNAVAILABLE' });
 });
 
@@ -32,4 +33,25 @@ test('image generation sends credentials only server-side and validates bytes', 
   assert.equal(result.mimeType, 'image/png');
   assert.deepEqual(result.image, png);
   assert.equal(detectImageMime(result.image), 'image/png');
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'server-side' });
+});
+
+test('image provider reports a retrying state after a real failure', async () => {
+  let now = 1_000;
+  const service = new ImageGenerationService({
+    endpoint: 'https://images.example/v1/images/generations', apiKey: 'server-secret', model: 'nexus-image', now: () => now,
+    fetchImpl: async () => ({ ok: false, json: async () => ({}) })
+  });
+  await assert.rejects(() => service.generate({ prompt: 'Nebulosa' }), { code: 'IMAGE_PROVIDER_ERROR' });
+  assert.deepEqual(service.capabilityState(), { state: 'degraded', mode: 'retrying' });
+  now += 301_000;
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'server-side' });
+});
+
+test('OpenAI image endpoint is opt-in and uses only server credentials', () => {
+  const off = ImageGenerationService.fromEnvironment({ OPENAI_API_KEY: 'server-secret' });
+  assert.equal(off.available, false, 'il modello esplicito evita costi o attivazioni implicite');
+  const configured = ImageGenerationService.fromEnvironment({ OPENAI_API_KEY: 'server-secret', NEXUS_IMAGE_MODEL: 'image-model' });
+  assert.equal(configured.endpoint, 'https://api.openai.com/v1/images/generations');
+  assert.equal(configured.available, true);
 });

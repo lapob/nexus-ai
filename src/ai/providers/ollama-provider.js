@@ -12,15 +12,17 @@ const { validateChatRequest } = require('../ai-provider');
 // La classificazione conservativa evita di selezionare come chat un modello
 // dedicato esclusivamente agli embedding.
 const EMBEDDING_MODEL_PATTERN = /embeddinggemma|(^|[-_.:/])(embed|embedding|bge|e5|gte)([-_.:/]|$)|nomic-embed|all-minilm/i;
+const VISION_MODEL_PATTERN = /(^|[-_.:/])(vl|vision)([-_.:/]|$)|llava|bakllava|moondream|minicpm-v/i;
 function inferModelCapabilities(modelName) {
-  const embeddingOnly = EMBEDDING_MODEL_PATTERN.test(String(modelName || ''));
+  const normalizedName = String(modelName || '');
+  const embeddingOnly = EMBEDDING_MODEL_PATTERN.test(normalizedName);
   return {
     chat: !embeddingOnly,
     streaming: !embeddingOnly,
     embeddings: embeddingOnly,
     tools: false,
-    vision: false,
-    thinking: /^qwen3(?::|$)/i.test(String(modelName || ''))
+    vision: !embeddingOnly && VISION_MODEL_PATTERN.test(normalizedName),
+    thinking: /^qwen3(?::|$)/i.test(normalizedName)
   };
 }
 
