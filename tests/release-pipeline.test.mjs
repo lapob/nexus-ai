@@ -70,10 +70,10 @@ test("keeps bootstrap, cutover, promotion, and rollback as distinct guarded stag
   assert.match(releaseScript, /await rm\(outputPath, \{ force: true \}\)/);
   assert.match(releaseScript, /--confirm-domain-cutover/);
   assert.match(releaseScript, /assertProductionDomainsAttached/);
-  assert.match(releaseScript, /runWrangler\(\["triggers", "deploy"\]/);
+  assert.match(releaseScript, /runWrangler\(\["deploy", "--strict"/);
   assert.match(releaseScript, /aiRoutePreviouslyAttached/);
   assert.match(releaseScript, /removeAiRoute/);
-  assert.match(releaseScript, /verifyAiHealth\(candidate\.version_id, \{ attempts: 12 \}\)/);
+  assert.match(releaseScript, /verifyAiHealth\(deployedVersion, \{ attempts: 12 \}\)/);
   assert.match(releaseScript, /artifact \? "dist\/server\/wrangler\.json" : "wrangler\.jsonc"/);
   assert.match(releaseScript, /AggregateError/);
   assert.match(verifier, /x-nexusnxs-worker-version/);
@@ -99,13 +99,10 @@ test("allows the production domain enough time to converge before rollback", asy
   const releaseScript = await readFile(new URL("../scripts/cloudflare-release.mjs", import.meta.url), "utf8");
   assert.match(
     releaseScript,
-    /verifySite\("https:\/\/nexusnxs\.com", candidate\.version_id, \{ attempts: 12 \}\)/,
+    /verifySite\("https:\/\/nexusnxs\.com", deployedVersion, \{ attempts: 12 \}\)/,
   );
-  assert.ok(
-    releaseScript.indexOf("await deployTriggers();")
-      < releaseScript.indexOf('await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 12 });'),
-    "production triggers must be deployed before the apex convergence check",
-  );
+  assert.match(releaseScript, /runWrangler\(\["deploy", "--strict"/);
+  assert.match(releaseScript, /const deployedVersion = await currentVersion\(\)/);
 });
 
 test("verifies immutable Cloudflare previews before promotion", async () => {

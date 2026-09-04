@@ -199,11 +199,6 @@ async function hasAiRoute() {
   return (await workerRoutes()).some((route) => route.pattern === aiRoutePattern && route.script === workerName);
 }
 
-async function deployTriggers() {
-  runWrangler(["triggers", "deploy"], { artifact: true });
-  if (!(await hasAiRoute())) throw new Error(`${aiRoutePattern} was not attached to ${workerName}.`);
-}
-
 async function removeAiRoute() {
   const route = (await workerRoutes()).find((item) => item.pattern === aiRoutePattern && item.script === workerName);
   if (!route?.id) return;
@@ -375,22 +370,20 @@ async function promote() {
   await verifyAiHealth();
   const previous = await currentVersion();
   const aiRoutePreviouslyAttached = await hasAiRoute();
-  runWrangler([
-    "versions", "deploy", `${candidate.version_id}@100%`,
-    "--yes", "--message", `production ${sha.slice(0, 12)}`,
-  ]);
+  // Cloudflare Custom Domains can lag behind an otherwise active gradual
+  // deployment. The atomic deploy path creates and activates the same tested
+  // build in one operation and updates its triggers as one production change.
+  runWrangler(["deploy", "--strict", "--message", `production ${sha.slice(0, 12)}`], { artifact: true });
+  const deployedVersion = await currentVersion();
+  if (!deployedVersion || deployedVersion === previous) {
+    throw new Error("Cloudflare did not activate a new atomic production version.");
+  }
   try {
-    // Custom-domain and route triggers are non-versioned Cloudflare settings.
-    // Apply them before testing the apex, otherwise the deployment can be at
-    // 100% while the public hostname still resolves the previous trigger.
-    await deployTriggers();
-    // Custom-domain propagation can trail the Worker deployment by several
-    // tens of seconds. Wait for edge convergence before declaring failure.
-    await verifySite("https://nexusnxs.com", candidate.version_id, { attempts: 12 });
-    await verifyAiHealth(candidate.version_id, { attempts: 12 });
+    await verifySite("https://nexusnxs.com", deployedVersion, { attempts: 12 });
+    await verifyAiHealth(deployedVersion, { attempts: 12 });
   } catch (releaseError) {
     if (!aiRoutePreviouslyAttached) await removeAiRoute();
-    if (previous && previous !== candidate.version_id) {
+    if (previous && previous !== deployedVersion) {
       runWrangler(["rollback", previous, "--yes", "--message", `automatic rollback ${sha.slice(0, 12)}`]);
       try {
         await verifySite("https://nexusnxs.com", previous, { attempts: 12 });
@@ -400,7 +393,7 @@ async function promote() {
     }
     throw releaseError;
   }
-  console.log(`Production release complete: ${candidate.version_id}`);
+  console.log(`Production release complete: ${deployedVersion}`);
 }
 
 async function rollback() {
