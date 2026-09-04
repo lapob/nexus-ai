@@ -63,7 +63,8 @@ body:is(.conversation-active,.request-active) .dock{isolation:isolate}
 body:is(.conversation-active,.request-active) .dock::before{content:'';position:absolute;z-index:-1;pointer-events:none;left:50%;width:100vw;top:-24px;bottom:calc(-1 * (var(--nxs-privacy-height) + 16px + env(safe-area-inset-bottom)));transform:translateX(-50%);background:linear-gradient(to bottom,transparent,#000 24px)}
 .privacy::before{content:'';position:absolute;z-index:-1;pointer-events:none;left:50%;width:100vw;top:-4px;bottom:calc(-16px - env(safe-area-inset-bottom));transform:translateX(-50%);background:#000}
 body:is(.conversation-active,.request-active) .shell{padding-bottom:calc(var(--nxs-dock-height,100px) + var(--nxs-privacy-height) + 40px + env(safe-area-inset-bottom))}
-.memory-cleared .phase{position:fixed;z-index:42;right:18px;bottom:max(18px,calc(12px + env(safe-area-inset-bottom)));left:18px;width:max-content;max-width:calc(100% - 36px);min-height:0;margin:auto;padding:8px 12px;border:1px solid rgba(103,211,208,.12);border-radius:999px;color:#83aaaa;background:rgba(4,14,15,.86);box-shadow:0 12px 34px rgba(0,0,0,.3);backdrop-filter:blur(12px);text-align:center}
+.memory-cleared .phase{position:fixed;z-index:42;right:18px;bottom:max(18px,calc(12px + env(safe-area-inset-bottom)));left:18px;width:max-content;max-width:calc(100% - 36px);min-height:0;margin:auto;padding:8px 12px;border:1px solid rgba(103,211,208,.12);border-radius:999px;color:#83aaaa;background:rgba(4,14,15,.96);box-shadow:0 12px 34px rgba(0,0,0,.3);backdrop-filter:blur(12px);text-align:center}
+.privacy{transition:opacity .16s ease}.memory-cleared .privacy{opacity:0;pointer-events:none}
 .send[data-mode=stop]{border-radius:50%;background:radial-gradient(circle at 42% 34%,rgba(72,171,169,.46),rgba(25,61,63,.94) 70%);box-shadow:0 0 0 1px rgba(114,236,230,.08),0 10px 28px rgba(17,108,109,.2)}
 .send[data-mode=stop] svg{width:20px;height:20px}.send[data-mode=stop] svg rect{fill:currentColor;stroke:none}
 @media(max-width:560px){body:not(.request-active):not(.conversation-active) .privacy{bottom:max(12px,env(safe-area-inset-bottom))}.conversation-active:not(.request-active) .dock,.request-active .dock{width:calc(100% - 20px)}.conversation-active .stage{padding-top:48px}}
@@ -72,6 +73,7 @@ body:is(.conversation-active,.request-active) .shell{padding-bottom:calc(var(--n
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .shell{padding-bottom:calc(var(--nxs-privacy-height) + 28px + env(safe-area-inset-bottom));min-height:100dvh}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{flex:none;margin-top:auto;padding-bottom:0}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock,body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .dock{position:relative;top:auto;right:auto;bottom:auto;left:auto;transform:none;flex:none;margin:20px auto auto;padding:0 0 16px}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .privacy{position:relative;z-index:29;top:auto;right:auto;bottom:auto;left:auto;flex:none;width:min(660px,100%);margin:0 auto;padding:0 8px}
 </style>`;
 
 const SLASH_COMMAND_STYLE = `<style>

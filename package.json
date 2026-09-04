@@ -84,6 +84,7 @@
     "qa:visual": "npm run build:renderer && node scripts/visual-qa.js",
     "qa:web:visual": "node scripts/web-visual-regression.js",
     "qa:web:experience": "node scripts/verify-public-ai-experience.js",
+    "qa:web:layout": "node scripts/verify-web-bottom-bar.js",
     "qa:web:probe": "node scripts/probe-public-ai.js",
     "qa:ai:performance": "node scripts/measure-cosmic-performance.js --strict",
     "qa:demo:performance": "npm run qa:ai:performance",

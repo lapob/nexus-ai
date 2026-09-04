@@ -8,6 +8,8 @@ const { spawn } = require('node:child_process');
 const { RemoteSessionGateway } = require('../src/remote/remote-session-gateway');
 const { browserExecutable, Cdp, evaluateWhenReady, freePort, waitForTarget, removeTemporaryPath } = require('./web-visual-regression');
 
+const VIEWPORTS = [[320,568], [360,420], [360,640], [375,667], [390,844], [412,915], [844,390], [768,1024], [1024,768], [1440,900], [2560,1440]];
+
 async function main() {
   const output = path.resolve(__dirname, '../qa-artifacts/web-bottom-bar');
   fs.mkdirSync(output, { recursive: true });
@@ -24,17 +26,18 @@ async function main() {
     child = spawn(browserExecutable(), ['--headless=new', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profile}`, '--no-first-run', '--disable-background-networking', url], { stdio: 'ignore', windowsHide: true });
     client = await new Cdp((await waitForTarget(debugPort, url)).webSocketDebuggerUrl).open();
     const report = [];
-    for (const [width, height] of [[390,844], [360,420], [1440,900]]) {
+    for (const [width, height] of VIEWPORTS) {
       await client.command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
       await client.command('Page.reload', { ignoreCache: true });
       const status = await evaluateWhenReady(client, `new Promise(resolve=>{
+        scrollTo(0,0);
         document.body.classList.add('status-active');
-        document.querySelector('#phase').textContent='La voce non è disponibile in questo browser: puoi scrivere.';
-        setTimeout(()=>{const a=document.querySelector('.copy').getBoundingClientRect(),b=document.querySelector('#phase').getBoundingClientRect(),c=document.querySelector('.dock').getBoundingClientRect();resolve({titleGap:b.top-a.bottom,dockGap:c.top-b.bottom})},700);
+        document.querySelector('#phase').textContent='La voce non è disponibile in questo browser: puoi continuare a scrivere senza interrompere la sessione.';
+        setTimeout(()=>{const a=document.querySelector('.copy').getBoundingClientRect(),b=document.querySelector('#phase').getBoundingClientRect(),c=document.querySelector('.dock').getBoundingClientRect(),d=document.querySelector('.privacy').getBoundingClientRect();resolve({titleGap:b.top-a.bottom,dockGap:c.top-b.bottom,privacyGap:d.top-c.bottom})},700);
       })`);
       const statusShot = await client.command('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
       fs.writeFileSync(path.join(output, `status-${width}x${height}.png`), Buffer.from(statusShot.data,'base64'));
-      if (status.titleGap < 0 || status.dockGap < 0) throw new Error('Status collision: '+JSON.stringify({width,height,...status}));
+      if (status.titleGap < 0 || status.dockGap < 0 || status.privacyGap < 0) throw new Error('Status collision: '+JSON.stringify({width,height,...status}));
       const typing = await evaluateWhenReady(client, `new Promise(resolve=>{
         document.body.classList.add('keyboard-open');
         const prompt=document.querySelector('#prompt'),core=document.querySelector('#core');
@@ -53,6 +56,14 @@ async function main() {
         },400);
       })`);
       if(Object.values(typing).some(value=>value!==true))throw new Error('Core typing regression: '+JSON.stringify({width,height,...typing}));
+      const transient = await evaluateWhenReady(client, `new Promise(resolve=>{
+        document.body.className='memory-cleared status-active';
+        const phase=document.querySelector('#phase'),privacy=document.querySelector('.privacy');
+        phase.textContent='Memoria locale cancellata';
+        setTimeout(()=>resolve({privacyHidden:parseFloat(getComputedStyle(privacy).opacity)===0,phaseVisible:phase.getBoundingClientRect().height>0}),260);
+      })`);
+      if(!transient.privacyHidden||!transient.phaseVisible)throw new Error('Transient collision regression: '+JSON.stringify({width,height,...transient}));
+      await evaluateWhenReady(client, `document.body.classList.remove('memory-cleared','status-active');document.querySelector('#phase').textContent='';true`);
       const result = await evaluateWhenReady(client, `new Promise(resolve => {
         document.body.classList.add('conversation-active','keyboard-open');
         document.querySelector('#answer').innerHTML = Array.from({length:30},(_,i)=>'<p>Paragrafo '+i+': una risposta lunga deve restare leggibile senza attraversare i comandi in fondo.</p>').join('');
@@ -69,10 +80,10 @@ async function main() {
       if (result.gap < 0 || result.backingWidth < width || !result.backing.includes('rgb(0, 0, 0)') || result.padding < result.occupied) throw new Error(JSON.stringify(result));
       const screenshot = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       fs.writeFileSync(path.join(output, `${width}x${height}.png`), Buffer.from(screenshot.data, 'base64'));
-      report.push({ width, height, typing, ...result });
+      report.push({ width, height, typing, transient, ...result });
     }
     fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
-    console.log('Bottom bar: sfondo nero continuo, note separate e spazio riservato verificati su tre viewport.');
+    console.log(`Layout adattivo: collisioni, Core, notifiche, dock e privacy verificati su ${VIEWPORTS.length} viewport.`);
   } finally {
     try { await client?.command('Browser.close'); } catch {}
     client?.close();
