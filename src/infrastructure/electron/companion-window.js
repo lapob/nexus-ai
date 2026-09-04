@@ -69,26 +69,26 @@ function presenceTransitionDelay(current, next) {
 function serializeDisplayPosition(bounds, display) {
   const area = display?.workArea;
   if (!finiteBounds(bounds) || !area) return null;
-  const travelX = Math.max(1, area.width - PRESENCE_SIZE - (DISPLAY_MARGIN * 2));
-  const travelY = Math.max(1, area.height - PRESENCE_SIZE - (DISPLAY_MARGIN * 2));
+  const travelX = Math.max(1, area.width - (bounds.width || PRESENCE_SIZE) - (DISPLAY_MARGIN * 2));
+  const travelY = Math.max(1, area.height - (bounds.height || PRESENCE_SIZE) - (DISPLAY_MARGIN * 2));
   return {
     x: clamp((bounds.x - area.x - DISPLAY_MARGIN) / travelX, 0, 1),
     y: clamp((bounds.y - area.y - DISPLAY_MARGIN) / travelY, 0, 1)
   };
 }
 
-function systemPresenceBounds(display, savedPosition) {
+function systemPresenceBounds(display, savedPosition, size = PRESENCE_SIZE) {
   const area = display?.workArea;
   if (!area) return { x: DISPLAY_MARGIN, y: DISPLAY_MARGIN, width: PRESENCE_SIZE, height: PRESENCE_SIZE };
-  const travelX = Math.max(0, area.width - PRESENCE_SIZE - (DISPLAY_MARGIN * 2));
-  const travelY = Math.max(0, area.height - PRESENCE_SIZE - (DISPLAY_MARGIN * 2));
+  const travelX = Math.max(0, area.width - size - (DISPLAY_MARGIN * 2));
+  const travelY = Math.max(0, area.height - size - (DISPLAY_MARGIN * 2));
   const relativeX = Number.isFinite(savedPosition?.x) ? clamp(savedPosition.x, 0, 1) : 1;
   const relativeY = Number.isFinite(savedPosition?.y) ? clamp(savedPosition.y, 0, 1) : 1;
   return {
     x: Math.round(area.x + DISPLAY_MARGIN + (travelX * relativeX)),
     y: Math.round(area.y + DISPLAY_MARGIN + (travelY * relativeY)),
-    width: PRESENCE_SIZE,
-    height: PRESENCE_SIZE
+    width: size,
+    height: size
   };
 }
 
@@ -105,14 +105,14 @@ function automaticPresenceDisplayId(descriptors = []) {
     || 'primary';
 }
 
-function ambientPresenceBounds(display) {
+function ambientPresenceBounds(display, size = PRESENCE_SIZE) {
   const area = display?.workArea;
   if (!area) return { x: DISPLAY_MARGIN, y: DISPLAY_MARGIN, width: PRESENCE_SIZE, height: PRESENCE_SIZE };
   return {
-    x: Math.round(area.x + ((area.width - PRESENCE_SIZE) / 2)),
-    y: Math.round(area.y + ((area.height - PRESENCE_SIZE) / 2)),
-    width: PRESENCE_SIZE,
-    height: PRESENCE_SIZE
+    x: Math.round(area.x + ((area.width - size) / 2)),
+    y: Math.round(area.y + ((area.height - size) / 2)),
+    width: size,
+    height: size
   };
 }
 
@@ -148,6 +148,7 @@ function systemPresenceDocument({ interactive = false, locale = 'en', configurat
     .join('');
   const contextualStateStyles = `
 ${stateColorStyles}
+html .presence{width:168px;height:168px;transform:scale(var(--presence-scale,1));transform-origin:top left}
 .presence[data-state=listening] .aura{animation:listen-wave 1.35s ease-out infinite}
 .presence[data-state=listening] .presence-particles i{animation-duration:2.6s;opacity:.72}
 .presence[data-state=thinking] .reactor{animation-duration:5.4s}
@@ -170,6 +171,7 @@ ${stateColorStyles}
 <html lang="${language}"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <meta name="viewport" content="width=device-width,initial-scale=1"><style>${contextualStateStyles}</style>
+<script>addEventListener('DOMContentLoaded',()=>{const fit=()=>document.documentElement.style.setProperty('--presence-scale',String(innerWidth/168));fit();addEventListener('resize',fit);});</script>
 <style>
 :root{color-scheme:dark;--accent:86,222,224}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent;font-family:Inter,system-ui,sans-serif;user-select:none}.presence{position:relative;display:grid;width:100%;height:100%;place-items:center;isolation:isolate;opacity:.72;transition:opacity .28s ease}.presence:hover,.presence:focus-within,.presence:not([data-state=idle]){opacity:1}.aura{position:absolute;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(var(--accent),.105),rgba(var(--accent),.025) 46%,transparent 72%);filter:blur(2px);animation:breathe 6s ease-in-out infinite;pointer-events:none}.drag-ring{position:relative;width:118px;height:118px;border-radius:50%;transform:translateZ(0);filter:drop-shadow(0 15px 26px rgba(0,0,0,.34));transition:filter .2s ease,transform .2s ease}.drag-ring[data-interactive=true]{-webkit-app-region:drag;cursor:grab}.drag-ring[data-interactive=true]:active{cursor:grabbing}.visual{position:absolute;inset:0;border-radius:50%;transition:opacity .26s ease,transform .26s ease}.neural{opacity:0;background:radial-gradient(circle at 43% 38%,rgba(237,255,255,.96) 0 2%,rgba(var(--accent),.82) 5%,rgba(35,134,143,.62) 25%,rgba(4,23,26,.94) 61%,rgba(0,4,5,.76) 72%);box-shadow:inset 0 0 0 1px rgba(var(--accent),.18),inset 0 0 28px rgba(var(--accent),.16),0 0 22px rgba(var(--accent),.16)}.neural:before,.neural:after{content:'';position:absolute;inset:12px;border-radius:47% 53% 42% 58%;border:1px solid rgba(218,255,255,.22);animation:neural-flow 9s linear infinite}.neural:after{inset:25px;border-color:rgba(var(--accent),.28);animation-direction:reverse;animation-duration:6.5s}.saturn{opacity:0;transform:rotate(-13deg);background:radial-gradient(circle,rgba(226,255,255,.96) 0 2%,rgba(var(--accent),.72) 5%,rgba(15,69,74,.85) 18%,rgba(1,10,12,.97) 34%,transparent 36%)}.saturn:before,.saturn:after{content:'';position:absolute;left:2px;right:2px;top:42px;height:31px;border:2px solid rgba(var(--accent),.62);border-left-color:rgba(225,255,255,.9);border-radius:50%;box-shadow:0 0 10px rgba(var(--accent),.28),inset 0 0 9px rgba(var(--accent),.12);animation:orbit-pulse 4.8s ease-in-out infinite}.saturn:after{left:17px;right:17px;top:48px;height:20px;border-width:1px;border-color:rgba(207,252,253,.36);animation-delay:-1.4s}.reactor{opacity:0;background:repeating-conic-gradient(from 4deg,rgba(var(--accent),.8) 0 5deg,transparent 5deg 19deg);mask:radial-gradient(circle,transparent 0 24%,#000 25% 37%,transparent 38% 50%,#000 51% 54%,transparent 55%);filter:drop-shadow(0 0 7px rgba(var(--accent),.34));animation:reactor-spin 18s linear infinite}.reactor:before,.reactor:after{content:'';position:absolute;inset:17px;border-radius:50%;border:1px solid rgba(218,255,255,.34);border-left-color:transparent;border-bottom-color:transparent;animation:reactor-spin 7s linear infinite reverse}.reactor:after{inset:35px;border-color:rgba(var(--accent),.58);border-right-color:transparent;animation-duration:4.8s;animation-direction:normal}.presence[data-appearance=neural] .neural,.presence[data-appearance=saturn-experimental] .saturn,.presence[data-appearance=jarvis-reactor] .reactor{opacity:1}.core{position:absolute;z-index:5;left:50%;top:50%;width:48px;height:48px;border:0;border-radius:50%;padding:0;background:radial-gradient(circle,rgba(236,255,255,.98) 0 5%,rgba(var(--accent),.9) 9%,rgba(8,42,45,.96) 49%,rgba(1,8,9,.98) 72%);box-shadow:0 0 0 1px rgba(var(--accent),.22),0 0 17px rgba(var(--accent),.27);outline:0;transform:translate(-50%,-50%);cursor:default;-webkit-app-region:no-drag;-webkit-tap-highlight-color:transparent;transition:transform .18s ease,filter .18s ease}.core[data-interactive=true]{cursor:pointer}.core[data-interactive=true]:hover,.core[data-interactive=true]:focus-visible{filter:brightness(1.18);transform:translate(-50%,-50%) scale(1.07)}.core[data-interactive=true]:focus-visible{outline:2px solid rgba(var(--accent),.62);outline-offset:5px}.state{position:absolute;z-index:6;bottom:3px;max-width:156px;padding:5px 9px;border-radius:999px;color:rgba(215,239,240,.82);background:rgba(3,12,13,.72);font-size:9px;letter-spacing:.075em;text-transform:uppercase;white-space:nowrap;opacity:0;transform:translateY(3px);transition:opacity .18s ease,transform .18s ease;backdrop-filter:blur(9px);pointer-events:none}.presence:hover .state,.presence:focus-within .state{opacity:1;transform:none}.wake-indicator{position:absolute;z-index:7;right:21px;top:21px;width:8px;height:8px;border-radius:50%;background:rgb(var(--accent));box-shadow:0 0 0 3px rgba(var(--accent),.11),0 0 10px rgba(var(--accent),.52);opacity:0;transform:scale(.72);pointer-events:none}.presence[data-interactive=true][data-wake-listening=true] .wake-indicator{opacity:.92;transform:scale(1);animation:wake-pulse 2.2s ease-in-out infinite}.presence:is([data-state=thinking],[data-state=responding],[data-state=executing]) .drag-ring{animation:work 1.45s ease-in-out infinite}.presence[data-state=listening] .visual{filter:brightness(1.15) saturate(1.08)}.presence[data-state=speaking] .visual{animation-duration:.72s}.presence[data-state=permission]{--accent:255,195,93}.presence[data-state=offline] .drag-ring{filter:saturate(.18);opacity:.55}.presence[data-state=error]{--accent:235,112,103}.presence[data-quality=efficient] .aura,.presence[data-quality=efficient] .visual:after{display:none}.presence[data-motion=reduced] *{animation:none!important;transition:none!important}@keyframes breathe{50%{opacity:.58;transform:scale(.94)}}@keyframes neural-flow{to{transform:rotate(360deg)}}@keyframes orbit-pulse{50%{transform:scaleX(.95);opacity:.68}}@keyframes reactor-spin{to{transform:rotate(360deg)}}@keyframes work{50%{filter:brightness(1.18) drop-shadow(0 15px 26px rgba(0,0,0,.34));transform:scale(1.025)}}@keyframes wake-pulse{50%{opacity:.5;transform:scale(.78)}}@media(prefers-reduced-motion:reduce){.presence[data-motion=system] *{animation:none!important;transition:none!important}}
 </style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}"><div class="aura" aria-hidden="true"></div><span class="presence-particles" aria-hidden="true">${presenceParticles}</span><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><span class="visual neural" aria-hidden="true"></span><span class="visual saturn" aria-hidden="true"></span><span class="visual reactor" aria-hidden="true"></span><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.talk}" title="${copy.talk}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main>
@@ -315,19 +317,49 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
   ipcMain.on(PRESENCE_VOICE_CHANNEL, onPresenceVoice);
 
   function savePresencePosition(entry) {
-    if (!entry || entry.window.isDestroyed() || entry.ambientCentered) return;
-    const display = screen.getAllDisplays().find((candidate) => String(candidate.id) === entry.displayId);
+    if (!entry || entry.window.isDestroyed() || entry.animation) return;
+    const display = screen.getDisplayMatching(entry.window.getBounds());
     const serialized = serializeDisplayPosition(entry.window.getBounds(), display);
     if (!serialized) return;
     presenceState = {
       ...persistentPresenceState(),
-      positions: { ...(presenceState.positions || {}), [entry.displayId]: serialized }
+      positions: { ...(presenceState.positions || {}), [String(display.id)]: serialized }
     };
+    const descriptor = displayDescriptors().find((item) => item.displayId === String(display.id));
+    if (descriptor) {
+      presenceWindows.delete(entry.displayId);
+      entry.displayId = descriptor.displayId;
+      presenceWindows.set(entry.displayId, entry);
+      selectedLogicalDisplayId = descriptor.logicalId;
+      displaySelectionMode = 'manual';
+    }
+    entry.detached = true;
+    presenceState = { ...presenceState, ...persistentPresenceState() };
     writeJson(presenceStatePath, presenceState, 'Posizione Presence non salvata.');
+    syncDisplays();
+  }
+
+  function animatePresenceBounds(entry, target, display) {
+    if (JSON.stringify(entry.targetBounds) === JSON.stringify(target)) return;
+    clearTimeout(entry.animation);
+    const from = entry.window.getBounds();
+    entry.targetBounds = target;
+    const reduced = presenceConfiguration.motion === 'reduced' || (presenceConfiguration.motion !== 'full' && require('electron').systemPreferences?.getAnimationSettings?.().prefersReducedMotion);
+    const duration = reduced || !entry.window.isVisible() ? 0 : 440;
+    const started = Date.now();
+    const tick = () => {
+      if (entry.window.isDestroyed()) return;
+      const progress = duration ? Math.min(1, (Date.now() - started) / duration) : 1;
+      const eased = 1 - Math.pow(1 - progress, 3);
+      entry.window.setBounds(Object.fromEntries(['x', 'y', 'width', 'height'].map((key) => [key, Math.round(from[key] + (target[key] - from[key]) * eased)])), false);
+      entry.animation = progress < 1 ? setTimeout(tick, 1000 / Math.min(120, Math.max(60, display.displayFrequency || 60))) : null;
+    };
+    tick();
   }
 
   function closePresenceWindow(displayId) {
     const entry = presenceWindows.get(displayId);
+    clearTimeout(entry?.animation);
     const timer = presenceMoveTimers.get(displayId);
     if (timer) clearTimeout(timer);
     presenceMoveTimers.delete(displayId);
@@ -340,8 +372,8 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
     const bounds = systemPresenceBounds(display, presenceState.positions?.[displayId]);
     const presenceWindow = new BrowserWindow({
       ...bounds,
-      minWidth: PRESENCE_SIZE, minHeight: PRESENCE_SIZE,
-      maxWidth: PRESENCE_SIZE, maxHeight: PRESENCE_SIZE,
+      minWidth: 96, minHeight: 96,
+      maxWidth: 384, maxHeight: 384,
       frame: false, transparent: true, backgroundColor: '#00000000', resizable: false,
       movable: true, alwaysOnTop: true, skipTaskbar: true, hasShadow: false, show: false,
       focusable: true, fullscreenable: false, minimizable: false, maximizable: false,
@@ -359,6 +391,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
     presenceWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     presenceWindow.webContents.on('will-navigate', (navigationEvent) => navigationEvent.preventDefault());
     presenceWindow.on('move', () => {
+      if (entry.animation || JSON.stringify(presenceWindow.getBounds()) === JSON.stringify(entry.targetBounds)) return;
       const current = presenceMoveTimers.get(displayId);
       if (current) clearTimeout(current);
       const timer = setTimeout(() => {
@@ -369,10 +402,11 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
       presenceMoveTimers.set(displayId, timer);
     });
     presenceWindow.on('closed', () => {
+      clearTimeout(entry.animation);
       const timer = presenceMoveTimers.get(displayId);
       if (timer) clearTimeout(timer);
       presenceMoveTimers.delete(displayId);
-      if (presenceWindows.get(displayId)?.window === presenceWindow) presenceWindows.delete(displayId);
+      if (presenceWindows.get(entry.displayId)?.window === presenceWindow) presenceWindows.delete(entry.displayId);
     });
     const document = systemPresenceDocument({
       interactive: true,
@@ -385,7 +419,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
         presenceWindow.webContents.send(PRESENCE_CONFIG_CHANNEL, presenceConfiguration);
         presenceWindow.webContents.send(PRESENCE_STATE_CHANNEL, currentPresenceState);
       }
-      if (systemPresenceEnabled && !applicationVisible && !presenceWindow.isDestroyed()) presenceWindow.showInactive();
+      if (systemPresenceEnabled && !presenceWindow.isDestroyed()) { syncDisplays(); presenceWindow.showInactive(); }
     });
     return entry;
   }
@@ -435,13 +469,13 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
     const { display, displayId } = selectedDescriptor;
     let entry = presenceWindows.get(displayId);
     if (!entry) entry = createPresenceWindow(display, true);
-    const ambientCentered = AMBIENT_CENTER_STATES.has(currentPresenceState);
+    const ambientCentered = !applicationVisible && !entry.detached;
     entry.ambientCentered = ambientCentered;
-    entry.window.setBounds(ambientCentered
-      ? ambientPresenceBounds(display)
-      : systemPresenceBounds(display, presenceState.positions?.[displayId]), false);
-    if (applicationVisible && !ambientCentered) entry.window.hide();
-    else if (!entry.window.isDestroyed() && entry.window.webContents.getURL()) entry.window.showInactive();
+    const size = Math.min(applicationVisible ? (entry.detached ? 240 : 128) : 300, display.workArea.width - 36, display.workArea.height - 36);
+    animatePresenceBounds(entry, ambientCentered
+      ? ambientPresenceBounds(display, size)
+      : systemPresenceBounds(display, entry.detached ? presenceState.positions?.[displayId] : undefined, size), display);
+    if (!entry.window.isDestroyed() && entry.window.webContents.getURL()) entry.window.showInactive();
   }
 
   function handleDisplayChange() {
@@ -539,7 +573,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
         : automaticDisplayId;
     return {
       available: true,
-      nucleusVisible: systemPresenceEnabled && !applicationVisible && presenceWindows.size > 0,
+      nucleusVisible: systemPresenceEnabled && presenceWindows.size > 0,
       fullAppOpen: applicationVisible,
       selectedDisplayId: selected,
       displaySelectionMode,
@@ -581,10 +615,10 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, activateVoice,
   }
 
   function setApplicationVisible(visible) {
+    if (applicationVisible === (visible === true)) return { visible: applicationVisible };
     applicationVisible = visible === true;
-    if (applicationVisible) {
-      for (const entry of presenceWindows.values()) entry.window.hide();
-    } else if (systemPresenceEnabled) syncDisplays();
+    for (const entry of presenceWindows.values()) entry.detached = false;
+    if (systemPresenceEnabled) syncDisplays();
     return { visible: applicationVisible };
   }
 

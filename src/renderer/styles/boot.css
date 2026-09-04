@@ -1,0 +1,15 @@
+/**
+ * @module renderer/styles/boot
+ * @description Immediate, network-free shell replaced when React is ready.
+ */
+.nexus-boot{position:fixed;inset:0;display:grid;place-items:center;background:#020708;color:#65dfdf}
+.nexus-boot-core{position:relative;width:min(48vw,280px);aspect-ratio:1;animation:nexus-emerge .55s ease-out both}
+.nexus-boot-core i{position:absolute;inset:12%;border:1px dotted #65dfdf70;border-radius:50%;animation:nexus-orbit 12s linear infinite;box-shadow:0 0 24px #65dfdf08}
+.nexus-boot-core i:nth-child(2){inset:23%;animation-direction:reverse;animation-duration:8s;transform:rotateX(50deg)}
+.nexus-boot-core i:nth-child(3){inset:34%;border-style:solid;border-color:#65dfdf22;animation-duration:6s}
+.nexus-boot-core i:before{content:'';position:absolute;top:12%;left:12%;width:4px;height:4px;border-radius:50%;background:#b3ffff;box-shadow:0 0 12px #65dfdf}
+.nexus-boot-core span{position:absolute;inset:44%;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e6ffff,#50cccc 25%,#0b4549 60%,#020708);box-shadow:0 0 45px #50cccc55;animation:nexus-breathe 2s ease-in-out infinite alternate}
+@keyframes nexus-orbit{to{rotate:360deg}}
+@keyframes nexus-breathe{to{scale:1.1;opacity:.7}}
+@keyframes nexus-emerge{from{opacity:0;scale:.94}to{opacity:1;scale:1}}
+@media(prefers-reduced-motion:reduce){.nexus-boot-core,.nexus-boot-core *{animation:none!important}}

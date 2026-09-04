@@ -68,14 +68,16 @@ test('le transizioni Presence preservano gli stati critici e assestano idle', ()
   assert.equal(presenceTransitionDelay('thinking', 'thinking'), 0);
 });
 
-test('il manager usa una sola Presence selezionabile, trascinabile e sospesa con la UI', () => {
+test('il manager usa una sola Presence trascinabile, compatta con la UI e ampia in tray', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src/infrastructure/electron/companion-window.js'), 'utf8');
   assert.match(source, /const presenceWindows = new Map\(\)/);
   assert.match(source, /screen\.on\('display-added', handleDisplayChange\)/);
   assert.match(source, /setIgnoreMouseEvents\(true, \{ forward: true \}\)/);
   assert.match(source, /movable: true, alwaysOnTop: true/);
   assert.match(source, /setVisibleOnAllWorkspaces\(true, \{ visibleOnFullScreen: true \}\)/);
-  assert.match(source, /if \(applicationVisible\)[\s\S]*entry\.window\.hide\(\)/);
+  assert.match(source, /applicationVisible \? \(entry.detached \? 240 : 128\) : 300/);
+  assert.match(source, /animatePresenceBounds/);
+  assert.match(source, /--presence-scale/);
   assert.match(source, /setApplicationVisible/);
   assert.match(source, /selectSystemPresenceDisplay/);
   assert.match(source, /displaySelectionMode/);

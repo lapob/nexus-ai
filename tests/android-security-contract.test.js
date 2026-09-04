@@ -21,8 +21,18 @@ test('manifest minimizzano backup, debug e componenti esportati', () => {
     assert.match(manifest, /android:fullBackupContent="false"/);
     assert.match(manifest, /android:dataExtractionRules="@xml\/data_extraction_rules"/);
     assert.match(manifest, /android:usesCleartextTraffic="false"/);
-    assert.doesNotMatch(manifest, /<service|<receiver/);
+    assert.doesNotMatch(manifest, /<receiver/);
   }
+  assert.doesNotMatch(consoleManifest(), /<service/);
+  const assistantServices = [...remoteManifest().matchAll(/<service\b[^>]*>/g)].map((match) => match[0]);
+  assert.equal(assistantServices.length, 3);
+  for (const service of assistantServices) {
+    assert.match(service, /android:permission="android\.permission\.BIND_(VOICE_INTERACTION|SPEECH_RECOGNITION)"/);
+  }
+  const assistantConfig = read('android/NexusRemote/app/src/main/res/xml/voice_interaction.xml');
+  assert.match(assistantConfig, /android:recognitionService="local.nexus.remote.NexusRecognitionService"/);
+  assert.match(assistantConfig, /android:supportsLaunchVoiceAssistFromKeyguard="false"/);
+  assert.match(read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusRecognitionService.kt'), /it.serviceInfo.packageName != packageName/);
   assert.match(remoteManifest(), /androidx\.core\.content\.FileProvider[\s\S]*?android:exported="false"[\s\S]*?android:grantUriPermissions="true"/);
   assert.doesNotMatch(consoleManifest(), /<provider/);
   assert.doesNotMatch(remoteManifest(), /<profileable|android:shell="true"/);

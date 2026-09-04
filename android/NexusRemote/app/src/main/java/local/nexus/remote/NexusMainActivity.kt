@@ -2590,6 +2590,18 @@ private fun JSONArray?.toTurns() = buildList {
  * conversazionale al Core senza trasformarsi in una sezione dell'interfaccia.
  */
 @Composable private fun NexusInstantApp(state: NexusUiState, dispatch: (String, String) -> Unit) {
+    val context = LocalContext.current
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var controlsAwake by remember { mutableStateOf(true) }
+    var lastInteraction by remember { mutableStateOf(0L) }
+    val accessibleControls = (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager)?.isTouchExplorationEnabled == true
+    LaunchedEffect(lastInteraction, settingsOpen, accessibleControls) {
+        controlsAwake = true
+        if (!settingsOpen && !accessibleControls) {
+            kotlinx.coroutines.delay(6_000)
+            controlsAwake = false
+        }
+    }
     val metrics = LocalNexusMetrics.current
     val reduceMotion = state.reduceMotion || metrics.adaptiveReducedMotion || !ValueAnimator.areAnimatorsEnabled()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -2655,7 +2667,7 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
     LaunchedEffect(latestAnswer, state.streaming) {
-        if (latestAnswer.isNotBlank()) scrollState.animateScrollTo(scrollState.maxValue)
+        if (latestAnswer.isNotBlank() && !scrollState.isScrollInProgress) scrollState.scrollTo(scrollState.maxValue)
     }
     BackHandler(enabled = voiceMode || textMode || typedSession) {
         if (voiceMode) voiceMode = false
@@ -2667,10 +2679,20 @@ private fun JSONArray?.toTurns() = buildList {
 
     Surface(color = Ink, contentColor = Ice, modifier = Modifier.fillMaxSize()) {
         Box(
-            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
+            Modifier.fillMaxSize().pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.any { it.pressed }) lastInteraction = System.nanoTime()
+                    }
+                }
+            }.statusBarsPadding().navigationBarsPadding().imePadding()
                 .padding(horizontal = metrics.horizontalPadding, vertical = 12.dp)
         ) {
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
+            AnimatedVisibility(controlsAwake, modifier = Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
+                IconButton(onClick = { keyboard?.hide(); settingsOpen = true }, modifier = Modifier.size(48.dp).clip(CircleShape).background(Surface.copy(alpha = .8f))) { PremiumMenuGlyph() }
+            }
             Column(
                 Modifier.fillMaxSize().widthIn(max = 760.dp).align(Alignment.Center).padding(top = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -2852,6 +2874,22 @@ private fun JSONArray?.toTurns() = buildList {
             }
         }
     }
+    if (settingsOpen) AlertDialog(
+        onDismissRequest = { settingsOpen = false; lastInteraction = System.nanoTime() },
+        title = { Text(nexusCopy("Impostazioni", "Settings")) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
+            CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
+            TextButton(onClick = {
+                val role = if (android.os.Build.VERSION.SDK_INT >= 29) context.getSystemService(android.app.role.RoleManager::class.java) else null
+                val request = if (Build.VERSION.SDK_INT >= 29 && role?.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT) == true && !role.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT)) role.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT) else Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
+                runCatching { context.startActivity(request) }.onFailure { runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) } }
+            }) { Text(nexusCopy("Usa Nexus come assistente", "Use Nexus as assistant")) }
+            Text(nexusCopy("Il richiamo con il tasto laterale dipende dalle impostazioni del telefono. Il microfono resta sotto il tuo controllo.", "Side-button activation depends on your phone settings. The microphone remains under your control."), style = MaterialTheme.typography.bodySmall, color = Mist)
+        } },
+        confirmButton = { TextButton({ settingsOpen = false; lastInteraction = System.nanoTime() }) { Text(nexusCopy("Chiudi", "Close")) } },
+        containerColor = Surface, shape = RoundedCornerShape(26.dp)
+    )
     if (voiceMode && interactionAvailable) ContinuousVoicePanel(
         reduceMotion = reduceMotion,
         connection = state.connection,
@@ -2930,13 +2968,9 @@ private fun JSONArray?.toTurns() = buildList {
                 modifier = Modifier.fillMaxWidth(if (centered) .92f else 1f).padding(top = 18.dp)
             )
         }
-        if (latestAnswer.isNotBlank()) Text(
-            latestAnswer,
-            color = Ice,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
-            modifier = Modifier.fillMaxWidth(if (centered) .92f else 1f).widthIn(max = 680.dp).padding(top = if (latestPrompt.isBlank()) 0.dp else 18.dp)
-        )
+        if (latestAnswer.isNotBlank()) Box(Modifier.fillMaxWidth(if (centered) .92f else 1f).widthIn(max = 680.dp).padding(top = if (latestPrompt.isBlank()) 0.dp else 18.dp)) {
+            MarkdownMessage(streamSafeMarkdown(latestAnswer), streamingTailChars = if (busy) 48 else 0, streamingAccent = if (busy) .65f else 0f)
+        }
         if (latestPrompt.isBlank() && latestAnswer.isBlank()) Text(
             nexusCopy("Scrivi. Il Core seguirà la conversazione.", "Type. The Core will follow the conversation."),
             color = Mist,
@@ -3300,6 +3334,7 @@ private fun JSONArray?.toTurns() = buildList {
     ) {
         Box(Modifier.width(23.dp).height(2.dp).clip(CircleShape).background(Ice))
         Box(Modifier.width(15.dp).height(2.dp).clip(CircleShape).background(Ice))
+        Box(Modifier.width(19.dp).height(2.dp).clip(CircleShape).background(Ice))
     }
 }
 

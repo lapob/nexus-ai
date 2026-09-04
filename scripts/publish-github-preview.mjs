@@ -114,7 +114,7 @@ const releaseBody = [
   '- Impronte complete: `CHECKSUMS.sha256`',
   '- Manifest pubblico: `release-manifest.preview.json`',
   '',
-  'Verifica sempre le impronte pubblicate su https://nexusnxs.com/downloads prima dell’installazione.',
+  'Verifica le impronte nel file CHECKSUMS.sha256 allegato a questa stessa release prima dell’installazione.',
   '',
   `_Asset aggiornati il ${new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'Europe/Rome' }).format(new Date())}._`,
 ].join('\n');

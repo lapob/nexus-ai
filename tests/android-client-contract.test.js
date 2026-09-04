@@ -665,7 +665,8 @@ test('la voce Android parte dal Core, invia una frase e non resta attiva in back
   assert.match(activity, /event == Lifecycle\.Event\.ON_STOP\) haltCapture\(false, false\)/);
   assert.match(activity, /handler\.removeCallbacksAndMessages\(null\)/);
   assert.match(activity, /sessionGeneration == expectedGeneration/);
-  assert.doesNotMatch(manifest, /<service|<receiver/, 'il client pubblico non deve simulare una wake word con ascolto nascosto in background');
+  assert.doesNotMatch(manifest, /<receiver|FOREGROUND_SERVICE_MICROPHONE/, 'nessuna wake word con ascolto nascosto in background');
+  assert.match(manifest, /android.permission.BIND_VOICE_INTERACTION/);
   assert.match(activity, /"stopSpeech" -> stopAllSpeech\(\)/, 'aprire la cattura deve interrompere subito sia la voce server sia il fallback locale');
   assert.match(activity, /speechConnection\?\.disconnect\(\)/);
   assert.match(activity, /EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS/, 'il VAD del recognizer deve chiudere una frase con un endpoint esplicito');
