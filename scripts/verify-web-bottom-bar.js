@@ -27,6 +27,14 @@ async function main() {
     for (const [width, height] of [[390,844], [360,420], [1440,900]]) {
       await client.command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
       await client.command('Page.reload', { ignoreCache: true });
+      const status = await evaluateWhenReady(client, `new Promise(resolve=>{
+        document.body.classList.add('status-active');
+        document.querySelector('#phase').textContent='La voce non è disponibile in questo browser: puoi scrivere.';
+        setTimeout(()=>{const a=document.querySelector('.copy').getBoundingClientRect(),b=document.querySelector('#phase').getBoundingClientRect(),c=document.querySelector('.dock').getBoundingClientRect();resolve({titleGap:b.top-a.bottom,dockGap:c.top-b.bottom})},700);
+      })`);
+      const statusShot = await client.command('Page.captureScreenshot', { format:'png', captureBeyondViewport:false });
+      fs.writeFileSync(path.join(output, `status-${width}x${height}.png`), Buffer.from(statusShot.data,'base64'));
+      if (status.titleGap < 0 || status.dockGap < 0) throw new Error('Status collision: '+JSON.stringify({width,height,...status}));
       const result = await evaluateWhenReady(client, `new Promise(resolve => {
         document.body.classList.add('conversation-active','keyboard-open');
         document.querySelector('#answer').innerHTML = Array.from({length:30},(_,i)=>'<p>Paragrafo '+i+': una risposta lunga deve restare leggibile senza attraversare i comandi in fondo.</p>').join('');

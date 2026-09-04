@@ -39,7 +39,9 @@ body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock{to
 body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom));transform:translate3d(0,var(--nxs-status-dock-shift),0)}
 body.keyboard-open:not(.request-active):not(.conversation-active) .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom));transform:translate3d(0,var(--nxs-keyboard-dock-shift),0)}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .exchange{min-height:0;margin:0}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{position:fixed;z-index:29;top:calc(var(--nxs-vv-top) + var(--nxs-vvh) * .62);right:18px;left:18px;width:min(560px,calc(100% - 36px));margin:0 auto;line-height:1.5;text-align:center;text-wrap:balance}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{position:relative;z-index:29;top:auto;right:auto;left:auto;width:min(560px,100%);margin:18px auto 0;line-height:1.5;text-align:center;text-wrap:balance}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{width:min(48vw,25dvh,232px)}
+@media(max-height:540px){body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{margin-top:0}body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .stage{padding-bottom:36px}}
 body:not(.request-active):not(.conversation-active) .privacy{position:fixed;z-index:29;top:auto;right:18px;bottom:max(14px,env(safe-area-inset-bottom));left:18px;margin:0 auto}
 .conversation-active:not(.request-active) .dock,.request-active .dock{top:auto;bottom:calc(var(--nxs-privacy-height) + max(10px,env(safe-area-inset-bottom)));transform:none;width:min(720px,calc(100% - 36px));padding:16px 0 8px;background:linear-gradient(transparent,rgba(2,6,7,.96) 30%)}
 .conversation-active.composer-collapsed:not(.request-active) .dock{background:none}
@@ -62,7 +64,7 @@ body:is(.conversation-active,.request-active) .shell{padding-bottom:calc(var(--n
 .memory-cleared .phase{position:fixed;z-index:42;right:18px;bottom:max(18px,calc(12px + env(safe-area-inset-bottom)));left:18px;width:max-content;max-width:calc(100% - 36px);min-height:0;margin:auto;padding:8px 12px;border:1px solid rgba(103,211,208,.12);border-radius:999px;color:#83aaaa;background:rgba(4,14,15,.86);box-shadow:0 12px 34px rgba(0,0,0,.3);backdrop-filter:blur(12px);text-align:center}
 .send[data-mode=stop]{border-radius:50%;background:radial-gradient(circle at 42% 34%,rgba(72,171,169,.46),rgba(25,61,63,.94) 70%);box-shadow:0 0 0 1px rgba(114,236,230,.08),0 10px 28px rgba(17,108,109,.2)}
 .send[data-mode=stop] svg{width:20px;height:20px}.send[data-mode=stop] svg rect{fill:currentColor;stroke:none}
-@media(max-width:560px){body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{top:calc(var(--nxs-vv-top) + var(--nxs-vvh) * .58)}body:not(.request-active):not(.conversation-active) .privacy{bottom:max(12px,env(safe-area-inset-bottom))}.conversation-active:not(.request-active) .dock,.request-active .dock{width:calc(100% - 20px)}.conversation-active .stage{padding-top:48px}}
+@media(max-width:560px){body:not(.request-active):not(.conversation-active) .privacy{bottom:max(12px,env(safe-area-inset-bottom))}.conversation-active:not(.request-active) .dock,.request-active .dock{width:calc(100% - 20px)}.conversation-active .stage{padding-top:48px}}
 @media(prefers-reduced-motion:reduce){.memory-cleared .phase{backdrop-filter:none}}
 </style>`;
 
