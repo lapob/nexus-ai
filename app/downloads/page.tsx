@@ -17,15 +17,15 @@ const releases = [
     name: "NexusNXS per PC",
     version: "0.3.9",
     platform: "Windows 11 · x64",
-    size: "102,51 MiB · 107.493.380 byte",
+    size: "102,51 MiB · 107.493.265 byte",
     date: "4 settembre 2026",
     state: "PREVIEW · NON FIRMATA",
     text: "Assistente AI connesso per Windows con voce e strumenti locali.",
     requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
-    sha256: "F2D20CFD2C671F3C39C3457EFB0DD5297EAF315F0FA5816188EFFBD0FE1FAA54",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.9-preview.1/NexusNXS-0.3.9-Setup.exe",
+    sha256: "27C27569DABF4C2E70228F5D72FCABDF8697B06CA0A429F333D517114547AF80",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.9-preview.2/NexusNXS-0.3.9-Setup.exe",
   },
   {
     Icon: Smartphone,
@@ -40,7 +40,7 @@ const releases = [
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
     sha256: "17000623AA976378A84C05E1C2DEA7F130ED9E0D97F3B682D27272438A6C16C6",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.9-preview.1/NexusNXS-Android-6.4.3.apk",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.9-preview.2/NexusNXS-Android-6.4.3.apk",
   },
 ];
 
