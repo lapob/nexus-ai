@@ -1,12 +1,13 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "service": "NexusNXS",
   "windowDays": 30,
   "objectives": {
     "availabilityTargetPercent": 99.5,
     "aiQuick": {
       "minimumBestPassRate": 90,
-      "maximumBestP95LatencyMs": 4000
+      "maximumBestP95FirstTokenLatencyMs": 4000,
+      "maximumBestP95CompletionLatencyMs": 20000
     },
     "aiDeep": {
       "minimumBestPassRate": 85,

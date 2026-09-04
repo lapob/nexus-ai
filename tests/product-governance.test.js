@@ -20,7 +20,7 @@ test('la policy SLO distingue prove conformi dalla disponibilita non misurata', 
   const writeJson = (name, value) => fs.writeFileSync(path.join(artifacts, name), `${JSON.stringify(value)}\n`, 'utf8');
   try {
     fs.mkdirSync(artifacts, { recursive: true });
-    writeJson('local-model-evaluation.json', { report: [{ passRate: 94, p95LatencyMs: 1800 }] });
+    writeJson('local-model-evaluation.json', { report: [{ passRate: 94, p95FirstTokenLatencyMs: 420, p95LatencyMs: 1800 }] });
     writeJson('ai-eval-lab-gate.json', { gatePassed: true, models: [{ model: 'fixture', summary: { passRate: 91, p95LatencyMs: 4200, mustPassFailures: [] } }] });
     writeJson('local-voice-evaluation.json', { backend: 'fixture', coldStartMs: 1200, warmMedianMs: 420 });
     writeJson('gateway-load-test.json', { clients: 20, p95LatencyMs: 180, passed: true });
@@ -48,15 +48,16 @@ test('lo SLO rapido sceglie il modello conforme piu veloce e non il cold-start d
   try {
     fs.writeFileSync(path.join(fixture, 'local-model-evaluation.json'), `${JSON.stringify({
       report: [
-        { model: 'fast', passRate: 94, p95LatencyMs: 1900 },
-        { model: 'deep', passRate: 100, p95LatencyMs: 52000 }
+        { model: 'fast', passRate: 94, p95FirstTokenLatencyMs: 480, p95LatencyMs: 1900 },
+        { model: 'deep', passRate: 100, p95FirstTokenLatencyMs: 3000, p95LatencyMs: 52000 }
       ]
     })}\n`, 'utf8');
     const quick = evaluateArtifacts({ policy, artifactsRoot: fixture, projectRoot: fixture })
       .find((entry) => entry.id === 'ai-quick-quality');
     assert.equal(quick.status, 'pass');
     assert.equal(quick.observed.passRate, 94);
-    assert.equal(quick.observed.p95LatencyMs, 1900);
+    assert.equal(quick.observed.p95FirstTokenLatencyMs, 480);
+    assert.equal(quick.observed.p95CompletionLatencyMs, 1900);
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
   }

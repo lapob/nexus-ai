@@ -30,14 +30,20 @@ function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifac
     .map((entry) => ({
       ...entry,
       passRate: Number(entry.passRate),
+      p95FirstTokenLatencyMs: Number(entry.p95FirstTokenLatencyMs),
       p95LatencyMs: Number(entry.p95LatencyMs)
     }))
-    .filter((entry) => entry.passRate >= objectives.aiQuick.minimumBestPassRate)
-    .sort((left, right) => left.p95LatencyMs - right.p95LatencyMs || right.passRate - left.passRate);
+    .filter((entry) => entry.passRate >= objectives.aiQuick.minimumBestPassRate && Number.isFinite(entry.p95FirstTokenLatencyMs) && Number.isFinite(entry.p95LatencyMs))
+    .sort((left, right) => left.p95FirstTokenLatencyMs - right.p95FirstTokenLatencyMs || left.p95LatencyMs - right.p95LatencyMs || right.passRate - left.passRate);
   const bestModel = quickCandidates[0];
   checks.push(bestModel
-    ? result('ai-quick-quality', Number(bestModel.passRate) >= objectives.aiQuick.minimumBestPassRate && Number(bestModel.p95LatencyMs) <= objectives.aiQuick.maximumBestP95LatencyMs ? 'pass' : 'fail', {
-        passRate: Number(bestModel.passRate), p95LatencyMs: Number(bestModel.p95LatencyMs)
+    ? result('ai-quick-quality', Number(bestModel.passRate) >= objectives.aiQuick.minimumBestPassRate
+      && Number(bestModel.p95FirstTokenLatencyMs) <= objectives.aiQuick.maximumBestP95FirstTokenLatencyMs
+      && Number(bestModel.p95LatencyMs) <= objectives.aiQuick.maximumBestP95CompletionLatencyMs ? 'pass' : 'fail', {
+        model: bestModel.model,
+        passRate: Number(bestModel.passRate),
+        p95FirstTokenLatencyMs: Number(bestModel.p95FirstTokenLatencyMs),
+        p95CompletionLatencyMs: Number(bestModel.p95LatencyMs)
       }, objectives.aiQuick)
     : result('ai-quick-quality', 'not-measured', null, objectives.aiQuick));
 

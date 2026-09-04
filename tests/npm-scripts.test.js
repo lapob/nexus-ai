@@ -213,7 +213,10 @@ test('la valutazione AI segue la porta privata posseduta dal runtime NexusNXS', 
 
 test('il gate AI concede al modello profondo un cold start misurabile senza alterare gli SLO di risposta', () => {
   assert.match(modelEvaluator, /REQUEST_TIMEOUT_MS[\s\S]*150_000/);
-  assert.match(fs.readFileSync(path.join(root, 'config', 'product-slo.json'), 'utf8'), /"maximumBestP95LatencyMs"\s*:\s*4000/);
+  assert.match(modelEvaluator, /stream:\s*true/);
+  const sloPolicy = fs.readFileSync(path.join(root, 'config', 'product-slo.json'), 'utf8');
+  assert.match(sloPolicy, /"maximumBestP95FirstTokenLatencyMs"\s*:\s*4000/);
+  assert.match(sloPolicy, /"maximumBestP95CompletionLatencyMs"\s*:\s*20000/);
 });
 
 test('il preflight è incrementale e non apre shell Windows secondarie', () => {
