@@ -21,7 +21,13 @@ const kib = (bytes) => Math.round(bytes / 102.4) / 10;
 
 const checks = [
   { label: "JavaScript client", actual: sum((file) => file.relative.endsWith(".js")), maximum: 525 * 1024 },
-  { label: "CSS client", actual: sum((file) => file.relative.endsWith(".css")), maximum: 98 * 1024 },
+  // nexus-operational.css appartiene alla pagina statica di fallback e non
+  // viene caricato insieme al bundle applicativo: sommarli falserebbe il peso
+  // di una singola navigazione reale.
+  // Il Continuum e il footer astrale aggiungono meno di 2 KiB senza aumentare
+  // JavaScript o immagini: la nuova soglia resta stretta e verificabile.
+  { label: "CSS applicazione", actual: sum((file) => file.relative.endsWith(".css") && file.relative !== "nexus-operational.css"), maximum: 100 * 1024 },
+  { label: "CSS fallback operativo", actual: find("nexus-operational.css"), maximum: 12 * 1024 },
   { label: "Font tecnico", actual: find("fonts/jetbrains-mono-latin.woff2"), maximum: 42 * 1024 },
   { label: "Cattura Android", actual: find("products/android-home.png"), maximum: 190 * 1024 },
   { label: "Cattura desktop", actual: find("products/desktop-core.png"), maximum: 190 * 1024 },

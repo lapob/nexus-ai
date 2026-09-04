@@ -59,6 +59,7 @@ const AMBIENT_SELECTOR = [
   ".presence-system",
   ".trust-seal",
   "[data-nexus-presence]",
+  ".interactive-visualizer",
 ].join(",");
 
 const IMMEDIATE_REVEAL_SELECTOR = [
@@ -85,6 +86,12 @@ export function SiteMotionRuntime() {
     let cosmicWidth = 1;
     let cosmicHeight = 1;
     const pointer = { x: 0, y: 0, active: 0 };
+    const draggableCore = document.querySelector<HTMLElement>(".home-neural-core");
+    const coreDrag = { active: false, pointerId: -1, startX: 0, startY: 0, x: 0, y: 0 };
+    let coreDragAnimation: Animation | null = null;
+    const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
+    const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
+    const sectionCount = Math.max(2, document.querySelectorAll("main > section").length);
 
     const cosmicCanvas = document.createElement("canvas");
     cosmicCanvas.className = "nxs-cosmic-field";
@@ -125,13 +132,62 @@ export function SiteMotionRuntime() {
       cosmicLastFrame = now;
       const time = reduced ? 0 : now / 1000;
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
+      const sectionPosition = scroll * (sectionCount - 1);
+      const sectionIndex = Math.floor(sectionPosition);
+      const sectionMixRaw = sectionPosition - sectionIndex;
+      const sectionMix = sectionMixRaw * sectionMixRaw * (3 - 2 * sectionMixRaw);
+      const laneFor = (index: number) => index % 2 === 0 ? .73 : .27;
+      const visualLane = cosmicWidth < 760
+        ? .5
+        : laneFor(sectionIndex) + (laneFor(sectionIndex + 1) - laneFor(sectionIndex)) * sectionMix;
+      const topology = sectionPosition + routePhase;
+      const topologyIndex = Math.floor(topology);
+      const topologyMixRaw = topology - topologyIndex;
+      const topologyMix = topologyMixRaw * topologyMixRaw * (3 - 2 * topologyMixRaw);
+      const topologyPoint = (particle: CosmicParticle, index: number, shape: number) => {
+        const kind = ((shape % 5) + 5) % 5;
+        const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
+        const centerX = cosmicWidth * visualLane;
+        const centerY = cosmicHeight * .5;
+        if (kind === 0) {
+          const radius = Math.min(cosmicWidth, cosmicHeight) * (.19 + (index % 3) * .052);
+          return { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
+        }
+        if (kind === 1) {
+          const side = index % 2 === 0 ? -1 : 1;
+          const lobeAngle = angle * 1.45;
+          const radius = Math.min(cosmicWidth, cosmicHeight) * (.11 + particle.depth * .12);
+          return { x: centerX + side * cosmicWidth * .105 + Math.cos(lobeAngle) * radius, y: centerY + Math.sin(lobeAngle) * radius * 1.18 };
+        }
+        if (kind === 2) {
+          const radius = Math.min(cosmicWidth, cosmicHeight) * (.035 + index / particles.length * .38);
+          return { x: centerX + Math.cos(angle * 2.35) * radius, y: centerY + Math.sin(angle * 2.35) * radius };
+        }
+        if (kind === 3) {
+          const column = index / Math.max(1, particles.length - 1);
+          return { x: cosmicWidth * (.12 + column * .76), y: centerY + Math.sin(column * Math.PI * 4 + routePhase) * cosmicHeight * .19 };
+        }
+        const orbit = index % 4;
+        const radiusX = cosmicWidth * (.12 + orbit * .055);
+        const radiusY = cosmicHeight * (.09 + orbit * .04);
+        return { x: centerX + Math.cos(angle + orbit * .42) * radiusX, y: centerY + Math.sin(angle + orbit * .42) * radiusY };
+      };
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
-      const points = particles.map((particle) => {
+      const points = particles.map((particle, index) => {
         const baseX = particle.x * cosmicWidth;
         const baseY = ((particle.y + scroll * particle.depth * .13) % 1) * cosmicHeight;
-        const x = baseX + Math.sin(time * particle.speed + particle.phase) * (5 + particle.depth * 12);
-        const y = baseY + Math.cos(time * particle.speed * .72 + particle.phase) * (4 + particle.depth * 9);
+        const first = topologyPoint(particle, index, topologyIndex);
+        const second = topologyPoint(particle, index, topologyIndex + 1);
+        const targetX = first.x + (second.x - first.x) * topologyMix;
+        const targetY = first.y + (second.y - first.y) * topologyMix;
+        // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
+        // e si ricompone nella topologia seguente. Il campo resta continuo:
+        // non ci sono cambi di scena o salti di corsia a meta scroll.
+        const transitionScatter = Math.sin(sectionMix * Math.PI) * .24;
+        const compose = (.64 + particle.depth * .24) * (1 - transitionScatter);
+        const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (4 + particle.depth * 9);
+        const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (3 + particle.depth * 7);
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
         const influence = pointer.active * Math.max(0, 1 - distance / 150);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
@@ -167,6 +223,7 @@ export function SiteMotionRuntime() {
     root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
     root.classList.add("nxs-motion-preparing", `nxs-motion-${tier}`);
     root.dataset.motionTier = tier;
+    root.dataset.nexusRoute = routeName;
     document.body.prepend(cosmicCanvas);
     resizeCosmicField();
     drawCosmicField(performance.now());
@@ -243,6 +300,37 @@ export function SiteMotionRuntime() {
       pointer.active = 1;
     };
     const onPointerLeave = () => { pointer.active = 0; };
+    const paintCoreDrag = () => {
+      if (!draggableCore) return;
+      coreDragAnimation?.cancel();
+      coreDragAnimation = draggableCore.animate(
+        [{ translate: `${coreDrag.x}px ${coreDrag.y}px` }],
+        { duration: 1, fill: "forwards" },
+      );
+    };
+    const onCorePointerDown = (event: PointerEvent) => {
+      if (!draggableCore || reducedMotion.matches) return;
+      coreDrag.active = true;
+      coreDrag.pointerId = event.pointerId;
+      coreDrag.startX = event.clientX - coreDrag.x;
+      coreDrag.startY = event.clientY - coreDrag.y;
+      draggableCore.dataset.dragging = "true";
+      draggableCore.setPointerCapture(event.pointerId);
+    };
+    const onCorePointerMove = (event: PointerEvent) => {
+      if (!draggableCore || !coreDrag.active || event.pointerId !== coreDrag.pointerId) return;
+      coreDrag.x = Math.max(-window.innerWidth * .22, Math.min(window.innerWidth * .22, event.clientX - coreDrag.startX));
+      coreDrag.y = Math.max(-window.innerHeight * .24, Math.min(window.innerHeight * .24, event.clientY - coreDrag.startY));
+      paintCoreDrag();
+    };
+    const onCorePointerUp = (event: PointerEvent) => {
+      if (!draggableCore || event.pointerId !== coreDrag.pointerId) return;
+      coreDrag.active = false;
+      coreDrag.pointerId = -1;
+      delete draggableCore.dataset.dragging;
+      if (draggableCore.hasPointerCapture(event.pointerId)) draggableCore.releasePointerCapture(event.pointerId);
+    };
+    const onCoreDoubleClick = () => { coreDrag.x = 0; coreDrag.y = 0; paintCoreDrag(); };
 
     updateScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -250,6 +338,11 @@ export function SiteMotionRuntime() {
     window.addEventListener("resize", resizeCosmicField, { passive: true });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     document.documentElement.addEventListener("pointerleave", onPointerLeave);
+    draggableCore?.addEventListener("pointerdown", onCorePointerDown);
+    draggableCore?.addEventListener("pointermove", onCorePointerMove);
+    draggableCore?.addEventListener("pointerup", onCorePointerUp);
+    draggableCore?.addEventListener("pointercancel", onCorePointerUp);
+    draggableCore?.addEventListener("dblclick", onCoreDoubleClick);
 
     return () => {
       revealObserver?.disconnect();
@@ -262,12 +355,19 @@ export function SiteMotionRuntime() {
       window.removeEventListener("resize", resizeCosmicField);
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
+      draggableCore?.removeEventListener("pointerdown", onCorePointerDown);
+      draggableCore?.removeEventListener("pointermove", onCorePointerMove);
+      draggableCore?.removeEventListener("pointerup", onCorePointerUp);
+      draggableCore?.removeEventListener("pointercancel", onCorePointerUp);
+      draggableCore?.removeEventListener("dblclick", onCoreDoubleClick);
+      coreDragAnimation?.cancel();
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
       document.removeEventListener("visibilitychange", syncVisibility);
       root.removeAttribute("data-motion-paused");
       root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
       delete root.dataset.motionTier;
+      delete root.dataset.nexusRoute;
       root.style.removeProperty("--nxs-scroll");
       cosmicCanvas.remove();
     };

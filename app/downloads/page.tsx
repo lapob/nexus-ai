@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert, Smartphone } from "lucide-react";
 import Image from "next/image";
 import { SiteFooter } from "../components/SiteChrome";
+import { VisualizerCollection } from "../components/InteractiveVisualizer";
 
 export const metadata: Metadata = {
   title: "Download NexusNXS — Release e verifiche",
@@ -15,32 +16,32 @@ const releases = [
   {
     Icon: Laptop,
     name: "NexusNXS per PC",
-    version: "0.3.9",
+    version: "0.3.10",
     platform: "Windows 11 · x64",
-    size: "102,51 MiB · 107.493.265 byte",
+    size: "102,51 MiB · 107.494.538 byte",
     date: "4 settembre 2026",
     state: "PREVIEW · NON FIRMATA",
     text: "Assistente AI connesso per Windows con voce e strumenti locali.",
     requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
-    sha256: "515041F42F89C068F52E7E6E46C7680CD4F133469FA1C0FBD63FE38429DB328D",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.9-preview.3/NexusNXS-0.3.9-Setup.exe",
+    sha256: "DB5A7E88CFBBCD0629C05500C608D133864E818B8A6099683039C4AA9C4DA469",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.10-preview.1/NexusNXS-0.3.10-Setup.exe",
   },
   {
     Icon: Smartphone,
     name: "NexusNXS per Android",
-    version: "6.4.3",
+    version: "6.4.4",
     platform: "Android 10+",
-    size: "1,28 MiB · 1.336.972 byte",
+    size: "1,31 MiB · 1.374.356 byte",
     date: "4 settembre 2026",
     state: "PREVIEW · FIRMA DEBUG",
     text: "Esperienza mobile nativa per conversazioni e continuità.",
     requirements: "Android 10 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
-    sha256: "17000623AA976378A84C05E1C2DEA7F130ED9E0D97F3B682D27272438A6C16C6",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.9-preview.3/NexusNXS-Android-6.4.3.apk",
+    sha256: "7B703404EE4A54A9A07EF43BCDA75521169E30559CBF32221FC3B42B40E4AB0B",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.10-preview.1/NexusNXS-Android-6.4.4.apk",
   },
 ];
 
@@ -53,6 +54,7 @@ export default function Downloads() {
       <p>Ogni file pubblico espone versione, dimensione, stato della firma e impronta crittografica. Queste build sono anteprime autorizzate e non vengono presentate come release firmate.</p>
       <div className="release-policy"><ShieldAlert size={18} /><span><strong>Preview non firmate</strong> — verifica sempre l’impronta SHA-256 prima dell’installazione. Le firme di produzione arriveranno in una release successiva.</span></div>
     </section>
+    <section className="download-visualizers"><div><p className="section-label">/ UN SOLO CONTINUUM</p><h2>Ogni Core.<br /><em>La stessa presenza.</em></h2></div><VisualizerCollection mode="all" compact /></section>
     <section className="release-list" aria-label="Release NexusNXS">
       {releases.map(({ Icon, ...release }) => <article key={release.name}>
         <div className="release-icon"><Icon aria-hidden="true" /></div>
@@ -74,7 +76,7 @@ export default function Downloads() {
     <section className="verify-guide">
       <div><FileCheck2 /><h2>Come verificare una release</h2></div>
       <ol><li><span>01</span>Avvia il download da <strong>nexusnxs.com</strong>; il file è ospitato nella release GitHub ufficiale.</li><li><span>02</span>Leggi lo stato della firma e gli avvisi della piattaforma.</li><li><span>03</span>Confronta l’impronta SHA-256 completa prima di eseguire il file.</li></ol>
-      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.9-Setup.exe -Algorithm SHA256</code></div>
+      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.10-Setup.exe -Algorithm SHA256</code></div>
       <p><BadgeCheck /> Versioni, avvisi e impronte sono pubblicati insieme ai file.</p>
     </section>
     <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili i client PC e Android con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>

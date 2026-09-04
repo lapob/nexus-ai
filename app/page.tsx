@@ -3,6 +3,7 @@ import { ArrowUpRight, Blocks, BrainCircuit, Check, Fingerprint, LockKeyhole, Me
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
+import { VisualizerCollection } from "./components/InteractiveVisualizer";
 
 const apps = [
   { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", device: "desktop", image: "/products/desktop-core.png", alt: "Core particellare reale di NexusNXS per PC", href: "/desktop" },
@@ -18,10 +19,16 @@ const presenceStates = [
 
 export default function Home() {
   return (
-    <main id="main-content">
+    <main id="main-content" className="home-continuum">
       <StructuredData data={[{"@context":"https://schema.org","@type":"WebSite",name:"NexusNXS",url:"https://nexusnxs.com",inLanguage:"it-IT"},{"@context":"https://schema.org","@type":"Organization",name:"NexusNXS",url:"https://nexusnxs.com",logo:"https://nexusnxs.com/nexus-icon.png",email:"hello@nexusnxs.com"}]} />
       <section className="hero" id="top">
-        <div className="aurora" aria-hidden="true"><i /><i /><i /></div>
+        <div className="aurora" aria-hidden="true">
+          <i /><i /><i />
+          <div className="home-neural-core">
+            <span className="home-neural-core__nucleus" />
+            {Array.from({ length: 18 }, (_, index) => <span className="home-neural-core__neuron" key={index} />)}
+          </div>
+        </div>
         <p className="eyebrow"><Sparkles size={13} strokeWidth={1.5} /> NEXUSNXS · AI PRIVATA, PROTETTA, CONNESSA</p>
         <h1>Chiedilo a Nexus.<br /><em>Fallo sul tuo PC.</em></h1>
         <p className="hero-copy">Un assistente personale che continua tra PC, Android e Web: comprende la richiesta, prepara il lavoro e agisce sul computer soltanto entro autorizzazioni chiare e revocabili.</p>
@@ -32,6 +39,7 @@ export default function Home() {
       <section className="manifesto reveal" id="vision"><p className="section-label">/ 01 — LA PRESENZA</p><p className="manifesto-text">NexusNXS non è un insieme di app separate. È <strong>una sola intelligenza privata</strong> che continua tra i tuoi dispositivi.</p></section>
       <section className="apps-section" id="apps">
         <div className="section-heading reveal"><div><p className="section-label">/ 02 — Le applicazioni</p><h2>Un ecosistema.<br />Il tuo ritmo.</h2></div><p>Ogni prodotto nasce per risolvere bene un problema reale. Insieme, diventano un ambiente senza attriti.</p></div>
+        <VisualizerCollection mode="all" compact />
         <div className="app-grid">{apps.map((app) => <article className={`app-card reveal ${app.accent}`} key={app.name}><div className="card-top"><span>{app.index}</span><span className="status"><i /> BUILD VERIFICATA</span></div><div className={`app-card-visual ${app.device}`}><div className="app-card-visual__screen"><Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 88vw, 540px" : "180px"} unoptimized /></div></div><p className="platform">{app.platform}</p><h3>{app.name}</h3><p>{app.description}</p><HardNavigationLink href={app.href} aria-label={`Scopri di più su ${app.name}`}>SCOPRI DI PIÙ <ArrowUpRight size={14} /></HardNavigationLink></article>)}</div>
       </section>
       <section className="presence-system reveal" aria-labelledby="presence-title">
