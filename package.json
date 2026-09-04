@@ -14,7 +14,7 @@
     "test:e2e": "node scripts/run-playwright.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .wrangler",
     "typecheck": "tsc --noEmit --incremental false",
-    "verify:security": "npm audit signatures && npm audit --audit-level=high --omit=optional",
+    "verify:security": "npm audit signatures && node scripts/audit-dependencies.mjs",
     "verify:performance": "node scripts/check-performance-budget.mjs",
     "verify:release": "npm run check && npm run verify:security && npm test && npm run test:e2e && npm run cloudflare:dry-run",
     "verify:deployment": "node scripts/verify-deployment.mjs",
