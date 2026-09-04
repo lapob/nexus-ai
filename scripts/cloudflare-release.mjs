@@ -415,6 +415,28 @@ async function rollback() {
   await verifyAiHealth();
 }
 
+async function diagnose() {
+  await ensureAccountToken();
+  const [routes, domains, activeVersion] = await Promise.all([
+    workerRoutes(),
+    workerDomains(),
+    currentVersion(),
+  ]);
+  const relevantRoutes = routes
+    .filter((route) => route.pattern?.includes("nexusnxs.com"))
+    .map(({ id, pattern, script }) => ({ id, pattern, script }));
+  const relevantDomains = domains
+    .filter((domain) => domain.hostname?.endsWith("nexusnxs.com"))
+    .map(({ id, hostname, service, environment, zone_id: domainZoneId }) => ({
+      id,
+      hostname,
+      service,
+      environment,
+      zone_id: domainZoneId,
+    }));
+  console.log(JSON.stringify({ worker: workerName, activeVersion, routes: relevantRoutes, domains: relevantDomains }, null, 2));
+}
+
 const action = process.argv[2];
 if (action === "bootstrap") await bootstrap();
 else if (action === "prepare") await prepare();
@@ -422,4 +444,5 @@ else if (action === "activate-initial") await activateInitial();
 else if (action === "cutover") await cutover();
 else if (action === "promote") await promote();
 else if (action === "rollback") await rollback();
-else throw new Error("Use bootstrap, prepare, activate-initial, cutover, promote, or rollback.");
+else if (action === "diagnose") await diagnose();
+else throw new Error("Use bootstrap, prepare, activate-initial, cutover, promote, rollback, or diagnose.");
