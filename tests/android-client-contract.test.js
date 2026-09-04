@@ -134,7 +134,7 @@ test('le due app restano client Android nativi con uno stato offline comprensibi
   assert.match(consoleActivity, /Riconnessione automatica/);
 });
 
-test('NexusMainActivity avvia soltanto la superficie istantanea adattiva', () => {
+test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assistente', () => {
   const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
   const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
   const launcherActivity = manifest.split('android:name=".NexusMainActivity"')[1]?.split('</activity>')[0] || '';
@@ -146,7 +146,8 @@ test('NexusMainActivity avvia soltanto la superficie istantanea adattiva', () =>
   assert.match(activity, /slideInHorizontally/);
   assert.match(activity, /slideOutHorizontally/);
   assert.match(activity, /if \(back\) -width \/ 9 else width \/ 9/, 'avanzamento e ritorno devono avere direzioni Android speculari');
-  assert.match(activity, /setContent \{ NexusTheme \{ NexusInstantApp\(state, ::dispatch\) \} \}/);
+  assert.match(activity, /setContent \{ NexusTheme \{ if \(state\.assistantOverlay\) NexusAssistantOverlay\(state, ::dispatch\) else NexusInstantApp\(state, ::dispatch\) \} \}/);
+  assert.match(manifest, /android:name="\.NexusAssistantActivity"[\s\S]*android\.intent\.action\.ASSIST/);
   assert.doesNotMatch(activity.match(/setContent[^\n]+/)?.[0] || '', /NexusApp\(/);
   assert.match(activity, /private fun NexusInstantApp/);
   assert.match(activity, /private fun NexusInstantCore/);
@@ -261,7 +262,7 @@ test('il client istantaneo non richiede la fotocamera', () => {
   const build = read('android/NexusRemote/app/build.gradle');
   const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
   assert.doesNotMatch(manifest, /android\.permission\.CAMERA|android\.hardware\.camera/);
-  assert.match(activity, /setContent \{ NexusTheme \{ NexusInstantApp/);
+  assert.match(activity, /setContent \{ NexusTheme \{ if \(state\.assistantOverlay\)[\s\S]*NexusInstantApp/);
   assert.doesNotMatch(activity.match(/@Composable private fun NexusInstantApp[\s\S]*?@Composable private fun NexusInstantCore/)?.[0] || '', /TakePicture|AttachmentPicker|PhotoCamera/);
   assert.match(manifest, /androidx\.core\.content\.FileProvider/);
   assert.doesNotMatch(manifest, /QrScannerActivity/);

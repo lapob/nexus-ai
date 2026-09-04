@@ -135,6 +135,11 @@ async function runElectronQa() {
   manager.setApplicationVisible(false);
   await settle();
   if (!window.isVisible() || window.getBounds().width !== 300) throw new Error('Presence tray non espansa.');
+  const tray = window.getBounds();
+  const trayDisplay = screen.getDisplayMatching(tray);
+  const centeredX = trayDisplay.workArea.x + ((trayDisplay.workArea.width - tray.width) / 2);
+  const centeredY = trayDisplay.workArea.y + ((trayDisplay.workArea.height - tray.height) / 2);
+  if (Math.abs(tray.x - centeredX) > 2 || Math.abs(tray.y - centeredY) > 2) throw new Error('Presence tray non centrata.');
   const surface = await window.webContents.executeJavaScript("document.querySelector('.presence').getBoundingClientRect().width");
   if (Math.abs(surface - 300) > 1) throw new Error('Visualizer non scalato insieme alla finestra.');
   fs.writeFileSync(path.join(output, 'presence-tray.png'), (await window.webContents.capturePage()).toPNG());

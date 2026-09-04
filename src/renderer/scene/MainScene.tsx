@@ -277,7 +277,7 @@ export function MainScene({ state, audioBus, preferences, hardware, suspended }:
     pointerReleaseTimer.current = window.setTimeout(() => {
       pointerPresence.current = 0;
       pointerReleaseTimer.current = null;
-    }, 520);
+    }, 820);
   };
   const releasePointer = () => {
     pointerPresence.current = 0;

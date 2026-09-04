@@ -26,7 +26,7 @@ test('Core, presenza e UI hanno ruoli non sovrapposti', () => {
   assert.deepEqual(capability, {
     mode: 'system-presence', lightweight: true, ownsAiRuntime: false,
     ownsRemoteGateway: false, multiDisplay: true, opensFullUiOnDemand: true,
-    tray: true, shortcut: 'CommandOrControl+Shift+Space'
+    tray: true, shortcut: 'CommandOrControl+Shift+Space', visibilityShortcut: 'CommandOrControl+Alt+Space'
   });
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: false, appRoot: 'C:\\Nexus' }), ['--ui']);
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: true, appRoot: 'C:\\Nexus' }), ['C:\\Nexus', '--ui']);

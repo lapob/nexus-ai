@@ -163,8 +163,8 @@ const vertexShader = /* glsl */ `
     vec2 pointerPosition = uPointer;
     vec2 pointerDelta = p.xy - pointerPosition;
     float pointerField = exp(-dot(pointerDelta, pointerDelta) * 2.05) * uPointerStrength;
-    p.xy += normalize(pointerDelta + vec2(0.0001)) * pointerField * (0.075 + aSeed * 0.085);
-    p.z += pointerField * sin(aSeed * 23.0 + uTime * 2.0) * 0.045;
+    p.xy += normalize(pointerDelta + vec2(0.0001)) * pointerField * (0.12 + aSeed * 0.11);
+    p.z += pointerField * sin(aSeed * 23.0 + uTime * 2.0) * 0.075;
 
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
@@ -446,7 +446,10 @@ export function SaturnVisualizer({ state, audioBus, reducedMotion, quality, perf
       material.uniforms.uAudio.value.set(audio.level, audio.bass, audio.mid, audio.treble);
       if (hasPointerIntersection) material.uniforms.uPointer.value.set(interactionPoint.x, interactionPoint.y);
       material.uniforms.uPointerStrength.value = THREE.MathUtils.damp(
-        material.uniforms.uPointerStrength.value, pointerPresence.current * 0.38, 5.2, delta
+        material.uniforms.uPointerStrength.value,
+        pointerPresence.current * 0.54,
+        pointerPresence.current > 0 ? 7 : 2.7,
+        delta
       );
       material.uniforms.uAccent.value.set(accent);
       material.uniforms.uLuminosity.value = THREE.MathUtils.damp(
@@ -480,6 +483,8 @@ export function SaturnVisualizer({ state, audioBus, reducedMotion, quality, perf
               ? 0.12
               : 0;
     system.current.rotation.z = THREE.MathUtils.damp(system.current.rotation.z, targetRotationZ, 3.2, delta);
+    system.current.rotation.x = THREE.MathUtils.damp(system.current.rotation.x, -0.03 - pointer.y * pointerPresence.current * 0.055, 2.7, delta);
+    system.current.rotation.y = THREE.MathUtils.damp(system.current.rotation.y, -0.05 + pointer.x * pointerPresence.current * 0.085, 2.7, delta);
     const parallax = reducedMotion ? 0 : quality === 'super' ? 0.055 : quality === 'ultra' ? 0.045 : quality === 'balanced' ? 0.025 : 0;
     system.current.position.x = THREE.MathUtils.damp(system.current.position.x, 1.35 + pointer.x * parallax, 2, delta);
     system.current.position.y = THREE.MathUtils.damp(system.current.position.y, 0.08 + pointer.y * parallax * 0.38, 2, delta);

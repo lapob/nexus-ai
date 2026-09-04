@@ -35,7 +35,8 @@ function presenceCapabilities({ platform = process.platform, shortcutRegistered 
     multiDisplay: true,
     opensFullUiOnDemand: true,
     tray: platform === 'win32',
-    shortcut: shortcutRegistered ? 'CommandOrControl+Shift+Space' : null
+    shortcut: shortcutRegistered ? 'CommandOrControl+Shift+Space' : null,
+    visibilityShortcut: shortcutRegistered ? 'CommandOrControl+Alt+Space' : null
   });
 }
 
@@ -183,6 +184,24 @@ async function bootstrapPresence({ env = process.env } = {}) {
     }
     return { ...launch, launched: true };
   };
+  const closeFullUi = async () => {
+    const requested = requestProcessShutdown(uiLockPath);
+    if (!requested) {
+      manager?.setApplicationVisible?.(false);
+      return { closed: true, alreadyClosed: true };
+    }
+    const deadline = Date.now() + 4_000;
+    while (Date.now() < deadline && processLockState(uiLockPath).running) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const closed = !processLockState(uiLockPath).running;
+    if (closed) manager?.setApplicationVisible?.(false);
+    return { closed };
+  };
+  const quitDesktop = async () => {
+    await closeFullUi();
+    app.quit();
+  };
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
@@ -209,6 +228,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
   manager = createSystemPresenceManager({
     logger,
     openPrimaryWindow: activateFullUi,
+    closePrimaryWindow: closeFullUi,
+    quitApplication: quitDesktop,
     activateVoice: () => activateFromWakeWord({
       manager,
       createActivationTicket: (kind) => presenceBridge?.createActivationTicket?.(kind),
@@ -272,16 +293,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
         return;
       }
       if (command.action === 'close-full-app') {
-        const requested = requestProcessShutdown(uiLockPath);
-        if (!requested) return;
-        const deadline = Date.now() + 4_000;
-        while (Date.now() < deadline && processLockState(uiLockPath).running) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        if (!processLockState(uiLockPath).running) {
-          manager.setApplicationVisible(false);
-          return;
-        }
+        if ((await closeFullUi()).closed) return;
         throw Object.assign(new Error('NexusNXS non si e chiusa in tempo.'), { code: 'PRESENCE_UI_STOP_TIMEOUT' });
       }
       if (command.action === 'open-chatgpt') {
@@ -354,20 +366,29 @@ async function bootstrapPresence({ env = process.env } = {}) {
     const italian = /^it(?:-|$)/i.test(String(app.getLocale?.() || ''));
     tray = new Tray(iconPath);
     tray.setToolTip('NexusNXS');
-    tray.setContextMenu(Menu.buildFromTemplate([
+    const refreshTrayMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
       { label: italian ? 'Apri NexusNXS' : 'Open NexusNXS', click: activateFullUi },
+      { label: italian ? 'Riduci al tray' : 'Minimize to tray', click: closeFullUi },
       { type: 'separator' },
       {
-        label: italian ? 'Presenza di sistema' : 'System presence',
+        label: italian ? 'Mostra Presence' : 'Show Presence',
         type: 'checkbox',
-        checked: initialPresence.nucleusVisible,
-        click: (item) => manager.setSystemPresenceEnabled?.(item.checked)
+        checked: manager.getSystemPresenceStatus().nucleusVisible,
+        click: (item) => { manager.setSystemPresenceEnabled?.(item.checked); refreshTrayMenu(); }
       },
-      { label: italian ? 'Termina presenza' : 'Quit presence', click: () => app.quit() }
+      { type: 'separator' },
+      { label: italian ? 'Esci da NexusNXS' : 'Quit NexusNXS', click: quitDesktop }
     ]));
+    refreshTrayMenu();
+    tray.on('right-click', refreshTrayMenu);
     tray.on('click', activateFullUi);
   }
-  shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', activateFullUi);
+  const openShortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', activateFullUi);
+  const visibilityShortcutRegistered = globalShortcut.register('CommandOrControl+Alt+Space', () => {
+    const visible = manager.getSystemPresenceStatus().nucleusVisible;
+    manager.setSystemPresenceEnabled(!visible);
+  });
+  shortcutRegistered = openShortcutRegistered && visibilityShortcutRegistered;
 
   let uiWasRunning = false;
   const syncVisibility = () => {

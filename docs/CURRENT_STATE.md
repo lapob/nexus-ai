@@ -1,6 +1,6 @@
 # Stato attuale
 
-NEXUSNXS 0.3.9 distingue due profili: il client pubblico usa il servizio
+NEXUSNXS 0.3.10 distingue due profili: il client pubblico usa il servizio
 NexusNXS Core via HTTPS, mentre la workstation dello sviluppatore può usare e
 valutare runtime locali senza includerli nell'installer pubblico.
 

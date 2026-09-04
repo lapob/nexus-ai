@@ -129,6 +129,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -463,6 +464,7 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val wakeBusy: Boolean = false,
     val wakeAwaiting: Boolean = false,
     val assistantInvocation: Long = 0L,
+    val assistantOverlay: Boolean = false,
     val slashCommands: List<SlashCommandRow> = emptyList()
 )
 
@@ -581,7 +583,7 @@ private fun String.isTransportFailure(): Boolean =
         contains("connection interrupted", ignoreCase = true) ||
         contains("transfer failed", ignoreCase = true)
 
-class NexusMainActivity : ComponentActivity() {
+open class NexusMainActivity : ComponentActivity() {
     companion object {
         private const val SESSION_RESUME_WINDOW_MS = 30L * 60L * 1000L
         private const val MAX_ATTACHMENT_BYTES = 1_500_000
@@ -863,7 +865,7 @@ class NexusMainActivity : ComponentActivity() {
         if (restoredWork == null) secureTokens.clear("workProposal")
         // Work resta chiuso finché il server autenticato non pubblica una
         // capability esplicita. Una preferenza salvata non può riattivarlo da sola.
-        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", slashCommands = loadCustomSlashCommands())
+        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = intent?.action == Intent.ACTION_ASSIST, slashCommands = loadCustomSlashCommands())
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
                 NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
@@ -871,7 +873,7 @@ class NexusMainActivity : ComponentActivity() {
             )
         }
         refreshChats(openIfEmpty = true)
-        setContent { NexusTheme { NexusInstantApp(state, ::dispatch) } }
+        setContent { NexusTheme { if (state.assistantOverlay) NexusAssistantOverlay(state, ::dispatch) else NexusInstantApp(state, ::dispatch) } }
         handleIncomingIntent(intent)
         probeConnection()
     }
@@ -944,6 +946,7 @@ class NexusMainActivity : ComponentActivity() {
             "remote" -> if (state.pairingAvailable || state.wakePairingAvailable || state.wakeAvailable) state = state.copy(screen = NexusScreen.REMOTE, drawer = false)
             "scheduled" -> if (state.remoteWorkAvailable) state = state.copy(screen = NexusScreen.SCHEDULED, drawer = false)
             "settings" -> state = state.copy(screen = NexusScreen.SETTINGS, drawer = false)
+            "assistantClose" -> { state = state.copy(assistantOverlay = false); finishAndRemoveTask() }
             "back" -> state = state.copy(screen = NexusScreen.CHAT)
             "modelSheet" -> state = state.copy(modelSheet = true)
             "closeModel" -> state = state.copy(modelSheet = false)
@@ -2503,6 +2506,7 @@ class NexusMainActivity : ComponentActivity() {
             state = state.copy(
                 screen = NexusScreen.CHAT,
                 work = false,
+                assistantOverlay = true,
                 assistantInvocation = System.currentTimeMillis()
             )
             incoming.replaceExtras(Bundle())
@@ -2592,6 +2596,8 @@ private fun JSONArray?.toTurns() = buildList {
 @Composable private fun NexusInstantApp(state: NexusUiState, dispatch: (String, String) -> Unit) {
     val context = LocalContext.current
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var remoteSettingsOpen by rememberSaveable { mutableStateOf(false) }
+    var remotePairCode by rememberSaveable { mutableStateOf("") }
     var controlsAwake by remember { mutableStateOf(true) }
     var lastInteraction by remember { mutableStateOf(0L) }
     val accessibleControls = (context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager)?.isTouchExplorationEnabled == true
@@ -2612,7 +2618,9 @@ private fun JSONArray?.toTurns() = buildList {
     val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
-    var voiceMode by rememberSaveable { mutableStateOf(false) }
+    // Una sessione microfono non deve mai essere ripristinata dal saved state
+    // dopo un nuovo avvio o un ritorno dal task switcher.
+    var voiceMode by remember { mutableStateOf(false) }
     var attachmentSheet by rememberSaveable { mutableStateOf(false) }
     val interactionAvailable = state.connection == NexusConnection.ONLINE
     val latestAnswer = if (state.busy) state.streaming else state.streaming.ifBlank { state.turns.lastOrNull { it.role == "assistant" }?.content.orEmpty() }
@@ -2880,6 +2888,16 @@ private fun JSONArray?.toTurns() = buildList {
         text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
             CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
+            CompactSetting(
+                Icons.Outlined.Computer,
+                nexusCopy("Controllo remoto", "Remote control"),
+                when {
+                    state.remoteWorkAvailable -> nexusCopy("Workstation associata", "Workstation paired")
+                    state.pairingAvailable -> nexusCopy("Associa e autorizza azioni sul PC", "Pair and authorize actions on your PC")
+                    else -> nexusCopy("Non disponibile su questo server", "Unavailable on this server")
+                },
+                { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }
+            ) { remoteSettingsOpen = true }
             TextButton(onClick = {
                 val role = if (android.os.Build.VERSION.SDK_INT >= 29) context.getSystemService(android.app.role.RoleManager::class.java) else null
                 val request = if (Build.VERSION.SDK_INT >= 29 && role?.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT) == true && !role.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT)) role.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT) else Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
@@ -2889,6 +2907,48 @@ private fun JSONArray?.toTurns() = buildList {
         } },
         confirmButton = { TextButton({ settingsOpen = false; lastInteraction = System.nanoTime() }) { Text(nexusCopy("Chiudi", "Close")) } },
         containerColor = Surface, shape = RoundedCornerShape(26.dp)
+    )
+    if (remoteSettingsOpen) AlertDialog(
+        onDismissRequest = { remoteSettingsOpen = false },
+        icon = { Icon(Icons.Outlined.Computer, null, tint = Cyan) },
+        title = { Text(nexusCopy("Controllo remoto", "Remote control")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    if (state.remoteWorkAvailable) nexusCopy("NexusNXS può preparare azioni sul computer associato. Ogni operazione sensibile richiede conferma.", "NexusNXS can prepare actions on the paired computer. Every sensitive action requires confirmation.")
+                    else nexusCopy("Inserisci il codice mostrato dall’app desktop per associare questa sessione.", "Enter the code shown by the desktop app to pair this session."),
+                    color = Mist,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (!state.remoteWorkAvailable && state.pairingAvailable) {
+                    OutlinedTextField(
+                        value = remotePairCode,
+                        onValueChange = { remotePairCode = it.filter(Char::isDigit).take(6) },
+                        label = { Text(nexusCopy("Codice a 6 cifre", "6-digit code")) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { dispatch("pair", remotePairCode); remotePairCode = "" },
+                        enabled = remotePairCode.length == 6,
+                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                    ) { Text(nexusCopy("Associa workstation", "Pair workstation")) }
+                }
+                if (state.remoteWorkAvailable) {
+                    OutlinedButton(
+                        onClick = { dispatch(if (state.work) "chat" else "work", "") },
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) { Text(if (state.work) nexusCopy("Torna alla chat", "Return to chat") else nexusCopy("Apri modalità operativa", "Open work mode")) }
+                    if (state.pairingAvailable && state.turns.isNotEmpty()) TextButton(
+                        onClick = { dispatch("continueOnPc", "") },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(nexusCopy("Continua questa conversazione sul PC", "Continue this conversation on PC")) }
+                }
+            }
+        },
+        confirmButton = { TextButton({ remoteSettingsOpen = false }) { Text(nexusCopy("Fatto", "Done")) } },
+        containerColor = Surface,
+        shape = RoundedCornerShape(26.dp)
     )
     if (voiceMode && interactionAvailable) ContinuousVoicePanel(
         reduceMotion = reduceMotion,
@@ -2928,6 +2988,112 @@ private fun JSONArray?.toTurns() = buildList {
         dismissButton = { TextButton({ dispatch("cancelWork", "") }) { Text(nexusCopy("Annulla", "Cancel")) } },
         containerColor = Surface,
         shape = RoundedCornerShape(26.dp)
+    )
+}
+
+/** Superficie traslucida invocata dal tasto laterale: nessuna apertura della UI completa. */
+@Composable private fun NexusAssistantOverlay(state: NexusUiState, dispatch: (String, String) -> Unit) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+    var textMode by rememberSaveable { mutableStateOf(false) }
+    var voiceMode by remember { mutableStateOf(true) }
+    var attachmentSheet by rememberSaveable { mutableStateOf(false) }
+    val online = state.connection == NexusConnection.ONLINE
+    val latestAnswer = state.streaming.ifBlank { state.turns.lastOrNull { it.role == "assistant" }?.content.orEmpty() }
+    BackHandler { dispatch("assistantClose", "") }
+    LaunchedEffect(textMode) {
+        if (textMode) {
+            kotlinx.coroutines.delay(80)
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (state.reduceMotion) .08f else .045f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { dispatch("assistantClose", "") }
+            .navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Surface(
+            color = Color(0xF4030A0B),
+            shape = RoundedCornerShape(32.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .22f)),
+            shadowElevation = 18.dp,
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().widthIn(max = 680.dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (latestAnswer.isNotBlank()) Text(
+                    latestAnswer,
+                    color = Ice,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
+                )
+                AnimatedContent(textMode, transitionSpec = { nexusTransform(state.reduceMotion) }, label = "assistantComposer") { typing ->
+                    if (typing) Surface(
+                        color = Surface2.copy(alpha = .96f),
+                        shape = RoundedCornerShape(24.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Hairline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(Modifier.padding(5.dp), verticalAlignment = Alignment.Bottom) {
+                            IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(44.dp)) {
+                                Icon(Icons.Rounded.Add, nexusCopy("Allega", "Attach"), tint = Ice)
+                            }
+                            BasicTextField(
+                                value = state.draft,
+                                onValueChange = { dispatch("draft", it.take(12_000)) },
+                                enabled = online,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Ice),
+                                cursorBrush = SolidColor(Cyan),
+                                modifier = Modifier.weight(1f).heightIn(min = 44.dp, max = 112.dp).focusRequester(focusRequester).padding(11.dp),
+                                decorationBox = { inner -> Box { if (state.draft.isBlank()) Text(nexusCopy("Chiedi a NexusNXS", "Ask NexusNXS"), color = Mist); inner() } }
+                            )
+                            FilledIconButton(
+                                onClick = { if (state.busy) dispatch("stop", "") else { keyboard?.hide(); dispatch("send", "") } },
+                                enabled = state.busy || online && state.draft.isNotBlank(),
+                                modifier = Modifier.size(44.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Cyan, contentColor = Color(0xFF002223), disabledContainerColor = Surface)
+                            ) { Icon(if (state.busy) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward, nexusCopy("Invia", "Send")) }
+                        }
+                    } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                            Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                        }
+                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, diameter = 118.dp) {
+                            if (online) voiceMode = true else dispatch("probe", "")
+                        }
+                        IconButton({ voiceMode = false; textMode = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                            Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                        }
+                    }
+                }
+                Text(
+                    when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Assistente NexusNXS", "NexusNXS assistant") },
+                    color = Mist, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)
+                )
+            }
+        }
+    }
+    if (voiceMode && online) ContinuousVoicePanel(
+        reduceMotion = state.reduceMotion,
+        connection = state.connection,
+        currentDraft = state.draft,
+        bargeIn = { dispatch("stopSpeech", "") },
+        close = { voiceMode = false },
+        transcript = { dispatch("draft", it) },
+        instantSubmit = { phrase -> voiceMode = false; dispatch("voiceSend", phrase) },
+        compactOverlay = true,
+        openKeyboard = { voiceMode = false; textMode = true },
+        openAttachment = { voiceMode = false; attachmentSheet = true }
+    )
+    NexusAttachmentFlow(
+        visible = attachmentSheet && online,
+        close = { attachmentSheet = false },
+        dispatch = dispatch,
+        remoteWorkAvailable = false,
+        planMode = {}
     )
 }
 
@@ -3029,50 +3195,66 @@ private fun JSONArray?.toTurns() = buildList {
     }
 }
 
-@Composable private fun NexusInstantCore(active: Boolean, offline: Boolean, reduceMotion: Boolean, energy: Float = 0f, onClick: () -> Unit) {
+@Composable private fun NexusInstantCore(active: Boolean, offline: Boolean, reduceMotion: Boolean, energy: Float = 0f, diameter: Dp = 214.dp, onClick: () -> Unit) {
     val pulse = nexusLoopFloat(!reduceMotion && !offline, 0f, 1f, if (active) 620 else 1550, RepeatMode.Reverse, "instantCorePulse")
     val rotation = nexusLoopFloat(!reduceMotion && active, 0f, 360f, 2600, RepeatMode.Restart, "instantCoreRotation", linear = true)
+    val emergence = remember { Animatable(if (reduceMotion) 1f else 0f) }
+    LaunchedEffect(reduceMotion) {
+        if (reduceMotion) emergence.snapTo(1f)
+        else {
+            emergence.snapTo(0f)
+            emergence.animateTo(1f, tween(NexusFlow.ENTER + NexusFlow.EXIT + NexusFlow.QUICK, easing = NexusFlow.emphasized))
+        }
+    }
     val smoothEnergy by animateFloatAsState(if (active) energy.coerceIn(0f, 1f) else 0f, tween(NexusFlow.QUICK, easing = NexusFlow.standard), label = "instantCoreEnergy")
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .94f else 1f + pulse * .018f, tween(NexusFlow.QUICK, easing = NexusFlow.emphasized), label = "instantCoreScale")
     val accent = if (offline) Color(0xFF627071) else Cyan
     Canvas(
-        Modifier.size(214.dp).graphicsLayer { scaleX = scale; scaleY = scale; rotationZ = rotation }
+        Modifier.size(diameter).graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(CircleShape).clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .semantics { contentDescription = if (offline) "NexusNXS offline" else "NexusNXS Core" }
     ) {
         val center = this.center
         val signal = smoothEnergy * .075f
         val outer = size.minDimension * (.43f + pulse * .018f + signal)
-        drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = .18f + smoothEnergy * .12f), accent.copy(alpha = .045f), Color.Transparent)), radius = size.minDimension * .5f)
+        val reveal = emergence.value
+        val coreReveal = ((reveal - .48f) / .52f).coerceIn(0f, 1f)
+        drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = (.18f + smoothEnergy * .12f) * reveal), accent.copy(alpha = .045f * reveal), Color.Transparent)), radius = size.minDimension * .5f)
         val neuralRadius = size.minDimension * (.29f + smoothEnergy * .055f)
-        val neuralNodes = 12
+        val neuralNodes = 18
         repeat(neuralNodes) { index ->
             val response = .78f + smoothEnergy * (.18f + (index % 4) * .025f)
-            val angle = (index.toFloat() / neuralNodes.toFloat()) * (Math.PI * 2.0).toFloat() + pulse * .16f
+            val angle = (index.toFloat() / neuralNodes.toFloat()) * (Math.PI * 2.0).toFloat() + pulse * .16f + Math.toRadians(rotation.toDouble()).toFloat()
             val radius = neuralRadius * (if (index % 2 == 0) 1f else .72f) * response
-            val node = androidx.compose.ui.geometry.Offset(
+            val target = androidx.compose.ui.geometry.Offset(
                 center.x + kotlin.math.cos(angle) * radius,
                 center.y + kotlin.math.sin(angle) * radius
             )
+            val sourceAngle = angle + 1.45f + (index % 5) * .17f
+            val sourceRadius = size.minDimension * (.47f + (index % 3) * .035f)
+            val source = androidx.compose.ui.geometry.Offset(center.x + kotlin.math.cos(sourceAngle) * sourceRadius, center.y + kotlin.math.sin(sourceAngle) * sourceRadius)
+            val delayedReveal = ((reveal - index * .018f) / .74f).coerceIn(0f, 1f)
+            val node = androidx.compose.ui.geometry.Offset(source.x + (target.x - source.x) * delayedReveal, source.y + (target.y - source.y) * delayedReveal)
             val nextAngle = ((index + 2).toFloat() / neuralNodes.toFloat()) * (Math.PI * 2.0).toFloat() + pulse * .16f
             val nextRadius = neuralRadius * (if ((index + 2) % 2 == 0) 1f else .72f)
             val next = androidx.compose.ui.geometry.Offset(
                 center.x + kotlin.math.cos(nextAngle) * nextRadius,
                 center.y + kotlin.math.sin(nextAngle) * nextRadius
             )
-            drawLine(accent.copy(alpha = .16f + pulse * .08f + smoothEnergy * .24f), node, center, (1f + smoothEnergy * .8f).dp.toPx())
-            drawLine(accent.copy(alpha = .10f + smoothEnergy * .12f), node, next, (.7f + smoothEnergy * .45f).dp.toPx())
-            drawCircle(accent.copy(alpha = .58f + pulse * .22f), radius = (if (index % 3 == 0) 3.2f + smoothEnergy * 2.2f else 2.1f + smoothEnergy * 1.4f).dp.toPx(), center = node)
+            drawLine(accent.copy(alpha = (.16f + pulse * .08f + smoothEnergy * .24f) * delayedReveal), node, center, (0.7f + smoothEnergy * .65f).dp.toPx())
+            drawLine(accent.copy(alpha = (.08f + smoothEnergy * .12f) * delayedReveal), node, next, (.55f + smoothEnergy * .4f).dp.toPx())
+            drawCircle(accent.copy(alpha = (.48f + pulse * .22f) * delayedReveal), radius = (if (index % 4 == 0) 2.8f + smoothEnergy * 1.8f else 1.7f + smoothEnergy).dp.toPx(), center = node)
         }
-        drawCircle(accent.copy(alpha = .12f), radius = outer, style = Stroke(width = 1.dp.toPx()))
-        drawArc(accent.copy(alpha = .92f), -72f, 112f, false, topLeft = androidx.compose.ui.geometry.Offset(center.x - outer, center.y - outer), size = androidx.compose.ui.geometry.Size(outer * 2, outer * 2), style = Stroke(width = 4.dp.toPx()))
-        drawArc(accent.copy(alpha = .48f), 96f, 92f, false, topLeft = androidx.compose.ui.geometry.Offset(center.x - outer, center.y - outer), size = androidx.compose.ui.geometry.Size(outer * 2, outer * 2), style = Stroke(width = 2.dp.toPx()))
-        drawArc(accent.copy(alpha = .72f), 204f, 104f, false, topLeft = androidx.compose.ui.geometry.Offset(center.x - outer, center.y - outer), size = androidx.compose.ui.geometry.Size(outer * 2, outer * 2), style = Stroke(width = 3.dp.toPx()))
-        drawCircle(accent.copy(alpha = .14f + pulse * .08f), radius = size.minDimension * .235f)
-        drawCircle(accent.copy(alpha = .94f), radius = size.minDimension * .082f)
-        drawCircle(Ice.copy(alpha = .9f), radius = size.minDimension * .028f)
+        drawCircle(accent.copy(alpha = .13f * reveal), radius = outer, style = Stroke(width = 1.dp.toPx()))
+        repeat(3) { orbit ->
+            val inset = orbit * size.minDimension * .055f
+            drawArc(accent.copy(alpha = (.32f - orbit * .06f) * reveal), -72f + orbit * 101f + rotation * (if (orbit % 2 == 0) 1f else -1f), 78f + orbit * 13f, false, topLeft = androidx.compose.ui.geometry.Offset(center.x - outer + inset, center.y - outer + inset), size = androidx.compose.ui.geometry.Size((outer - inset) * 2, (outer - inset) * 2), style = Stroke(width = (1.1f + (2 - orbit) * .45f).dp.toPx()))
+        }
+        drawCircle(accent.copy(alpha = (.14f + pulse * .08f) * coreReveal), radius = size.minDimension * .235f)
+        drawCircle(Brush.radialGradient(listOf(Ice.copy(alpha = .98f * coreReveal), accent.copy(alpha = .92f * coreReveal), Color.Transparent)), radius = size.minDimension * .11f)
+        drawCircle(Ice.copy(alpha = .92f * coreReveal), radius = size.minDimension * .026f)
     }
 }
 
@@ -4465,7 +4647,18 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable private fun ContinuousVoicePanel(reduceMotion: Boolean, connection: NexusConnection, currentDraft: String, bargeIn: () -> Unit, close: () -> Unit, transcript: (String) -> Unit, instantSubmit: ((String) -> Unit)? = null) {
+@Composable private fun ContinuousVoicePanel(
+    reduceMotion: Boolean,
+    connection: NexusConnection,
+    currentDraft: String,
+    bargeIn: () -> Unit,
+    close: () -> Unit,
+    transcript: (String) -> Unit,
+    instantSubmit: ((String) -> Unit)? = null,
+    compactOverlay: Boolean = false,
+    openKeyboard: (() -> Unit)? = null,
+    openAttachment: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
     val configuration = LocalConfiguration.current
@@ -4654,7 +4847,48 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     LaunchedEffect(instantSubmit) {
         if (instantSubmit != null) beginCapture(NexusVoiceMode.SINGLE_TURN)
     }
-    Dialog(onDismissRequest = { haltCapture(false, false); close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    val voiceStatus = when {
+        connection == NexusConnection.OFFLINE -> nexusCopy("Server offline", "Server offline")
+        listening -> nexusCopy("Ti ascolto", "I'm listening")
+        mode != NexusVoiceMode.IDLE -> nexusCopy("Elaboro la voce", "Processing voice")
+        else -> nexusCopy("Parla con NexusNXS", "Talk to NexusNXS")
+    }
+    val voiceDetail = when {
+        partial.isNotBlank() -> partial
+        voiceMessage.isNotBlank() -> voiceMessage
+        connection == NexusConnection.OFFLINE -> nexusCopy("Riconnessione automatica", "Reconnecting automatically")
+        listening -> nexusCopy("Parla naturalmente", "Speak naturally")
+        else -> nexusCopy("Tocca il Core per riprovare", "Tap the Core to try again")
+    }
+    if (compactOverlay) {
+        Box(Modifier.fillMaxSize().navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Surface(
+                color = Color(0xF4030A0B),
+                shape = RoundedCornerShape(32.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .22f)),
+                shadowElevation = 18.dp,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().widthIn(max = 680.dp)
+            ) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    IconButton({ openAttachment?.invoke() }, enabled = openAttachment != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                        Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                    }
+                    NexusInstantCore(active = listening, offline = connection == NexusConnection.OFFLINE, reduceMotion = reduceMotion, energy = voiceEnergy, diameter = 118.dp) {
+                        if (mode != NexusVoiceMode.IDLE || listening) { haltCapture(false, true); close() } else beginCapture(NexusVoiceMode.SINGLE_TURN)
+                    }
+                    IconButton({ haltCapture(false, false); openKeyboard?.invoke() }, enabled = openKeyboard != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                        Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                    }
+                }
+                AnimatedContent(voiceStatus, transitionSpec = { nexusTransform(reduceMotion) }, label = "assistantVoiceStatus") { value ->
+                    Text(value, color = Ice, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 7.dp))
+                }
+                Text(voiceDetail, color = if (partial.isNotBlank()) Ice else Mist, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+            }
+        }
+    } else Dialog(onDismissRequest = { haltCapture(false, false); close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Surface(color = Color(0xFF030809), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(20.dp)) {
                 IconButton(
@@ -4678,24 +4912,12 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                         )
                     }
                     AnimatedContent(
-                        targetState = when {
-                            connection == NexusConnection.OFFLINE -> nexusCopy("Server offline", "Server offline")
-                            listening -> nexusCopy("Ti ascolto", "I'm listening")
-                            mode != NexusVoiceMode.IDLE -> nexusCopy("Elaboro la voce", "Processing voice")
-                            else -> nexusCopy("Parla con NexusNXS", "Talk to NexusNXS")
-                        },
+                        targetState = voiceStatus,
                         transitionSpec = { nexusTransform(reduceMotion) }, label = "instantVoiceTitle"
                     ) { title ->
-                        Text(title, fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Text(title, color = Ice, fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
-                    val message = when {
-                        partial.isNotBlank() -> partial
-                        voiceMessage.isNotBlank() -> voiceMessage
-                        connection == NexusConnection.OFFLINE -> nexusCopy("Il server è offline. Riconnessione automatica in corso.", "The server is offline. Automatic reconnection is in progress.")
-                        listening -> nexusCopy("Parla naturalmente.", "Speak naturally.")
-                        else -> nexusCopy("Tocca il Core per riprovare.", "Tap the Core to try again.")
-                    }
-                    Text(message, color = if (partial.isNotBlank()) Ice else Mist, style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    Text(voiceDetail, color = if (partial.isNotBlank()) Ice else Mist, style = MaterialTheme.typography.bodyLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), maxLines = 4, overflow = TextOverflow.Ellipsis)
                 }
                 Text(
                     when {

@@ -130,7 +130,7 @@ export function NexusCore({ state, audioBus, reducedMotion, quality, performance
     const motion = reducedMotion ? 0.1 : 1;
     const time = frame.clock.elapsedTime;
     emergence.current = MathUtils.damp(emergence.current, 1, reducedMotion ? 8 : 2.8, delta);
-    pointerEnergy.current = MathUtils.damp(pointerEnergy.current, pointerPresence.current * 0.38, 5.2, delta);
+    pointerEnergy.current = MathUtils.damp(pointerEnergy.current, pointerPresence.current * 0.52, pointerPresence.current > 0 ? 7 : 2.7, delta);
     // Whisper possiede il microfono in esclusiva: durante l'ascolto un
     // inviluppo organico mantiene vivo il reattore senza aprire un secondo
     // stream. Quando è disponibile, l'energia audio reale ha la precedenza.
@@ -141,8 +141,8 @@ export function NexusCore({ state, audioBus, reducedMotion, quality, performance
       + (active ? Math.sin(time * 7.7) * 0.035 : 0);
     const energy = Math.min(1, Math.max(stateEnergy, audio.level * 0.74 + audio.mid * 0.26));
     group.current.rotation.z += delta * (active ? 0.055 : 0.018) * motion;
-    group.current.rotation.x = -0.12 + Math.sin(time * 0.22) * 0.035 * motion;
-    group.current.rotation.y = Math.sin(time * 0.16) * 0.08 * motion;
+    group.current.rotation.x = MathUtils.damp(group.current.rotation.x, -0.12 + Math.sin(time * 0.22) * 0.035 * motion - frame.pointer.y * pointerEnergy.current * 0.13, 2.8, delta);
+    group.current.rotation.y = MathUtils.damp(group.current.rotation.y, Math.sin(time * 0.16) * 0.08 * motion + frame.pointer.x * pointerEnergy.current * 0.18, 2.8, delta);
     const stateSpeed = state === 'executing' ? 1.65
       : state === 'thinking' ? 1.3
         : state === 'permission' ? 0.28

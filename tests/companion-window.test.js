@@ -44,6 +44,9 @@ test('la Presence usa solo i tre visualizer, CSS leggero e un hotspot esplicito'
   assert.match(document, /aria-label="Parla con NexusNXS"/);
   assert.match(document, /bridge\.startVoice\(\)/);
   assert.match(document, /dblclick[\s\S]*bridge\.openMain\(\)/);
+  assert.match(document, /data-action="minimize-main"/);
+  assert.match(document, /data-action="hide-presence"/);
+  assert.match(document, /data-action="quit-desktop"/);
   assert.match(document, /class="visual neural"/);
   assert.match(document, /class="visual saturn"/);
   assert.match(document, /class="visual reactor"/);
@@ -68,7 +71,7 @@ test('le transizioni Presence preservano gli stati critici e assestano idle', ()
   assert.equal(presenceTransitionDelay('thinking', 'thinking'), 0);
 });
 
-test('il manager usa una sola Presence trascinabile, compatta con la UI e ampia in tray', () => {
+test('il manager usa una sola Presence trascinabile e ancorata senza fondo opaco', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src/infrastructure/electron/companion-window.js'), 'utf8');
   assert.match(source, /const presenceWindows = new Map\(\)/);
   assert.match(source, /screen\.on\('display-added', handleDisplayChange\)/);
@@ -76,13 +79,16 @@ test('il manager usa una sola Presence trascinabile, compatta con la UI e ampia 
   assert.match(source, /movable: true, alwaysOnTop: true/);
   assert.match(source, /setVisibleOnAllWorkspaces\(true, \{ visibleOnFullScreen: true \}\)/);
   assert.match(source, /applicationVisible \? \(entry.detached \? 240 : 128\) : 300/);
+  assert.match(source, /setBackgroundColor\?\.\('#00000000'\)/);
+  assert.match(source, /PRESENCE_MENU_ACTIONS/);
   assert.match(source, /animatePresenceBounds/);
   assert.match(source, /--presence-scale/);
   assert.match(source, /setApplicationVisible/);
   assert.match(source, /selectSystemPresenceDisplay/);
   assert.match(source, /displaySelectionMode/);
   assert.match(source, /automaticPresenceDisplayId/);
-  assert.match(source, /AMBIENT_CENTER_STATES/);
+  assert.match(source, /entry\.ambientCentered = !applicationVisible/);
+  assert.match(source, /entry\.ambientCentered[\s\S]{0,160}ambientPresenceBounds/);
   assert.match(source, /PRESENCE_VOICE_CHANNEL/);
   assert.match(source, /activateVoice/);
   assert.match(source, /entry\.ambientCentered/);

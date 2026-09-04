@@ -15,7 +15,7 @@ class NexusVoiceSessionService : VoiceInteractionSessionService() {
             super.onShow(args, showFlags)
             setUiEnabled(false)
             // Reuse the real Core and its microphone/connection lifecycle, not a second client.
-            startAssistantActivity(Intent(this@NexusVoiceSessionService, NexusMainActivity::class.java).apply {
+            startAssistantActivity(Intent(this@NexusVoiceSessionService, NexusAssistantActivity::class.java).apply {
                 action = Intent.ACTION_ASSIST
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             })

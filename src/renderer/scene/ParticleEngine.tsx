@@ -150,8 +150,8 @@ const vertexShader = /* glsl */ `
     float pointerDistance = dot(pointerDelta, pointerDelta);
     float pointerField = exp(-pointerDistance * 1.85) * uPointerStrength;
     vec2 pointerDirection = normalize(pointerDelta + vec2(0.0001));
-    p.xy += pointerDirection * pointerField * (0.12 + aSeed.z * 0.11);
-    p.z += pointerField * sin(aSeed.w * 18.0 + time * 2.1) * 0.07;
+    p.xy += pointerDirection * pointerField * (0.18 + aSeed.z * 0.15);
+    p.z += pointerField * sin(aSeed.w * 18.0 + time * 2.1) * 0.11;
 
     vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mvPosition;
@@ -325,7 +325,10 @@ export function ParticleEngine({ state, audioBus, particleCount, reducedMotion, 
       material.current.uniforms.uPointer.value.set(interactionPoint.x, interactionPoint.y);
     }
     material.current.uniforms.uPointerStrength.value = THREE.MathUtils.damp(
-      material.current.uniforms.uPointerStrength.value, pointerPresence.current * 0.42, 5.2, delta
+      material.current.uniforms.uPointerStrength.value,
+      pointerPresence.current * 0.58,
+      pointerPresence.current > 0 ? 7.2 : 2.8,
+      delta
     );
     const accent = state === 'error' ? '#d69a58'
       : state === 'permission' ? '#ffbf69'
