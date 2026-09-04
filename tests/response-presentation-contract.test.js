@@ -41,6 +41,10 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /id="answerContext"/);
   assert.match(html, /class="web-answer-context"/);
   assert.match(html, /answer\.textContent=rawAnswer/);
+  assert.match(html, /formatAnswer\(rawAnswer,\{streaming:true\}\)/);
+  assert.match(html, /now-lastStreamRender<48/);
+  assert.match(html, /options\.target \|\| answer/);
+  assert.match(html, /options\.announce !== false/);
   assert.match(html, /formatAnswer\(responseText\)/);
   assert.match(html, /rawAnswer=recentAnswer\.content;formatAnswer\(recentAnswer\.content\)/);
   assert.match(html, /className = 'web-code-card'/);
@@ -74,6 +78,10 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /async function memoryRead\(\)\{return\[\]/);
   assert.match(html, /id="sessionHistory"/);
   assert.match(html, /function renderSessionHistory\(\)/);
+  assert.match(html, /className='session-turn-content'/);
+  assert.match(html, /formatAnswer\(String\(turn\.content\|\|''\),\{target:content,announce:false\}\)/);
+  assert.match(html, /aria-label',assistant\?'Messaggio di NexusNXS':'Il tuo messaggio'/);
+  assert.match(html, /\.session-turn\[data-role=user\] \.session-turn-content/);
   assert.match(html, /classList\.add\('request-active','conversation-active','keyboard-open'\)/);
   assert.match(html, /classList\.add\('conversation-active','keyboard-open'\)/);
   assert.match(html, /contains\('conversation-active'\)\)\{const collapsed=document\.body\.classList\.toggle\('composer-collapsed'\)/);
@@ -115,6 +123,7 @@ test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
   const activity = fs.readFileSync(path.join(root, 'android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt'), 'utf8');
   assert.match(activity, /enum class ResponsePresentationKind/);
   assert.match(activity, /ResponseContextHeader\(value, streaming = true/);
+  assert.match(activity, /Text\("NEXUSNXS", color = Color\(0xFF648485\)/);
   assert.match(activity, /ResponseContextHeader\(turn\.content, streaming = false\)/);
   assert.match(activity, /streamSafeMarkdown\(value\)/);
   assert.match(activity, /HighlightedCodeText\(code/);
@@ -127,6 +136,7 @@ test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
   assert.match(activity, /val superscripts/);
   assert.match(activity, /§NEXUS_MATH§/);
   assert.match(activity, /fontFamily = FontFamily\.Serif/);
+  assert.match(activity, /nexusCopy\("TU", "YOU"\) else "NEXUSNXS"/);
   assert.match(activity, /private fun spokenLocale\(/);
   assert.match(activity, /val language = spokenLocale\(text/);
   assert.match(activity, /textToSpeech\?\.language = spokenLocale\(text/);

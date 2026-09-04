@@ -9,6 +9,8 @@ import { spawnSync } from 'node:child_process';
 
 const repository = process.env.NEXUS_GITHUB_REPOSITORY || 'lapob/nexus-ai';
 const root = resolve(import.meta.dirname, '..');
+const sourceCommit = String(spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).stdout || '').trim();
+if (!/^[0-9a-f]{40}$/i.test(sourceCommit)) throw new Error('Revisione sorgente Git non disponibile.');
 const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 const androidGradle = await readFile(resolve(root, 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
 const androidVersion = androidGradle.match(/versionName\s*(?:=\s*)?["']([^"']+)["']/)?.[1];
@@ -79,7 +81,7 @@ if (!release) {
   release = await request(`${apiRoot}/releases`, token, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tag_name: tag, name: `NexusNXS Founder Preview ${packageJson.version}`, prerelease: true, draft: true })
+    body: JSON.stringify({ tag_name: tag, target_commitish: sourceCommit, name: `NexusNXS Founder Preview ${packageJson.version}`, prerelease: true, draft: true })
   });
 }
 const replaceNames = new Set(prepared.map((asset) => asset.name));
@@ -111,6 +113,7 @@ const releaseBody = [
   '',
   `- Windows 11 x64: NexusNXS ${packageJson.version} Preview (non firmata Authenticode)`,
   `- Android 8+: NexusNXS ${androidVersion} Preview (firma Android Debug, non Play Store)`,
+  `- Revisione sorgente: \`${sourceCommit.slice(0, 12)}\``,
   '- Impronte complete: `CHECKSUMS.sha256`',
   '- Manifest pubblico: `release-manifest.preview.json`',
   '',

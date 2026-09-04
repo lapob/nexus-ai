@@ -3706,6 +3706,10 @@ private fun normalizeMathBlocks(value: String): String = Regex("(?s)\\x24\\x24(.
         }
     }
     Column(Modifier.clearAndSetSemantics { contentDescription = accessibilityLabel; liveRegion = LiveRegionMode.Polite }) {
+        Row(Modifier.padding(start = 2.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(5.dp).background(Cyan.copy(alpha = .88f), CircleShape))
+            Text("NEXUSNXS", color = Color(0xFF648485), fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp, modifier = Modifier.padding(start = 7.dp))
+        }
         ResponseContextHeader(value, streaming = true, reduceMotion = reduceMotion)
         if (stablePrefix.isNotBlank()) key(stablePrefix.hashCode()) { MarkdownMessage(stablePrefix) }
         if (stablePrefix.isNotBlank() && liveTail.isNotBlank()) Spacer(Modifier.height(6.dp))
@@ -3950,6 +3954,11 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
       val messageMaxWidth = this.maxWidth * if (user) .84f else 1f
       Column(Modifier.fillMaxWidth(), horizontalAlignment = if (user) Alignment.End else Alignment.Start) {
+        Row(Modifier.padding(start = if (user) 0.dp else 2.dp, end = if (user) 10.dp else 0.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (!user) Box(Modifier.size(5.dp).background(Cyan.copy(alpha = .88f), CircleShape))
+            Text(if (user) nexusCopy("TU", "YOU") else "NEXUSNXS", color = Color(0xFF648485), fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp, modifier = Modifier.padding(start = if (user) 0.dp else 7.dp, end = if (user) 7.dp else 0.dp))
+            if (user) Box(Modifier.size(5.dp).background(Color(0xFFAFC4C5).copy(alpha = .72f), CircleShape))
+        }
         Surface(color = when { search.isNotBlank() && turn.content.contains(search, true) -> Cyan.copy(alpha = .09f); user -> Surface2; else -> Color.Transparent }, shape = RoundedCornerShape(20.dp), modifier = Modifier.widthIn(max = messageMaxWidth).then(if (user) Modifier.border(1.dp, Hairline.copy(alpha = .48f), RoundedCornerShape(20.dp)) else Modifier).combinedClickable(onClick = {}, onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); actionsOpen = true })) {
             if (user) Text(turn.content, color = Ice, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp))
             else Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp)) {

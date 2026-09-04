@@ -251,6 +251,8 @@ async function exercise(client, { stop = false } = {}) {
     let activeDockInset = null;
     let finishedAt = 0;
     let stopped = false;
+    let progressiveRich = false;
+    let progressiveStructure = false;
     const frames = [];
     let previousFrame = performance.now();
     let raf = 0;
@@ -264,6 +266,8 @@ async function exercise(client, { stop = false } = {}) {
     const sample = setInterval(() => {
       maxY = Math.max(maxY, scrollY);
       const requestActive = document.body.classList.contains('request-active');
+      if (answer.classList.contains('streaming') && answer.classList.contains('rich') && answer.textContent.trim()) progressiveRich = true;
+      if (answer.classList.contains('streaming') && answer.querySelector('h2,h3,ul,ol,.web-code-card,.web-table-wrap,.web-math-block')) progressiveStructure = true;
       const currentDockInset = innerHeight - dock.getBoundingClientRect().bottom;
       // La transizione centro -> dock parte 420 ms dopo l'avvio ed è lunga
       // 280 ms. Lasciamo anche due frame di assestamento e campioniamo soltanto
@@ -313,6 +317,8 @@ async function exercise(client, { stop = false } = {}) {
           elapsedMs: Math.round(performance.now() - startedAt),
           frameP95: Math.round(p95 * 10) / 10,
           longFrameRatio: sorted.length ? sorted.filter((value) => value > 40).length / sorted.length : 0,
+          progressiveRich,
+          progressiveStructure,
           sendMode: send.dataset.mode,
           actions: [...actions.querySelectorAll('button')].map((button) => button.id)
         });
@@ -411,7 +417,21 @@ async function verifySessionContinuity(client) {
       }
       if (entries >= 2 && answer.textContent.trim() && !answer.classList.contains('streaming') && !document.body.classList.contains('request-active')) {
         clearInterval(timer);
-        resolve({ entries, pinnedAfterResponse: document.body.classList.contains('keyboard-open') && document.body.classList.contains('conversation-active') });
+        const user = history.querySelector('.session-turn[data-role="user"]');
+        const assistant = history.querySelector('.session-turn[data-role="assistant"]');
+        const userBody = user?.querySelector('.session-turn-content');
+        const assistantBody = assistant?.querySelector('.session-turn-content');
+        const userRect = user?.getBoundingClientRect();
+        const assistantRect = assistant?.getBoundingClientRect();
+        resolve({
+          entries,
+          pinnedAfterResponse: document.body.classList.contains('keyboard-open') && document.body.classList.contains('conversation-active'),
+          roles: [...history.querySelectorAll('.session-turn')].map((item) => item.dataset.role),
+          labels: [...history.querySelectorAll('.session-turn > small')].map((item) => item.textContent.trim()),
+          userBubble: Boolean(userBody && getComputedStyle(userBody).borderTopWidth !== '0px' && userRect && userRect.left > innerWidth * .25),
+          assistantOpen: Boolean(assistantBody?.classList.contains('rich') && assistantRect && assistantRect.width > userRect.width),
+          assistantStructured: Boolean(assistantBody?.querySelector('h2,h3,ul,ol,.web-code-card,.web-table-wrap,.web-math-block'))
+        });
       }
     }, 60);
     setTimeout(() => { clearInterval(timer); reject(new Error('Continuità di sessione non verificata: '+JSON.stringify({ entries: history.querySelectorAll('.session-turn').length, answerLength: answer.textContent.trim().length, mode: send.dataset.mode, bodyClass: document.body.className }))); }, 45_000);
@@ -430,6 +450,7 @@ function assertExperience(result, { stop = false, label }) {
   if (!result.collapsedComposer || !result.collapsedDockPinned || !result.restoredComposer) throw new Error(`${label}: il composer compatto non resta ancorato o non viene ripristinato (${JSON.stringify({ collapsed: result.collapsedComposer, pinned: result.collapsedDockPinned, restored: result.restoredComposer })}).`);
   if (result.composerPrivacyGap < 6) throw new Error(`${label}: nota inferiore sovrapposta al composer (${result.composerPrivacyGap.toFixed(1)}px).`);
   if (result.longFrameRatio > 0.2) throw new Error(`${label}: troppi frame oltre 40ms (${(result.longFrameRatio * 100).toFixed(1)}%).`);
+  if (!result.progressiveRich || (!stop && !result.progressiveStructure)) throw new Error(`${label}: la risposta resta grezza durante la generazione.`);
   if (!stop) {
     for (const action of ['copyResponse', 'deepenResponse', 'exportResponse', 'feedbackAction']) {
       if (!result.actions.includes(action)) throw new Error(`${label}: azione finale assente: ${action}.`);
@@ -486,7 +507,7 @@ async function main() {
     assertExperience(desktop, { label: 'Desktop' });
     const desktopSlide = await verifyComposerSlide(client, 'Desktop');
     const continuity = await verifySessionContinuity(client);
-    if (continuity.entries < 2 || !continuity.pinnedAfterResponse) {
+    if (continuity.entries < 2 || !continuity.pinnedAfterResponse || !continuity.userBubble || !continuity.assistantOpen || !continuity.assistantStructured || !continuity.roles.includes('user') || !continuity.roles.includes('assistant')) {
       throw new Error('Desktop: i turni della sessione o il composer ancorato non sono coerenti.');
     }
 

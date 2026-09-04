@@ -201,8 +201,8 @@
 }
 
 .conversation-transcript-turns article[data-role="user"] {
-  max-width: 40rem;
-  margin-left: clamp(0.35rem, 1vw, 0.8rem);
+  max-width: min(40rem, 82%);
+  margin-left: auto;
 }
 
 .conversation-transcript-turns small { margin-bottom: 0.24rem; color: rgba(125, 189, 192, 0.43); transition: color 150ms ease; }
@@ -996,7 +996,7 @@
     --nexus-control-size: 0.8rem;
     --nexus-body-size: 0.95rem;
   }
-  .conversation-transcript-turns article[data-role="user"] { margin-left: 0; }
+  .conversation-transcript-turns article[data-role="user"] { max-width: 90%; margin-left: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

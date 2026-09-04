@@ -548,6 +548,7 @@ test('cronologia e lettura conversazione hanno chiusure visibili e layout confin
   const visualQa = fs.readFileSync(path.join(root, 'scripts/visual-qa.js'), 'utf8');
   const accessibilityQa = fs.readFileSync(path.join(root, 'scripts/accessibility-qa.js'), 'utf8');
   assert.match(transcript, /label="Chiudi conversazione"/);
+  assert.match(transcript, /aria-label=\{turn\.role === 'user' \? 'Il tuo messaggio' : 'Messaggio di NexusNXS'\}/);
   assert.match(visualQa, /\['conversation', 1090, 613\]/);
   assert.match(visualQa, /\['history', 1920, 1080\]/);
   assert.match(visualQa, /\['settings-select', 720, 640\]/);

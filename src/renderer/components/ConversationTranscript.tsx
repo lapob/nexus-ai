@@ -210,6 +210,7 @@ export function ConversationTranscript({ record, onClose, onSteer, onDeleteFrom 
                   key={`${turn.createdAt}-${index}`}
                   ref={(node) => { turnRefs.current[index] = node; }}
                   data-role={turn.role}
+                  aria-label={turn.role === 'user' ? 'Il tuo messaggio' : 'Messaggio di NexusNXS'}
                 >
                   <small>{turn.role === 'user' ? 'Tu' : 'NexusNXS'} · {turnTime(turn.createdAt)}</small>
                   <div className="conversation-turn-actions" data-open={actionTurn === index}>
