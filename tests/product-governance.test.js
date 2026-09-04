@@ -63,6 +63,26 @@ test('lo SLO rapido sceglie il modello conforme piu veloce e non il cold-start d
   }
 });
 
+test('lo SLO usa lo storico disponibilita piu completo senza farsi oscurare da un campione manuale', () => {
+  const policy = JSON.parse(fs.readFileSync(path.join(root, 'config/product-slo.json'), 'utf8'));
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-slo-availability-'));
+  const projectRoot = path.join(fixture, '.AI');
+  const artifacts = path.join(projectRoot, 'qa-artifacts');
+  const operational = path.join(fixture, '.nexus-data', 'metrics');
+  try {
+    fs.mkdirSync(artifacts, { recursive: true });
+    fs.mkdirSync(operational, { recursive: true });
+    fs.writeFileSync(path.join(artifacts, 'availability-report.json'), `${JSON.stringify({ measured: false, endpoints: [{ endpoint: 'manual', samples: 1, coverageMs: 0 }] })}\n`);
+    fs.writeFileSync(path.join(operational, 'availability-report.json'), `${JSON.stringify({ measured: true, availabilityPercent: 99.9, endpoints: [{ endpoint: 'resident', samples: 45_000, coverageMs: 30 * 86_400_000 }] })}\n`);
+    const availability = evaluateArtifacts({ policy, artifactsRoot: artifacts, projectRoot })
+      .find((entry) => entry.id === 'availability-window');
+    assert.equal(availability.status, 'pass');
+    assert.equal(availability.observed.endpoints[0].endpoint, 'resident');
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('la mappa ASVS punta soltanto a prove presenti', () => {
   const map = JSON.parse(fs.readFileSync(path.join(root, 'config/asvs-5-controls.json'), 'utf8'));
   assert.deepEqual(inspectControls(map, root), { passed: true, controls: 14, excluded: 3, failures: [] });

@@ -91,8 +91,15 @@ function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifac
   const baselineObserved = baselineFiles.map((file) => ({ file, present: fs.existsSync(path.join(projectRoot, file)) && fs.statSync(path.join(projectRoot, file)).size > 0 }));
   checks.push(result('android-baseline-profiles', baselineObserved.every((entry) => entry.present) ? 'pass' : 'fail', baselineObserved, { requiredForBothClients: true }));
 
-  const availability = readJson(path.join(artifactsRoot, 'availability-report.json'))
-    || readJson(path.join(path.dirname(projectRoot), '.nexus-data', 'metrics', 'availability-report.json'));
+  const availability = [
+    readJson(path.join(artifactsRoot, 'availability-report.json')),
+    readJson(path.join(path.dirname(projectRoot), '.nexus-data', 'metrics', 'availability-report.json'))
+  ].filter(Boolean).sort((left, right) => {
+    if (Boolean(left.measured) !== Boolean(right.measured)) return Number(right.measured) - Number(left.measured);
+    const coverage = (report) => Math.max(0, ...(report.endpoints || []).map((entry) => Number(entry.coverageMs) || 0));
+    const samples = (report) => (report.endpoints || []).reduce((total, entry) => total + (Number(entry.samples) || 0), 0);
+    return coverage(right) - coverage(left) || samples(right) - samples(left);
+  })[0] || null;
   checks.push(availability?.measured === true
     ? result('availability-window', availability.availabilityPercent >= objectives.availabilityTargetPercent ? 'pass' : 'fail', {
         availabilityPercent: availability.availabilityPercent,
