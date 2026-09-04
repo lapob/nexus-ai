@@ -15,7 +15,7 @@ const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'ut
 const androidGradle = await readFile(resolve(root, 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
 const androidVersion = androidGradle.match(/versionName\s*(?:=\s*)?["']([^"']+)["']/)?.[1];
 if (!androidVersion) throw new Error('Versione Android pubblica non rilevata.');
-const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || `v${packageJson.version}-preview.1`;
+const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || `v${packageJson.version}-preview.2`;
 const assets = [
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), type: 'application/vnd.microsoft.portable-executable' },
   { path: resolve(root, 'release-android', `NexusNXS-Android-${androidVersion}.apk`), type: 'application/vnd.android.package-archive' },

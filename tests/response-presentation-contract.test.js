@@ -20,6 +20,8 @@ test('desktop rende Markdown semantico anche durante lo streaming', () => {
   assert.match(styles, /\.response-table-wrap/);
   assert.match(styles, /\.code-card-meta/);
   assert.match(surface, /kind: 'formula'/);
+  assert.match(surface, /start: ordered \? Number\.parseInt\(listItem\[1\], 10\) \|\| 1/);
+  assert.match(surface, /start: block\.start/);
   assert.match(surface, /className="math-inline"/);
   assert.match(surface, /className="math-block"/);
   assert.match(surface, /SUPERSCRIPTS/);
@@ -53,6 +55,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /className = block \? 'web-math-block' : 'math-inline'/);
   assert.match(html, /role', 'math'/);
   assert.match(html, /const superscripts/);
+  assert.match(html, /list\.start = Number\.parseInt\(bullet\[1\], 10\) \|\| 1/);
   assert.match(html, /raw\.startsWith\('\$\$'\)/);
   assert.match(html, /Cambria Math/);
   assert.match(html, /id="copyResponse"/);

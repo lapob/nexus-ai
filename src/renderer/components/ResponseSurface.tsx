@@ -28,7 +28,7 @@ type MarkdownBlock =
   | { kind: 'code'; language: string; content: string }
   | { kind: 'formula'; content: string }
   | { kind: 'heading'; level: number; content: string }
-  | { kind: 'list'; ordered: boolean; items: string[] }
+  | { kind: 'list'; ordered: boolean; start?: number; items: string[] }
   | { kind: 'table'; headers: string[]; rows: string[][] }
   | { kind: 'callout'; tone: 'note' | 'tip' | 'warning' | 'result'; title: string; content: string }
   | { kind: 'divider' }
@@ -184,7 +184,7 @@ function parseBlocks(markdown: string): MarkdownBlock[] {
         items.push(match[2]);
         index += 1;
       }
-      blocks.push({ kind: 'list', ordered, items });
+      blocks.push({ kind: 'list', ordered, start: ordered ? Number.parseInt(listItem[1], 10) || 1 : undefined, items });
       continue;
     }
 
@@ -387,7 +387,7 @@ export const MarkdownContent = memo(function MarkdownContent({ text, streaming =
         }
         if (block.kind === 'list') {
           const List = block.ordered ? 'ol' : 'ul';
-          return <List key={index}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{inlineMarkup(item)}</li>)}</List>;
+          return <List key={index} {...(block.ordered && block.start ? { start: block.start } : {})}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{inlineMarkup(item)}</li>)}</List>;
         }
         if (block.kind === 'table') return (
           <div className="response-table-wrap" key={index}>
