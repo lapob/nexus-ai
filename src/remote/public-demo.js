@@ -66,6 +66,10 @@ body:is(.conversation-active,.request-active) .shell{padding-bottom:calc(var(--n
 .send[data-mode=stop] svg{width:20px;height:20px}.send[data-mode=stop] svg rect{fill:currentColor;stroke:none}
 @media(max-width:560px){body:not(.request-active):not(.conversation-active) .privacy{bottom:max(12px,env(safe-area-inset-bottom))}.conversation-active:not(.request-active) .dock,.request-active .dock{width:calc(100% - 20px)}.conversation-active .stage{padding-top:48px}}
 @media(prefers-reduced-motion:reduce){.memory-cleared .phase{backdrop-filter:none}}
+/* Empty-state content is one flowing group. It grows/scrolls instead of overlapping. */
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .shell{padding-bottom:calc(var(--nxs-privacy-height) + 28px + env(safe-area-inset-bottom));min-height:100dvh}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{flex:none;margin-top:auto;padding-bottom:0}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock,body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .dock{position:relative;top:auto;right:auto;bottom:auto;left:auto;transform:none;flex:none;margin:20px auto auto;padding:0 0 16px}
 </style>`;
 
 const SLASH_COMMAND_STYLE = `<style>
