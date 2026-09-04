@@ -3,6 +3,7 @@
  * @description Verifica reale che la X termini la UI ma conservi la Presence leggera.
  */
 const fs = require('node:fs');
+const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
@@ -11,8 +12,20 @@ const { isProcessAlive, readLock, requestProcessShutdown } = require('../src/inf
 const root = path.resolve(__dirname, '..');
 const electronBinary = require('electron');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-shutdown-'));
-const debugPort = 9400 + (process.pid % 400);
+let debugPort = 0;
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function reserveDebugPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
+}
 
 // #region 01 — Inventario e terminazione dei processi di prova
 
@@ -128,6 +141,7 @@ async function removeProfile() {
 // #region 03 — Scenario end-to-end di chiusura
 
 (async () => {
+  debugPort = await reserveDebugPort();
   let stderr = '';
   const child = spawn(electronBinary, ['.', `--remote-debugging-port=${debugPort}`], {
     cwd: root,

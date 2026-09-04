@@ -13,6 +13,7 @@ test('gli entry point developer non dipendono dalla lettera o dal profilo della 
     'scripts/build-android-console.ps1',
     'scripts/benchmark-android-ui.ps1',
     'scripts/start-portable-ollama.ps1',
+    'scripts/manage-self-hosted-search.ps1',
     'scripts/ensure-ollama-runtime.js',
     'scripts/prepare-training-dataset.js',
     'scripts/audit-portable-storage.ps1'
@@ -22,6 +23,17 @@ test('gli entry point developer non dipendono dalla lettera o dal profilo della 
     assert.doesNotMatch(source, /Z:[\\/]/i, `${relative} contiene una dipendenza da Z:`);
     assert.doesNotMatch(source, /C:[\\/]Users[\\/]steal/i, `${relative} contiene un profilo personale`);
   }
+});
+
+test('la ricerca self-hosted recupera i socket Docker bloccati senza toccare dati persistenti', () => {
+  const source = read('scripts/manage-self-hosted-search.ps1');
+  assert.match(source, /function Remove-StaleDockerSockets/);
+  assert.match(source, /sailor-ingest\.sock/);
+  assert.match(source, /docker-secrets-engine/);
+  assert.match(source, /ProcessStartInfo/);
+  assert.match(source, /\.WorkingDirectory = \$dockerRoot/);
+  assert.match(source, /--autostart/);
+  assert.doesNotMatch(source, /docker-data|ext4\.vhdx|compose\s+down\s+-v/i);
 });
 
 test('le build Android rigenerano la configurazione locale dalla toolchain risolta', () => {

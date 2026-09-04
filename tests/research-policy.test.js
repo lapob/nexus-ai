@@ -7,6 +7,7 @@ test('richiede il web per richieste esplicite e informazioni temporali', () => {
   assert.equal(webResearchPolicy({ question: 'Chi è il CEO attuale della società?', mode: 'fast' }).reason, 'time-sensitive');
   assert.equal(webResearchPolicy({ question: 'Qual è il risultato sportivo della partita di oggi?' }).reason, 'time-sensitive');
   assert.equal(researchIntent('Verifica le fonti online').explicit, true);
+  assert.equal(webResearchPolicy({ question: 'Spiegalo con una fonte web affidabile' }).level, 'required');
 });
 
 test('non rallenta domande stabili o operazioni locali', () => {

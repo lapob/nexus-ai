@@ -6,7 +6,7 @@
 // #region 01 — Segnali deterministici
 
 // Verification alone can refer to maths, code, or an output marker, not the web.
-const EXPLICIT_WEB_PATTERN = /\b(?:cerca|cercami|ricerca|naviga|browse|search|look\s*up|find\s+online|(?:verifica|controlla|consulta)\s+online|sul\s+web|su\s+internet|fonti\s+(?:online|web|pubbliche)|citazioni)\b/iu;
+const EXPLICIT_WEB_PATTERN = /\b(?:cerca|cercami|ricerca|naviga|browse|search|look\s*up|find\s+online|(?:verifica|controlla|consulta)\s+online|sul\s+web|su\s+internet|font[ei]\s+(?:online|web|pubblic[aoe])|citazioni)\b/iu;
 const TIME_SENSITIVE_PATTERN = /\b(?:oggi|adesso|attuale|attualmente|corrente|correnti|ultimo|ultima|ultimi|ultime|pi[uù]\s+recente|novit[aà]|news|prezzo|prezzi|quotazione|meteo|risultat[oi]\s+(?:sportiv[oi]|elettoral[ei]|della\s+(?:partita|gara|corsa|votazione))|classifica|calendario|versione|release|legge|normativa|regolamento|presidente|ceo|latest|current|today|recent|news|price|weather|score|standings|schedule|version|release|law|regulation)\b/iu;
 const RESEARCH_PATTERN = /\b(?:approfondisci|confronta|letteratura|studi|paper|ricerca\s+scientifica|prove|evidenze|benchmark|deep\s+research|research)\b/iu;
 const LOCAL_OPERATION_PATTERN = /\b(?:quest[oa]\s+(?:pc|computer|cartella|file|progetto)|workspace|repository\s+locale|desktop|disco|volume|terminale|powershell|prompt|apri|chiudi|avvia|spegni|riavvia|modifica|elimina|sposta|rinomina)\b/iu;

@@ -1,38 +1,56 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const packagedExecutable = process.env.NEXUS_PACKAGED_EXECUTABLE;
 const electronBinary = packagedExecutable || require('electron');
-const debugPort = 9337;
 const smokeProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-electron-smoke-'));
-const launchArguments = [
-  ...(packagedExecutable ? [] : ['.']),
-  `--remote-debugging-port=${debugPort}`,
-  `--user-data-dir=${smokeProfile}`
-];
-const child = spawn(electronBinary, launchArguments, {
-  cwd: root,
-  env: {
-    ...process.env,
-    NEXUS_SMOKE_TEST: '1',
-    NEXUS_SMOKE_DEBUG_PORT: String(debugPort),
-    NEXUS_SMOKE_STAGE_PATH: path.join(smokeProfile, 'smoke-stages.log'),
-    // Mantiene i log del bootstrap nel profilo effimero del test: in caso di
-    // errore del pacchetto possiamo riportare la causa senza toccare i dati
-    // dell'installazione o del server reale.
-    NEXUS_SHARED_DATA_ROOT: smokeProfile
-  },
-  stdio: ['ignore', 'pipe', 'pipe']
-});
-
+let debugPort = 0;
+let child;
 let stderr = '';
-child.stderr.on('data', (chunk) => { stderr += chunk; });
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
-const spawnError = new Promise((_, reject) => child.once('error', reject));
+let exit;
+let spawnError;
+
+function reserveDebugPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
+}
+
+function launchElectron() {
+  const launchArguments = [
+    ...(packagedExecutable ? [] : ['.']),
+    `--remote-debugging-port=${debugPort}`,
+    `--user-data-dir=${smokeProfile}`
+  ];
+  child = spawn(electronBinary, launchArguments, {
+    cwd: root,
+    env: {
+      ...process.env,
+      NEXUS_SMOKE_TEST: '1',
+      NEXUS_SMOKE_DEBUG_PORT: String(debugPort),
+      NEXUS_SMOKE_STAGE_PATH: path.join(smokeProfile, 'smoke-stages.log'),
+      // Mantiene i log del bootstrap nel profilo effimero del test: in caso di
+      // errore del pacchetto possiamo riportare la causa senza toccare i dati
+      // dell'installazione o del server reale.
+      NEXUS_SHARED_DATA_ROOT: smokeProfile
+    },
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
+  spawnError = new Promise((_, reject) => child.once('error', reject));
+}
 
 async function findRendererTarget() {
   // Il pacchetto Windows può impiegare alcuni secondi in più al primo avvio
@@ -221,6 +239,8 @@ async function inspectBridge(target) {
 }
 
 (async () => {
+  debugPort = await reserveDebugPort();
+  launchElectron();
     const timeout = setTimeout(() => child.kill(), 25000);
   try {
     let contract;

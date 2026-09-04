@@ -47,6 +47,60 @@ function Wait-DockerReady([int]$TimeoutSeconds = 90) {
   return $false
 }
 
+function Remove-StaleDockerSockets {
+  # Docker Desktop 4.89 can leave Windows AF_UNIX reparse points behind after
+  # an unclean shutdown. The next backend then fails before the engine starts.
+  # Touch only the transient endpoints and only while the backend is stopped;
+  # images, volumes, WSL disks and user configuration are never involved.
+  if (Get-Process -Name 'com.docker.backend' -ErrorAction SilentlyContinue) { return }
+  $runDirectory = Join-Path $env:LOCALAPPDATA 'Docker\run'
+  $allowedRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Docker\run'))
+  $blockedSocket = $false
+  if (Test-Path -LiteralPath $runDirectory -PathType Container) {
+    foreach ($socketName in @('sailor-ingest.sock', 'sailor-ingest.sock.stale', 'userAnalyticsOtlpHttp.sock')) {
+      $socketPath = [IO.Path]::GetFullPath((Join-Path $allowedRoot $socketName))
+      if (-not $socketPath.StartsWith("$allowedRoot\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Percorso socket Docker non valido.'
+      }
+      if (Test-Path -LiteralPath $socketPath) {
+        try {
+          Remove-Item -LiteralPath $socketPath -Force -ErrorAction Stop
+        } catch {
+          # AF_UNIX endpoints can remain undeletable even after WSL has stopped.
+          # Renaming the transient run directory lets Docker recreate it cleanly.
+          $blockedSocket = $true
+        }
+      }
+    }
+  }
+  if ($blockedSocket) {
+    $dockerLocalRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Docker'))
+    $staleDirectory = [IO.Path]::GetFullPath((Join-Path $dockerLocalRoot "run.stale-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff'))"))
+    if ($allowedRoot -ne (Join-Path $dockerLocalRoot 'run') -or
+        -not $staleDirectory.StartsWith("$dockerLocalRoot\", [StringComparison]::OrdinalIgnoreCase)) {
+      throw 'Percorso di recupero Docker non valido.'
+    }
+    Move-Item -LiteralPath $allowedRoot -Destination $staleDirectory
+    [IO.Directory]::CreateDirectory($allowedRoot) | Out-Null
+  }
+
+  $secretsDirectory = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'docker-secrets-engine'))
+  $secretsSocket = Join-Path $secretsDirectory 'engine.sock'
+  if (Test-Path -LiteralPath $secretsSocket) {
+    try {
+      Remove-Item -LiteralPath $secretsSocket -Force -ErrorAction Stop
+    } catch {
+      $localRoot = [IO.Path]::GetFullPath($env:LOCALAPPDATA)
+      $staleSecretsDirectory = [IO.Path]::GetFullPath((Join-Path $localRoot "docker-secrets-engine.stale-$([DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff'))"))
+      if ($secretsDirectory -ne (Join-Path $localRoot 'docker-secrets-engine') -or
+          -not $staleSecretsDirectory.StartsWith("$localRoot\", [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Percorso di recupero del Docker secrets engine non valido.'
+      }
+      Move-Item -LiteralPath $secretsDirectory -Destination $staleSecretsDirectory
+    }
+  }
+}
+
 function Wait-SearchReady([int]$TimeoutSeconds = 60) {
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   do {
@@ -80,7 +134,16 @@ if ($Action -eq 'start') {
     [IO.File]::WriteAllText($settingsPath, $template.Replace('__NEXUS_SEARXNG_SECRET__', $secret), [Text.UTF8Encoding]::new($false))
   }
   if (-not (Test-DockerReady)) {
-    Start-Process -FilePath $dockerDesktop -WindowStyle Hidden
+    Remove-StaleDockerSockets
+    # ProcessStartInfo treats the working directory literally; Start-Process
+    # interprets the square brackets in the portable volume name as wildcards.
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $dockerDesktop
+    $startInfo.Arguments = '--autostart'
+    $startInfo.WorkingDirectory = $dockerRoot
+    $startInfo.UseShellExecute = $true
+    $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+    [Diagnostics.Process]::Start($startInfo) | Out-Null
   }
   if (-not (Wait-DockerReady)) { throw 'Docker Desktop non e diventato disponibile entro 90 secondi.' }
   & $dockerCompose -f $composePath up -d --pull never
