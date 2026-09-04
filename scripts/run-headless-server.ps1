@@ -8,6 +8,8 @@ $launcher = Join-Path $projectRoot 'scripts\start-electron.js'
 $node = (Get-Command node.exe -ErrorAction Stop).Source
 $env:NEXUS_PUBLIC_PORT = '32147'
 $env:NEXUS_PUBLIC_URL = 'https://ai.nexusnxs.com'
+# The dedicated public listener binds only to loopback behind cloudflared.
+$env:NEXUS_TRUST_PUBLIC_CLOUDFLARE = '1'
 $dataRoot = Join-Path (Split-Path $projectRoot -Parent) '.nexus-data'
 $secretDirectory = Join-Path $dataRoot 'secrets'
 $qaSecretPath = Join-Path $secretDirectory 'qa-browser.key'

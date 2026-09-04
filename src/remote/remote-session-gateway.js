@@ -5,6 +5,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
+const { isIP } = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
@@ -456,8 +457,14 @@ function cleanPublicUrl(value, configuredUrl = process.env.NEXUS_PUBLIC_URL) {
   } catch { return ''; }
 }
 
-function requestAddress(request) {
+function requestAddress(request, { trustedCloudflare = false } = {}) {
   const peer = String(request.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+  // Only the explicitly configured public loopback listener trusts cloudflared.
+  // Never use forwarded headers to authorize private console access.
+  if (trustedCloudflare && isLoopbackRequest(request)) {
+    const visitor = request.headers?.['cf-connecting-ip'];
+    if (typeof visitor === 'string' && isIP(visitor)) return visitor.replace(/^::ffff:/, '').toLowerCase();
+  }
   return peer;
 }
 
@@ -717,6 +724,7 @@ class RemoteSessionGateway {
       ? Number(publicPort)
       : 0;
     this.qaSecret = String(qaSecret || '').length >= 32 ? String(qaSecret) : '';
+    this.trustPublicCloudflare = process.env.NEXUS_TRUST_PUBLIC_CLOUDFLARE === '1';
     this.pairing = null;
     this.failedPairings = new Map();
     this.requestBuckets = new Map();
@@ -1888,7 +1896,7 @@ class RemoteSessionGateway {
         return this.json(response, 200, { models: publicModelEntries(models).map((entry) => entry.public) });
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/bootstrap') {
-        const address = requestAddress(request);
+        const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
         const qaRequest = this.isQaRequest(request, publicIngress);
         if (!qaRequest && !this.persistentQuotas.allow(`bootstrap:${address}`, { limit: 80 })) {
           this.securityEvents.append('guest.bootstrap.blocked', { severity: 'warning', address, detail: 'Quota giornaliera superata' });
@@ -1947,7 +1955,7 @@ class RemoteSessionGateway {
         if (!this.voiceTranscriber) return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: 'VOICE_BACKEND_UNAVAILABLE' });
         const contentType = String(request.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
         if (contentType !== 'audio/wav') return this.json(response, 415, { error: 'Formato audio non supportato.', code: 'VOICE_FORMAT_UNSUPPORTED' });
-        const address = requestAddress(request);
+        const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
         const voiceAllowed = this.guestAllowed(`voice-input:${guest.id}`, 8, REQUEST_WINDOW_MS)
           && this.guestDailyAllowed(guest, 'voice-input', 2, 120)
           && this.persistentQuotas.allow(`voice-input-ip:${address}`, { cost: 2, limit: 240 });
@@ -1978,7 +1986,7 @@ class RemoteSessionGateway {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
         if (!this.voiceSynthesizer) return this.json(response, 503, { error: 'La voce NexusNXS non è disponibile.' });
-        const address = requestAddress(request);
+        const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
         const voiceAllowed = this.guestAllowed(`voice:${guest.id}`, 8, REQUEST_WINDOW_MS)
           && this.guestDailyAllowed(guest, 'voice', 2, 120)
           && this.persistentQuotas.allow(`voice-ip:${address}`, { cost: 2, limit: 240 });
@@ -2012,7 +2020,7 @@ class RemoteSessionGateway {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
         if (!this.imageGenerationService?.available) return this.json(response, 503, { error: 'La generazione immagini NexusNXS non è disponibile.', code: 'IMAGE_BACKEND_UNAVAILABLE' });
-        const address = requestAddress(request);
+        const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
         const allowed = this.guestAllowed(`image:${guest.id}`, 4, REQUEST_WINDOW_MS)
           && this.guestDailyAllowed(guest, 'image', 10, 40)
           && this.persistentQuotas.allow(`image-ip:${address}`, { cost: 10, limit: 120 });

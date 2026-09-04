@@ -128,6 +128,39 @@ test('non considera affidabili gli header di inoltro ricevuti dal client', () =>
   assert.equal(requestAddress({ socket: { remoteAddress: '192.168.1.20' }, headers: { 'x-forwarded-for': '203.0.113.8' } }), '192.168.1.20');
 });
 
+test('separa i visitatori Cloudflare solo dietro il proxy loopback esplicitamente fidato', () => {
+  const request = (visitor, peer = '127.0.0.1') => ({ socket: { remoteAddress: peer }, headers: { 'cf-connecting-ip': visitor } });
+  const trusted = { trustedCloudflare: true };
+  assert.equal(requestAddress(request('203.0.113.8')), '127.0.0.1');
+  assert.equal(requestAddress(request('203.0.113.8'), trusted), '203.0.113.8');
+  assert.equal(requestAddress(request('203.0.113.9'), trusted), '203.0.113.9');
+  assert.equal(requestAddress(request('2001:DB8::1'), trusted), '2001:db8::1');
+  assert.equal(requestAddress(request('203.0.113.8', '192.168.1.20'), trusted), '192.168.1.20');
+  for (const invalid of ['', 'unknown', '203.0.113.8, 203.0.113.9', ['203.0.113.8']]) {
+    assert.equal(requestAddress(request(invalid), trusted), '127.0.0.1');
+  }
+});
+
+test('la quota di bootstrap di un visitatore non blocca gli altri e il listener privato ignora Cloudflare', async () => {
+  const { root, gateway } = fixture();
+  try {
+    const port = await freePort();
+    gateway.publicPort = await freePort();
+    gateway.trustPublicCloudflare = true;
+    await gateway.configure({ enabled: true, port });
+    for (let index = 0; index < 80; index++) {
+      assert.equal(gateway.persistentQuotas.allow('bootstrap:203.0.113.8', { limit: 80 }), true);
+    }
+    const bootstrap = (targetPort, address) => fetch(`http://127.0.0.1:${targetPort}/api/guest/bootstrap`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': address },
+      body: JSON.stringify({ installationId: crypto.randomUUID() })
+    });
+    assert.equal((await bootstrap(gateway.publicPort, '203.0.113.8')).status, 429);
+    assert.equal((await bootstrap(gateway.publicPort, '203.0.113.9')).status, 201);
+    assert.equal((await bootstrap(port, '203.0.113.8')).status, 201);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('riconosce soltanto peer nel range privato Tailscale', () => {
   assert.equal(isTailscalePeer({ socket: { remoteAddress: '100.104.213.84' } }), true);
   assert.equal(isTailscalePeer({ socket: { remoteAddress: '192.168.1.20' } }), false);
