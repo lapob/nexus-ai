@@ -25,6 +25,7 @@ test('normalizza Wikipedia come fallback senza chiavi client', async () => {
   assert.equal(result.results[0].snippet, 'Voce enciclopedica');
   assert.match(result.results[0].url, /^https:\/\/it\.wikipedia\.org\/wiki\/Nexus/);
   assert.equal(calls.length, 1);
+  assert.deepEqual(service.capabilityState(), { state: 'degraded', mode: 'reference-only' });
   assert.equal(calls[0].options.redirect, 'error');
   assert.match(calls[0].options.headers['User-Agent'], /^NexusNXS\//);
   const cached = await service.search('Nexus', { language: 'it', limit: 3 });
@@ -46,6 +47,7 @@ test('usa Brave soltanto lato server e non restituisce la credenziale', async ()
   assert.equal(token, 'server-secret');
   assert.equal(result.results[0].url, 'https://example.com/docs');
   assert.doesNotMatch(JSON.stringify(result), /server-secret/);
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
 });
 
 test('in modalita auto ripiega su Wikipedia se Brave non risponde', async () => {
@@ -74,6 +76,7 @@ test('non spaccia Wikipedia per ricerca in tempo reale', async () => {
     () => withoutLiveProvider.search('versione corrente Node.js', { freshOnly: true }),
     /provider live/
   );
+  assert.deepEqual(withoutLiveProvider.capabilityState(), { state: 'degraded', mode: 'reference-only' });
 
   const calls = [];
   const failingLiveProvider = new WebResearchService({
@@ -88,6 +91,7 @@ test('non spaccia Wikipedia per ricerca in tempo reale', async () => {
     () => failingLiveProvider.search('versione corrente Node.js', { freshOnly: true }),
     /503/
   );
+  assert.deepEqual(failingLiveProvider.capabilityState(), { state: 'degraded', mode: 'live-retrying' });
   assert.equal(calls.length, 1);
   assert.match(calls[0], /api\.search\.brave\.com/);
 });

@@ -532,6 +532,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         modelProvider: () => aiRuntime.listModels(),
         imageGenerationService: ImageGenerationService.fromEnvironment(env),
         researchAvailable: webResearchService?.enabled !== false,
+        researchCapabilityProvider: () => webResearchService.capabilityState(),
         voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 20 }) => speechService.transcribeAudio({
           audio,
           language,

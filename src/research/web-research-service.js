@@ -59,6 +59,7 @@ class WebResearchService {
     this.logger = logger;
     this.now = now;
     this.cache = new Map();
+    this.lastLiveFailureAt = 0;
   }
 
   activeProvider() {
@@ -66,6 +67,16 @@ class WebResearchService {
     if (this.provider === 'brave') return this.braveApiKey ? 'brave' : 'unavailable';
     if (this.provider === 'wikipedia') return 'wikipedia';
     return this.braveApiKey ? 'brave' : 'wikipedia';
+  }
+
+  capabilityState() {
+    const provider = this.activeProvider();
+    if (provider === 'off' || provider === 'unavailable') return { state: 'unavailable', mode: 'off' };
+    if (provider === 'wikipedia') return { state: 'degraded', mode: 'reference-only' };
+    if (this.lastLiveFailureAt && this.now() - this.lastLiveFailureAt < this.cacheTtlMs) {
+      return { state: 'degraded', mode: 'live-retrying' };
+    }
+    return { state: 'available', mode: 'live' };
   }
 
   cacheKey(provider, query, language, limit) {
@@ -180,7 +191,9 @@ class WebResearchService {
       results = provider === 'brave'
         ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal })
         : await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
+      if (provider === 'brave') this.lastLiveFailureAt = 0;
     } catch (error) {
+      if (provider === 'brave' && !signal?.aborted) this.lastLiveFailureAt = this.now();
       // In modalita auto una credenziale Brave scaduta o un guasto temporaneo
       // non deve disattivare tutta la ricerca pubblica. Wikipedia resta un
       // fallback dichiarato e senza credenziali; la modalita brave esplicita,

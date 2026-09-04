@@ -647,7 +647,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -682,6 +682,7 @@ class RemoteSessionGateway {
     this.modelProvider = modelProvider;
     this.readinessProvider = typeof readinessProvider === 'function' ? readinessProvider : null;
     this.researchAvailable = researchAvailable === true;
+    this.researchCapabilityProvider = typeof researchCapabilityProvider === 'function' ? researchCapabilityProvider : null;
     this.performanceStore = performanceStore;
     this.telemetry = telemetry && typeof telemetry.emit === 'function' ? telemetry : null;
     this.communityFeedbackStore = communityFeedbackStore;
@@ -1139,6 +1140,12 @@ class RemoteSessionGateway {
       this.onWorkflowCreate, this.onWorkflowNext, this.onWorkflowDecide,
       this.onWorkflowCancel, this.onWorkflowStatus
     ].every((handler) => typeof handler === 'function');
+    let researchCapability = this.researchAvailable ? 'available' : 'unavailable';
+    try {
+      if (this.researchCapabilityProvider) researchCapability = this.researchCapabilityProvider();
+    } catch {
+      researchCapability = 'unavailable';
+    }
     return createCapabilityManifest({
       audience: publicIngress ? 'public' : 'private',
       features: {
@@ -1146,7 +1153,7 @@ class RemoteSessionGateway {
         attachments: true,
         'voice-input': this.voiceTranscriber ? 'available' : 'degraded',
         'voice-output': this.voiceSynthesizer ? 'available' : 'degraded',
-        'web-research': this.researchAvailable ? 'available' : 'unavailable',
+        'web-research': researchCapability,
         'image-generation': Boolean(this.imageGenerationService?.available),
         artifacts: Boolean(this.onMessage),
         continuity: publicIngress ? 'degraded' : 'available',

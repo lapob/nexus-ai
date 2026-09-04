@@ -408,6 +408,25 @@ async function bootstrapGuest(baseUrl, installationId = '019fa53a-63c1-79b1-bf97
   return response.json();
 }
 
+test('il manifesto pubblico riflette la qualita reale della ricerca web', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-research-capability-'));
+  let researchState = { state: 'degraded', mode: 'reference-only' };
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (record) => record },
+    researchAvailable: true,
+    researchCapabilityProvider: () => researchState,
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    const degraded = gateway.capabilityManifest({ publicIngress: true }).capabilities.find(({ id }) => id === 'web-research');
+    assert.deepEqual(degraded, { id: 'web-research', state: 'degraded', mode: 'reference-only' });
+    researchState = { state: 'available', mode: 'live' };
+    const available = gateway.capabilityManifest({ publicIngress: true }).capabilities.find(({ id }) => id === 'web-research');
+    assert.deepEqual(available, { id: 'web-research', state: 'available', mode: 'live' });
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 function mono16kWave(seconds = 0.25) {
   const samples = Math.round(16_000 * seconds);
   const audio = Buffer.alloc(44 + samples * 2);
