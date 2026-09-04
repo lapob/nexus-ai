@@ -3009,12 +3009,12 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (state.reduceMotion) .08f else .045f))
+        Modifier.fillMaxSize()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { dispatch("assistantClose", "") }
             .navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Surface(
-            color = Color(0xF4030A0B),
+            color = Color(0xD6030A0B),
             shape = RoundedCornerShape(32.dp),
             border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .22f)),
             shadowElevation = 18.dp,
