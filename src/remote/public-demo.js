@@ -70,10 +70,10 @@ body:is(.conversation-active,.request-active) .shell{padding-bottom:calc(var(--n
 @media(max-width:560px){body:not(.request-active):not(.conversation-active) .privacy{bottom:max(12px,env(safe-area-inset-bottom))}.conversation-active:not(.request-active) .dock,.request-active .dock{width:calc(100% - 20px)}.conversation-active .stage{padding-top:48px}}
 @media(prefers-reduced-motion:reduce){.memory-cleared .phase{backdrop-filter:none}}
 /* Empty-state content is one flowing group. It grows/scrolls instead of overlapping. */
-body:not(.keyboard-open):not(.request-active):not(.conversation-active) .shell{padding-bottom:calc(var(--nxs-privacy-height) + 28px + env(safe-area-inset-bottom));min-height:100dvh}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .shell{padding-bottom:max(14px,env(safe-area-inset-bottom));min-height:100dvh}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{flex:none;margin-top:auto;padding-bottom:0}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock,body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .dock{position:relative;top:auto;right:auto;bottom:auto;left:auto;transform:none;flex:none;margin:20px auto auto;padding:0 0 16px}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active) .privacy{position:relative;z-index:29;top:auto;right:auto;bottom:auto;left:auto;flex:none;width:min(660px,100%);margin:0 auto;padding:0 8px}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .privacy{position:relative;z-index:29;top:auto;right:auto;bottom:auto;left:auto;flex:none;width:min(660px,100%);margin:2px auto 0;padding:0 8px}
 </style>`;
 
 const SLASH_COMMAND_STYLE = `<style>
