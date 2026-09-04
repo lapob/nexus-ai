@@ -103,6 +103,7 @@ test("allows the production domain enough time to converge before rollback", asy
   );
   assert.match(releaseScript, /runWrangler\(\["deploy", "--strict"/);
   assert.match(releaseScript, /const deployedVersion = await currentVersion\(\)/);
+  assert.match(releaseScript, /await refreshProductionTriggers\(\)/);
 });
 
 test("verifies immutable Cloudflare previews before promotion", async () => {

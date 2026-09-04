@@ -199,12 +199,32 @@ async function hasAiRoute() {
   return (await workerRoutes()).some((route) => route.pattern === aiRoutePattern && route.script === workerName);
 }
 
+async function attachAiRoute() {
+  const { response, payload } = await cloudflareZoneRequest("/workers/routes", {
+    method: "POST",
+    body: JSON.stringify({ pattern: aiRoutePattern, script: workerName }),
+  });
+  if (!response.ok || payload.success === false) {
+    throw new Error(`Unable to attach ${aiRoutePattern} (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
+  }
+}
+
 async function removeAiRoute() {
   const route = (await workerRoutes()).find((item) => item.pattern === aiRoutePattern && item.script === workerName);
   if (!route?.id) return;
   const { response, payload } = await cloudflareZoneRequest(`/workers/routes/${route.id}`, { method: "DELETE" });
   if (!response.ok || payload.success === false) {
     throw new Error(`Unable to restore the previous AI route state (${response.status}).`);
+  }
+}
+
+async function purgeProductionCache() {
+  const { response, payload } = await cloudflareZoneRequest("/purge_cache", {
+    method: "POST",
+    body: JSON.stringify({ purge_everything: true }),
+  });
+  if (!response.ok || payload.success === false) {
+    throw new Error(`Unable to purge the NexusNXS production cache (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
   }
 }
 
@@ -337,6 +357,29 @@ async function attachDomain(hostname) {
   }
 }
 
+async function deleteDomain(domain) {
+  const { response, payload } = await cloudflareRequest(`/workers/domains/${domain.id}`, { method: "DELETE" });
+  if (!response.ok || payload.success === false) {
+    throw new Error(`Unable to refresh ${domain.hostname} (${response.status}): ${JSON.stringify(payload.errors ?? [])}`);
+  }
+}
+
+async function refreshProductionTriggers() {
+  const domains = await workerDomains();
+  const targets = productionHostnames.map((hostname) => domains.find((domain) => domain.hostname === hostname));
+  if (targets.some((domain) => !domain || domain.service !== workerName)) {
+    throw new Error("Production trigger refresh refused because domain ownership does not match the NexusNXS Worker.");
+  }
+  await removeAiRoute();
+  await attachAiRoute();
+  for (const domain of targets) {
+    await deleteDomain(domain);
+    await attachDomain(domain.hostname);
+  }
+  await assertProductionDomainsAttached();
+  if (!(await hasAiRoute())) throw new Error(`${aiRoutePattern} was not restored on ${workerName}.`);
+}
+
 async function cutover() {
   if (!process.argv.includes("--confirm-domain-cutover")) {
     throw new Error("Cutover changes public routing. Re-run with --confirm-domain-cutover after the old apex/www DNS records are removed.");
@@ -379,7 +422,12 @@ async function promote() {
     throw new Error("Cloudflare did not activate a new atomic production version.");
   }
   try {
-    await verifySite("https://nexusnxs.com", deployedVersion, { attempts: 12 });
+    try {
+      await verifySite("https://nexusnxs.com", deployedVersion);
+    } catch {
+      await refreshProductionTriggers();
+      await verifySite("https://nexusnxs.com", deployedVersion, { attempts: 12 });
+    }
     await verifyAiHealth(deployedVersion, { attempts: 12 });
   } catch (releaseError) {
     if (!aiRoutePreviouslyAttached) await removeAiRoute();
@@ -410,10 +458,13 @@ async function rollback() {
 
 async function diagnose() {
   await ensureAccountToken();
-  const [routes, domains, activeVersion] = await Promise.all([
+  const [routes, domains, activeVersion, apexDns, wwwDns, rulesets] = await Promise.all([
     workerRoutes(),
     workerDomains(),
     currentVersion(),
+    cloudflareZoneRequest("/dns_records?name=nexusnxs.com"),
+    cloudflareZoneRequest("/dns_records?name=www.nexusnxs.com"),
+    cloudflareZoneRequest("/rulesets"),
   ]);
   const relevantRoutes = routes
     .filter((route) => route.pattern?.includes("nexusnxs.com"))
@@ -427,7 +478,24 @@ async function diagnose() {
       environment,
       zone_id: domainZoneId,
     }));
-  console.log(JSON.stringify({ worker: workerName, activeVersion, routes: relevantRoutes, domains: relevantDomains }, null, 2));
+  const safeDns = [apexDns, wwwDns].flatMap(({ payload }) => (payload.result ?? []).map(({ id, name, type, content, proxied }) => ({ id, name, type, content, proxied })));
+  const safeRulesets = (rulesets.payload.result ?? []).map(({ id, name, kind, phase }) => ({ id, name, kind, phase }));
+  console.log(JSON.stringify({
+    worker: workerName,
+    activeVersion,
+    routes: relevantRoutes,
+    domains: relevantDomains,
+    dns: safeDns,
+    rulesets: safeRulesets,
+    rulesetsStatus: rulesets.response.status,
+    rulesetsErrors: rulesets.payload.errors ?? [],
+  }, null, 2));
+}
+
+async function purge() {
+  await ensureAccountToken();
+  await purgeProductionCache();
+  console.log("NexusNXS production cache purged.");
 }
 
 const action = process.argv[2];
@@ -438,4 +506,5 @@ else if (action === "cutover") await cutover();
 else if (action === "promote") await promote();
 else if (action === "rollback") await rollback();
 else if (action === "diagnose") await diagnose();
-else throw new Error("Use bootstrap, prepare, activate-initial, cutover, promote, rollback, or diagnose.");
+else if (action === "purge") await purge();
+else throw new Error("Use bootstrap, prepare, activate-initial, cutover, promote, rollback, diagnose, or purge.");
