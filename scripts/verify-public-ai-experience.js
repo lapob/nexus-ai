@@ -162,9 +162,15 @@ async function verifyIdleComposerSlide(client, label) {
       };
       measure(started);
       action();
+      // Measure the complete CSS transition, including the slower ambient
+      // slide. Closing a 620ms transition at a fixed 540ms tested an accidental
+      // interruption rather than the final layout.
+      const style = getComputedStyle(dock);
+      const milliseconds = value => value.trim().endsWith('ms') ? parseFloat(value) : parseFloat(value) * 1000;
+      const duration = Math.max(540, ...style.transitionDuration.split(',').map(milliseconds)) + 100;
       const frame = (now) => {
         measure(now);
-        if (now - started >= 540) return done(samples);
+        if (now - started >= duration) return done(samples);
         requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);

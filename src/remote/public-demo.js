@@ -39,6 +39,9 @@ const SESSION_EXPERIENCE_STYLE = `<style>
 </style>`;
 
 const CONVERSATION_LAYOUT_STYLE = `<style>
+/* Decorative transforms must not enlarge the mobile layout viewport: a
+   viewport resize during keyboard collapse moves the entire dock vertically. */
+html{overflow-x:clip}body{width:100%;max-width:100vw;overflow-x:clip}
 :root{--nxs-privacy-height:16px;--nxs-idle-dock-shift:0px;--nxs-status-dock-shift:0px;--nxs-keyboard-dock-shift:0px;--nxs-collapse-shift:0px}
 .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom))}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom));transform:translate3d(0,var(--nxs-idle-dock-shift),0)}
