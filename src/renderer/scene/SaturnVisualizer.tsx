@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AudioBus, EntityState } from '../types/nexus';
-import { VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
+import { VISUALIZER_MOTION, VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
 
 // #region 01 — Contratto e shader condiviso
 
@@ -361,9 +361,11 @@ export function SaturnVisualizer({ state, audioBus, reducedMotion, quality, perf
   // punti più fini lasciano distinguere superficie, orbite e polvere cosmica.
   const luminosity = quality === 'super' ? 0.9 : quality === 'ultra' ? 0.88 : quality === 'balanced' ? 0.86 : 0.84;
   const pointScale = quality === 'super' ? 0.96 : quality === 'ultra' && performanceLevel >= 5 ? 0.98 : quality === 'ultra' ? 0.94 : 0.92;
-  const planetUniforms = useMemo(() => uniforms(0, luminosity, pointScale), [luminosity, pointScale]);
-  const orbitUniforms = useMemo(() => uniforms(1, luminosity, pointScale), [luminosity, pointScale]);
-  const haloUniforms = useMemo(() => uniforms(2, luminosity, pointScale), [luminosity, pointScale]);
+  // Quality changes refine the same material; recreating uniforms resets
+  // voice, pointer and ring state in the middle of the startup ramp.
+  const planetUniforms = useMemo(() => uniforms(0, 0.84, 0.92), []);
+  const orbitUniforms = useMemo(() => uniforms(1, 0.84, 0.92), []);
+  const haloUniforms = useMemo(() => uniforms(2, 0.84, 0.92), []);
   const transition = useRef(0);
   const ringVisibility = useRef(0);
   const previousState = useRef(state);
@@ -388,7 +390,7 @@ export function SaturnVisualizer({ state, audioBus, reducedMotion, quality, perf
   useFrame(({ clock, pointer, camera }, delta) => {
     if (!system.current || !planetMaterial.current || !orbitMaterial.current || !haloMaterial.current) return;
     const audio = audioBus.current;
-    const time = reducedMotion ? 0 : clock.elapsedTime;
+    const time = reducedMotion ? 0 : clock.elapsedTime * VISUALIZER_MOTION.ambientScale;
     const stateEnergy = state === 'speaking' ? 0.38 + audio.level * 0.54
       : state === 'listening' ? 0.48
         : state === 'thinking' ? 0.68
@@ -438,6 +440,7 @@ export function SaturnVisualizer({ state, audioBus, reducedMotion, quality, perf
     if (hasPointerIntersection) system.current.worldToLocal(interactionPoint);
     [planetMaterial.current, orbitMaterial.current, haloMaterial.current].forEach((material) => {
       material.uniforms.uTime.value = time;
+      material.uniforms.uPointScale.value = THREE.MathUtils.damp(material.uniforms.uPointScale.value, pointScale, 1.7, delta);
       material.uniforms.uStateEnergy.value = stateEnergy;
       material.uniforms.uTransition.value = transition.current;
       material.uniforms.uRingVisibility.value = ringVisibility.current;

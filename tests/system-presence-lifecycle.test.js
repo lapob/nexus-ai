@@ -11,6 +11,7 @@ const {
   PRESENCE_ARGUMENT,
   WAKE_WORD_ARGUMENT_PREFIX,
   interactiveLaunchArguments,
+  launchInteractiveDesktop,
   launchSystemPresence,
   presenceLaunchArguments,
   processLockState
@@ -59,6 +60,29 @@ test('la UI avvia la Presence in un processo nascosto privo di runtime AI', asyn
   assert.equal(calls[0].options.detached, true);
   assert.equal(calls[0].options.env.NEXUS_MANAGED_OLLAMA, '0');
   assert.equal(calls[0].options.env.NEXUS_SHARED_DATA_ROOT, 'Z:\\NexusData');
+  assert.equal(calls[0].options.env.NEXUS_USER_DATA_ROOT, 'Z:\\NexusData');
+});
+
+test('packaged Presence and UI spawn outside ASAR and preserve the shared profile', async () => {
+  for (const launchDesktop of [launchSystemPresence, launchInteractiveDesktop]) {
+    let captured;
+    await launchDesktop({
+      executable: process.execPath,
+      defaultApp: false,
+      appRoot: path.join(root, 'resources', 'app.asar'),
+      env: { NEXUS_SHARED_DATA_ROOT: root },
+      launch: (_file, _args, options) => {
+        captured = options;
+        return {
+          once(event, callback) { if (event === 'spawn') queueMicrotask(callback); return this; },
+          unref() {}
+        };
+      }
+    });
+    assert.equal(captured.cwd, path.dirname(process.execPath));
+    assert.ok(fs.statSync(captured.cwd).isDirectory());
+    assert.equal(captured.env.NEXUS_USER_DATA_ROOT, root);
+  }
 });
 
 test('la capability startup documenta Core persistente e UI on-demand', () => {

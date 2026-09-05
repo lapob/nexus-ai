@@ -51,13 +51,14 @@ test('all real interaction states preserve phase and use bounded finite geometry
   assert.equal(f.listeners.size, 0);
 });
 
-test('motion speed follows time at 20, 60 and 120 Hz', () => {
-  const phases = [20, 60, 120].map(hz => {
+test('motion stays slow and follows time at 20, 60, 120 and 240 Hz', () => {
+  const phases = [20, 60, 120, 240].map(hz => {
     const f = fixture();
     for (let i = 0; i <= hz * 2; i++) f.frame(1 + i * 1000 / hz);
     const phase = f.renderer.getMetrics().phase; f.renderer.dispose(); return phase;
   });
   assert.ok(Math.max(...phases) - Math.min(...phases) < .001);
+  assert.ok(phases.every(phase => phase > .6 && phase < .7), 'Decoration runs at 0.55x, not by skipping display frames');
 });
 
 test('reduced motion paints once, redraws a changed state, and never resets its geometry clock', () => {
@@ -82,11 +83,52 @@ test('a drag rotates the volume, suppresses voice clicks and settles without res
   f.handlers.get('click')({preventDefault(){suppressed++;},stopImmediatePropagation(){suppressed++;}});
   assert.equal(suppressed,2);
   const phase = f.renderer.getMetrics().phase;
-  for(let i=0;i<900;i++) f.frame(now += 1000/120);
+  const releasedRotation = Math.abs(Number(f.canvas.dataset.astralRotation.split(',')[1]));
+  for(let i=0;i<120;i++) f.frame(now += 1000/120);
+  const floatingRotation = Math.abs(Number(f.canvas.dataset.astralRotation.split(',')[1]));
+  assert.ok(floatingRotation > releasedRotation * .6 && floatingRotation < releasedRotation * .8, 'A released core floats back instead of snapping home');
+  // The visible drift is already subpixel before this; wait through the full
+  // longer wake tail before requiring the original 0.05px resting precision.
+  for(let i=0;i<1560;i++) f.frame(now += 1000/120);
   assert.ok(f.canvas.dataset.astralRotation.split(',').every(v=>Math.abs(Number(v)) < .002));
   assert.ok(f.renderer.getMetrics().maxDrift < .05);
   assert.ok(f.renderer.getMetrics().phase > phase);
   f.renderer.dispose();
+});
+
+test('slow ambient motion does not delay voice feedback or simple core clicks', () => {
+  const f = fixture({ getEnergy: () => 1 });
+  f.renderer.setState('listening');
+  f.frame(1);
+  f.frame(101);
+  assert.equal(f.renderer.getMetrics().state, 'listening');
+  assert.ok(f.renderer.getMetrics().audio > .7);
+  f.handlers.get('pointerdown')({button:0,pointerId:9,clientX:200,clientY:200});
+  f.handlers.get('pointerup')({type:'pointerup'});
+  let suppressed = false;
+  f.handlers.get('click')({preventDefault(){suppressed = true;},stopImmediatePropagation(){suppressed = true;}});
+  assert.equal(suppressed, false, 'A simple click is never delayed by decorative settling');
+  f.renderer.dispose();
+});
+
+test('Android and all desktop visualizers share the same decorative motion rates', () => {
+  const android = fs.readFileSync(path.join(__dirname, '../android/NexusRemote/app/src/main/java/local/nexus/remote/AstralCore.kt'), 'utf8');
+  const animation = fs.readFileSync(path.join(__dirname, '../src/renderer/systems/AnimationController.ts'), 'utf8');
+  for (const [name, value] of [['ambientScale', '.55'], ['returnOmega', '1.1']]) {
+    assert.ok(source.includes(`${name}: ${value}`));
+    assert.ok(animation.includes(`${name}: ${value}`));
+    assert.ok(android.includes(`${name} = ${value}f`));
+  }
+  assert.ok(source.includes('pointerRelease: .8'));
+  assert.ok(android.includes('pointerRelease = .8f'));
+  assert.ok(animation.includes('release: .8'));
+  for (const name of ['ParticleEngine', 'SaturnVisualizer', 'NexusCore']) {
+    const visualizer = fs.readFileSync(path.join(__dirname, `../src/renderer/scene/${name}.tsx`), 'utf8');
+    assert.match(visualizer, /clock\.elapsedTime \* VISUALIZER_MOTION\.ambientScale/);
+    assert.match(visualizer, /VISUALIZER_POINTER_DAMPING\.release/);
+  }
+  const inspection = fs.readFileSync(path.join(__dirname, '../src/renderer/scene/VisualizerInspection.tsx'), 'utf8');
+  assert.match(inspection, /dragging \? 9 : VISUALIZER_MOTION\.returnOmega/);
 });
 
 test('Android uses the same topology and keeps capture inline through recomposition', () => {
@@ -100,4 +142,31 @@ test('Android uses the same topology and keeps capture inline through recomposit
   assert.match(activity, /if \(inlineState != null\) return/);
   assert.match(activity, /generation != speechGeneration/);
   assert.match(activity, /speechPlayback = "speaking"/);
+});
+
+test('quality sheds glow before particles and recovers with hysteresis', () => {
+  const f = fixture(); let time = 1;
+  f.frame(time); const initial = f.renderer.getMetrics().particles;
+  for (let i = 0; i < 26; i++) f.frame(time += 50);
+  assert.equal(f.renderer.getMetrics().quality, .75);
+  assert.equal(f.renderer.getMetrics().particles, initial);
+  for (let i = 0; i < 90; i++) f.frame(time += 50);
+  assert.ok(f.renderer.getMetrics().particles < initial);
+  for (let i = 0; i < 4500; i++) f.frame(time += 1000 / 120);
+  assert.equal(f.renderer.getMetrics().quality, 1);
+  assert.equal(f.renderer.getMetrics().particles, initial);
+  f.renderer.dispose();
+});
+
+test('voice light ignores stale audio outside listening and speaking', () => {
+  const f = fixture({ getEnergy: () => 1 }); let time = 1;
+  for (let i = 0; i < 60; i++) f.frame(time += 1000 / 60);
+  assert.equal(f.renderer.getMetrics().audio, 0);
+  f.renderer.setState('speaking');
+  for (let i = 0; i < 60; i++) f.frame(time += 1000 / 60);
+  assert.ok(f.renderer.getMetrics().audio > .95);
+  f.renderer.setState('idle');
+  for (let i = 0; i < 90; i++) f.frame(time += 1000 / 60);
+  assert.ok(f.renderer.getMetrics().audio < .001);
+  f.renderer.dispose();
 });

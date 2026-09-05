@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AudioBus, EntityState, VisualQuality } from '../types/nexus';
-import { AnimationController, VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
+import { AnimationController, VISUALIZER_MOTION, VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
 
 // #region 01 — Contratto e shader GPU
 
@@ -296,7 +296,7 @@ export function ParticleEngine({ state, audioBus, particleCount, reducedMotion, 
     const voiceBlend = state === 'speaking' ? audio.level : 1;
     // Con "Riduci movimento" il Core conserva forma e feedback audio, ma non
     // produce respirazione, rotazione e oscillazioni automatiche continue.
-    material.current.uniforms.uTime.value = reducedMotion ? 0 : clock.elapsedTime;
+    material.current.uniforms.uTime.value = reducedMotion ? 0 : clock.elapsedTime * VISUALIZER_MOTION.ambientScale;
     material.current.uniforms.uMode.value = profile.mode;
     material.current.uniforms.uEnergy.value = state === 'speaking'
       ? THREE.MathUtils.lerp(0.34, profile.energy, voiceBlend)
@@ -340,6 +340,8 @@ export function ParticleEngine({ state, audioBus, particleCount, reducedMotion, 
                   : '#55b9bf';
     material.current.uniforms.uAccent.value.set(accent);
     const baseLuminosity = quality === 'super' ? 1.04 : quality === 'ultra' ? 1.02 : quality === 'balanced' ? 0.98 : 0.94;
+    const pointScale = quality === 'super' ? 0.96 : quality === 'ultra' ? 1.02 : quality === 'balanced' ? 0.98 : 0.96;
+    material.current.uniforms.uPointScale.value = THREE.MathUtils.damp(material.current.uniforms.uPointScale.value, pointScale, 1.7, delta);
     const targetLuminosity = baseLuminosity * (state === 'speaking'
       ? 1.015 + audio.level * 0.16
       : state === 'listening'
@@ -374,12 +376,12 @@ export function ParticleEngine({ state, audioBus, particleCount, reducedMotion, 
     ,
     // La qualità superiore aumenta il campionamento del campo; non deve
     // trasformare i filamenti in una superficie sovraesposta.
-    uLuminosity: { value: quality === 'super' ? 1.04 : quality === 'ultra' ? 1.02 : quality === 'balanced' ? 0.98 : 0.94 },
-    uPointScale: { value: quality === 'super' ? 0.96 : quality === 'ultra' ? 1.02 : quality === 'balanced' ? 0.98 : 0.96 }
+    uLuminosity: { value: 0.94 },
+    uPointScale: { value: 0.96 }
     ,
     uPointer: { value: new THREE.Vector2() },
     uPointerStrength: { value: 0 }
-  }), [quality]);
+  }), []);
 
   return (
     <group ref={group} position={[0, 0.18, 0]}>

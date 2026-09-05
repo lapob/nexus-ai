@@ -22,11 +22,26 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlin.math.*
 
+// Match the canonical renderer: slow decoration, immediate gesture and voice input.
+private object AstralMotion {
+    const val ambientScale = .55f
+    const val returnOmega = 1.1f
+    const val pointerRelease = .8f
+}
+
 private class AstralInspection {
     var dragging = false
     var start = Offset.Zero
     var point = Offset.Zero
+    var pointerVelocity = Offset.Zero
+    var pointerPresence = 0f
+    var lastPointerNanos = 0L
     var lastNanos = 0L
+    var quality = 1f
+    var strainedSeconds = 0f
+    var healthySeconds = 0f
+    var drawMillis = 0f
+    var visibleCount = 0
     val rotation = FloatArray(2)
     val velocity = FloatArray(2)
     val target = FloatArray(2)
@@ -51,17 +66,18 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
     }
     val clock = remember { mutableFloatStateOf(0f) }
     val emergence = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(Unit) { emergence.animateTo(1f, tween(if (reduceMotion) 0 else 1600)) }
+    LaunchedEffect(Unit) { emergence.animateTo(1f, tween(if (reduceMotion) 0 else 2400)) }
     LaunchedEffect(visible, reduceMotion) {
         if (visible && !reduceMotion) {
             var previous = 0L
             while (true) withFrameNanos { now ->
-                if (previous != 0L) clock.floatValue += ((now - previous) / 1_000_000_000f).coerceIn(0f, .25f) * (.55f + activity.value * .35f)
+                if (previous != 0L) clock.floatValue += ((now - previous) / 1_000_000_000f).coerceIn(0f, .25f) * (.55f + activity.value * .35f) * AstralMotion.ambientScale
                 previous = now
             }
         }
     }
-    val voice = animateFloatAsState(energy.coerceIn(0f, 1f), tween(120), label = "astralVoice")
+    val voiceEnergy = if ((state == "listening" || state == "speaking") && energy.isFinite()) energy.coerceIn(0f, 1f) else 0f
+    val voice = animateFloatAsState(voiceEnergy, tween(120), label = "astralVoice")
     val opacity = animateFloatAsState(if (state == "offline" || state == "error") .35f else 1f, tween(700), label = "astralConnection")
     val count = ((particleBudget * 6).coerceIn(210, 660) / 3) * 3
     val xs = remember(count) { FloatArray(count) }; val ys = remember(count) { FloatArray(count) }; val zs = remember(count) { FloatArray(count) }
@@ -72,11 +88,17 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
     val velocityX = remember(count) { FloatArray(count) }; val velocityY = remember(count) { FloatArray(count) }
     Canvas(Modifier.size(diameter).pointerInput(reduceMotion) {
         if (!reduceMotion) detectDragGestures(
-            onDragStart = { inspection.start = it; inspection.point = it; inspection.dragging = true },
+            onDragStart = { inspection.start = it; inspection.point = it; inspection.pointerVelocity = Offset.Zero; inspection.lastPointerNanos = System.nanoTime(); inspection.dragging = true },
             onDragEnd = { inspection.dragging = false },
             onDragCancel = { inspection.dragging = false },
             onDrag = { change, _ ->
                 change.consume()
+                val now = System.nanoTime()
+                val seconds = ((now - inspection.lastPointerNanos) / 1_000_000_000f).coerceAtLeast(.008f)
+                val limit = min(size.width, size.height) * 1.5f
+                val velocity = (change.position - inspection.point) / seconds
+                inspection.pointerVelocity = Offset(velocity.x.coerceIn(-limit, limit), velocity.y.coerceIn(-limit, limit))
+                inspection.lastPointerNanos = now
                 inspection.point = change.position
                 val delta = change.position - inspection.start
                 val dimension = min(size.width, size.height).toFloat().coerceAtLeast(1f)
@@ -90,9 +112,21 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
         val now = System.nanoTime()
         val dt = if (inspection.lastNanos == 0L) .016f else ((now - inspection.lastNanos) / 1_000_000_000f).coerceIn(0f, 1f)
         inspection.lastNanos = now
+        inspection.pointerPresence += ((if (inspection.dragging) 1f else 0f) - inspection.pointerPresence) * (1f - exp(-(if (inspection.dragging) 7f else AstralMotion.pointerRelease) * dt))
+        if (now - inspection.lastPointerNanos > 80_000_000L) inspection.pointerVelocity *= exp(-5f * dt)
+        val strained = dt > .03f || inspection.drawMillis > 8f
+        inspection.strainedSeconds = if (strained) inspection.strainedSeconds + dt else (inspection.strainedSeconds - dt * .5f).coerceAtLeast(0f)
+        inspection.healthySeconds = if (!strained && dt < .02f && inspection.drawMillis < 5f) inspection.healthySeconds + dt else 0f
+        if (inspection.strainedSeconds > 1.2f) { inspection.quality = (inspection.quality - .25f).coerceAtLeast(0f); inspection.strainedSeconds = 0f }
+        if (inspection.healthySeconds > 8f) { inspection.quality = (inspection.quality + .25f).coerceAtMost(1f); inspection.healthySeconds = 0f }
+        val quality = inspection.quality
+        val targetCount = max(210, (count * (if (quality >= .5f) 1f else .55f + quality * .9f)).toInt() / 3 * 3)
+        if (inspection.visibleCount == 0) inspection.visibleCount = count
+        inspection.visibleCount = (inspection.visibleCount + (targetCount - inspection.visibleCount).coerceIn(-3, 3)).coerceAtMost(count)
+        val visibleCount = inspection.visibleCount
         repeat(2) { axis ->
             val goal = if (inspection.dragging && !reduceMotion) inspection.target[axis] else 0f
-            val omega = if (inspection.dragging) 9f else 1.7f; val decay = exp(-omega * dt)
+            val omega = if (inspection.dragging) 9f else AstralMotion.returnOmega; val decay = exp(-omega * dt)
             val error = inspection.rotation[axis] - goal; val a = inspection.velocity[axis] + omega * error
             inspection.rotation[axis] = goal + (error + a * dt) * decay
             inspection.velocity[axis] = (inspection.velocity[axis] - omega * a * dt) * decay
@@ -100,7 +134,7 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
         val reveal = 1f - (1f - emergence.value).pow(3)
         val unit = size.minDimension * 1.15f; val scale = 1f + sin(flow * .67f) * .026f + audio * .055f
         val dim = opacity.value
-        repeat(count) { i ->
+        repeat(visibleCount) { i ->
             val ribbon = i % 3; val progress = (((i / 3) * .61803398875) % 1.0).toFloat()
             val a = progress * (PI * 2).toFloat() + flow * .17f + ribbon * 2.094f
             val phi = i * 2.399963f + sin(flow * .6f + i * .13f) * .3f
@@ -123,33 +157,40 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
             ys[i] = center.y + (y * perspective * scale + sin(phi) * scatter) * unit; zs[i] = z
             val dx = xs[i] - inspection.point.x; val dy = ys[i] - inspection.point.y
             val distance = hypot(dx, dy).coerceAtLeast(1f)
-            val influence = if (inspection.dragging) (1f - distance / (size.minDimension * .32f)).coerceAtLeast(0f) else 0f
-            val gx = dx / distance * influence * size.minDimension * .14f
-            val gy = dy / distance * influence * size.minDimension * .14f
-            val omega = if (influence > .01f) 4.5f else 1.7f; val decay = exp(-omega * dt)
+            val structural = i % 9 < 3
+            val influence = (1f - distance / (size.minDimension * .38f)).coerceAtLeast(0f) * inspection.pointerPresence * (if (structural) .22f else 1f)
+            val gx = (dx / distance * size.minDimension * .20f + inspection.pointerVelocity.x * .14f) * influence
+            val gy = (dy / distance * size.minDimension * .20f + inspection.pointerVelocity.y * .14f) * influence
+            val omega = if (influence > .01f) 4.5f else AstralMotion.returnOmega; val decay = exp(-omega * dt)
             val ex = driftX[i] - gx; val ey = driftY[i] - gy
             val ax = velocityX[i] + omega * ex; val ay = velocityY[i] + omega * ey
             driftX[i] = gx + (ex + ax * dt) * decay; driftY[i] = gy + (ey + ay * dt) * decay
             velocityX[i] = (velocityX[i] - omega * ax * dt) * decay; velocityY[i] = (velocityY[i] - omega * ay * dt) * decay
+            val displacement = hypot(driftX[i], driftY[i]); val limit = size.minDimension * (if (structural) .025f else .09f)
+            if (displacement > limit) {
+                val ratio = limit / displacement
+                driftX[i] *= ratio; driftY[i] *= ratio; velocityX[i] *= ratio; velocityY[i] *= ratio
+            }
             xs[i] += driftX[i]; ys[i] += driftY[i]
         }
-        for (i in 0 until count step 3) {
-            val peer = (i + if (i % 11 == 0) 33 else 9) % count
+        for (i in 0 until visibleCount step 3) {
+            val peer = (i + if (i % 11 == 0) 33 else 9) % visibleCount
             if (hypot(xs[i] - xs[peer], ys[i] - ys[peer]) < size.minDimension * .25f)
                 drawLine(Color(0xFF88DAEE).copy(alpha = (.05f + activityLevel * .1f) * reveal * dim), Offset(xs[i],ys[i]), Offset(xs[peer],ys[peer]), max(.4f, size.minDimension * .0011f))
         }
-        repeat(count) { i ->
+        repeat(visibleCount) { i ->
             val depth = (.55f + zs[i] * 1.3f).coerceIn(.15f, 1f)
             val color = palette[if (i % 19 == 0) 2 else if (i % 3 == 0) 1 else 0]
             val dot = max(.55f, size.minDimension * (.0017f + seeds[i] * .0015f)) * (.65f + depth * .7f)
-            val point = Offset(xs[i],ys[i]); val alpha = reveal * (.32f + depth * .62f) * dim
-            if (i % 13 == 0) {
+            val point = Offset(xs[i],ys[i]); val alpha = reveal * (.36f + depth * .52f + audio * .08f) * dim
+            if (quality > .25f && i % (if (quality < .75f) 26 else 13) == 0) {
                 drawCircle(color.copy(alpha = alpha * .045f), dot * 7f, point)
                 drawCircle(color.copy(alpha = alpha * .09f), dot * 3.7f, point)
             }
             drawCircle(color.copy(alpha = alpha), dot, point)
         }
-        drawCircle(Brush.radialGradient(listOf(palette[0].copy(alpha = reveal * (.55f + activityLevel * .35f) * dim), Color.Transparent), center = center, radius = size.minDimension * .08f), size.minDimension * .08f)
+        drawCircle(Brush.radialGradient(listOf(palette[0].copy(alpha = reveal * (.6f + activityLevel * .2f + audio * .15f) * dim), Color.Transparent), center = center, radius = size.minDimension * .08f), size.minDimension * .08f)
         drawCircle(Color(0xFFE9FFFF).copy(alpha = reveal * dim), max(1f,size.minDimension * .006f))
+        inspection.drawMillis += ((System.nanoTime() - now) / 1_000_000f - inspection.drawMillis) * .1f
     }
 }

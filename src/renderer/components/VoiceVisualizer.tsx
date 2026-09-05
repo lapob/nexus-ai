@@ -108,10 +108,10 @@ export function VoiceVisualizer({ state, audioBus, preferences, hardware, suspen
       }}
     >
       <WebGLBoundary>
-        <Suspense fallback={<ThinkingAnimation fallback />}>
+        <Suspense fallback={null}>
           {sceneReady
             ? <MainScene state={state} audioBus={audioBus} preferences={preferences} hardware={hardware} suspended={suspended} />
-            : <ThinkingAnimation fallback />}
+            : null}
         </Suspense>
       </WebGLBoundary>
       <div className="visualizer-ambient" aria-hidden="true">

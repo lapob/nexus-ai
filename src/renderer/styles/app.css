@@ -633,6 +633,19 @@ a:focus:not(:focus-visible) {
   cursor: default;
 }
 
+.voice-visualizer canvas {
+  animation: visualizer-materialize 1400ms ease-out both;
+}
+
+@keyframes visualizer-materialize {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-visualizer canvas { animation: none; }
+}
+
 .visualizer::before,
 .voice-visualizer::before {
   position: absolute;

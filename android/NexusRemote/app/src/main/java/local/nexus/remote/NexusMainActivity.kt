@@ -2652,6 +2652,8 @@ private fun JSONArray?.toTurns() = buildList {
     val focusRequester = remember { FocusRequester() }
     val composerBringIntoView = remember { BringIntoViewRequester() }
     val instantImeVisible = WindowInsets.isImeVisible
+    val coreConfiguration = LocalConfiguration.current
+    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .82f, coreConfiguration.screenHeightDp * .40f, 340f).dp
     val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
@@ -2883,6 +2885,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 offline = state.connection == NexusConnection.OFFLINE,
                                 reduceMotion = reduceMotion,
                                 energy = if (voiceMode) inlineVoiceEnergy else 0f,
+                                diameter = homeCoreDiameter,
                                 phaseState = when { !interactionAvailable -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" },
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)

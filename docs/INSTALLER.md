@@ -14,7 +14,7 @@ in base al PC dell'utente.
   durante l'installazione degli utenti.
 
 Il comando `npm run build:win` richiede `NEXUS_SERVICE_URL`, verifica che sia
-HTTPS e genera `release/NexusNXS-0.3.12-Setup.exe` senza runtime LLM locale.
+HTTPS e genera `release/NexusNXS-0.3.13-Setup.exe` senza runtime LLM locale.
 
 La disinstallazione rimuove l'applicazione ma conserva configurazione, dataset
 approvati e preferenze locali. Un'eventuale funzione “rimuovi anche i miei dati”

@@ -56,11 +56,12 @@ function launchInteractiveDesktop({
   }
   return new Promise((resolve, reject) => {
     const child = launch(executable, interactiveLaunchArguments({ defaultApp, appRoot, activationTicket }), {
-      cwd: appRoot,
+      // ASAR is an Electron virtual filesystem, never a valid OS cwd.
+      cwd: defaultApp ? appRoot : path.dirname(executable),
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
-      env: { ...env, NEXUS_MANAGED_OLLAMA: env.NEXUS_MANAGED_OLLAMA || '0' }
+      env: { ...env, NEXUS_USER_DATA_ROOT: env.NEXUS_SHARED_DATA_ROOT || env.NEXUS_USER_DATA_ROOT || '', NEXUS_MANAGED_OLLAMA: env.NEXUS_MANAGED_OLLAMA || '0' }
     });
     child.once('error', reject);
     child.once('spawn', () => {
@@ -82,11 +83,11 @@ function launchSystemPresence({
   }
   return new Promise((resolve, reject) => {
     const child = launch(executable, presenceLaunchArguments({ defaultApp, appRoot }), {
-      cwd: appRoot,
+      cwd: defaultApp ? appRoot : path.dirname(executable),
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
-      env: { ...env, NEXUS_MANAGED_OLLAMA: '0' }
+      env: { ...env, NEXUS_USER_DATA_ROOT: env.NEXUS_SHARED_DATA_ROOT || env.NEXUS_USER_DATA_ROOT || '', NEXUS_MANAGED_OLLAMA: '0' }
     });
     child.once('error', reject);
     child.once('spawn', () => {

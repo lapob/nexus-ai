@@ -4,9 +4,10 @@
  */
 import type { EntityState } from '../types/nexus';
 
-// Shared inspection physics: fast response to the pointer, ~2.4 s to settle.
-// Only decorative deformation uses this; voice/state feedback stays immediate.
-export const VISUALIZER_POINTER_DAMPING = { engage: 7, release: 1.25 } as const;
+// Match the canonical web/Android core: slower decorative time, with a long
+// zero-gravity return. Pointer engagement and voice/state feedback stay prompt.
+export const VISUALIZER_MOTION = { ambientScale: .55, returnOmega: 1.1 } as const;
+export const VISUALIZER_POINTER_DAMPING = { engage: 7, release: .8 } as const;
 
 export interface AnimationProfile {
   mode: number;

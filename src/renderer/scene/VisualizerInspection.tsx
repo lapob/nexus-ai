@@ -4,6 +4,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { Group } from 'three';
+import { VISUALIZER_MOTION } from '../systems/AnimationController';
 
 // #region Gesture ownership and time-based physics
 export function VisualizerInspection({ children, reduced }: { children: ReactNode; reduced: boolean }) {
@@ -59,7 +60,7 @@ export function VisualizerInspection({ children, reduced }: { children: ReactNod
     if (!group.current) return;
     // Closed-form damping is stable even when Chromium throttles an inactive
     // window. Clamping to one 25-Hz frame made the return last many seconds.
-    const s = motion.current, dt = Math.min(1, Math.max(0, elapsed)), omega = s.dragging ? 9 : 1.7;
+    const s = motion.current, dt = Math.min(1, Math.max(0, elapsed)), omega = s.dragging ? 9 : VISUALIZER_MOTION.returnOmega;
     const decay = Math.exp(-omega * dt), ex = s.x - s.targetX, ey = s.y - s.targetY;
     const ax = s.vx + omega * ex, ay = s.vy + omega * ey;
     s.x = s.targetX + (ex + ax * dt) * decay; s.y = s.targetY + (ey + ay * dt) * decay;

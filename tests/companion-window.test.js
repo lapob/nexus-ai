@@ -63,6 +63,19 @@ test('la configurazione elimina i campi pet legacy e applica fallback sicuri', (
   assert.equal(normalizePresenceConfiguration({ appearance: 'unknown' }).appearance, 'saturn-experimental');
 });
 
+test('il menu Presence resta compatto fuori dal layer scalato senza pannello di sfondo', () => {
+  const document = systemPresenceDocument({ interactive: true, locale: 'it-IT' });
+  assert.match(document, /<\/main><section class="presence-menu" role="menu"/);
+  assert.match(document, /width:min\(164px,calc\(100vw - 12px\)\)/);
+  assert.match(document, /\.presence-menu\{[^}]*background:transparent;box-shadow:none/);
+  assert.match(document, /\.presence\[data-motion=reduced\]~\.presence-menu/);
+  assert.equal((document.match(/role="menuitem"/g) || []).length, 4);
+  assert.match(document, /event\.key==='Escape'[\s\S]*closeMenu\(\)/);
+  assert.match(document, /event\.key==='ArrowDown'/);
+  assert.match(document, /event\.key==='ArrowUp'/);
+  assert.match(document, /suppressCoreClickUntil=performance\.now\(\)\+350/);
+});
+
 test('le transizioni Presence preservano gli stati critici e assestano idle', () => {
   assert.equal(presenceTransitionDelay('thinking', 'permission'), 0);
   assert.equal(presenceTransitionDelay('idle', 'listening'), 0);

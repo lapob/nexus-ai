@@ -7,7 +7,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, MathUtils, Po
 import { useMemo, useRef, type RefObject } from 'react';
 import type { AudioBus, EntityState, VisualQuality } from '../types/nexus';
 import interactionStates from '../../../config/nexus-interaction-states.json';
-import { VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
+import { VISUALIZER_MOTION, VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
 
 // #region 01 — Profilo e generazione
 
@@ -128,8 +128,8 @@ export function NexusCore({ state, audioBus, reducedMotion, quality, performance
       || !ringMaterial.current || !coreMaterial.current || !scannerMaterial.current || !auraMaterial.current) return;
     const audio = audioBus.current;
     const active = !['idle', 'booting', 'offline'].includes(state);
-    const motion = reducedMotion ? 0.1 : 1;
-    const time = frame.clock.elapsedTime;
+    const motion = reducedMotion ? 0 : VISUALIZER_MOTION.ambientScale;
+    const time = reducedMotion ? 0 : frame.clock.elapsedTime * VISUALIZER_MOTION.ambientScale;
     emergence.current = MathUtils.damp(emergence.current, 1, reducedMotion ? 8 : 2.8, delta);
     pointerEnergy.current = MathUtils.damp(pointerEnergy.current, pointerPresence.current * 0.52, pointerPresence.current > 0 ? VISUALIZER_POINTER_DAMPING.engage : VISUALIZER_POINTER_DAMPING.release, delta);
     // Whisper possiede il microfono in esclusiva: durante l'ascolto un
@@ -151,7 +151,8 @@ export function NexusCore({ state, audioBus, reducedMotion, quality, performance
             : 1;
     rings.current.rotation.z += delta * ((active ? 0.28 : 0.07) * motion * stateSpeed + pointerEnergy.current * 0.12);
     core.current.rotation.z -= delta * (active ? 0.46 : 0.12) * motion * stateSpeed;
-    scanner.current.rotation.z = -time * (active ? 0.34 : 0.09) * motion * stateSpeed;
+    // Integrate phase so state changes alter speed without teleporting the scanner.
+    scanner.current.rotation.z -= delta * (active ? 0.34 : 0.09) * motion * stateSpeed;
     scanner.current.rotation.y = Math.sin(time * 0.9) * 0.16 * motion;
     const pulse = 1 + Math.sin(time * (active ? 3.2 : 1.1)) * (0.018 + energy * 0.035) * motion;
     group.current.scale.setScalar(pulse * (0.78 + emergence.current * 0.22));
