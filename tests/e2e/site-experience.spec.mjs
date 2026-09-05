@@ -50,6 +50,7 @@ test("real product captures keep Android system bars visible and use precise hov
   await showcase.scrollIntoViewIfNeeded();
   const androidScreen = showcase.locator(".product-mockup--real.android .product-screen");
   const androidImage = androidScreen.locator("img");
+  await expect.poll(() => androidImage.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
   const androidGeometry = await androidScreen.evaluate((screen) => {
     const image = screen.querySelector("img");
     const screenRect = screen.getBoundingClientRect();
