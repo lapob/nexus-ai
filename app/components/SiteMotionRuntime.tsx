@@ -17,6 +17,8 @@ type CosmicParticle = {
   speed: number;
   offsetX: number;
   offsetY: number;
+  velocityX: number;
+  velocityY: number;
 };
 
 const MOTION_TIER_CLASSES = ["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
@@ -39,7 +41,6 @@ const REVEAL_SELECTOR = [
   ".download-hero",
   ".status-hero",
   ".legal-hero",
-  ".pricing-hero",
   ".product-facts > div",
   ".feature-grid > article",
   ".control-grid > article",
@@ -48,9 +49,6 @@ const REVEAL_SELECTOR = [
   ".verify-guide",
   ".report-band",
   ".release-notes > article",
-  ".pricing-grid > article",
-  ".founder-program",
-  ".pricing-disclosure",
   ".uptime-panel",
   ".footer-links > div",
 ].join(",");
@@ -70,7 +68,6 @@ const IMMEDIATE_REVEAL_SELECTOR = [
   ".download-hero",
   ".status-hero",
   ".legal-hero",
-  ".pricing-hero",
 ].join(",");
 
 export function SiteMotionRuntime() {
@@ -87,22 +84,20 @@ export function SiteMotionRuntime() {
     let cosmicLastFrame = 0;
     let cosmicWidth = 1;
     let cosmicHeight = 1;
-    const pointer = { x: 0, y: 0, active: 0 };
-    const draggableCore = document.querySelector<HTMLElement>(".home-neural-core");
-    const coreDrag = { active: false, pointerId: -1, startX: 0, startY: 0, x: 0, y: 0 };
-    let coreDragAnimation: Animation | null = null;
+    const pointer = { x: 0, y: 0, vx: 0, vy: 0, time: 0, active: 0 };
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
     const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
     const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section"));
     let sectionAnchors: number[] = [];
     let readingZones: { left: number; right: number; top: number; bottom: number }[] = [];
     let sceneProgress = 0;
+    let paintMs = 0;
 
     const cosmicCanvas = document.createElement("canvas");
     cosmicCanvas.className = "nxs-cosmic-field";
     cosmicCanvas.setAttribute("aria-hidden", "true");
     const cosmicContext = cosmicCanvas.getContext("2d", { alpha: true });
-    const particleCount = tier === "ultra" ? 108 : tier === "balanced" ? 72 : 28;
+    const particleCount = tier === "ultra" ? 600 : tier === "balanced" ? 360 : 120;
     let seed = 0x4e5853;
     const random = () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -116,6 +111,8 @@ export function SiteMotionRuntime() {
       speed: .22 + random() * .42,
       offsetX: 0,
       offsetY: 0,
+      velocityX: 0,
+      velocityY: 0,
     }));
 
     const resizeCosmicField = () => {
@@ -127,7 +124,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.height = Math.round(cosmicHeight * ratio);
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
-      readingZones = Array.from(document.querySelectorAll<HTMLElement>("main h1,main h2,main p,main li,main .app-grid,main .nexus-stage,main .presence-grid,main .security-panel")).map(element => {
+      readingZones = Array.from(document.querySelectorAll<HTMLElement>("main h1,main h2,main p,main li,main .app-grid,main .nexus-stage,main .presence-grid,main .security-panel,main .interactive-visualizer")).map(element => {
         const rect = element.getBoundingClientRect();
         return { left: rect.left - 24, right: rect.right + 24, top: rect.top + window.scrollY - 20, bottom: rect.bottom + window.scrollY + 20 };
       });
@@ -135,15 +132,12 @@ export function SiteMotionRuntime() {
 
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
+      const paintStart = performance.now();
       const reduced = reducedMotion.matches;
-      const frameInterval = tier === "lite" ? 33 : 0;
-      if (!reduced && now - cosmicLastFrame < frameInterval) {
-        cosmicFrame = requestAnimationFrame(drawCosmicField);
-        return;
-      }
       const delta = Math.min(.064, Math.max(.001, (now - cosmicLastFrame) / 1000));
       cosmicLastFrame = now;
       const time = reduced ? 0 : now / 1000;
+      if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
       const viewportAnchor = window.scrollY + cosmicHeight * .3;
       let currentSection = Math.max(0, sectionAnchors.findLastIndex(top => top <= viewportAnchor));
@@ -156,7 +150,10 @@ export function SiteMotionRuntime() {
       const sectionIndex = Math.floor(sectionPosition);
       const sectionMixRaw = sectionPosition - sectionIndex;
       const sectionMix = sectionMixRaw * sectionMixRaw * (3 - 2 * sectionMixRaw);
-      const laneFor = (index: number) => sections[index]?.dataset.cosmicScene === "center" ? .5 : index % 2 === 0 ? .87 : .13;
+      const laneFor = (index: number) => {
+        const scene = sections[index]?.dataset.cosmicScene;
+        return scene === "center" ? .5 : scene === "left" ? .13 : scene === "right" ? .87 : index % 2 === 0 ? .87 : .13;
+      };
       const visualLane = cosmicWidth < 760
         ? (sectionIndex % 2 ? .04 : .96)
         : laneFor(sectionIndex) + (laneFor(sectionIndex + 1) - laneFor(sectionIndex)) * sectionMix;
@@ -205,18 +202,30 @@ export function SiteMotionRuntime() {
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
         const transitionScatter = Math.sin(sectionMix * Math.PI) * .24;
-        const compose = (.64 + particle.depth * .24) * (1 - transitionScatter);
+        const compose = (.82 + particle.depth * .16) * (1 - transitionScatter);
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (4 + particle.depth * 9);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (3 + particle.depth * 7);
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
         const influence = (reduced ? 0 : pointer.active) * Math.max(0, 1 - distance / 190);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
-        const returnEase = 1 - Math.exp(-(influence > 0 ? 7 : 1.25) * delta);
-        particle.offsetX += (Math.cos(angle) * influence * 46 - particle.offsetX) * returnEase;
-        particle.offsetY += (Math.sin(angle) * influence * 46 - particle.offsetY) * returnEase;
+        const goalX = (Math.cos(angle) * 46 + pointer.vx * .1) * influence;
+        const goalY = (Math.sin(angle) * 46 + pointer.vy * .1) * influence;
+        const omega = influence > .01 ? 4.5 : 1.7, decay = Math.exp(-omega * delta);
+        const ex = particle.offsetX - goalX, ey = particle.offsetY - goalY;
+        const ax = particle.velocityX + omega * ex, ay = particle.velocityY + omega * ey;
+        particle.offsetX = goalX + (ex + ax * delta) * decay;
+        particle.offsetY = goalY + (ey + ay * delta) * decay;
+        particle.velocityX = (particle.velocityX - omega * ax * delta) * decay;
+        particle.velocityY = (particle.velocityY - omega * ay * delta) * decay;
         const px = x + particle.offsetX, py = y + particle.offsetY;
-        const behindText = readingZones.some(rect => px > rect.left && px < rect.right && py + window.scrollY > rect.top && py + window.scrollY < rect.bottom);
-        return { x: px, y: py, depth: particle.depth, visibility: behindText ? .035 : 1 };
+        let visibility = 1;
+        for (const rect of readingZones) {
+          const dx = Math.max(rect.left - px, 0, px - rect.right);
+          const dy = Math.max(rect.top - py - window.scrollY, 0, py + window.scrollY - rect.bottom);
+          const edge = Math.min(1, Math.hypot(dx, dy) / 44);
+          visibility = Math.min(visibility, .05 + .95 * edge * edge * (3 - 2 * edge));
+        }
+        return { x: px, y: py, depth: particle.depth, visibility };
       });
       cosmicContext.lineWidth = .55;
       for (let index = 0; index < points.length; index += 3) {
@@ -237,11 +246,15 @@ export function SiteMotionRuntime() {
       }
       for (const point of points) {
         cosmicContext.beginPath();
-        cosmicContext.fillStyle = `rgba(${point.depth > .9 ? '239,213,154' : '101,238,239'}, ${(.16 + point.depth * .4) * point.visibility})`;
+        cosmicContext.fillStyle = `rgba(${point.depth > .93 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.2 + point.depth * .45) * point.visibility})`;
         cosmicContext.arc(point.x, point.y, .45 + point.depth * 1.15, 0, Math.PI * 2);
         cosmicContext.fill();
       }
       cosmicContext.globalCompositeOperation = "source-over";
+      paintMs += (performance.now() - paintStart - paintMs) * .1;
+      cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
+      cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
+      cosmicCanvas.dataset.particles = String(particleCount);
       if (!reduced && !document.hidden) cosmicFrame = requestAnimationFrame(drawCosmicField);
     };
 
@@ -252,6 +265,10 @@ export function SiteMotionRuntime() {
     document.body.prepend(cosmicCanvas);
     resizeCosmicField();
     drawCosmicField(performance.now());
+    // Images and fonts can change the reading lanes without resizing the window.
+    const layoutObserver = new ResizeObserver(resizeCosmicField);
+    const content = document.getElementById("site-content");
+    if (content) layoutObserver.observe(content);
 
     const syncVisibility = () => {
       root.toggleAttribute("data-motion-paused", document.hidden);
@@ -320,64 +337,25 @@ export function SiteMotionRuntime() {
     };
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType === "touch" || tier === "lite") return;
+      const now = performance.now(), seconds = Math.max(.008, (now - pointer.time) / 1000);
+      pointer.vx = pointer.active ? Math.max(-650, Math.min(650, (event.clientX - pointer.x) / seconds)) : 0;
+      pointer.vy = pointer.active ? Math.max(-650, Math.min(650, (event.clientY - pointer.y) / seconds)) : 0;
+      pointer.time = now;
       pointer.x = event.clientX;
       pointer.y = event.clientY;
       pointer.active = 1;
     };
     const onPointerLeave = () => { pointer.active = 0; };
-    const paintCoreDrag = () => {
-      if (!draggableCore) return;
-      coreDragAnimation?.cancel();
-      coreDragAnimation = draggableCore.animate(
-        [{ translate: `${coreDrag.x}px ${coreDrag.y}px` }],
-        { duration: 1, fill: "forwards" },
-      );
-    };
-    const onCorePointerDown = (event: PointerEvent) => {
-      if (!draggableCore || reducedMotion.matches) return;
-      coreDrag.active = true;
-      coreDrag.pointerId = event.pointerId;
-      coreDrag.startX = event.clientX - coreDrag.x;
-      coreDrag.startY = event.clientY - coreDrag.y;
-      draggableCore.dataset.dragging = "true";
-      draggableCore.setPointerCapture(event.pointerId);
-    };
-    const onCorePointerMove = (event: PointerEvent) => {
-      if (!draggableCore || !coreDrag.active || event.pointerId !== coreDrag.pointerId) return;
-      coreDrag.x = Math.max(-window.innerWidth * .22, Math.min(window.innerWidth * .22, event.clientX - coreDrag.startX));
-      coreDrag.y = Math.max(-window.innerHeight * .24, Math.min(window.innerHeight * .24, event.clientY - coreDrag.startY));
-      paintCoreDrag();
-    };
-    const onCorePointerUp = (event: PointerEvent) => {
-      if (!draggableCore || event.pointerId !== coreDrag.pointerId) return;
-      coreDrag.active = false;
-      coreDrag.pointerId = -1;
-      delete draggableCore.dataset.dragging;
-      if (draggableCore.hasPointerCapture(event.pointerId)) draggableCore.releasePointerCapture(event.pointerId);
-      coreDragAnimation?.cancel();
-      coreDragAnimation = draggableCore.animate(
-        [{ translate: `${coreDrag.x}px ${coreDrag.y}px` }, { translate: "0px 0px" }],
-        { duration: 2400, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" },
-      );
-      coreDrag.x = 0;
-      coreDrag.y = 0;
-    };
-    const onCoreDoubleClick = () => { coreDrag.x = 0; coreDrag.y = 0; paintCoreDrag(); };
-
     updateScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
     window.addEventListener("resize", resizeCosmicField, { passive: true });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     document.documentElement.addEventListener("pointerleave", onPointerLeave);
-    draggableCore?.addEventListener("pointerdown", onCorePointerDown);
-    draggableCore?.addEventListener("pointermove", onCorePointerMove);
-    draggableCore?.addEventListener("pointerup", onCorePointerUp);
-    draggableCore?.addEventListener("pointercancel", onCorePointerUp);
-    draggableCore?.addEventListener("dblclick", onCoreDoubleClick);
 
     return () => {
       revealObserver?.disconnect();
+      layoutObserver.disconnect();
       ambientObserver?.disconnect();
       cancelAnimationFrame(scrollFrame);
       cancelAnimationFrame(revealFrame);
@@ -387,12 +365,6 @@ export function SiteMotionRuntime() {
       window.removeEventListener("resize", resizeCosmicField);
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
-      draggableCore?.removeEventListener("pointerdown", onCorePointerDown);
-      draggableCore?.removeEventListener("pointermove", onCorePointerMove);
-      draggableCore?.removeEventListener("pointerup", onCorePointerUp);
-      draggableCore?.removeEventListener("pointercancel", onCorePointerUp);
-      draggableCore?.removeEventListener("dblclick", onCoreDoubleClick);
-      coreDragAnimation?.cancel();
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
       document.removeEventListener("visibilitychange", syncVisibility);

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const publicRoutes = ["/", "/desktop", "/android", "/pricing", "/downloads", "/security", "/status", "/privacy", "/terms"];
+const publicRoutes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
 const responsiveRoutes = [...publicRoutes, "/maintenance", "/percorso-che-non-esiste"];
 
 test("all public and operational pages render without horizontal overflow or oversized headings", async ({ page }) => {
@@ -91,6 +91,7 @@ test("real product captures keep Android system bars visible and use precise hov
 });
 
 test("core routes pass automated WCAG A/AA checks", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   for (const route of publicRoutes) {
     await page.goto(route, { waitUntil: "load" });
     const results = await new AxeBuilder({ page })
@@ -105,7 +106,7 @@ test("the mobile navigation is icon-only, fullscreen and keyboard safe at every 
     { width: 320, height: 640 },
     { width: 390, height: 844 },
     { width: 768, height: 1024 },
-    { width: 1024, height: 768 },
+    { width: 900, height: 768 },
   ]) {
     const context = await browser.newContext({ viewport, colorScheme: "dark" });
     const page = await context.newPage();
@@ -163,73 +164,28 @@ test("the mobile navigation is icon-only, fullscreen and keyboard safe at every 
   }
 });
 
-test("desktop has no persistent header or navigation rail", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/desktop", { waitUntil: "load" });
-  const navigation = page.getByRole("navigation", { name: "Navigazione principale" });
-  const content = page.locator("#site-content");
-
-  await expect(navigation).toBeHidden();
-  await expect(page.locator(".nxs-header, .nxs-top-nav")).toHaveCount(0);
-  await expect(page.locator(".nxs-floating-brand")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
-  expect(Number.parseFloat(await content.evaluate((element) => getComputedStyle(element).paddingLeft))).toBeCloseTo(0, 0);
-
-  const layout = await page.evaluate(() => ({
-    clientWidth: document.documentElement.clientWidth,
-    scrollWidth: document.documentElement.scrollWidth,
-  }));
-  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
-});
-
-test("floating controls stay stable at effective 100, 125, 150 and 200 percent desktop scales", async ({ browser }) => {
-  for (const viewport of [
-    { width: 1920, height: 1080 },
-    { width: 1536, height: 864 },
-    { width: 1280, height: 720 },
-    { width: 960, height: 540 },
-  ]) {
-    const context = await browser.newContext({ viewport, colorScheme: "dark" });
+test("desktop navigation stays stable while scrolling and adapts to zoom", async ({ browser }) => {
+  for (const width of [1920, 1536, 1280, 960]) {
+    const context = await browser.newContext({viewport:{width,height:900}, colorScheme:"dark"});
     const page = await context.newPage();
-    await page.goto("/", { waitUntil: "load" });
-
-    const before = await page.evaluate(() => {
-      const brand = document.querySelector(".nxs-floating-brand")?.getBoundingClientRect();
-      const control = document.querySelector(".nxs-menu-toggle")?.getBoundingClientRect();
-      return {
-        brand: brand && { top: brand.top, left: brand.left, width: brand.width, height: brand.height },
-        control: control && { top: control.top, right: control.right, width: control.width, height: control.height },
-        brandPosition: getComputedStyle(document.querySelector(".nxs-floating-brand")).position,
-        controlPosition: getComputedStyle(document.querySelector(".nxs-menu-toggle")).position,
-        clientWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-      };
-    });
-
-    expect(before.brandPosition).toBe("fixed");
-    expect(before.controlPosition).toBe("fixed");
-    expect(before.brand?.width).toBeGreaterThanOrEqual(44);
-    expect(before.brand?.height).toBeGreaterThanOrEqual(44);
-    expect(before.control?.width).toBeGreaterThanOrEqual(44);
-    expect(before.control?.height).toBeGreaterThanOrEqual(44);
-    expect(before.brand?.left).toBeGreaterThanOrEqual(12);
-    expect(before.control?.right).toBeLessThanOrEqual(viewport.width - 12);
-    expect(before.scrollWidth).toBeLessThanOrEqual(before.clientWidth + 1);
-    await expect(page.getByRole("button", { name: "Apri navigazione" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Navigazione principale" })).toBeHidden();
-
+    await page.goto("/desktop");
+    const header = page.locator(".nxs-desktop-header");
+    await expect(header).toBeVisible();
+    await expect(page.locator(".nxs-menu-toggle")).toBeHidden();
+    await expect(page.locator("#main-navigation")).toBeHidden();
+    const box = await header.boundingBox();
+    expect(box.x).toBe(0);
+    expect(box.width).toBeLessThanOrEqual(width);
+    await expect(header.getByRole("link", {name:"PC",exact:true})).toHaveAttribute("aria-current","page");
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
-    await page.waitForTimeout(80);
-    const after = await page.evaluate(() => {
-      const brand = document.querySelector(".nxs-floating-brand")?.getBoundingClientRect();
-      const control = document.querySelector(".nxs-menu-toggle")?.getBoundingClientRect();
-      return {
-        brand: brand && { top: brand.top, left: brand.left, width: brand.width, height: brand.height },
-        control: control && { top: control.top, right: control.right, width: control.width, height: control.height },
-      };
-    });
-    expect(after.brand).toEqual(before.brand);
-    expect(after.control).toEqual(before.control);
+    expect(await header.boundingBox()).toEqual(box);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    await page.setViewportSize({width:390,height:844});
+    await expect(header).toBeHidden();
+    await page.locator(".nxs-menu-toggle").click();
+    await expect(page.locator("#site-content")).toHaveAttribute("inert","");
+    await page.setViewportSize({width:1280,height:900});
+    await expect(page.locator("#site-content")).not.toHaveAttribute("inert","");
     await context.close();
   }
 });
@@ -268,7 +224,7 @@ test("every mobile navigation destination opens and marks the current page", asy
 });
 
 test("the fullscreen overlay remains coherent across breakpoints and honors reduced motion", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: "reduce", colorScheme: "dark" });
+  const context = await browser.newContext({ viewport: { width: 900, height: 768 }, reducedMotion: "reduce", colorScheme: "dark" });
   const page = await context.newPage();
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Apri navigazione" }).click();
@@ -284,9 +240,9 @@ test("the fullscreen overlay remains coherent across breakpoints and honors redu
   expect(Math.max(0, ...ambientMotionSeconds)).toBeLessThanOrEqual(.02);
 
   await page.setViewportSize({ width: 1025, height: 768 });
-  await expect(page.locator("#main-navigation")).toHaveClass(/is-open/);
-  await expect(page.locator(".nxs-menu-toggle")).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("#main-navigation")).toBeVisible();
+  await expect(page.locator("#main-navigation")).not.toHaveClass(/is-open/);
+  await expect(page.locator(".nxs-menu-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator(".nxs-desktop-header")).toBeVisible();
   await context.close();
 });
 
@@ -368,21 +324,41 @@ test("ambient motion only runs while its surface is near the viewport", async ({
 
   const hero = page.locator(".hero");
   await expect(hero).toHaveClass(/nxs-ambient-active/);
-  const initialHeroTransform = await hero.evaluate((element) => getComputedStyle(element.querySelector(".aurora"), "::before").transform);
+  const core = hero.locator(".home-neural-core canvas");
+  await expect(core).toHaveAttribute("data-astral-state", "idle");
+  const initialHeroTransform = await core.evaluate((canvas) => canvas.toDataURL());
   await page.waitForTimeout(260);
-  const movingHeroTransform = await hero.evaluate((element) => getComputedStyle(element.querySelector(".aurora"), "::before").transform);
+  const movingHeroTransform = await core.evaluate((canvas) => canvas.toDataURL());
   expect(movingHeroTransform).not.toBe(initialHeroTransform);
 
   const surface = page.locator(".presence-system");
-  const indicator = surface.locator(".presence-grid article > i").first();
+
   await expect(surface).not.toHaveClass(/nxs-ambient-active/);
-  await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).animationPlayState)).toBe("paused");
 
   await surface.scrollIntoViewIfNeeded();
   await expect(hero).not.toHaveClass(/nxs-ambient-active/);
+  await page.waitForTimeout(150);
+  const pausedCore = await core.evaluate((canvas) => canvas.toDataURL());
+  await page.waitForTimeout(150);
+  expect(await core.evaluate((canvas) => canvas.toDataURL())).toBe(pausedCore);
   await expect(surface).toHaveClass(/nxs-ambient-active/);
-  await expect.poll(() => indicator.evaluate((element) => getComputedStyle(element).animationPlayState)).toBe("running");
   await context.close();
+});
+
+test("astral hero reserves separate space for text at mobile, tablet and desktop sizes", async ({ page }) => {
+  for (const width of [320, 390, 768, 900, 1280, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/", { waitUntil: "load" });
+    await expect(page.locator(".hero-product-name")).toBeVisible();
+    await page.waitForTimeout(800);
+    const intro = await page.locator(".hero-intro").boundingBox();
+    const core = await page.locator(".home-neural-core").boundingBox();
+    if (width <= 800) expect(core.y + core.height).toBeLessThanOrEqual(intro.y + 1);
+    else expect(core.y + core.height).toBeLessThanOrEqual(intro.y + 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    await page.locator(".footer-astral-mark").scrollIntoViewIfNeeded();
+    expect((await page.locator(".footer-astral-mark canvas").boundingBox()).width).toBeGreaterThan(200);
+  }
 });
 
 test("the homepage routes to the single live AI and local performance metrics never transmit", async ({ page }) => {
@@ -468,4 +444,44 @@ test("mobile status and security surfaces stay bounded around the floating contr
     expect(sealMotion).toContain("nxs-trust-breathe");
     await context.close();
   }
+});
+
+test("the product title enters once and plans no longer appear", async ({page}) => {
+  await page.setViewportSize({width:1440,height:1000});
+  await page.emulateMedia({reducedMotion:"no-preference"});
+  await page.goto("/");
+  const letters=page.locator(".hero-letter");
+  await expect(letters).toHaveCount(8);
+  await page.waitForTimeout(2400);
+  expect(await letters.evaluateAll(nodes => nodes.every(n => getComputedStyle(n).opacity === "1"))).toBe(true);
+  await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
+  await page.goto("/pricing");
+  await expect(page).toHaveURL(/\/downloads$/);
+});
+
+test("a single background stays continuous on the internal pages", async ({page}) => {
+  for (const route of ["/status", "/desktop", "/android", "/downloads", "/security"]) {
+    await page.goto(route);
+    await expect(page.locator('.nxs-cosmic-field')).toHaveCount(1);
+    const backgrounds = await page.locator('main.inner-page > section').evaluateAll(nodes => nodes.map(n => getComputedStyle(n).backgroundColor));
+    expect(backgrounds.every(color => color === 'rgba(0, 0, 0, 0)'), route).toBe(true);
+    await page.mouse.wheel(0, 650);
+    await expect(page.locator('.nxs-cosmic-field')).toBeVisible();
+  }
+});
+
+test("the shared core rotates on drag and returns without shifting the interface", async ({page}) => {
+  await page.goto('/');
+  const core = page.locator('.astral-hero canvas');
+  await expect(core).toHaveAttribute('data-astral-particles', /\d+/);
+  const before = await core.boundingBox();
+  await page.mouse.move(before.x + before.width * .4, before.y + before.height * .5);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width * .65, before.y + before.height * .57, {steps:24});
+  await page.waitForTimeout(600);
+  expect(Math.abs(Number((await core.getAttribute('data-astral-rotation')).split(',')[1]))).toBeGreaterThan(.3);
+  await page.mouse.up();
+  await page.waitForTimeout(7000);
+  expect((await core.getAttribute('data-astral-rotation')).split(',').every(v=>Math.abs(Number(v))<.003)).toBe(true);
+  expect(await core.boundingBox()).toEqual(before);
 });

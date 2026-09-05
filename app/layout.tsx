@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 import "./navigation.css";
 import "./experience.css";
+import "./narrative.css";
 import { CspNonceProvider } from "./components/CspNonceContext";
 import { ConnectivityPresence } from "./components/ConnectivityPresence";
 import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowUpRight, BrainCircuit, CircleDollarSign, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowUpRight, BrainCircuit, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
 import Image from "next/image";
 import { InteractiveVisualizer } from "./InteractiveVisualizer";
 import { usePathname } from "next/navigation";
@@ -26,6 +26,13 @@ export function SiteHeader() {
       .catch(() => active && setOnline(false));
 
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 960px)");
+    const closeOnDesktop = () => { if (desktop.matches) { setOpen(false); setNavigating(false); } };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
   }, []);
 
   useEffect(() => {
@@ -109,7 +116,6 @@ export function SiteHeader() {
     "https://ai.nexusnxs.com": BrainCircuit,
     "/desktop": Monitor,
     "/android": Smartphone,
-    "/pricing": CircleDollarSign,
     "/security": ShieldCheck,
     "/status": Activity,
     "/downloads": ArrowDownToLine,
@@ -117,6 +123,14 @@ export function SiteHeader() {
   const networkLabel = online === null ? "VERIFICA RETE" : online ? "NEXUSNXS · ONLINE" : "STATO RETE";
 
   return <>
+    <header className="nxs-desktop-header">
+      <HardNavigationLink className="nxs-desktop-brand" href="/" aria-label="NexusNXS, homepage">
+        <Image src="/nexus-icon.png" alt="" width={28} height={28} priority unoptimized />NexusNXS
+      </HardNavigationLink>
+      <nav aria-label="Navigazione desktop">
+        {navigationItems.filter(({href}) => href !== "/").map(({href, label}) => <HardNavigationLink href={href} key={href} aria-current={pathname === href ? "page" : undefined}>{label}</HardNavigationLink>)}
+      </nav>
+    </header>
     <HardNavigationLink className="nxs-floating-brand" data-awake={open || chromeAwake} href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
       <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
     </HardNavigationLink>
@@ -172,7 +186,7 @@ export function SiteFooter({ ctaHref = "https://ai.nexusnxs.com", ctaLabel = "Ap
   return <footer className="premium-footer">
     <div className="footer-astral-mark" role="img" aria-label="NexusNXS, intelligenza connessa"><InteractiveVisualizer variant="sigil" /></div>
     <div className="footer-callout"><h2>Un solo NexusNXS.<br /><em>Ovunque tu sia.</em></h2><HardNavigationLink className="primary-button" href={ctaHref}>{ctaLabel} <ArrowUpRight size={15} /></HardNavigationLink></div>
-    <div className="footer-links"><div><strong>Prodotti</strong><HardNavigationLink href="https://ai.nexusnxs.com">NexusNXS AI</HardNavigationLink><HardNavigationLink href="/desktop">NexusNXS per PC</HardNavigationLink><HardNavigationLink href="/android">NexusNXS per Android</HardNavigationLink><HardNavigationLink href="/downloads">Download verificati</HardNavigationLink></div><div><strong>Fiducia</strong><HardNavigationLink href="/security">Trust Center</HardNavigationLink><HardNavigationLink href="/status">Stato servizi</HardNavigationLink><a href="mailto:security@nexusnxs.com">Segnala una vulnerabilità</a></div><div><strong>Informazioni</strong><HardNavigationLink href="/pricing">Piani e Founder Beta</HardNavigationLink><HardNavigationLink href="/privacy">Privacy</HardNavigationLink><HardNavigationLink href="/terms">Termini d’uso</HardNavigationLink><a href="mailto:hello@nexusnxs.com">Contatti</a></div></div>
+    <div className="footer-links"><div><strong>Prodotti</strong><HardNavigationLink href="https://ai.nexusnxs.com">NexusNXS AI</HardNavigationLink><HardNavigationLink href="/desktop">NexusNXS per PC</HardNavigationLink><HardNavigationLink href="/android">NexusNXS per Android</HardNavigationLink><HardNavigationLink href="/downloads">Download verificati</HardNavigationLink></div><div><strong>Fiducia</strong><HardNavigationLink href="/security">Trust Center</HardNavigationLink><HardNavigationLink href="/status">Stato servizi</HardNavigationLink><a href="mailto:security@nexusnxs.com">Segnala una vulnerabilità</a></div><div><strong>Informazioni</strong><HardNavigationLink href="/privacy">Privacy</HardNavigationLink><HardNavigationLink href="/terms">Termini d’uso</HardNavigationLink><a href="mailto:hello@nexusnxs.com">Contatti</a></div></div>
     <div className="footer-bottom"><span>© 2026 NEXUSNXS</span><span>PRIVACY-FIRST · MADE IN ITALY</span></div>
   </footer>;
 }

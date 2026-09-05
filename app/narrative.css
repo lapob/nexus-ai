@@ -1,0 +1,109 @@
+/* One page-wide field. Semantic sections remain for navigation/accessibility,
+   but never introduce a new background, frame or independent motion loop. */
+body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%) fixed; }
+.home-continuum, .inner-page { background: transparent; }
+.inner-page > section { background: transparent; border-color: transparent; box-shadow: none; }
+.client-performance dl { background: transparent; }
+.client-performance dl > div { background: rgba(9, 20, 24, .3); }
+.nxs-cosmic-field { opacity: .74; }
+.service-list span, .service-list small, .service-list b, .service-list .neutral { font-size: 12px; line-height: 1.5; }
+.narrative-page, .product-narrative { position: relative; isolation: isolate; }
+.narrative-page > section, .product-narrative > section,
+.download-visualizers, .premium-footer {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.narrative-page h2, .product-narrative h2 { font-size: clamp(34px, 4.5vw, 64px); line-height: 1.08; letter-spacing: -.05em; font-weight: 500; }
+.narrative-page p, .product-narrative p { text-wrap: pretty; }
+.narrative-page .section-label, .narrative-page .platform { color: #92b0b4; font-size: 12px; letter-spacing: .13em; }
+.narrative-page h2 em { color: #94e5e7; }
+
+/* The wordmarks flank the core without sharing its hit area. Narrow screens
+   reflow the title below it, never shrink the core into an unreadable strip. */
+.home-continuum .astral-hero {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  padding: 76px var(--page-pad) 44px;
+  gap: 0;
+  text-align: center;
+  overflow: clip;
+}
+.astral-hero__scene { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 720px) minmax(0, 1fr); align-items: center; flex: 1; width: 100%; }
+.astral-hero .hero-product-name {
+  display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; grid-row: 1;
+  width: 100%; max-width: none; margin: 0; z-index: 2;
+  font-size: clamp(36px, 4.9vw, 72px); line-height: 1.15; font-weight: 500; letter-spacing: -.07em;
+  pointer-events: none;
+}
+.home-continuum .astral-hero h1.hero-product-name { width: 100% !important; max-width: none !important; margin-inline: 0 !important; }
+.hero-word { display: inline-flex; justify-content: flex-start; white-space: nowrap; }
+.hero-word:last-child { grid-column: 3; justify-content: flex-end; }
+.hero-letter { display: inline-block; animation: nxs-letter-arrive 1.6s cubic-bezier(.22, 1, .36, 1) both; }
+.hero-letter:nth-child(2) { animation-delay: .1s; }
+.hero-letter:nth-child(3) { animation-delay: .2s; }
+.hero-letter:nth-child(4) { animation-delay: .3s; }
+.hero-letter:nth-child(5) { animation-delay: .4s; }
+.hero-word:last-child .hero-letter { animation-delay: .45s; }
+.hero-word:last-child .hero-letter:nth-child(2) { animation-delay: .55s; }
+.hero-word:last-child .hero-letter:nth-child(3) { animation-delay: .65s; }
+@keyframes nxs-letter-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(720px, 74svh); aspect-ratio: 1; margin: auto; filter: none; cursor: default; touch-action: pan-y; }
+.astral-hero .home-neural-core .interactive-visualizer { width: 100%; height: 100%; min-height: 0; }
+.astral-hero .home-neural-core .interactive-visualizer { background: none; border-radius: 0; }
+.astral-hero .home-neural-core .interactive-visualizer::before { display: none; }
+.astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; }
+.astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
+.home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
+.astral-hero .hero-actions a { font-size: 14px; }
+
+.narrative-copy { position: relative; max-width: 660px; margin: 0 auto 0 max(var(--page-pad), calc((100vw - 1160px) / 2)); padding: clamp(96px, 13vw, 200px) 0; }
+.narrative-copy--right { margin-left: auto; margin-right: max(var(--page-pad), calc((100vw - 1160px) / 2)); }
+.narrative-copy h2 { margin: 24px 0 32px; }
+.narrative-copy > p:not(.section-label), .narrative-app-copy > p:not(.platform) { max-width: 51ch; font-size: clamp(17px, 1.5vw, 21px); line-height: 1.7; color: #a4bbbe; margin-bottom: 24px; }
+.narrative-copy .text-link, .narrative-app-copy .text-link { display: inline-flex; align-items: center; gap: 14px; min-height: 44px; font-size: 14px; color: #b9eff0; }
+.narrative-apps { padding: 0 var(--page-pad); }
+.narrative-apps .app-grid { display: flex; flex-direction: column; max-width: 1280px; margin: auto; gap: clamp(100px, 13vw, 220px); }
+.narrative-apps .app-card { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: center; gap: clamp(36px, 6vw, 100px); padding: 0; background: none; border: 0; border-radius: 0; backdrop-filter: none; box-shadow: none; overflow: visible; }
+.narrative-apps .app-card:nth-child(2) .narrative-app-copy { order: 2; }
+.narrative-app-copy h2 { margin: 24px 0; }
+.narrative-apps .app-card::before, .narrative-apps .app-card::after { display: none; }
+.narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
+.narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: clamp(300px, 40vw, 540px); overflow: visible; }
+.narrative-apps .app-card-visual.android .app-card-visual__screen { width: min(50%, 220px); }
+.narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; }
+.narrative-page .presence-system { margin-block: clamp(120px, 18vw, 250px) clamp(64px, 8vw, 120px); }
+.narrative-page .presence-grid article { background: none; border: 0; border-radius: 0; backdrop-filter: none; padding-inline: 0; }
+.narrative-page .presence-grid article small { color: #92b0b4; font-size: 14px; line-height: 1.5; }
+.narrative-page .presence-grid article > i { display: none; }
+.narrative-forms { padding-block: 32px 80px; }
+.narrative-page .one-nexus { padding-block: clamp(100px, 14vw, 200px); }
+.interactive-visualizer::before { display: none; }
+.product-narrative .product-facts, .product-narrative .feature-grid { border: 0; background: none; }
+.product-narrative .product-facts > div, .product-narrative .feature-grid > article { border: 0; background: none; box-shadow: none; }
+.product-narrative .architecture-band { border: 0; border-radius: 0; background: none; }
+.premium-footer .footer-bottom { border-top-color: transparent; }
+
+@media (max-width: 1100px) and (min-width: 801px) {
+  .astral-hero__scene { grid-template-columns: minmax(0, 1fr) minmax(0, 58vw) minmax(0, 1fr); }
+}
+@media (max-width: 800px) {
+  .home-continuum .astral-hero { padding: 76px var(--page-pad) 36px; min-height: 100svh; }
+  .astral-hero__scene { grid-template-columns: minmax(0, 1fr); flex: 0; }
+  .astral-hero .home-neural-core { grid-column: 1; grid-row: 1; width: min(100%, 520px, 58svh); order: initial; }
+  .astral-hero .hero-product-name { grid-column: 1; grid-row: 2; display: flex; justify-content: center; gap: .2em; font-size: clamp(40px, 9vw, 64px); margin-top: 8px; }
+  .astral-hero .hero-intro { padding-top: 20px; }
+  .home-continuum .astral-hero .hero-actions { margin-top: 22px !important; gap: 12px 24px; }
+  .narrative-copy, .narrative-copy--right { max-width: 620px; margin-inline: auto; padding: 96px var(--page-pad); }
+  .narrative-apps .app-card { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .narrative-apps .app-card:nth-child(2) .narrative-app-copy { order: initial; }
+  .narrative-apps .app-card-visual { height: clamp(240px, 70vw, 440px); }
+  .narrative-apps .app-card-visual.android { height: 440px; }
+  .narrative-apps .app-card-visual.android .app-card-visual__screen { width: 210px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-letter { animation: none; opacity: 1; transform: none; }
+}

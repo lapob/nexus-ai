@@ -24,13 +24,13 @@ test("server-renders the NexusNXS public homepage", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="it">/i);
   assert.match(html, /NEXUSNXS/);
-  assert.match(html, /Chiedilo a Nexus/);
-  assert.match(html, /AI PRIVATA, PROTETTA, CONNESSA/);
-  assert.match(html, /STATI COMPRENSIBILI/);
-  assert.match(html, /Trust Center/);
+  assert.match(html, /hero-product-name/);
+  assert.match(html, /Un pensiero\. La voce\. Le possibilità\./);
+  assert.match(html, /UN DIALOGO CONTINUO/);
+  assert.match(html, /IL CONTROLLO RESTA TUO/);
   assert.match(html, /NexusNXS per PC/);
   assert.match(html, /NexusNXS per Android/);
-  assert.match(html, /FOUNDER BETA/);
+  assert.match(html, /NexusNXS è in Preview/);
   assert.match(html, /application\/ld\+json/);
   assert.doesNotMatch(html, /codex-preview|starter loading skeleton|Your site is taking shape/i);
 });
@@ -97,7 +97,7 @@ test("keeps public product claims aligned with the current client architecture",
     readFile(new URL("../app/privacy/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/security/page.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(home, /AI PRIVATA, PROTETTA, CONNESSA/);
+  assert.match(home, /Autorizzazioni esplicite, sessioni revocabili/);
   assert.doesNotMatch(`${home}\n${desktop}`, /modelli eseguiti sulla tua macchina|AI locale completo/i);
   assert.match(downloads, /4 GB di spazio libero consigliati/);
   assert.match(privacy, /ultimi turni di contesto/);
@@ -137,8 +137,8 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
 });
 
 test("renders every public route with one shared, complete navigation", async () => {
-  const routes = ["/", "/desktop", "/android", "/pricing", "/downloads", "/security", "/status", "/privacy", "/terms"];
-  const expectedNavigation = ["/desktop", "/android", "/pricing", "/security", "/status", "/downloads"];
+  const routes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
+  const expectedNavigation = ["/desktop", "/android", "/security", "/status", "/downloads"];
 
   for (const route of routes) {
     const response = await render(route);
@@ -151,7 +151,7 @@ test("renders every public route with one shared, complete navigation", async ()
   }
 });
 
-test("keeps the floating navigation fullscreen, accessible, and free of persistent bars", async () => {
+test("keeps the floating navigation fullscreen, accessible, and paired with the desktop navigation", async () => {
   const [chrome, navigationStyles, layout, globalStyles] = await Promise.all([
     readFile(new URL("../app/components/SiteChrome.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/navigation.css", import.meta.url), "utf8"),
@@ -173,7 +173,8 @@ test("keeps the floating navigation fullscreen, accessible, and free of persiste
   assert.match(chrome, /data-awake=\{open \|\| chromeAwake\}/);
   assert.match(chrome, /4_200/);
   assert.doesNotMatch(chrome, /className="nxs-header/);
-  assert.doesNotMatch(chrome, /nxs-top-nav/);
+  assert.match(chrome, /className="nxs-desktop-header"/);
+  assert.match(navigationStyles, /@media \(min-width: 960px\)/);
   assert.match(layout, /id="site-content"/);
   assert.match(layout, /href="#site-content"/);
   assert.match(layout, /id="site-content" tabIndex=\{-1\}/);

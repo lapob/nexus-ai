@@ -1,3 +1,5 @@
+.nxs-desktop-header { display: none; }
+
 .nxs-floating-brand,
 .nxs-menu-toggle {
   position: fixed;
@@ -178,6 +180,31 @@ body.menu-open .nexus-connectivity { visibility: hidden; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .nxs-nav, .nxs-nav__link, .nxs-nav__arrow, .nxs-menu-glyph i, .nxs-menu-toggle, .nxs-floating-brand { transition: none; }
+}
+
+@media (min-width: 960px) {
+  .nxs-floating-brand, .nxs-menu-toggle, .nxs-nav { display: none; }
+  .nxs-desktop-header {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 150;
+    min-height: 72px;
+    padding: 10px max(32px, calc((100vw - 1440px) / 2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(28px, 4vw, 72px);
+    isolation: isolate;
+    background: none;
+    color: #eefafa;
+  }
+  .nxs-desktop-header::before { content: ""; position: absolute; inset: 0 0 -28px; z-index: -1; pointer-events: none; background: linear-gradient(#020405 0 65%, #020405ed 75%, #02040500); }
+  .nxs-desktop-brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: 19px; font-weight: 650; letter-spacing: -.035em; }
+  .nxs-desktop-brand img { object-fit: contain; }
+  .nxs-desktop-header nav { display: flex; align-items: center; gap: clamp(18px, 2.3vw, 40px); }
+  .nxs-desktop-header nav a { display: inline-flex; align-items: center; min-height: 44px; color: #c5d5d7; font-size: 14px; font-weight: 500; transition: color .2s ease; }
+  .nxs-desktop-header nav a:is(:hover, [aria-current="page"]) { color: #81eff0; }
+  .nxs-desktop-header a:focus-visible { outline: 2px solid #52eef0; outline-offset: 5px; border-radius: 4px; }
 }
 
 html { scrollbar-width: thin; scrollbar-color: rgba(82, 238, 240, .42) rgba(2, 4, 5, .72); }

@@ -705,73 +705,6 @@ body { isolation: isolate; }
 .nxs-motion-lite .nxs-cosmic-field { opacity: .42; }
 @media (prefers-reduced-motion: reduce) { .nxs-cosmic-field { opacity: .28; } }
 
-/* Cosmic Continuum — la home e una singola scena, non una pila di pannelli. */
-.home-continuum {
-  position: relative;
-  isolation: isolate;
-  background:
-    radial-gradient(circle at 76% 12%, rgba(39,207,210,.105), transparent 28%),
-    radial-gradient(circle at 18% 48%, rgba(101,71,183,.075), transparent 31%),
-    radial-gradient(circle at 72% 82%, rgba(211,151,70,.045), transparent 26%),
-    #020405;
-}
-.home-continuum .hero,
-.home-continuum .manifesto,
-.home-continuum .apps-section,
-.home-continuum .presence-system,
-.home-continuum .one-nexus,
-.home-continuum .security,
-.home-continuum .founder-preview,
-.home-continuum footer { background: transparent; }
-.home-continuum .manifesto { color: #f3fbfb; }
-.home-continuum .manifesto .section-label { color: #789193; }
-.home-continuum .manifesto-text strong,
-.home-continuum h1 em,
-.home-continuum h2 em { color: #55e8ea; }
-.home-continuum .app-grid {
-  gap: clamp(18px, 2.2vw, 34px);
-  border: 0;
-  background: transparent;
-}
-.home-continuum .app-card,
-.home-continuum .presence-grid article,
-.home-continuum .security-panel {
-  border: 1px solid rgba(111,224,226,.11);
-  background: linear-gradient(145deg, rgba(9,20,22,.82), rgba(2,7,8,.56));
-  border-radius: 26px;
-  backdrop-filter: blur(14px);
-}
-.home-continuum .security { border: 1px solid rgba(111,224,226,.12); border-radius: 34px; background: linear-gradient(135deg, rgba(20,96,100,.28), rgba(31,20,53,.22)); overflow: hidden; }
-.home-continuum .founder-preview { border-block: 1px solid rgba(111,224,226,.08); }
-.home-neural-core {
-  position: absolute;
-  left: 70%;
-  top: 49%;
-  width: min(42vw, 650px);
-  aspect-ratio: 1;
-  transform: translate3d(-50%,-50%,0);
-  pointer-events: auto;
-  touch-action: none;
-  cursor: grab;
-  transition: filter .22s ease;
-  filter: drop-shadow(0 0 42px rgba(70,235,237,.16));
-}
-.home-neural-core[data-dragging="true"] { cursor: grabbing; filter: drop-shadow(0 0 58px rgba(70,235,237,.28)); }
-.home-neural-core .interactive-visualizer {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  border: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, rgba(53,219,222,.105), transparent 54%);
-  box-shadow: none;
-}
-.home-neural-core .interactive-visualizer::before { inset: 9%; opacity: .72; }
-@media (max-width: 800px) {
-  .home-neural-core { left: 82%; top: 31%; width: 72vw; }
-  .home-continuum .security { border-radius: 0; border-inline: 0; }
-}
-
 /* Product proof — real, current application captures in a restrained frame. */
 .app-card-visual {
   position: relative;
@@ -846,7 +779,7 @@ body { isolation: isolate; }
   border-radius: 0;
   background: radial-gradient(circle at 50% 48%, rgba(51,213,215,.09), transparent 42%);
   box-shadow: none;
-  cursor: crosshair;
+  cursor: default;
   touch-action: pan-y;
   isolation: isolate;
 }
@@ -865,6 +798,7 @@ body { isolation: isolate; }
 .astral-interlude{position:relative;max-width:1100px;margin:auto;padding:clamp(20px,5vw,72px) 24px;text-align:center;isolation:isolate}
 .astral-interlude .interactive-visualizer{height:clamp(300px,58vw,650px);background:none}
 .astral-interlude .interactive-visualizer::before{display:none}
+.interactive-visualizer--android::before{display:none}
 .astral-interlude>p{color:var(--muted);font-size:clamp(18px,2.6vw,30px);letter-spacing:-.025em;margin:0 0 clamp(40px,8vw,100px)}
 .visualizer-collection.is-compact .interactive-visualizer { min-height: clamp(160px, 17vw, 230px); border-radius: 21px; }
 .product-visualizers,
@@ -912,17 +846,15 @@ body { isolation: isolate; }
 @media (prefers-reduced-motion: reduce) {
   .interactive-visualizer::before { animation: none; }
 }
-.footer-astral-mark{position:relative;width:min(100%,820px);height:clamp(300px,42vw,520px);margin:0 auto -8rem;isolation:isolate}
+.premium-footer .footer-astral-mark{position:relative;display:block;grid-column:1/-1;width:min(820px,calc(100vw - 2 * var(--page-pad)));max-width:100%;height:clamp(280px,36vw,440px);margin:0 auto 12px;isolation:isolate}
 .footer-astral-mark::before,.footer-astral-mark::after{content:"";position:absolute;inset:50% auto auto 50%;translate:-50% -50%;border-radius:50%;pointer-events:none}
 .footer-astral-mark::before{width:clamp(180px,28vw,390px);aspect-ratio:1;border:1px solid rgba(101,238,239,.11);box-shadow:0 0 90px rgba(65,226,229,.06),inset 0 0 62px rgba(65,226,229,.035);animation:nxs-footer-orbit 18s linear infinite}
 .footer-astral-mark::after{width:clamp(125px,18vw,250px);aspect-ratio:1;background:radial-gradient(circle,rgba(82,238,240,.13),rgba(82,238,240,.025) 39%,transparent 68%);filter:blur(7px);animation:nxs-footer-breathe 5.6s ease-in-out infinite}
-.footer-astral-mark .interactive-visualizer{height:100%;min-height:0;z-index:1;background:radial-gradient(circle at 50% 50%,rgba(51,213,215,.12),transparent 43%)}
+.footer-astral-mark .interactive-visualizer{width:100%;height:100%;min-height:0;z-index:1;background:radial-gradient(circle at 50% 50%,rgba(51,213,215,.12),transparent 43%)}
 .footer-astral-mark::before,.footer-astral-mark::after{display:none}
 .footer-astral-mark .interactive-visualizer::before{display:none}
-.home-continuum .manifesto,.home-continuum .one-nexus,.home-continuum .security,.home-continuum .founder-preview{background:transparent;border:0;box-shadow:none}
-@media(min-width:900px){.home-continuum .hero h1{margin-left:0;margin-right:0;max-width:65%;font-size:clamp(58px,6.2vw,80px)}.home-continuum .hero-copy{margin-left:0!important;max-width:47%}.home-continuum .home-neural-core{left:78%}}
 .premium-footer .footer-callout{position:relative;z-index:4}
 @keyframes nxs-footer-orbit{to{rotate:1turn}}
 @keyframes nxs-footer-breathe{50%{scale:1.12;opacity:.72}}
-@media(max-width:620px){.footer-astral-mark{height:280px;margin-bottom:-5rem}}
+@media(max-width:620px){.footer-astral-mark{height:280px;margin-bottom:12px}}
 @media(prefers-reduced-motion:reduce){.footer-astral-mark::before,.footer-astral-mark::after{animation:none}}
