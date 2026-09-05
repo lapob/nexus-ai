@@ -787,8 +787,6 @@ body { isolation: isolate; }
 .interactive-visualizer figcaption{display:none}
 .astral-interlude{position:relative;max-width:1100px;margin:auto;padding:clamp(20px,5vw,72px) 24px;text-align:center;isolation:isolate}
 .astral-interlude .interactive-visualizer{height:clamp(300px,58vw,650px);background:none}
-.astral-interlude .interactive-visualizer::before{display:none}
-.interactive-visualizer--android::before{display:none}
 .astral-interlude>p{color:var(--muted);font-size:clamp(18px,2.6vw,30px);letter-spacing:-.025em;margin:0 0 clamp(40px,8vw,100px)}
 .visualizer-collection.is-compact .interactive-visualizer { min-height: clamp(160px, 17vw, 230px); border-radius: 21px; }
 .product-visualizers,
@@ -810,7 +808,6 @@ body { isolation: isolate; }
 .product-visualizers > div:first-child > p:last-child { max-width: 54ch; color: rgba(189,217,219,.58); line-height: 1.65; }
 .download-visualizers { display: grid; grid-template-columns: minmax(220px,.55fr) minmax(0,1.45fr); align-items: center; gap: clamp(22px,4vw,68px); }
 .download-visualizers .visualizer-collection { width: 100%; grid-template-columns: repeat(4,minmax(120px,1fr)); }
-@keyframes nxs-inspection-ring { to { rotate: 1turn; } }
 
 @media (max-width: 900px) {
   .visualizer-collection--all { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -834,7 +831,6 @@ body { isolation: isolate; }
   .download-visualizers .visualizer-collection { width: calc(100% - 2 * var(--page-pad)); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .interactive-visualizer::before { animation: none; }
 }
 .premium-footer .footer-astral-mark{position:relative;display:block;grid-column:1/-1;width:min(820px,calc(100vw - 2 * var(--page-pad)));max-width:100%;height:clamp(280px,36vw,440px);margin:0 auto 12px;isolation:isolate}
 .footer-astral-mark::before,.footer-astral-mark::after{content:"";position:absolute;inset:50% auto auto 50%;translate:-50% -50%;border-radius:50%;pointer-events:none}
@@ -842,7 +838,6 @@ body { isolation: isolate; }
 .footer-astral-mark::after{width:clamp(125px,18vw,250px);aspect-ratio:1;background:radial-gradient(circle,rgba(82,238,240,.13),rgba(82,238,240,.025) 39%,transparent 68%);filter:blur(7px);animation:nxs-footer-breathe 5.6s ease-in-out infinite}
 .footer-astral-mark .interactive-visualizer{width:100%;height:100%;min-height:0;z-index:1;background:radial-gradient(circle at 50% 50%,rgba(51,213,215,.12),transparent 43%)}
 .footer-astral-mark::before,.footer-astral-mark::after{display:none}
-.footer-astral-mark .interactive-visualizer::before{display:none}
 .premium-footer .footer-callout{position:relative;z-index:4}
 @keyframes nxs-footer-orbit{to{rotate:1turn}}
 @keyframes nxs-footer-breathe{50%{scale:1.12;opacity:.72}}
