@@ -127,7 +127,7 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
 
     const draw = (now: number) => {
       if (!canvas.isConnected) return;
-      const elapsed = Math.min(34, now - last) / 16.667;
+      const elapsed = Math.min(250, now - last) / 16.667;
       last = now;
       context.clearRect(0, 0, width, height);
       const scale = Math.min(width, height) * (compact ? 1.02 : .9);

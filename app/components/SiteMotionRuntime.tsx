@@ -134,7 +134,7 @@ export function SiteMotionRuntime() {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const paintStart = performance.now();
       const reduced = reducedMotion.matches;
-      const delta = Math.min(.064, Math.max(.001, (now - cosmicLastFrame) / 1000));
+      const delta = Math.min(.25, Math.max(.001, (now - cosmicLastFrame) / 1000));
       cosmicLastFrame = now;
       const time = reduced ? 0 : now / 1000;
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }

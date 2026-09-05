@@ -47,7 +47,7 @@ export function createAstralCore(canvas, options = {}) {
     if (options.getState) setState(options.getState());
     if (reduced() && reducedPainted) return;
     const paintStarted = performance.now();
-    const dt = Math.min(.04, elapsed / 1000);
+    const dt = Math.min(.25, elapsed / 1000);
     if (elapsed > 30 && !reduced()) slowFrames++; else slowFrames = Math.max(0, slowFrames - .2);
     if (slowFrames > 18 && count > 210) { count = Math.max(210, count - 90); slowFrames = 0; }
     const target = states[state]; energy += (target - energy) * (1 - Math.exp(-dt * 4.5));
