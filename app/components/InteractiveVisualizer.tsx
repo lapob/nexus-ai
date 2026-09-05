@@ -229,12 +229,13 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
       pointer.y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
       pointer.pressed = true;
       if (inspection.id === event.pointerId && !reduceMotion.matches) {
+        canvas.style.cursor = 'none';
         inspection.tx = Math.max(-1.15, Math.min(1.15, (event.clientY - inspection.startY) / Math.min(width,height) * 2.8));
         inspection.ty = Math.max(-1.15, Math.min(1.15, (event.clientX - inspection.startX) / Math.min(width,height) * 2.8));
       }
     };
     const down = (event: PointerEvent) => { if (event.button !== 0 || reduceMotion.matches) return; inspection.id = event.pointerId; inspection.startX = event.clientX; inspection.startY = event.clientY; canvas.setPointerCapture(event.pointerId); move(event); };
-    const leave = () => { pointer.pressed = false; if (inspection.id >= 0 && canvas.hasPointerCapture(inspection.id)) canvas.releasePointerCapture(inspection.id); inspection.id = -1; };
+    const leave = () => { canvas.style.cursor = ''; pointer.pressed = false; const id = inspection.id; inspection.id = -1; if (id >= 0 && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id); };
     const observer = new IntersectionObserver(([entry]) => {
       const nextVisible = entry.isIntersecting;
       if (nextVisible && !visible) {
@@ -253,11 +254,16 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
     canvas.addEventListener("pointerleave", leave);
     canvas.addEventListener("pointerup", leave);
     canvas.addEventListener("pointercancel", leave);
+    canvas.addEventListener('lostpointercapture', leave);
+    window.addEventListener('blur', leave);
     document.addEventListener("visibilitychange", resume);
     reduceMotion.addEventListener("change", resume);
     resize();
     frame = requestAnimationFrame(draw);
     return () => {
+      leave();
+      canvas.removeEventListener('lostpointercapture', leave);
+      window.removeEventListener('blur', leave);
       cancelAnimationFrame(frame);
       observer.disconnect();
       resizeObserver.disconnect();

@@ -92,12 +92,12 @@ async function verifyAiHealth(expectedVersion, { attempts = 1 } = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const response = await fetch("https://ai.nexusnxs.com/healthz", {
+      const response = await fetch("https://ai.nexusnxs.com/readyz", {
         headers: { accept: "application/json" },
         signal: AbortSignal.timeout(15_000),
       });
       const payload = await response.json().catch(() => null);
-      if (response.status !== 200 || payload?.status !== "ok") {
+      if (response.status !== 200 || payload?.status !== "ready") {
         throw new Error(`ai.nexusnxs.com health gate failed with status ${response.status}.`);
       }
       if (expectedVersion && response.headers.get("x-nexusnxs-worker-version") !== expectedVersion) {

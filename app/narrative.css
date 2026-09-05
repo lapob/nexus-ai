@@ -1,6 +1,8 @@
 /* One page-wide field. Semantic sections remain for navigation/accessibility,
    but never introduce a new background, frame or independent motion loop. */
 body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%) fixed; }
+.hero > *:not(.scroll-cue) { width: min(100%, var(--content-max)); margin-inline: auto; }
+.nxs-field-dragging, .nxs-field-dragging * { cursor: none !important; }
 .home-continuum, .inner-page { background: transparent; }
 .inner-page > section { background: transparent; border-color: transparent; box-shadow: none; }
 .client-performance dl { background: transparent; }
@@ -14,7 +16,7 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .inner-page .uptime-empty { background: transparent; box-shadow: none; }
 .nxs-cosmic-field { opacity: .74; }
 .service-list span, .service-list small, .service-list b, .service-list .neutral { font-size: 12px; line-height: 1.5; }
-.narrative-page, .product-narrative { position: relative; isolation: isolate; }
+.narrative-page, .product-narrative { position: relative; isolation: auto; }
 .narrative-page > section, .product-narrative > section,
 .download-visualizers, .premium-footer {
   background: transparent;
@@ -60,8 +62,6 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .hero-word:last-child .hero-letter:nth-child(3) { animation-delay: .65s; }
 @keyframes nxs-letter-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(920px, 78svh); aspect-ratio: 1; margin: auto; filter: none; cursor: default; touch-action: pan-y; }
-.astral-hero .home-neural-core .interactive-visualizer { width: 100%; height: 100%; min-height: 0; }
-.astral-hero .home-neural-core .interactive-visualizer { background: none; border-radius: 0; }
 .astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
@@ -70,6 +70,8 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .astral-hero__replay:hover { background: #10292cb3; color: #e1ffff; }
 .astral-hero__replay:focus-visible { outline: 2px solid #91e9ec; outline-offset: 4px; }
 .home-continuum .astral-hero > .astral-hero__replay { width: 44px; margin: 0; }
+.astral-hero .hero-product-name, .astral-hero__replay { opacity: var(--hero-label-opacity, 1); }
+.astral-hero__replay:disabled { visibility: hidden; pointer-events: none; }
 
 .narrative-copy { position: relative; max-width: 660px; margin: 0 auto 0 max(var(--page-pad), calc((100vw - 1160px) / 2)); padding: clamp(96px, 13vw, 200px) 0; }
 .narrative-copy--right { margin-left: auto; margin-right: max(var(--page-pad), calc((100vw - 1160px) / 2)); }
@@ -82,17 +84,20 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-apps .app-card:nth-child(2) .narrative-app-copy { order: 2; }
 .narrative-app-copy h2 { margin: 24px 0; }
 .narrative-apps .app-card::before, .narrative-apps .app-card::after { display: none; }
+.narrative-apps .app-card { mix-blend-mode: screen; }
 .narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
 .narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: clamp(300px, 40vw, 540px); overflow: visible; }
 .narrative-apps .app-card-visual.android .app-card-visual__screen { width: min(50%, 220px); }
 .narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; }
+.narrative-apps .app-card-visual__screen { background: transparent; border: 0; box-shadow: none; mix-blend-mode: screen; }
+.narrative-page .device-frame, .narrative-page .product-screen { background: transparent; box-shadow: none; mix-blend-mode: screen; }
 .narrative-page .presence-system { margin-block: clamp(120px, 18vw, 250px) clamp(64px, 8vw, 120px); }
 .narrative-page .presence-grid article { background: none; border: 0; border-radius: 0; backdrop-filter: none; padding-inline: 0; }
 .narrative-page .presence-grid article small { color: #92b0b4; font-size: 14px; line-height: 1.5; }
 .narrative-page .presence-grid article > i { display: none; }
 .narrative-forms { padding-block: 32px 80px; }
 .narrative-page .astral-interlude { max-width: none; min-height: 160svh; padding: 0; margin: 0; }
-.narrative-page .astral-interlude .interactive-visualizer { position: sticky; top: 0; width: 100%; height: 100svh; min-height: 100svh; margin: 0; border: 0; border-radius: 0; }
+.cosmic-stage { height: 100svh; }
 .narrative-page .astral-interlude > p { position: relative; z-index: 1; max-width: 34ch; margin: -15svh auto 0; padding: 0 24px 10svh; }
 .narrative-page .one-nexus { padding-block: clamp(100px, 14vw, 200px); }
 .product-narrative .product-facts, .product-narrative .feature-grid { border: 0; background: none; }

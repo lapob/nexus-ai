@@ -3,7 +3,6 @@ import { ArrowUpRight, BrainCircuit, MessageCircle, Mic2, Zap } from "lucide-rea
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
-import { InteractiveVisualizer, VisualizerCollection } from "./components/InteractiveVisualizer";
 import { AstralHero } from "./components/AstralHero";
 
 const apps = [
@@ -21,14 +20,14 @@ export default function Home() {
   return <main id="main-content" className="home-continuum narrative-page">
     <StructuredData data={[{"@context":"https://schema.org","@type":"WebSite",name:"NexusNXS",url:"https://nexusnxs.com",inLanguage:"it-IT"},{"@context":"https://schema.org","@type":"Organization",name:"NexusNXS",url:"https://nexusnxs.com",logo:"https://nexusnxs.com/nexus-icon.png",email:"hello@nexusnxs.com"}]} />
     <AstralHero />
-    <section className="narrative-copy reveal" id="vision" data-cosmic-scene="right">
+    <section className="narrative-copy reveal" id="vision" data-cosmic-scene="right" data-cosmic-form="neural">
       <p className="section-label">DALL’IDEA AL RISULTATO</p>
       <h2>Meno passaggi.<br /><em>Più possibilità.</em></h2>
       <p>Una domanda veloce, un testo da migliorare, un problema da risolvere. Parla con Nexus o scrivi: ricevi una risposta leggibile mentre prende forma.</p>
       <p>Allega ciò su cui vuoi lavorare. Quando serve una ricerca, Nexus mostra l’uso del web e le fonti disponibili. Puoi fermare la generazione in qualsiasi momento.</p>
     </section>
-    <section className="astral-interlude" aria-label="Il segno NexusNXS si compone nello spazio" data-cosmic-scene="center">
-      <InteractiveVisualizer variant="sigil" /><p>La stessa intelligenza. Il tuo modo di usarla.</p>
+    <section className="astral-interlude" aria-label="Un cursore si compone nello spazio" data-cosmic-scene="center" data-cosmic-form="cursor">
+      <div className="cosmic-stage" aria-hidden="true" /><p>La stessa intelligenza. Il tuo modo di usarla.</p>
     </section>
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
       <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device}>
@@ -40,7 +39,7 @@ export default function Home() {
       <div className="presence-copy"><p className="section-label">UN DIALOGO CONTINUO</p><h2 id="presence-title">Non solo una risposta.<br /><em>Un’interazione.</em></h2><p>Il Core segue gli stati reali dell’assistente. La voce è in primo piano; tastiera e dettagli sono disponibili quando servono.</p></div>
       <div className="presence-grid">{presenceStates.map(({Icon,label,detail,state}) => <article key={state} data-state={state}><span><Icon strokeWidth={1.4}/></span><div><strong>{label}</strong><small>{detail}</small></div><i aria-hidden="true"/></article>)}</div>
     </section>
-    <section className="narrative-forms" aria-label="I Core dei prodotti NexusNXS" data-cosmic-scene="center"><VisualizerCollection mode="all" compact /></section>
+    <section className="astral-interlude narrative-forms" aria-label="Saturno particellare" data-cosmic-scene="center" data-cosmic-form="saturn"><div className="cosmic-stage" aria-hidden="true" /></section>
     <section className="one-nexus reveal" data-cosmic-scene="left">
       <div className="one-nexus-copy"><p className="section-label">PC · ANDROID · WEB</p><h2>Un solo prodotto.<br /><em>Più modi di esserci.</em></h2><p>Le app condividono il servizio NexusNXS. Collega il telefono al tuo desktop con una sessione remota autorizzata, oppure apri il web per iniziare senza installazioni.</p><HardNavigationLink className="text-link" href="https://ai.nexusnxs.com">Provalo nel browser <ArrowUpRight size={16}/></HardNavigationLink></div>
       <div className="nexus-stage"><ProductMockup type="desktop"/><ProductMockup type="android"/></div>
@@ -51,6 +50,6 @@ export default function Home() {
       <p>NexusNXS è in Preview e può commettere errori. Verifica i risultati importanti; l’accesso richiede che i servizi siano disponibili.</p>
       <HardNavigationLink className="text-link" href="/security">Come proteggiamo il servizio <ArrowUpRight size={16}/></HardNavigationLink>
     </section>
-    <SiteFooter />
+    <SiteFooter continuous />
   </main>;
 }

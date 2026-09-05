@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect } from "react";
+import { useEffect } from "react";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -71,7 +71,7 @@ const IMMEDIATE_REVEAL_SELECTOR = [
 ].join(",");
 
 export function SiteMotionRuntime() {
-  useLayoutEffect(() => {
+  useEffect(() => {
     const root = document.documentElement;
     const runtime = navigator as RuntimeNavigator;
     const tier = resolveMotionTier(runtime);
@@ -87,19 +87,33 @@ export function SiteMotionRuntime() {
     const pointer = { x: 0, y: 0, vx: 0, vy: 0, time: 0, active: 0 };
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
     const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
-    const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section"));
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section, main > footer"));
     let sectionAnchors: number[] = [];
     let readingZones: { left: number; right: number; top: number; bottom: number }[] = [];
     let sceneProgress = 0;
     let paintMs = 0;
     let fieldStarted = performance.now();
     let ambientTime = 0;
+    const inspection = { id: -1, startX: 0, startY: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
+    let strainedSeconds = 0;
+    let healthySeconds = 0;
 
     const cosmicCanvas = document.createElement("canvas");
     cosmicCanvas.className = "nxs-cosmic-field";
     cosmicCanvas.setAttribute("aria-hidden", "true");
     const cosmicContext = cosmicCanvas.getContext("2d", { alpha: true });
-    const particleCount = tier === "ultra" ? 600 : tier === "balanced" ? 360 : 120;
+    const glow = document.createElement('canvas');
+    glow.width = glow.height = 32;
+    const glowContext = glow.getContext('2d');
+    if (glowContext) {
+      const gradient = glowContext.createRadialGradient(16,16,0,16,16,16);
+      gradient.addColorStop(0,'rgba(220,250,255,.7)');
+      gradient.addColorStop(.2,'rgba(120,225,245,.24)');
+      gradient.addColorStop(1,'rgba(120,225,245,0)');
+      glowContext.fillStyle = gradient; glowContext.fillRect(0,0,32,32);
+    }
+    const particleCount = tier === "ultra" ? 1800 : tier === "balanced" ? 1200 : 480;
+    let activeParticles = particleCount;
     let seed = 0x4e5853;
     const random = () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -126,7 +140,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.height = Math.round(cosmicHeight * ratio);
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
-      readingZones = Array.from(document.querySelectorAll<HTMLElement>("main h1,main h2,main p,main li,main .app-grid,main .nexus-stage,main .presence-grid,main .security-panel,main .interactive-visualizer")).map(element => {
+      readingZones = Array.from(document.querySelectorAll<HTMLElement>("main h1:not(.hero-product-name),main .hero-product-name > span,main h2,main p,main li")).map(element => {
         const rect = element.getBoundingClientRect();
         return { left: rect.left - 24, right: rect.right + 24, top: rect.top + window.scrollY - 20, bottom: rect.bottom + window.scrollY + 20 };
       });
@@ -138,16 +152,33 @@ export function SiteMotionRuntime() {
       const reduced = reducedMotion.matches;
       const delta = Math.min(.25, Math.max(.001, (now - cosmicLastFrame) / 1000));
       cosmicLastFrame = now;
+      strainedSeconds = paintMs > 9 || delta > .035 ? strainedSeconds + delta : Math.max(0, strainedSeconds - delta);
+      healthySeconds = paintMs < 5 && delta < .022 ? healthySeconds + delta : 0;
+      if (strainedSeconds > 2) { activeParticles = Math.max(300, activeParticles - 60); strainedSeconds = 0; }
+      if (healthySeconds > 8) { activeParticles = Math.min(particleCount, activeParticles + 30); healthySeconds = 0; }
+      const dragging = inspection.id !== -1 && !reduced;
+      const omega = dragging ? 5 : 1.1;
+      const decay = Math.exp(-omega * delta);
+      for (const axis of ['x', 'y'] as const) {
+        const velocity = axis === 'x' ? 'vx' : 'vy';
+        const target = dragging ? (axis === 'x' ? inspection.targetX : inspection.targetY) : 0;
+        const error = inspection[axis] - target;
+        const acceleration = inspection[velocity] + omega * error;
+        inspection[axis] = target + (error + acceleration * delta) * decay;
+        inspection[velocity] = (inspection[velocity] - omega * acceleration * delta) * decay;
+      }
       if (!reduced) ambientTime += delta * .55;
       const time = reduced ? 0 : ambientTime;
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
-      const viewportAnchor = window.scrollY + cosmicHeight * .3;
+      const viewportAnchor = window.scrollY;
       let currentSection = Math.max(0, sectionAnchors.findLastIndex(top => top <= viewportAnchor));
       currentSection = Math.min(currentSection, Math.max(0, sections.length - 1));
       const sectionStart = sectionAnchors[currentSection] || 0;
       const sectionEnd = sectionAnchors[currentSection + 1] || sectionStart + cosmicHeight;
-      const destination = currentSection + Math.min(1, Math.max(0, (viewportAnchor - sectionStart) / Math.max(1, sectionEnd - sectionStart)));
+      const fraction = (viewportAnchor - sectionStart) / Math.max(1, sectionEnd - sectionStart);
+      const hold = sections[currentSection]?.classList.contains('astral-interlude') ? .55 : .2;
+      const destination = currentSection + Math.min(1, Math.max(0, (fraction - hold) / (1 - hold)));
       sceneProgress += (destination - sceneProgress) * (reduced ? 1 : 1 - Math.exp(-1.35 * delta));
       const sectionPosition = sceneProgress;
       const sectionIndex = Math.floor(sectionPosition);
@@ -157,18 +188,51 @@ export function SiteMotionRuntime() {
         const scene = sections[index]?.dataset.cosmicScene;
         return scene === "center" ? .5 : scene === "left" ? .13 : scene === "right" ? .87 : index % 2 === 0 ? .87 : .13;
       };
-      const visualLane = cosmicWidth < 760
-        ? (sectionIndex % 2 ? .04 : .96)
-        : laneFor(sectionIndex) + (laneFor(sectionIndex + 1) - laneFor(sectionIndex)) * sectionMix;
-      const topology = sectionPosition + routePhase;
+      const responsiveLane = (index: number) => {
+        const lane = laneFor(index);
+        return cosmicWidth < 760 && lane !== .5 ? (lane < .5 ? .04 : .96) : lane;
+      };
+      const visualLane = responsiveLane(sectionIndex) + (responsiveLane(sectionIndex + 1) - responsiveLane(sectionIndex)) * sectionMix;
+      const topology = sectionPosition;
       const topologyIndex = Math.floor(topology);
       const topologyMixRaw = topology - topologyIndex;
       const topologyMix = topologyMixRaw * topologyMixRaw * (3 - 2 * topologyMixRaw);
       const topologyPoint = (particle: CosmicParticle, index: number, shape: number) => {
-        const kind = ((shape % 5) + 5) % 5;
+        const form = sections[shape]?.dataset.cosmicForm;
+        const kind = (((shape + routePhase) % 5) + 5) % 5;
         const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
         const centerX = cosmicWidth * visualLane;
         const centerY = cosmicHeight * .5;
+        const unit = Math.min(cosmicWidth, cosmicHeight) * (laneFor(shape) === .5 ? .95 : .66);
+        // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
+        const depth = shape === 0 ? Math.min(1, sectionPosition * 3) : 1;
+        const pitch = depth * (.22 + Math.sin(time * .04) * .08) + inspection.x;
+        const yaw = depth * Math.sin(time * .03) * .22 + inspection.y;
+        const project = (x: number, y: number, z: number) => {
+          const rx = x * Math.cos(yaw) + z * Math.sin(yaw);
+          const rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
+          return { x:centerX+rx*unit, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit };
+        };
+        if (form === 'sigil') {
+          const reach = (Math.floor(index / 10) * .61803398875) % 1;
+          const turn = index % 10 * Math.PI / 5 + reach * 1.55 + time * .015;
+          const width = .009 + Math.sin(reach * Math.PI) * .022;
+          const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
+          return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.cos(particle.phase)*width*2);
+        }
+        if (form === 'cursor') {
+          const vertices = [[-.27,-.38],[-.23,.31],[-.07,.14],[.05,.39],[.18,.33],[.05,.09],[.29,.07],[-.27,-.38]];
+          const along = index / particles.length * 7, edge = Math.floor(along), t = along - edge;
+          const a = vertices[edge], b = vertices[edge + 1];
+          const thickness = Math.sin(particle.phase) * .006;
+          return project(a[0]+(b[0]-a[0])*t+thickness,a[1]+(b[1]-a[1])*t+thickness,(index%2-.5)*.025);
+        }
+        if (form === 'saturn') {
+          const a = index * 2.399963 + time * .015;
+          if(index % 3 === 0) return project(Math.cos(a)*.46,Math.sin(a)*.14,Math.sin(a)*.35);
+          const latitude = Math.acos(2 * (particle.depth-.25)/.75 - 1), r = .23;
+          return project(Math.cos(a)*Math.sin(latitude)*r,Math.cos(latitude)*r,Math.sin(a)*Math.sin(latitude)*r);
+        }
         if (kind === 0) {
           const radius = Math.min(cosmicWidth, cosmicHeight) * (.19 + (index % 3) * .052);
           return { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
@@ -200,7 +264,8 @@ export function SiteMotionRuntime() {
       // per particle made long narrative pages needlessly expensive.
       const scrollY = window.scrollY;
       const visibleZones = readingZones.filter(rect => rect.bottom >= scrollY - 44 && rect.top <= scrollY + cosmicHeight + 44);
-      const points = particles.map((particle, index) => {
+      let maxDrift = 0;
+      const points = particles.slice(0, activeParticles).map((particle, index) => {
         const baseX = particle.x * cosmicWidth;
         const baseY = ((particle.y + scroll * particle.depth * .13) % 1) * cosmicHeight;
         const first = topologyPoint(particle, index, topologyIndex);
@@ -210,11 +275,13 @@ export function SiteMotionRuntime() {
         // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
-        const transitionScatter = Math.sin(sectionMix * Math.PI) * .24;
+        const transitionScatter = Math.sin(sectionMix * Math.PI) * .48;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
-        const arrival = reduced ? 1 : 1 - Math.exp(-Math.max(0, age - .4) * .8);
-        const compose = (.82 + particle.depth * .16) * (1 - transitionScatter) * arrival;
+        const arrivalTime = Math.min(1, Math.max(0, age - .4) / 5);
+        // Zero velocity at both ends: acceleration never snaps into the final form.
+        const arrival = reduced ? 1 : arrivalTime ** 3 * (arrivalTime * (arrivalTime * 6 - 15) + 10);
+        const compose = (1 - transitionScatter) * arrival;
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (4 + particle.depth * 9);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (3 + particle.depth * 7);
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
@@ -229,6 +296,7 @@ export function SiteMotionRuntime() {
         particle.offsetY = goalY + (ey + ay * delta) * decay;
         particle.velocityX = (particle.velocityX - omega * ax * delta) * decay;
         particle.velocityY = (particle.velocityY - omega * ay * delta) * decay;
+        maxDrift = Math.max(maxDrift, Math.hypot(particle.offsetX, particle.offsetY));
         const px = x + particle.offsetX, py = y + particle.offsetY;
         let visibility = 1;
         for (const rect of visibleZones) {
@@ -236,8 +304,8 @@ export function SiteMotionRuntime() {
           const dy = Math.max(rect.top - py - scrollY, 0, py + scrollY - rect.bottom);
           if (dx >= 44 || dy >= 44) continue;
           const edge = Math.min(1, Math.hypot(dx, dy) / 44);
-          visibility = Math.min(visibility, .05 + .95 * edge * edge * (3 - 2 * edge));
-          if (visibility <= .05) break;
+          visibility = Math.min(visibility, .24 + .76 * edge * edge * (3 - 2 * edge));
+          if (visibility <= .24) break;
         }
         return { x: px, y: py, depth: particle.depth, visibility };
       });
@@ -259,17 +327,27 @@ export function SiteMotionRuntime() {
         cosmicContext.stroke();
       }
       for (const point of points) {
+        if (point.depth > .93) {
+          const glowSize = 8 + point.depth * 7;
+          cosmicContext.save();
+          cosmicContext.globalAlpha *= point.visibility;
+          cosmicContext.drawImage(glow,point.x-glowSize/2,point.y-glowSize/2,glowSize,glowSize);
+          cosmicContext.restore();
+        }
         cosmicContext.beginPath();
-        cosmicContext.fillStyle = `rgba(${point.depth > .93 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.25 + point.depth * .55) * point.visibility})`;
-        cosmicContext.arc(point.x, point.y, .45 + point.depth * 1.15, 0, Math.PI * 2);
+        cosmicContext.fillStyle = `rgba(${point.depth > .96 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
+        cosmicContext.arc(point.x, point.y, .35 + point.depth ** 4 * 1.35, 0, Math.PI * 2);
         cosmicContext.fill();
       }
       cosmicContext.globalCompositeOperation = "source-over";
       cosmicContext.globalAlpha = 1;
       paintMs += (performance.now() - paintStart - paintMs) * .1;
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
+      cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
+      cosmicCanvas.dataset.arrival = Math.min(1, Math.max(0, age - .4) / 5).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
-      cosmicCanvas.dataset.particles = String(particleCount);
+      cosmicCanvas.dataset.particles = String(activeParticles);
+      cosmicCanvas.dataset.rotation = `${inspection.x.toFixed(3)},${inspection.y.toFixed(3)}`;
       if (!reduced && !document.hidden) cosmicFrame = requestAnimationFrame(drawCosmicField);
     };
 
@@ -342,15 +420,34 @@ export function SiteMotionRuntime() {
       revealFrame = requestAnimationFrame(() => initiallyVisible.forEach(showTarget));
     }
 
+    const hero = document.querySelector<HTMLElement>(".astral-hero");
+    const replayButton = hero?.querySelector<HTMLButtonElement>(".astral-hero__replay");
     const updateScroll = () => {
       scrollFrame = 0;
       const available = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       root.style.setProperty("--nxs-scroll", String(Math.min(1, Math.max(0, window.scrollY / available))));
+      // One reversible scroll envelope for the wordmark and replay control.
+      // Keep the particles alive; only the opening labels dissolve.
+      if (hero) {
+        const progress = Math.min(1, Math.max(0, (window.scrollY / Math.max(1, window.innerHeight) - .08) / .42));
+        const opacity = 1 - progress * progress * (3 - 2 * progress);
+        hero.style.setProperty("--hero-label-opacity", String(opacity));
+        if (replayButton) {
+          replayButton.disabled = progress >= 1;
+          replayButton.tabIndex = progress >= 1 ? -1 : 0;
+        }
+      }
     };
     const onScroll = () => {
       if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll);
     };
     const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerId === inspection.id) {
+        const dx = event.clientX - inspection.startX, dy = event.clientY - inspection.startY;
+        if (Math.hypot(dx, dy) > 8) root.classList.add('nxs-field-dragging');
+        inspection.targetX = Math.max(-.8, Math.min(.8, dy / cosmicHeight * 2));
+        inspection.targetY = Math.max(-1.2, Math.min(1.2, dx / cosmicWidth * 2.5));
+      }
       if (event.pointerType === "touch" || tier === "lite") return;
       const now = performance.now(), seconds = Math.max(.008, (now - pointer.time) / 1000);
       pointer.vx = pointer.active ? Math.max(-650, Math.min(650, (event.clientX - pointer.x) / seconds)) : 0;
@@ -360,7 +457,16 @@ export function SiteMotionRuntime() {
       pointer.y = event.clientY;
       pointer.active = 1;
     };
-    const onPointerLeave = () => { pointer.active = 0; };
+    const releaseDrag = () => { inspection.id = -1; root.classList.remove('nxs-field-dragging'); };
+    const startDrag = (event: PointerEvent) => {
+      if (event.button !== 0 || reducedMotion.matches || !(event.target instanceof Element)) return;
+      if (event.target.closest('a,button,input,textarea,select,[contenteditable],h1,h2,p,li')) return;
+      if (event.pointerType === 'touch') return;
+      inspection.id = event.pointerId;
+      inspection.startX = event.clientX; inspection.startY = event.clientY;
+      inspection.targetX = inspection.x; inspection.targetY = inspection.y;
+    };
+    const onPointerLeave = () => { pointer.active = 0; releaseDrag(); };
     const replayComposition = () => {
       fieldStarted = performance.now();
       if (reducedMotion.matches) drawCosmicField(fieldStarted);
@@ -370,10 +476,19 @@ export function SiteMotionRuntime() {
     window.addEventListener("resize", onScroll, { passive: true });
     window.addEventListener("resize", resizeCosmicField, { passive: true });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener('pointerdown', startDrag, {passive:true});
+    window.addEventListener('pointerup', releaseDrag);
+    window.addEventListener('pointercancel', releaseDrag);
+    window.addEventListener('blur', releaseDrag);
     document.documentElement.addEventListener("pointerleave", onPointerLeave);
     window.addEventListener("nxs:replay-composition", replayComposition);
 
     return () => {
+      releaseDrag();
+      window.removeEventListener('pointerdown', startDrag);
+      window.removeEventListener('pointerup', releaseDrag);
+      window.removeEventListener('pointercancel', releaseDrag);
+      window.removeEventListener('blur', releaseDrag);
       revealObserver?.disconnect();
       layoutObserver.disconnect();
       ambientObserver?.disconnect();

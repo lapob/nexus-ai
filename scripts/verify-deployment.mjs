@@ -92,12 +92,12 @@ assert.equal(typeof statusBody.online, "boolean");
 assert.equal(typeof statusBody.checkedAt, "string");
 
 if (verifyAi) {
-  const aiHealth = await fetch("https://ai.nexusnxs.com/healthz", {
+  const aiHealth = await fetch("https://ai.nexusnxs.com/readyz", {
     headers: { accept: "application/json" },
     signal: AbortSignal.timeout(15_000),
   });
   assert.equal(aiHealth.status, 200, `ai.nexusnxs.com health returned ${aiHealth.status}`);
-  assert.equal((await aiHealth.json()).status, "ok");
+  assert.equal((await aiHealth.json()).status, "ready");
 }
 
 console.log(`Deployment verified: ${baseUrl.origin} (${routeChecks.length} routes, navbar, headers${verifyAi ? ", AI health" : ""})`);

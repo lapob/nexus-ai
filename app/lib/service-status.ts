@@ -1,4 +1,4 @@
-import { NEXUSNXS_AI_HEALTH_URL } from "./service-endpoints";
+import { NEXUSNXS_AI_READINESS_URL } from "./service-endpoints";
 
 type NexusNxsAiStatus = {
   online: boolean;
@@ -16,14 +16,14 @@ async function probeNexusNxsAi(): Promise<NexusNxsAiStatus> {
   const checkedAt = new Date();
 
   try {
-    const response = await fetch(NEXUSNXS_AI_HEALTH_URL, {
+    const response = await fetch(NEXUSNXS_AI_READINESS_URL, {
       cache: "no-store",
       signal: AbortSignal.timeout(4000),
     });
     const data = response.ok ? await response.json() as { status?: string } : {};
     if (!response.ok) console.warn("NEXUSNXS_AI_HEALTH_CHECK_UNAVAILABLE", response.status);
     return {
-      online: response.ok && data.status === "ok",
+      online: response.ok && data.status === "ready",
       latencyMs: Date.now() - started,
       checkedAt,
     };

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ArrowUpRight, RotateCcw } from "lucide-react";
 import { HardNavigationLink } from "./HardNavigationLink";
-import { InteractiveVisualizer } from "./InteractiveVisualizer";
 
 /** The title and core have separate grid tracks, including at 200% text size. */
 export function AstralHero() {
@@ -12,14 +11,14 @@ export function AstralHero() {
     setComposition(value => value + 1);
     window.dispatchEvent(new Event("nxs:replay-composition"));
   };
-  return <section className="hero astral-hero" id="top" aria-label="NexusNXS AI">
+  return <section className="hero astral-hero" id="top" aria-label="NexusNXS AI" data-cosmic-scene="center" data-cosmic-form="sigil">
     <div className="astral-hero__scene" key={composition}>
       <h1 className="hero-product-name" aria-label="NexusNXS AI">
         {["NEXUS", "NXS"].map((word) => <span className="hero-word" aria-hidden="true" key={word}>
           {[...word].map((letter, index) => <span className="hero-letter" key={index}>{letter}</span>)}
         </span>)}
       </h1>
-      <div className="home-neural-core" aria-hidden="true"><InteractiveVisualizer variant="android" /></div>
+      <div className="home-neural-core" aria-hidden="true" />
     </div>
     <div className="hero-intro">
       <p>Un pensiero. La voce. Le possibilità.</p>

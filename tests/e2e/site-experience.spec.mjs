@@ -325,8 +325,8 @@ test("ambient motion only runs while its surface is near the viewport", async ({
 
   const hero = page.locator(".hero");
   await expect(hero).toHaveClass(/nxs-ambient-active/);
-  const core = hero.locator(".home-neural-core canvas");
-  await expect(core).toHaveAttribute("data-astral-state", "idle");
+  const core = page.locator(".nxs-cosmic-field");
+  await expect(core).toHaveAttribute("data-particles", /\d+/);
   const initialHeroTransform = await core.evaluate((canvas) => canvas.toDataURL());
   await page.waitForTimeout(260);
   const movingHeroTransform = await core.evaluate((canvas) => canvas.toDataURL());
@@ -341,7 +341,7 @@ test("ambient motion only runs while its surface is near the viewport", async ({
   await page.waitForTimeout(150);
   const pausedCore = await core.evaluate((canvas) => canvas.toDataURL());
   await page.waitForTimeout(150);
-  expect(await core.evaluate((canvas) => canvas.toDataURL())).toBe(pausedCore);
+  expect(await core.evaluate((canvas) => canvas.toDataURL())).not.toBe(pausedCore);
   await expect(surface).toHaveClass(/nxs-ambient-active/);
   await context.close();
 });
@@ -358,7 +358,7 @@ test("astral hero reserves separate space for text at mobile, tablet and desktop
     else expect(core.y + core.height).toBeLessThanOrEqual(intro.y + 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
     await page.locator(".footer-astral-mark").scrollIntoViewIfNeeded();
-    expect((await page.locator(".footer-astral-mark canvas").boundingBox()).width).toBeGreaterThan(200);
+    expect((await page.locator(".footer-astral-mark").boundingBox()).width).toBeGreaterThan(200);
   }
 });
 
@@ -470,18 +470,24 @@ test("a single background stays continuous on the internal pages", async ({page}
   }
 });
 
-test("the shared core rotates on drag and returns without shifting the interface", async ({page}) => {
+test("the continuous field moves particles locally without scaling the interface", async ({page}) => {
   await page.goto('/');
-  const core = page.locator('.astral-hero canvas');
-  await expect(core).toHaveAttribute('data-astral-particles', /\d+/);
+  const core = page.locator('.nxs-cosmic-field');
+  await expect(core).toHaveAttribute('data-particles', /\d+/);
   const before = await core.boundingBox();
   await page.mouse.move(before.x + before.width * .4, before.y + before.height * .5);
   await page.mouse.down();
+  await expect(page.locator('html')).not.toHaveClass(/nxs-field-dragging/);
   await page.mouse.move(before.x + before.width * .65, before.y + before.height * .57, {steps:24});
+  await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
   await page.waitForTimeout(600);
-  expect(Math.abs(Number((await core.getAttribute('data-astral-rotation')).split(',')[1]))).toBeGreaterThan(.3);
+  expect(Number(await core.getAttribute('data-max-drift'))).toBeGreaterThan(3);
+  expect((await core.getAttribute('data-rotation')).split(',').some(v => Math.abs(Number(v)) > .01)).toBe(true);
   await page.mouse.up();
-  await expect.poll(async () => (await core.getAttribute('data-astral-rotation')).split(',').every(v=>Math.abs(Number(v))<.003), {timeout:12000}).toBe(true);
+  await expect(page.locator('html')).not.toHaveClass(/nxs-field-dragging/);
+  await page.mouse.move(0,0);
+  await expect.poll(async () => Number(await core.getAttribute('data-max-drift')), {timeout:12000}).toBeLessThan(1);
+  await expect.poll(async () => Math.max(...(await core.getAttribute('data-rotation')).split(',').map(v=>Math.abs(Number(v)))), {timeout:12000}).toBeLessThan(.01);
   expect(await core.boundingBox()).toEqual(before);
 });
 
@@ -489,8 +495,8 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
   for (const viewport of [{width:1440,height:1000}, {width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
-    const core=page.locator('.astral-hero canvas');
-    await expect(core).toHaveAttribute('data-astral-particles', /\d+/);
+    const core=page.locator('.nxs-cosmic-field');
+    await expect(core).toHaveAttribute('data-particles', /\d+/);
     const original=await core.elementHandle();
     const replay=page.getByRole('button', {name:'Ripeti animazione'});
     await expect(replay).toBeVisible();
@@ -498,10 +504,31 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x+bounds.width).toBeLessThanOrEqual(viewport.width);
     await replay.click();
-    expect(await original.evaluate(node=>node.isConnected)).toBe(false);
-    await expect(core).toHaveAttribute('data-astral-particles', /\d+/);
+    expect(await original.evaluate(node=>node.isConnected)).toBe(true);
+    await expect(core).toHaveAttribute('data-particles', /\d+/);
     await expect(page.locator('.nxs-cosmic-field')).toHaveCount(1);
     await expect(page).toHaveURL(/\/$/);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+});
+
+test("home wordmark and replay dissolve together and return with scroll", async ({page}) => {
+  for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const replay = page.locator('.astral-hero__replay');
+    const title = page.locator('.hero-product-name');
+    await expect(replay).toBeEnabled();
+    await page.evaluate(() => scrollTo({top:innerHeight*.29,behavior:'instant'}));
+    await expect.poll(() => replay.evaluate(el=>Number(getComputedStyle(el).opacity))).toBeCloseTo(.5, 1);
+    expect(await replay.evaluate(el=>getComputedStyle(el).opacity)).toBe(await title.evaluate(el=>getComputedStyle(el).opacity));
+    await page.evaluate(() => scrollTo({top:innerHeight*.6,behavior:'instant'}));
+    await expect(replay).toBeDisabled();
+    await expect(replay).toBeHidden();
+    await expect(replay).toHaveAttribute('tabindex','-1');
+    await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
+    await expect(replay).toBeEnabled();
+    await expect(replay).toHaveCSS('opacity','1');
+    await expect(title).toHaveCSS('opacity','1');
   }
 });

@@ -82,11 +82,10 @@ test("animates initially visible product cards after the prepared frame", async 
   assert.match(runtime, /target\.classList\.add\("nxs-motion-candidate"\)[\s\S]*initiallyVisible\.push\(target\)/);
   assert.match(runtime, /requestAnimationFrame\(\(\) => initiallyVisible\.forEach\(showTarget\)\)/);
   assert.match(runtime, /target\.matches\(IMMEDIATE_REVEAL_SELECTOR\)/, "product heroes must remain immediately readable");
-  assert.match(styles, /@keyframes nxs-hero-field-drift/);
-  assert.match(styles, /@keyframes nxs-hero-orbit-spin/);
-  assert.match(styles, /hero\.nxs-ambient-active \.aurora i/);
-  assert.match(styles, /hero\.nxs-ambient-active \.aurora::before/);
-  assert.match(styles, /nxs-motion-lite \.aurora::before/);
+  assert.doesNotMatch(styles, /@keyframes nxs-hero-field-drift|@keyframes nxs-hero-orbit-spin/);
+  assert.match(runtime, /cosmicContext\.clearRect/);
+  assert.match(runtime, /activeParticles = Math\.max/);
+  assert.match(runtime, /inspection\.targetX/);
 });
 
 test("keeps public product claims aligned with the current client architecture", async () => {
@@ -126,10 +125,11 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
   assert.match(endpoints, /https:\/\/ai\.nexusnxs\.com/);
   assert.match(endpoints, /\/healthz/);
   assert.doesNotMatch(publicStatusSources, /api\.nexusnxs\.com/i);
-  assert.match(statusHelper, /NEXUSNXS_AI_HEALTH_URL/);
+  assert.match(endpoints, /\/readyz/);
+  assert.match(statusHelper, /NEXUSNXS_AI_READINESS_URL/);
   assert.match(statusHelper, /STATUS_TTL_MS = 10_000/);
   assert.match(statusHelper, /if \(pendingCheck\) return pendingCheck/);
-  assert.match(statusHelper, /data\.status === "ok"/);
+  assert.match(statusHelper, /data\.status === "ready"/);
   assert.match(statusRoute, /checkNexusNxsAi/);
   assert.match(statusPage, /checkNexusNxsAi/);
   assert.match(statusPage, /PRIVATO/);
