@@ -191,6 +191,10 @@ export function SiteMotionRuntime() {
       };
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
+      // Only nearby text can mask this viewport. Checking the entire document
+      // per particle made long narrative pages needlessly expensive.
+      const scrollY = window.scrollY;
+      const visibleZones = readingZones.filter(rect => rect.bottom >= scrollY - 44 && rect.top <= scrollY + cosmicHeight + 44);
       const points = particles.map((particle, index) => {
         const baseX = particle.x * cosmicWidth;
         const baseY = ((particle.y + scroll * particle.depth * .13) % 1) * cosmicHeight;
@@ -219,11 +223,13 @@ export function SiteMotionRuntime() {
         particle.velocityY = (particle.velocityY - omega * ay * delta) * decay;
         const px = x + particle.offsetX, py = y + particle.offsetY;
         let visibility = 1;
-        for (const rect of readingZones) {
+        for (const rect of visibleZones) {
           const dx = Math.max(rect.left - px, 0, px - rect.right);
-          const dy = Math.max(rect.top - py - window.scrollY, 0, py + window.scrollY - rect.bottom);
+          const dy = Math.max(rect.top - py - scrollY, 0, py + scrollY - rect.bottom);
+          if (dx >= 44 || dy >= 44) continue;
           const edge = Math.min(1, Math.hypot(dx, dy) / 44);
           visibility = Math.min(visibility, .05 + .95 * edge * edge * (3 - 2 * edge));
+          if (visibility <= .05) break;
         }
         return { x: px, y: py, depth: particle.depth, visibility };
       });
@@ -246,7 +252,7 @@ export function SiteMotionRuntime() {
       }
       for (const point of points) {
         cosmicContext.beginPath();
-        cosmicContext.fillStyle = `rgba(${point.depth > .93 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.2 + point.depth * .45) * point.visibility})`;
+        cosmicContext.fillStyle = `rgba(${point.depth > .93 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.25 + point.depth * .55) * point.visibility})`;
         cosmicContext.arc(point.x, point.y, .45 + point.depth * 1.15, 0, Math.PI * 2);
         cosmicContext.fill();
       }
