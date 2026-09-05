@@ -13,8 +13,10 @@ export function VisualizerInspection({ children, reduced }: { children: ReactNod
   const motion = useRef({ id: -1, startX: 0, startY: 0, dragging: false, suppressClickUntil: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 });
   useEffect(() => {
     const canvas = gl.domElement, state = motion.current;
+    const originalCursor = canvas.style.cursor;
     const host = canvas.closest('.voice-visualizer') || canvas;
     const release = () => {
+      canvas.style.cursor = originalCursor;
       if (state.dragging) state.suppressClickUntil = performance.now() + 350;
       const id = state.id;
       state.id = -1; state.dragging = false; state.targetX = state.targetY = 0;
@@ -34,6 +36,7 @@ export function VisualizerInspection({ children, reduced }: { children: ReactNod
       const dx = event.clientX - state.startX, dy = event.clientY - state.startY;
       if (Math.hypot(dx, dy) < 8 && !state.dragging) return;
       state.dragging = true;
+      canvas.style.cursor = 'none';
       canvas.setPointerCapture(event.pointerId);
       const size = Math.max(1, Math.min(canvas.clientWidth, canvas.clientHeight));
       state.targetX = Math.max(-1.15, Math.min(1.15, dy / size * 2.8));

@@ -91,7 +91,7 @@ test('il manager usa una sola Presence trascinabile e ancorata senza fondo opaco
   assert.match(source, /setIgnoreMouseEvents\(true, \{ forward: true \}\)/);
   assert.match(source, /movable: true, alwaysOnTop: true/);
   assert.match(source, /setVisibleOnAllWorkspaces\(true, \{ visibleOnFullScreen: true \}\)/);
-  assert.match(source, /applicationVisible \? \(entry.detached \? 240 : 128\) : 300/);
+  assert.match(source, /applicationVisible \? \(entry.detached \? 280 : 168\) : 360/);
   assert.match(source, /setBackgroundColor\?\.\('#00000000'\)/);
   assert.match(source, /PRESENCE_MENU_ACTIONS/);
   assert.match(source, /animatePresenceBounds/);

@@ -1,6 +1,8 @@
 package local.nexus.remote
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateColorAsState
+import local.nexus.motion.NexusInteractionStates
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -51,11 +53,9 @@ private class AstralInspection {
  * three fluid ribbons, identical geometry and real state/voice modulation. */
 @Composable
 internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion: Boolean, particleBudget: Int, onClick: () -> Unit) {
-    val target = when (state) {
-        "ready" -> .2f; "listening" -> .57f; "transcribing" -> .7f; "thinking" -> .74f
-        "responding" -> .85f; "speaking" -> .9f; "executing" -> .82f; "permission" -> .32f
-        "offline" -> .03f; "error" -> .1f; "booting" -> .3f; else -> .15f
-    }
+    val contract = NexusInteractionStates.resolve(when(state) { "ready" -> "idle"; "transcribing" -> "thinking"; else -> state })
+    val target = contract.energy
+    val stateColor by animateColorAsState(Color(contract.argb), tween(600), label = "astralColor")
     val activity = animateFloatAsState(target, tween(600), label = "astralState")
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var visible by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
@@ -82,7 +82,7 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
     val count = ((particleBudget * 6).coerceIn(210, 660) / 3) * 3
     val xs = remember(count) { FloatArray(count) }; val ys = remember(count) { FloatArray(count) }; val zs = remember(count) { FloatArray(count) }
     val seeds = remember(count) { FloatArray(count) { i -> val n = sin((i + 1) * 91.733) * 43758.5453; (n - floor(n)).toFloat() } }
-    val palette = remember { arrayOf(Color(0xFF7DF5FA), Color(0xFFE1F9FF), Color(0xFFA189FA)) }
+    val palette = arrayOf(stateColor, Color(0xFFE1F9FF), Color(0xFFA189FA))
     val inspection = remember { AstralInspection() }
     val driftX = remember(count) { FloatArray(count) }; val driftY = remember(count) { FloatArray(count) }
     val velocityX = remember(count) { FloatArray(count) }; val velocityY = remember(count) { FloatArray(count) }
@@ -182,7 +182,7 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
             val depth = (.55f + zs[i] * 1.3f).coerceIn(.15f, 1f)
             val color = palette[if (i % 19 == 0) 2 else if (i % 3 == 0) 1 else 0]
             val dot = max(.55f, size.minDimension * (.0017f + seeds[i] * .0015f)) * (.65f + depth * .7f)
-            val point = Offset(xs[i],ys[i]); val alpha = reveal * (.36f + depth * .52f + audio * .08f) * dim
+            val point = Offset(xs[i],ys[i]); val alpha = (reveal * (.36f + depth * .52f + audio * .28f) * dim).coerceIn(0f, 1f)
             if (quality > .25f && i % (if (quality < .75f) 26 else 13) == 0) {
                 drawCircle(color.copy(alpha = alpha * .045f), dot * 7f, point)
                 drawCircle(color.copy(alpha = alpha * .09f), dot * 3.7f, point)

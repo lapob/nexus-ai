@@ -26,7 +26,10 @@ function createAstralCore(canvas, options = {}) {
     gradient.addColorStop(0, `rgba(${color},.75)`); gradient.addColorStop(.15, `rgba(${color},.3)`); gradient.addColorStop(1, `rgba(${color},0)`);
     paint.fillStyle = gradient; paint.fillRect(0, 0, 32, 32); return sprite;
   });
-  const states = { idle: .15, ready: .2, listening: .57, transcribing: .7, thinking: .74, responding: .85, speaking: .9, executing: .82, permission: .32, offline: .03, error: .1, booting: .3 };
+  // Mirrors config/nexus-interaction-states.json; parity is regression-tested.
+  const states = { idle: .17, ready: .17, listening: .42, transcribing: .58, thinking: .58, responding: .68, speaking: .76, executing: .76, permission: .46, offline: .04, error: .42, booting: .08 };
+  const stateColors = { idle:[58,156,161], ready:[58,156,161], listening:[69,200,157], transcribing:[102,143,189], thinking:[102,143,189], responding:[143,214,229], speaking:[85,219,225], executing:[189,159,79], permission:[197,148,88], offline:[83,104,106], error:[214,154,88], booting:[82,123,128] };
+  const originalCursor = host.style?.cursor || '';
   let state = 'idle', energy = .15, offline = 0, phase = 0, emergence = 0, audio = 0;
   let width = 1, height = 1, size = 1, count = 360, frame = 0, last = 0, visible = true, disposed = false;
   let px = 0, py = 0, touched = false, pointer = 0, reducedPainted = false, draws = 0, drawMs = 0;
@@ -60,6 +63,7 @@ function createAstralCore(canvas, options = {}) {
     const targetCount = Math.max(210, Math.floor(budget * (quality >= .5 ? 1 : .55 + quality * .9) / 3) * 3);
     count += Math.sign(targetCount - count) * Math.min(3, Math.abs(targetCount - count));
     const target = states[state]; energy += (target - energy) * (1 - Math.exp(-dt * 4.5));
+    for (let channel = 0; channel < 3; channel++) colors[0][channel] += (stateColors[state][channel] - colors[0][channel]) * (1 - Math.exp(-dt * 4.5));
     offline += ((state === 'offline' || state === 'error' ? 1 : 0) - offline) * (1 - Math.exp(-dt * 3));
     const requestedEnergy = Number(options.getEnergy?.() || 0);
     const audioTarget = (state === 'listening' || state === 'speaking') && Number.isFinite(requestedEnergy) ? Math.min(1, Math.max(0, requestedEnergy)) : 0;
@@ -137,7 +141,7 @@ function createAstralCore(canvas, options = {}) {
       const depth = Math.min(1, Math.max(.15, .55 + z[i] * 1.3));
       const colorIndex = i % 19 === 0 ? 2 : i % 3 === 0 ? 1 : 0;
       const dot = Math.max(.55, size * (.0017 + seed[i] * .0015)) * (.65 + depth * .7);
-      context.globalAlpha = reveal * (.36 + depth * .52 + audio * .08) * (1 - offline * .65);
+      context.globalAlpha = Math.min(1, reveal * (.36 + depth * .52 + audio * .28) * (1 - offline * .65));
       if (quality > .25 && i % (quality < .75 ? 26 : 13) === 0) { const glowSize = dot * (8 + energy * 3 + audio * 2); context.drawImage(glows[colorIndex], x[i] - glowSize / 2, y[i] - glowSize / 2, glowSize, glowSize); }
       context.fillStyle = `rgb(${colors[colorIndex]})`; context.beginPath(); context.arc(x[i], y[i], dot, 0, Math.PI * 2); context.fill();
     }
@@ -165,6 +169,7 @@ function createAstralCore(canvas, options = {}) {
       const dx = event.clientX - dragX, dy = event.clientY - dragY;
       if (Math.hypot(dx, dy) > 8) dragging = true;
       if (dragging) {
+        if (host.style) host.style.cursor = 'none';
         rotationTarget[0] = Math.max(-1.15, Math.min(1.15, dy / size * 2.8));
         rotationTarget[1] = Math.max(-1.15, Math.min(1.15, dx / size * 2.8));
         host.setPointerCapture?.(event.pointerId);
@@ -175,6 +180,7 @@ function createAstralCore(canvas, options = {}) {
   const leave = event => {
     touched = false;
     if (event?.type === 'pointerleave' && dragging) return;
+    if (host.style) host.style.cursor = originalCursor;
     if (dragging) suppressClickUntil = performance.now() + 350;
     if (dragId !== null && host.hasPointerCapture?.(dragId)) host.releasePointerCapture(dragId);
     dragId = null; dragging = false;
@@ -185,8 +191,10 @@ function createAstralCore(canvas, options = {}) {
   resizeObserver.observe(canvas); observer.observe(canvas);
   host.addEventListener('pointermove', move, {passive:true}); host.addEventListener('pointerleave', leave); host.addEventListener('pointerup', leave); host.addEventListener('pointercancel', leave);
   host.addEventListener('pointerdown', down); host.addEventListener('click', click, true);
+  document.defaultView?.addEventListener('blur', leave);
+  host.addEventListener('lostpointercapture', leave);
   document.addEventListener('visibilitychange', resume); media.addEventListener('change', resume); resize(); resume();
-  return { setState, getMetrics: () => ({ state, phase, energy, audio, quality, particles: count, draws, drawMs, maxDrift }), dispose() { disposed = true; cancelAnimationFrame(frame); observer.disconnect(); resizeObserver.disconnect(); host.removeEventListener('pointermove', move); host.removeEventListener('pointerdown', down); host.removeEventListener('click', click, true); host.removeEventListener('pointerleave', leave); host.removeEventListener('pointerup', leave); host.removeEventListener('pointercancel', leave); document.removeEventListener('visibilitychange', resume); media.removeEventListener('change', resume); } };
+  return { setState, getMetrics: () => ({ state, phase, energy, audio, quality, particles: count, draws, drawMs, maxDrift }), dispose() { leave(); document.defaultView?.removeEventListener('blur', leave); host.removeEventListener('lostpointercapture', leave); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); resizeObserver.disconnect(); host.removeEventListener('pointermove', move); host.removeEventListener('pointerdown', down); host.removeEventListener('click', click, true); host.removeEventListener('pointerleave', leave); host.removeEventListener('pointerup', leave); host.removeEventListener('pointercancel', leave); document.removeEventListener('visibilitychange', resume); media.removeEventListener('change', resume); } };
   // #endregion
 }
 

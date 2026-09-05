@@ -42,6 +42,7 @@ async function main() {
       const status = await evaluateWhenReady(client, `new Promise(resolve=>{
         scrollTo(0,0);
         document.body.classList.add('status-active');
+        document.querySelector('#phase').dataset.microphone='true';
         document.querySelector('#phase').textContent='La voce non è disponibile in questo browser: puoi continuare a scrivere senza interrompere la sessione.';
         setTimeout(()=>{const a=document.querySelector('.copy').getBoundingClientRect(),b=document.querySelector('#phase').getBoundingClientRect(),c=document.querySelector('.dock').getBoundingClientRect(),d=document.querySelector('.privacy').getBoundingClientRect();resolve({titleGap:b.top-a.bottom,dockGap:c.top-b.bottom,privacyGap:d.top-c.bottom})},700);
       })`);

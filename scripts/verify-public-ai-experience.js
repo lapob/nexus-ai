@@ -288,7 +288,7 @@ async function exercise(client, { stop = false } = {}) {
       }
       const finished = !answer.classList.contains('streaming') && answer.textContent.trim();
       const stoppedCleanly = stopped && /interrotta/i.test(phase.textContent);
-      const completedCleanly = !${stop ? 'true' : 'false'} && !actions.hidden && /pronta/i.test(phase.textContent);
+      const completedCleanly = !${stop ? 'true' : 'false'} && !actions.hidden && !requestActive && send.dataset.mode !== 'stop' && !phase.classList.contains('error');
       if (finished && (stoppedCleanly || completedCleanly)) {
         if (!finishedAt) finishedAt = performance.now();
         if (performance.now() - finishedAt < 360) return;

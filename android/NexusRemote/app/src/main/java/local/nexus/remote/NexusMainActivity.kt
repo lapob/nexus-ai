@@ -2653,7 +2653,7 @@ private fun JSONArray?.toTurns() = buildList {
     val composerBringIntoView = remember { BringIntoViewRequester() }
     val instantImeVisible = WindowInsets.isImeVisible
     val coreConfiguration = LocalConfiguration.current
-    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .82f, coreConfiguration.screenHeightDp * .40f, 340f).dp
+    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .90f, coreConfiguration.screenHeightDp * .44f, 380f).dp
     val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
@@ -3110,16 +3110,18 @@ private fun JSONArray?.toTurns() = buildList {
                                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = Cyan, contentColor = Color(0xFF002223), disabledContainerColor = Surface)
                             ) { Icon(if (state.busy) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward, nexusCopy("Invia", "Send")) }
                         }
-                    } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                            Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
-                        }
-                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, energy = if (voiceMode) inlineVoiceEnergy else 0f, diameter = 118.dp,
+                    } else Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, energy = if (voiceMode) inlineVoiceEnergy else 0f, diameter = minOf(176f, LocalConfiguration.current.screenWidthDp - 160f).coerceAtLeast(96f).dp,
                             phaseState = when { !online -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" }) {
                             if (online) voiceMode = !voiceMode else dispatch("probe", "")
                         }
-                        IconButton({ voiceMode = false; textMode = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                            Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
+                            IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                                Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                            }
+                            IconButton({ voiceMode = false; textMode = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                                Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                            }
                         }
                     }
                 }
@@ -4872,15 +4874,17 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().widthIn(max = 680.dp)
             ) {
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    IconButton({ openAttachment?.invoke() }, enabled = openAttachment != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                        Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
-                    }
-                    NexusInstantCore(active = listening, offline = connection == NexusConnection.OFFLINE, reduceMotion = reduceMotion, energy = voiceEnergy, diameter = 118.dp) {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    NexusInstantCore(active = listening, offline = connection == NexusConnection.OFFLINE, reduceMotion = reduceMotion, energy = voiceEnergy, diameter = minOf(176f, LocalConfiguration.current.screenWidthDp - 160f).coerceAtLeast(96f).dp) {
                         if (mode != NexusVoiceMode.IDLE || listening) { haltCapture(false, true); close() } else beginCapture(NexusVoiceMode.SINGLE_TURN)
                     }
-                    IconButton({ haltCapture(false, false); openKeyboard?.invoke() }, enabled = openKeyboard != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                        Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
+                        IconButton({ openAttachment?.invoke() }, enabled = openAttachment != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                            Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                        }
+                        IconButton({ haltCapture(false, false); openKeyboard?.invoke() }, enabled = openKeyboard != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                            Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                        }
                     }
                 }
                 AnimatedContent(voiceStatus, transitionSpec = { nexusTransform(reduceMotion) }, label = "assistantVoiceStatus") { value ->

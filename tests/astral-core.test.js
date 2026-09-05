@@ -32,6 +32,32 @@ function fixture(options = {}) {
     frame(time) { const pending = [...callbacks.values()]; callbacks.clear(); pending.forEach(fn => fn(time)); } };
 }
 
+test('all desktop state energies are shared by the portable core', () => {
+  const contract = require('../config/nexus-interaction-states.json');
+  const f = fixture(); let now = 0;
+  for (const [name, state] of Object.entries(contract.states)) {
+    f.renderer.setState(name);
+    for (let i=0;i<90;i++) f.frame(now += 1000/60);
+    assert.ok(Math.abs(f.renderer.getMetrics().energy-state.energy)<.003, name);
+  }
+  f.renderer.dispose();
+});
+
+test('web microphone level drives the core and resets when capture stops', () => {
+  const web = fs.readFileSync(path.join(__dirname,'../src/remote/public-demo.js'),'utf8');
+  const monitor = JSON.parse(web.match(/const voiceMonitor = (".*");/)[1]);
+  let sample, value=128, now=0;
+  const runtime={};
+  const analyser={ getByteTimeDomainData: values=>values.fill(value), disconnect(){} };
+  const sandbox={runtime, performance:{now:()=>now}, requestAnimationFrame:fn=>{sample=fn;return 1},cancelAnimationFrame(){},Uint8Array,
+    AudioContext: class {createMediaStreamSource(){return {connect(){},disconnect(){}}}createAnalyser(){return analyser}close(){return Promise.resolve()}}};
+  vm.runInNewContext('let voiceMonitor=null;'+monitor+';monitorVoice({}, {state:"recording",stop(){}});',sandbox);
+  sample(); assert.equal(runtime.voiceEnergy,0);
+  value=150; now=600; sample(); assert.ok(runtime.voiceEnergy>.5);
+  vm.runInNewContext('stopVoiceMonitor()',sandbox); assert.equal(runtime.voiceEnergy,0);
+  assert.match(web,/getEnergy: \(\) => Number\(globalThis\.nexusDemoState\?\.voiceEnergy \|\| 0\)/);
+});
+
 test('all real interaction states preserve phase and use bounded finite geometry', () => {
   let energy = NaN;
   const f = fixture({ getEnergy: () => energy });

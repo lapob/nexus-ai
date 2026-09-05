@@ -584,7 +584,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     let entry = presenceWindows.get(displayId);
     if (!entry) entry = createPresenceWindow(display, true);
     entry.ambientCentered = !applicationVisible;
-    const size = Math.min(applicationVisible ? (entry.detached ? 240 : 128) : 300, display.workArea.width - 36, display.workArea.height - 36);
+    const size = Math.min(applicationVisible ? (entry.detached ? 280 : 168) : 360, display.workArea.width - 36, display.workArea.height - 36);
     const targetBounds = entry.ambientCentered
       ? ambientPresenceBounds(display, size)
       : systemPresenceBounds(display, entry.detached ? presenceState.positions?.[displayId] : undefined, size);

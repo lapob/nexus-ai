@@ -34,22 +34,29 @@ $env:NEXUS_QA_SECRET_FILE = $qaSecretPath
 
 # Il motore di ricerca e confinato al loopback e viene gestito dallo stesso
 # avvio headless. Un errore del container non deve impedire chat e voce.
-$searchManager = Join-Path $projectRoot 'scripts\manage-self-hosted-search.ps1'
-try {
-  & $searchManager -Action start | Out-Null
-} catch {
-  Write-Warning "Ricerca self-hosted non disponibile: $($_.Exception.Message)"
+function Start-OptionalService([string]$Manager) {
+  # An unavailable auxiliary service must never delay the public gateway.
+  # Each manager owns its readiness/recovery and exits after starting its daemon.
+  $serviceStart = [Diagnostics.ProcessStartInfo]::new()
+  $serviceStart.FileName = (Get-Command pwsh.exe -ErrorAction Stop).Source
+  $serviceStart.WorkingDirectory = $projectRoot
+  $serviceStart.UseShellExecute = $false
+  $serviceStart.CreateNoWindow = $true
+  $serviceStart.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  foreach ($argument in @('-NoProfile', '-File', $Manager, '-Action', 'start')) {
+    $serviceStart.ArgumentList.Add($argument)
+  }
+  try { [Diagnostics.Process]::Start($serviceStart) | Out-Null }
+  catch { Write-Warning "Avvio servizio opzionale non riuscito: $($_.Exception.Message)" }
 }
+$searchManager = Join-Path $projectRoot 'scripts\manage-self-hosted-search.ps1'
+Start-OptionalService $searchManager
 
 # Anche il generatore immagini resta loopback-only e parte senza finestre.
 # Se l'accelerazione o il modello non sono pronti, il Core rimane disponibile
 # e dichiara correttamente la capability immagini come degradata.
 $imageManager = Join-Path $projectRoot 'scripts\manage-local-image-service.ps1'
-try {
-  & $imageManager -Action start | Out-Null
-} catch {
-  Write-Warning "Generazione immagini locale non disponibile: $($_.Exception.Message)"
-}
+Start-OptionalService $imageManager
 
 #region Headless gateway
 
