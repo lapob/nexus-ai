@@ -63,6 +63,8 @@ test("selects a private client motion tier without rendering device telemetry", 
   assert.match(runtime, /hardwareConcurrency/);
   assert.match(runtime, /deviceMemory/);
   assert.match(runtime, /root\.dataset\.motionTier = tier/);
+  assert.match(runtime, /readingZones/, "the particle field must yield to readable content");
+  assert.match(runtime, /sectionAnchors/, "chapter transitions follow actual layout, not assumed equal section heights");
   assert.match(styles, /\.nxs-motion-lite/);
   assert.match(styles, /\.nxs-motion-balanced/);
   assert.match(styles, /\.nxs-motion-ultra/);

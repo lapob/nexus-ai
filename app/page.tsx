@@ -3,10 +3,10 @@ import { ArrowUpRight, Blocks, BrainCircuit, Check, Fingerprint, LockKeyhole, Me
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
 import { HardNavigationLink } from "./components/HardNavigationLink";
-import { VisualizerCollection } from "./components/InteractiveVisualizer";
+import { InteractiveVisualizer, VisualizerCollection } from "./components/InteractiveVisualizer";
 
 const apps = [
-  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce locale, progetti e azioni approvate sul computer.", accent: "cyan", device: "desktop", image: "/products/desktop-core.png", alt: "Core particellare reale di NexusNXS per PC", href: "/desktop" },
+  { index: "01", name: "NexusNXS per PC", platform: "Windows · NexusNXS Core", description: "Il centro intelligente della tua esperienza: AI connessa, voce naturale, progetti e azioni approvate sul computer.", accent: "cyan", device: "desktop", image: "/products/desktop-core.png", alt: "Core particellare reale di NexusNXS per PC", href: "/desktop" },
   { index: "02", name: "NexusNXS per Android", platform: "Android · Core vocale", description: "Un Core neurale da toccare e una scrittura essenziale quando serve: il ragionamento resta sui servizi NexusNXS.", accent: "teal", device: "android", image: "/products/android-home.png", alt: "NexusNXS per Android pronto all'ascolto", href: "/android" },
 ];
 
@@ -25,8 +25,7 @@ export default function Home() {
         <div className="aurora" aria-hidden="true">
           <i /><i /><i />
           <div className="home-neural-core">
-            <span className="home-neural-core__nucleus" />
-            {Array.from({ length: 18 }, (_, index) => <span className="home-neural-core__neuron" key={index} />)}
+            <InteractiveVisualizer variant="android" />
           </div>
         </div>
         <p className="eyebrow"><Sparkles size={13} strokeWidth={1.5} /> NEXUSNXS · AI PRIVATA, PROTETTA, CONNESSA</p>
@@ -37,6 +36,10 @@ export default function Home() {
         <div className="scroll-cue" aria-hidden="true">SCORRI <i /></div>
       </section>
       <section className="manifesto reveal" id="vision"><p className="section-label">/ 01 — LA PRESENZA</p><p className="manifesto-text">NexusNXS non è un insieme di app separate. È <strong>una sola intelligenza privata</strong> che continua tra i tuoi dispositivi.</p></section>
+      <section className="astral-interlude" aria-label="Il segno NexusNXS si compone nello spazio" data-cosmic-scene="center">
+        <InteractiveVisualizer variant="sigil" />
+        <p>Un pensiero. Infinite connessioni.</p>
+      </section>
       <section className="apps-section" id="apps">
         <div className="section-heading reveal"><div><p className="section-label">/ 02 — Le applicazioni</p><h2>Un ecosistema.<br />Il tuo ritmo.</h2></div><p>Ogni prodotto nasce per risolvere bene un problema reale. Insieme, diventano un ambiente senza attriti.</p></div>
         <VisualizerCollection mode="all" compact />

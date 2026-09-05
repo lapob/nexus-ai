@@ -757,52 +757,19 @@ body { isolation: isolate; }
   filter: drop-shadow(0 0 42px rgba(70,235,237,.16));
 }
 .home-neural-core[data-dragging="true"] { cursor: grabbing; filter: drop-shadow(0 0 58px rgba(70,235,237,.28)); }
-.home-neural-core__nucleus {
-  position: absolute;
-  inset: 41%;
+.home-neural-core .interactive-visualizer {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 42% 38%, #fff 0 4%, #7fffff 9%, #22bec3 34%, rgba(8,48,50,.82) 63%, transparent 72%);
-  box-shadow: 0 0 24px rgba(101,255,255,.75), 0 0 92px rgba(38,215,219,.34);
-  animation: nxs-neural-breath 3.4s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 50%, rgba(53,219,222,.105), transparent 54%);
+  box-shadow: none;
 }
-.home-neural-core__neuron {
-  --angle: calc(var(--neuron) * 20deg);
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: #9cffff;
-  box-shadow: 0 0 8px #52eef0;
-  transform: rotate(var(--angle)) translateX(calc(108px + var(--neuron) * 3px));
-  transform-origin: 0 0;
-  opacity: .64;
-  animation: nxs-neuron-compose 1.05s cubic-bezier(.22,1,.36,1) both, nxs-neuron-signal 3.1s ease-in-out calc(var(--neuron) * -90ms) infinite;
-  animation-delay: calc(var(--neuron) * 24ms), calc(var(--neuron) * -90ms);
-}
-.home-neural-core__neuron:nth-of-type(2){--neuron:0}.home-neural-core__neuron:nth-of-type(3){--neuron:1}.home-neural-core__neuron:nth-of-type(4){--neuron:2}.home-neural-core__neuron:nth-of-type(5){--neuron:3}.home-neural-core__neuron:nth-of-type(6){--neuron:4}.home-neural-core__neuron:nth-of-type(7){--neuron:5}.home-neural-core__neuron:nth-of-type(8){--neuron:6}.home-neural-core__neuron:nth-of-type(9){--neuron:7}.home-neural-core__neuron:nth-of-type(10){--neuron:8}.home-neural-core__neuron:nth-of-type(11){--neuron:9}.home-neural-core__neuron:nth-of-type(12){--neuron:10}.home-neural-core__neuron:nth-of-type(13){--neuron:11}.home-neural-core__neuron:nth-of-type(14){--neuron:12}.home-neural-core__neuron:nth-of-type(15){--neuron:13}.home-neural-core__neuron:nth-of-type(16){--neuron:14}.home-neural-core__neuron:nth-of-type(17){--neuron:15}.home-neural-core__neuron:nth-of-type(18){--neuron:16}.home-neural-core__neuron:nth-of-type(19){--neuron:17}
-.home-neural-core__neuron::before {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: clamp(58px, 8.5vw, 142px);
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(86,238,240,.21));
-  transform: translateY(-50%);
-  transform-origin: right;
-}
-@keyframes nxs-neuron-compose { from { opacity: 0; transform: rotate(var(--angle)) translateX(44vw) scale(0); } to { opacity: .64; } }
-@keyframes nxs-neuron-signal { 50% { opacity: 1; filter: brightness(1.55); } }
-@keyframes nxs-neural-breath { 50% { transform: scale(1.08); filter: brightness(1.18); } }
+.home-neural-core .interactive-visualizer::before { inset: 9%; opacity: .72; }
 @media (max-width: 800px) {
   .home-neural-core { left: 82%; top: 31%; width: 72vw; }
-  .home-neural-core__neuron { transform: rotate(var(--angle)) translateX(calc(58px + var(--neuron) * 1.7px)); }
   .home-continuum .security { border-radius: 0; border-inline: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-neural-core__nucleus,
-  .home-neural-core__neuron { animation: none; }
 }
 
 /* Product proof — real, current application captures in a restrained frame. */
@@ -895,6 +862,10 @@ body { isolation: isolate; }
 }
 .interactive-visualizer canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .interactive-visualizer figcaption{display:none}
+.astral-interlude{position:relative;max-width:1100px;margin:auto;padding:clamp(20px,5vw,72px) 24px;text-align:center;isolation:isolate}
+.astral-interlude .interactive-visualizer{height:clamp(300px,58vw,650px);background:none}
+.astral-interlude .interactive-visualizer::before{display:none}
+.astral-interlude>p{color:var(--muted);font-size:clamp(18px,2.6vw,30px);letter-spacing:-.025em;margin:0 0 clamp(40px,8vw,100px)}
 .visualizer-collection.is-compact .interactive-visualizer { min-height: clamp(160px, 17vw, 230px); border-radius: 21px; }
 .product-visualizers,
 .download-visualizers {
@@ -946,7 +917,10 @@ body { isolation: isolate; }
 .footer-astral-mark::before{width:clamp(180px,28vw,390px);aspect-ratio:1;border:1px solid rgba(101,238,239,.11);box-shadow:0 0 90px rgba(65,226,229,.06),inset 0 0 62px rgba(65,226,229,.035);animation:nxs-footer-orbit 18s linear infinite}
 .footer-astral-mark::after{width:clamp(125px,18vw,250px);aspect-ratio:1;background:radial-gradient(circle,rgba(82,238,240,.13),rgba(82,238,240,.025) 39%,transparent 68%);filter:blur(7px);animation:nxs-footer-breathe 5.6s ease-in-out infinite}
 .footer-astral-mark .interactive-visualizer{height:100%;min-height:0;z-index:1;background:radial-gradient(circle at 50% 50%,rgba(51,213,215,.12),transparent 43%)}
-.footer-astral-mark>img{position:absolute;z-index:3;inset:50% auto auto 50%;width:clamp(82px,9vw,132px);height:auto;translate:-50% -50%;filter:drop-shadow(0 0 42px rgba(82,238,240,.5));border-radius:28%}
+.footer-astral-mark::before,.footer-astral-mark::after{display:none}
+.footer-astral-mark .interactive-visualizer::before{display:none}
+.home-continuum .manifesto,.home-continuum .one-nexus,.home-continuum .security,.home-continuum .founder-preview{background:transparent;border:0;box-shadow:none}
+@media(min-width:900px){.home-continuum .hero h1{margin-left:0;margin-right:0;max-width:65%;font-size:clamp(58px,6.2vw,80px)}.home-continuum .hero-copy{margin-left:0!important;max-width:47%}.home-continuum .home-neural-core{left:78%}}
 .premium-footer .footer-callout{position:relative;z-index:4}
 @keyframes nxs-footer-orbit{to{rotate:1turn}}
 @keyframes nxs-footer-breathe{50%{scale:1.12;opacity:.72}}

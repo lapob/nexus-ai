@@ -15,6 +15,8 @@ type CosmicParticle = {
   depth: number;
   phase: number;
   speed: number;
+  offsetX: number;
+  offsetY: number;
 };
 
 const MOTION_TIER_CLASSES = ["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
@@ -91,13 +93,16 @@ export function SiteMotionRuntime() {
     let coreDragAnimation: Animation | null = null;
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
     const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
-    const sectionCount = Math.max(2, document.querySelectorAll("main > section").length);
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section"));
+    let sectionAnchors: number[] = [];
+    let readingZones: { left: number; right: number; top: number; bottom: number }[] = [];
+    let sceneProgress = 0;
 
     const cosmicCanvas = document.createElement("canvas");
     cosmicCanvas.className = "nxs-cosmic-field";
     cosmicCanvas.setAttribute("aria-hidden", "true");
     const cosmicContext = cosmicCanvas.getContext("2d", { alpha: true });
-    const particleCount = tier === "ultra" ? 74 : tier === "balanced" ? 48 : 24;
+    const particleCount = tier === "ultra" ? 108 : tier === "balanced" ? 72 : 28;
     let seed = 0x4e5853;
     const random = () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -109,6 +114,8 @@ export function SiteMotionRuntime() {
       depth: .25 + random() * .75,
       phase: random() * Math.PI * 2,
       speed: .22 + random() * .42,
+      offsetX: 0,
+      offsetY: 0,
     }));
 
     const resizeCosmicField = () => {
@@ -119,26 +126,39 @@ export function SiteMotionRuntime() {
       cosmicCanvas.width = Math.round(cosmicWidth * ratio);
       cosmicCanvas.height = Math.round(cosmicHeight * ratio);
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+      sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
+      readingZones = Array.from(document.querySelectorAll<HTMLElement>("main h1,main h2,main p,main li,main .app-grid,main .nexus-stage,main .presence-grid,main .security-panel")).map(element => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left - 24, right: rect.right + 24, top: rect.top + window.scrollY - 20, bottom: rect.bottom + window.scrollY + 20 };
+      });
     };
 
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const reduced = reducedMotion.matches;
-      const frameInterval = tier === "ultra" || tier === "balanced" ? 16.5 : 33;
+      const frameInterval = tier === "lite" ? 33 : 0;
       if (!reduced && now - cosmicLastFrame < frameInterval) {
         cosmicFrame = requestAnimationFrame(drawCosmicField);
         return;
       }
+      const delta = Math.min(.064, Math.max(.001, (now - cosmicLastFrame) / 1000));
       cosmicLastFrame = now;
       const time = reduced ? 0 : now / 1000;
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
-      const sectionPosition = scroll * (sectionCount - 1);
+      const viewportAnchor = window.scrollY + cosmicHeight * .3;
+      let currentSection = Math.max(0, sectionAnchors.findLastIndex(top => top <= viewportAnchor));
+      currentSection = Math.min(currentSection, Math.max(0, sections.length - 1));
+      const sectionStart = sectionAnchors[currentSection] || 0;
+      const sectionEnd = sectionAnchors[currentSection + 1] || sectionStart + cosmicHeight;
+      const destination = currentSection + Math.min(1, Math.max(0, (viewportAnchor - sectionStart) / Math.max(1, sectionEnd - sectionStart)));
+      sceneProgress += (destination - sceneProgress) * (reduced ? 1 : 1 - Math.exp(-2.4 * delta));
+      const sectionPosition = sceneProgress;
       const sectionIndex = Math.floor(sectionPosition);
       const sectionMixRaw = sectionPosition - sectionIndex;
       const sectionMix = sectionMixRaw * sectionMixRaw * (3 - 2 * sectionMixRaw);
-      const laneFor = (index: number) => index % 2 === 0 ? .73 : .27;
+      const laneFor = (index: number) => sections[index]?.dataset.cosmicScene === "center" ? .5 : index % 2 === 0 ? .87 : .13;
       const visualLane = cosmicWidth < 760
-        ? .5
+        ? (sectionIndex % 2 ? .04 : .96)
         : laneFor(sectionIndex) + (laneFor(sectionIndex + 1) - laneFor(sectionIndex)) * sectionMix;
       const topology = sectionPosition + routePhase;
       const topologyIndex = Math.floor(topology);
@@ -189,9 +209,14 @@ export function SiteMotionRuntime() {
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (4 + particle.depth * 9);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (3 + particle.depth * 7);
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
-        const influence = pointer.active * Math.max(0, 1 - distance / 150);
+        const influence = (reduced ? 0 : pointer.active) * Math.max(0, 1 - distance / 190);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
-        return { x: x + Math.cos(angle) * influence * 8, y: y + Math.sin(angle) * influence * 8, depth: particle.depth };
+        const returnEase = 1 - Math.exp(-(influence > 0 ? 7 : 1.25) * delta);
+        particle.offsetX += (Math.cos(angle) * influence * 46 - particle.offsetX) * returnEase;
+        particle.offsetY += (Math.sin(angle) * influence * 46 - particle.offsetY) * returnEase;
+        const px = x + particle.offsetX, py = y + particle.offsetY;
+        const behindText = readingZones.some(rect => px > rect.left && px < rect.right && py + window.scrollY > rect.top && py + window.scrollY < rect.bottom);
+        return { x: px, y: py, depth: particle.depth, visibility: behindText ? .035 : 1 };
       });
       cosmicContext.lineWidth = .55;
       for (let index = 0; index < points.length; index += 3) {
@@ -205,14 +230,14 @@ export function SiteMotionRuntime() {
         }
         if (!nearest) continue;
         cosmicContext.beginPath();
-        cosmicContext.strokeStyle = `rgba(86, 232, 234, ${.026 * (1 - nearestDistance / 128)})`;
+        cosmicContext.strokeStyle = `rgba(86, 232, 234, ${.1 * point.visibility * nearest.visibility * (1 - nearestDistance / 128)})`;
         cosmicContext.moveTo(point.x, point.y);
         cosmicContext.lineTo(nearest.x, nearest.y);
         cosmicContext.stroke();
       }
       for (const point of points) {
         cosmicContext.beginPath();
-        cosmicContext.fillStyle = `rgba(101, 238, 239, ${.04 + point.depth * .12})`;
+        cosmicContext.fillStyle = `rgba(${point.depth > .9 ? '239,213,154' : '101,238,239'}, ${(.16 + point.depth * .4) * point.visibility})`;
         cosmicContext.arc(point.x, point.y, .45 + point.depth * 1.15, 0, Math.PI * 2);
         cosmicContext.fill();
       }
@@ -329,6 +354,13 @@ export function SiteMotionRuntime() {
       coreDrag.pointerId = -1;
       delete draggableCore.dataset.dragging;
       if (draggableCore.hasPointerCapture(event.pointerId)) draggableCore.releasePointerCapture(event.pointerId);
+      coreDragAnimation?.cancel();
+      coreDragAnimation = draggableCore.animate(
+        [{ translate: `${coreDrag.x}px ${coreDrag.y}px` }, { translate: "0px 0px" }],
+        { duration: 2400, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" },
+      );
+      coreDrag.x = 0;
+      coreDrag.y = 0;
     };
     const onCoreDoubleClick = () => { coreDrag.x = 0; coreDrag.y = 0; paintCoreDrag(); };
 

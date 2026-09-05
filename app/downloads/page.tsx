@@ -16,7 +16,7 @@ const releases = [
   {
     Icon: Laptop,
     name: "NexusNXS per PC",
-    version: "0.3.10",
+    version: "0.3.11",
     platform: "Windows 11 · x64",
     size: "102,51 MiB · 107.494.538 byte",
     date: "4 settembre 2026",
@@ -26,12 +26,12 @@ const releases = [
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
     sha256: "DB5A7E88CFBBCD0629C05500C608D133864E818B8A6099683039C4AA9C4DA469",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.10-preview.2/NexusNXS-0.3.10-Setup.exe",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.11-preview.1/NexusNXS-0.3.11-Setup.exe",
   },
   {
     Icon: Smartphone,
     name: "NexusNXS per Android",
-    version: "6.4.5",
+    version: "6.4.6",
     platform: "Android 10+",
     size: "1,31 MiB · 1.374.360 byte",
     date: "4 settembre 2026",
@@ -41,7 +41,7 @@ const releases = [
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
     sha256: "6BBAFEDB4D2F50478895247C6C3B1FB4BD7FFE8B205AFABE6533E93CFD65C29D",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.10-preview.2/NexusNXS-Android-6.4.5.apk",
+    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.11-preview.1/NexusNXS-Android-6.4.6.apk",
   },
 ];
 
@@ -76,7 +76,7 @@ export default function Downloads() {
     <section className="verify-guide">
       <div><FileCheck2 /><h2>Come verificare una release</h2></div>
       <ol><li><span>01</span>Avvia il download da <strong>nexusnxs.com</strong>; il file è ospitato nella release GitHub ufficiale.</li><li><span>02</span>Leggi lo stato della firma e gli avvisi della piattaforma.</li><li><span>03</span>Confronta l’impronta SHA-256 completa prima di eseguire il file.</li></ol>
-      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.10-Setup.exe -Algorithm SHA256</code></div>
+      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.11-Setup.exe -Algorithm SHA256</code></div>
       <p><BadgeCheck /> Versioni, avvisi e impronte sono pubblicati insieme ai file.</p>
     </section>
     <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili i client PC e Android con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>
