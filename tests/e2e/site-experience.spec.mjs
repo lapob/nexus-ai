@@ -452,8 +452,7 @@ test("the product title enters once and plans no longer appear", async ({page}) 
   await page.goto("/");
   const letters=page.locator(".hero-letter");
   await expect(letters).toHaveCount(8);
-  await page.waitForTimeout(2400);
-  expect(await letters.evaluateAll(nodes => nodes.every(n => getComputedStyle(n).opacity === "1"))).toBe(true);
+  await expect.poll(() => letters.evaluateAll(nodes => nodes.every(n => getComputedStyle(n).opacity === "1"))).toBe(true);
   await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
   await page.goto("/pricing");
   await expect(page).toHaveURL(/\/downloads$/);
@@ -481,7 +480,27 @@ test("the shared core rotates on drag and returns without shifting the interface
   await page.waitForTimeout(600);
   expect(Math.abs(Number((await core.getAttribute('data-astral-rotation')).split(',')[1]))).toBeGreaterThan(.3);
   await page.mouse.up();
-  await page.waitForTimeout(7000);
-  expect((await core.getAttribute('data-astral-rotation')).split(',').every(v=>Math.abs(Number(v))<.003)).toBe(true);
+  await expect.poll(async () => (await core.getAttribute('data-astral-rotation')).split(',').every(v=>Math.abs(Number(v))<.003), {timeout:12000}).toBe(true);
   expect(await core.boundingBox()).toEqual(before);
+});
+
+test("replay reassembles only the home artwork and remains bounded on mobile", async ({page}) => {
+  for (const viewport of [{width:1440,height:1000}, {width:390,height:844}]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const core=page.locator('.astral-hero canvas');
+    await expect(core).toHaveAttribute('data-astral-particles', /\d+/);
+    const original=await core.elementHandle();
+    const replay=page.getByRole('button', {name:'Ripeti animazione'});
+    await expect(replay).toBeVisible();
+    const bounds=await replay.boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x+bounds.width).toBeLessThanOrEqual(viewport.width);
+    await replay.click();
+    expect(await original.evaluate(node=>node.isConnected)).toBe(false);
+    await expect(core).toHaveAttribute('data-astral-particles', /\d+/);
+    await expect(page.locator('.nxs-cosmic-field')).toHaveCount(1);
+    await expect(page).toHaveURL(/\/$/);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
 });

@@ -92,6 +92,8 @@ export function SiteMotionRuntime() {
     let readingZones: { left: number; right: number; top: number; bottom: number }[] = [];
     let sceneProgress = 0;
     let paintMs = 0;
+    let fieldStarted = performance.now();
+    let ambientTime = 0;
 
     const cosmicCanvas = document.createElement("canvas");
     cosmicCanvas.className = "nxs-cosmic-field";
@@ -136,7 +138,8 @@ export function SiteMotionRuntime() {
       const reduced = reducedMotion.matches;
       const delta = Math.min(.25, Math.max(.001, (now - cosmicLastFrame) / 1000));
       cosmicLastFrame = now;
-      const time = reduced ? 0 : now / 1000;
+      if (!reduced) ambientTime += delta * .55;
+      const time = reduced ? 0 : ambientTime;
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
       const viewportAnchor = window.scrollY + cosmicHeight * .3;
@@ -145,7 +148,7 @@ export function SiteMotionRuntime() {
       const sectionStart = sectionAnchors[currentSection] || 0;
       const sectionEnd = sectionAnchors[currentSection + 1] || sectionStart + cosmicHeight;
       const destination = currentSection + Math.min(1, Math.max(0, (viewportAnchor - sectionStart) / Math.max(1, sectionEnd - sectionStart)));
-      sceneProgress += (destination - sceneProgress) * (reduced ? 1 : 1 - Math.exp(-2.4 * delta));
+      sceneProgress += (destination - sceneProgress) * (reduced ? 1 : 1 - Math.exp(-1.35 * delta));
       const sectionPosition = sceneProgress;
       const sectionIndex = Math.floor(sectionPosition);
       const sectionMixRaw = sectionPosition - sectionIndex;
@@ -191,6 +194,8 @@ export function SiteMotionRuntime() {
       };
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
+      const age = Math.max(0, now - fieldStarted) / 1000;
+      cosmicContext.globalAlpha = reduced ? 1 : Math.min(1, age / .9);
       // Only nearby text can mask this viewport. Checking the entire document
       // per particle made long narrative pages needlessly expensive.
       const scrollY = window.scrollY;
@@ -206,15 +211,18 @@ export function SiteMotionRuntime() {
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
         const transitionScatter = Math.sin(sectionMix * Math.PI) * .24;
-        const compose = (.82 + particle.depth * .16) * (1 - transitionScatter);
+        // Reload starts with dispersed matter, not a blank canvas followed
+        // by a finished diagram. The same particles keep moving on scroll.
+        const arrival = reduced ? 1 : 1 - Math.exp(-Math.max(0, age - .4) * .8);
+        const compose = (.82 + particle.depth * .16) * (1 - transitionScatter) * arrival;
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (4 + particle.depth * 9);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (3 + particle.depth * 7);
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
-        const influence = (reduced ? 0 : pointer.active) * Math.max(0, 1 - distance / 190);
+        const influence = (reduced ? 0 : pointer.active) * Math.max(0, 1 - distance / 240) * (index % 9 < 3 ? .3 : 1);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
-        const goalX = (Math.cos(angle) * 46 + pointer.vx * .1) * influence;
-        const goalY = (Math.sin(angle) * 46 + pointer.vy * .1) * influence;
-        const omega = influence > .01 ? 4.5 : 1.7, decay = Math.exp(-omega * delta);
+        const goalX = (Math.cos(angle) * 85 + pointer.vx * .14) * influence;
+        const goalY = (Math.sin(angle) * 85 + pointer.vy * .14) * influence;
+        const omega = influence > .01 ? 4.5 : 1.1, decay = Math.exp(-omega * delta);
         const ex = particle.offsetX - goalX, ey = particle.offsetY - goalY;
         const ax = particle.velocityX + omega * ex, ay = particle.velocityY + omega * ey;
         particle.offsetX = goalX + (ex + ax * delta) * decay;
@@ -257,6 +265,7 @@ export function SiteMotionRuntime() {
         cosmicContext.fill();
       }
       cosmicContext.globalCompositeOperation = "source-over";
+      cosmicContext.globalAlpha = 1;
       paintMs += (performance.now() - paintStart - paintMs) * .1;
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
@@ -352,12 +361,17 @@ export function SiteMotionRuntime() {
       pointer.active = 1;
     };
     const onPointerLeave = () => { pointer.active = 0; };
+    const replayComposition = () => {
+      fieldStarted = performance.now();
+      if (reducedMotion.matches) drawCosmicField(fieldStarted);
+    };
     updateScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
     window.addEventListener("resize", resizeCosmicField, { passive: true });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     document.documentElement.addEventListener("pointerleave", onPointerLeave);
+    window.addEventListener("nxs:replay-composition", replayComposition);
 
     return () => {
       revealObserver?.disconnect();
@@ -371,6 +385,7 @@ export function SiteMotionRuntime() {
       window.removeEventListener("resize", resizeCosmicField);
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("nxs:replay-composition", replayComposition);
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
       document.removeEventListener("visibilitychange", syncVisibility);

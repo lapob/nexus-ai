@@ -75,7 +75,7 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
     if (!context) return;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const lite = document.documentElement.dataset.motionTier === "lite";
-    const count = lite ? 40 : variant === "sigil" ? 160 : compact ? 48 : 72;
+    const count = variant === "sigil" ? (lite ? 180 : 540) : lite ? 40 : compact ? 48 : 72;
     // Rasterize glow once; per-particle shadowBlur forces repeated expensive
     // shadow passes on mobile/software renderers.
     const glow = document.createElement("canvas");
@@ -106,12 +106,17 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
     let last = performance.now();
     let initialized = false;
     let documentTop = 0;
+    let chapterTop = 0;
+    let chapterHeight = 0;
+    const chapter = canvas.closest<HTMLElement>(".astral-interlude");
+    let ambientTime = 0;
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       width = Math.max(1, rect.width);
       height = Math.max(1, rect.height);
       documentTop = rect.top + window.scrollY;
+      if (chapter) { chapterTop = chapter.getBoundingClientRect().top + window.scrollY; chapterHeight = chapter.offsetHeight; }
       ratio = Math.min(window.devicePixelRatio || 1, lite ? 1 : 1.6);
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
@@ -130,14 +135,15 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
       const elapsed = Math.min(250, now - last) / 16.667;
       last = now;
       context.clearRect(0, 0, width, height);
-      const scale = Math.min(width, height) * (compact ? 1.02 : .9);
+      const scale = Math.min(width, height) * (variant === "sigil" ? 1.3 : compact ? 1.02 : .9);
       const cx = width / 2;
       const cy = height / 2;
       const targetPointerX = (pointer.x - .5) * width;
       const targetPointerY = (pointer.y - .5) * height;
       const dt = elapsed / 60;
-      const settle = 1 - Math.exp(-(pointer.pressed ? 7 : 1.25) * dt);
-      const omega = inspection.id >= 0 ? 9 : 1.7, decay = Math.exp(-omega * dt);
+      if (!reduceMotion.matches) ambientTime += dt * 1000 * .55;
+      const settle = 1 - Math.exp(-(pointer.pressed ? 7 : .8) * dt);
+      const omega = inspection.id >= 0 ? 9 : 1.1, decay = Math.exp(-omega * dt);
       const goalX = inspection.id >= 0 ? inspection.tx : 0, goalY = inspection.id >= 0 ? inspection.ty : 0;
       const ex = inspection.x - goalX, ey = inspection.y - goalY;
       const ax = inspection.vx + omega * ex, ay = inspection.vy + omega * ey;
@@ -147,11 +153,15 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
       const top = documentTop - window.scrollY;
       const arrival = Math.min(1, Math.max(0, (window.innerHeight * .92 - top) / Math.max(1, height * .7)));
       const departure = Math.min(1, Math.max(0, (top + height) / Math.max(1, height * .55)));
-      const reveal = variant === "sigil" && !reduceMotion.matches ? Math.min(arrival, departure) : 1;
+      const chapterProgress = chapter ? (window.scrollY + window.innerHeight - chapterTop) / Math.max(1, chapterHeight + window.innerHeight) : 0;
+      const chapterArrival = Math.min(1, Math.max(0, (chapterProgress - .06) / .26));
+      const chapterDeparture = 1 - Math.min(1, Math.max(0, (chapterProgress - .62) / .3));
+      const reveal = variant === "sigil" && !reduceMotion.matches ? (chapter ? Math.min(chapterArrival, chapterDeparture) : Math.min(arrival, departure)) : 1;
       const composition = reveal * reveal * (3 - 2 * reveal);
+      canvas.dataset.composition = composition.toFixed(3);
       pointer.active += ((pointer.pressed ? 1 : 0) - pointer.active) * settle;
       const rendered = points.map((point, index) => {
-        const target = targetFor(variant, point, index, count, reduceMotion.matches ? 0 : now);
+        const target = targetFor(variant, point, index, count, reduceMotion.matches ? 0 : ambientTime);
         const scatterX = (point.seed - .5) * width * 1.35;
         const scatterY = Math.sin(point.phase) * height * .65;
         const z = Math.sin(point.phase) * .09;
@@ -167,7 +177,7 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
         if (!reduceMotion.matches) {
           const gx = tx + dx / distance * influence * scale * .18;
           const gy = ty + dy / distance * influence * scale * .18;
-          const omega = influence > .01 ? 4.5 : 1.7, decay = Math.exp(-omega * dt);
+          const omega = influence > .01 ? 4.5 : 1.1, decay = Math.exp(-omega * dt);
           const ex = point.x - gx, ey = point.y - gy;
           const ax = point.vx + omega * ex, ay = point.vy + omega * ey;
           point.x = gx + (ex + ax * dt) * decay; point.y = gy + (ey + ay * dt) * decay;

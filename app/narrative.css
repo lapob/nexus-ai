@@ -5,6 +5,13 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .inner-page > section { background: transparent; border-color: transparent; box-shadow: none; }
 .client-performance dl { background: transparent; }
 .client-performance dl > div { background: rgba(9, 20, 24, .3); }
+.inner-page .security-policies article,
+.inner-page .release-list article,
+.inner-page .feature-grid article,
+.inner-page .control-grid article,
+.inner-page .security-summary,
+.inner-page .service-list > div,
+.inner-page .uptime-empty { background: transparent; box-shadow: none; }
 .nxs-cosmic-field { opacity: .74; }
 .service-list span, .service-list small, .service-list b, .service-list .neutral { font-size: 12px; line-height: 1.5; }
 .narrative-page, .product-narrative { position: relative; isolation: isolate; }
@@ -27,22 +34,23 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
-  padding: 76px var(--page-pad) 44px;
+  padding: 76px clamp(24px, 2vw, 48px) 44px;
   gap: 0;
   text-align: center;
   overflow: clip;
 }
-.astral-hero__scene { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 720px) minmax(0, 1fr); align-items: center; flex: 1; width: 100%; }
+.astral-hero__scene { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, min(62vw, 920px)) minmax(0, 1fr); align-items: center; flex: 1; width: 100%; }
+.home-continuum .astral-hero > .astral-hero__scene { width: 100%; margin-inline: 0; }
 .astral-hero .hero-product-name {
   display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; grid-row: 1;
   width: 100%; max-width: none; margin: 0; z-index: 2;
-  font-size: clamp(36px, 4.9vw, 72px); line-height: 1.15; font-weight: 500; letter-spacing: -.07em;
+  font-size: clamp(36px, 4.1vw, 68px); line-height: 1.15; font-weight: 500; letter-spacing: -.07em;
   pointer-events: none;
 }
 .home-continuum .astral-hero h1.hero-product-name { width: 100% !important; max-width: none !important; margin-inline: 0 !important; }
 .hero-word { display: inline-flex; justify-content: flex-start; white-space: nowrap; }
 .hero-word:last-child { grid-column: 3; justify-content: flex-end; }
-.hero-letter { display: inline-block; animation: nxs-letter-arrive 1.6s cubic-bezier(.22, 1, .36, 1) both; }
+.hero-letter { display: inline-block; animation: nxs-letter-arrive 2.4s cubic-bezier(.22, 1, .36, 1) both; }
 .hero-letter:nth-child(2) { animation-delay: .1s; }
 .hero-letter:nth-child(3) { animation-delay: .2s; }
 .hero-letter:nth-child(4) { animation-delay: .3s; }
@@ -51,7 +59,7 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .hero-word:last-child .hero-letter:nth-child(2) { animation-delay: .55s; }
 .hero-word:last-child .hero-letter:nth-child(3) { animation-delay: .65s; }
 @keyframes nxs-letter-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-.astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(720px, 74svh); aspect-ratio: 1; margin: auto; filter: none; cursor: default; touch-action: pan-y; }
+.astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(920px, 78svh); aspect-ratio: 1; margin: auto; filter: none; cursor: default; touch-action: pan-y; }
 .astral-hero .home-neural-core .interactive-visualizer { width: 100%; height: 100%; min-height: 0; }
 .astral-hero .home-neural-core .interactive-visualizer { background: none; border-radius: 0; }
 .astral-hero .home-neural-core .interactive-visualizer::before { display: none; }
@@ -59,6 +67,10 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
 .astral-hero .hero-actions a { font-size: 14px; }
+.astral-hero__replay { position: absolute; right: max(20px, env(safe-area-inset-right)); bottom: 20px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #71b6bb38; border-radius: 50%; color: #b8d8db; background: #0410158c; cursor: pointer; transition: background .3s, color .3s; }
+.astral-hero__replay:hover { background: #10292cb3; color: #e1ffff; }
+.astral-hero__replay:focus-visible { outline: 2px solid #91e9ec; outline-offset: 4px; }
+.home-continuum .astral-hero > .astral-hero__replay { width: 44px; margin: 0; }
 
 .narrative-copy { position: relative; max-width: 660px; margin: 0 auto 0 max(var(--page-pad), calc((100vw - 1160px) / 2)); padding: clamp(96px, 13vw, 200px) 0; }
 .narrative-copy--right { margin-left: auto; margin-right: max(var(--page-pad), calc((100vw - 1160px) / 2)); }
@@ -80,6 +92,9 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-page .presence-grid article small { color: #92b0b4; font-size: 14px; line-height: 1.5; }
 .narrative-page .presence-grid article > i { display: none; }
 .narrative-forms { padding-block: 32px 80px; }
+.narrative-page .astral-interlude { max-width: none; min-height: 160svh; padding: 0; margin: 0; }
+.narrative-page .astral-interlude .interactive-visualizer { position: sticky; top: 0; width: 100%; height: 100svh; min-height: 100svh; margin: 0; border: 0; border-radius: 0; }
+.narrative-page .astral-interlude > p { position: relative; z-index: 1; max-width: 34ch; margin: -15svh auto 0; padding: 0 24px 10svh; }
 .narrative-page .one-nexus { padding-block: clamp(100px, 14vw, 200px); }
 .interactive-visualizer::before { display: none; }
 .product-narrative .product-facts, .product-narrative .feature-grid { border: 0; background: none; }
@@ -91,7 +106,7 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
   .astral-hero__scene { grid-template-columns: minmax(0, 1fr) minmax(0, 58vw) minmax(0, 1fr); }
 }
 @media (max-width: 800px) {
-  .home-continuum .astral-hero { padding: 76px var(--page-pad) 36px; min-height: 100svh; }
+  .home-continuum .astral-hero { padding: 76px var(--page-pad) 84px; min-height: 100svh; }
   .astral-hero__scene { grid-template-columns: minmax(0, 1fr); flex: 0; }
   .astral-hero .home-neural-core { grid-column: 1; grid-row: 1; width: min(100%, 520px, 58svh); order: initial; }
   .astral-hero .hero-product-name { grid-column: 1; grid-row: 2; display: flex; justify-content: center; gap: .2em; font-size: clamp(40px, 9vw, 64px); margin-top: 8px; }
@@ -106,4 +121,12 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-letter { animation: none; opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nxs-motion-ready .narrative-copy.nxs-motion-candidate,
+  .nxs-motion-ready .narrative-apps .nxs-motion-candidate {
+    transition-duration: 1.2s, 1.6s;
+    transition-delay: .12s;
+  }
 }
