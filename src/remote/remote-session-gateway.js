@@ -1982,7 +1982,7 @@ class RemoteSessionGateway {
         const audio = await this.rawBody(request, MAX_PRIVATE_VOICE_BYTES);
         privateVoiceWaveInfo(audio);
         try {
-          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 20 });
+          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 55 });
           this.assertServing();
           const text = String(result?.text || '').trim().slice(0, 4_000);
           if (!text) return this.json(response, 422, { error: 'Nessuna frase riconosciuta.', code: 'VOICE_NO_SPEECH' });
@@ -2325,7 +2325,7 @@ class RemoteSessionGateway {
         request.once('aborted', cancel);
         response.once('close', cancel);
         try {
-          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 20, signal: controller.signal });
+          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 55, signal: controller.signal });
           this.assertServing();
           if (controller.signal.aborted || response.destroyed) return;
           const text = String(result?.text || '').trim().slice(0, 4_000);

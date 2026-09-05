@@ -71,6 +71,11 @@ class AIRuntime {
   async chat(request) { const valid = validateChatRequest(request); this.permit('chat'); const controller = this.begin(valid.requestId, valid.signal); try { const result = await this.requireProvider().chat({ ...valid, signal: controller.signal }); this.record('chat'); return result; } catch (error) { const normalized = normalizeAIError(error, this.providerName); this.record('chat', normalized); throw normalized; } finally { this.requests.delete(valid.requestId); } }
   async streamChat(request, handlers) { const valid = validateChatRequest(request); this.permit('stream'); const controller = this.begin(valid.requestId, valid.signal); try { const result = await this.requireProvider().streamChat({ ...valid, signal: controller.signal }, handlers); this.record('stream'); return result; } catch (error) { const normalized = normalizeAIError(error, this.providerName); this.record('stream', normalized); throw normalized; } finally { this.requests.delete(valid.requestId); } }
   async embed(input, options) { this.permit('embed'); try { const result = await this.requireProvider().embed(input, options); this.record('embed'); return result; } catch (error) { const normalized = normalizeAIError(error, this.providerName); this.record('embed', normalized); throw normalized; } }
+  async transcribeVoiceAudio(audio, options = {}) {
+    const provider = this.requireProvider();
+    if (typeof provider.transcribeAudio !== 'function') throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'La trascrizione vocale non è disponibile.', { provider: this.providerName });
+    try { return await provider.transcribeAudio(audio, options); } catch (error) { throw normalizeAIError(error, this.providerName); }
+  }
   async submitFeedback(example) {
     const provider = this.requireProvider();
     if (typeof provider.submitFeedback !== 'function') throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'La raccolta dei contributi non è disponibile.', { provider: this.providerName });

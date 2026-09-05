@@ -137,6 +137,8 @@ test('le due app restano client Android nativi con uno stato offline comprensibi
 test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assistente', () => {
   const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
   const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
+  const assistantActivity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusAssistantActivity.kt');
+  const styles = read('android/NexusRemote/app/src/main/res/values/styles.xml');
   const launcherActivity = manifest.split('android:name=".NexusMainActivity"')[1]?.split('</activity>')[0] || '';
   assert.match(launcherActivity, /android\.intent\.action\.MAIN/);
   assert.doesNotMatch(manifest, /NativeMainActivity|QrScannerActivity|NexusRedesignActivity/);
@@ -148,6 +150,13 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(activity, /if \(back\) -width \/ 9 else width \/ 9/, 'avanzamento e ritorno devono avere direzioni Android speculari');
   assert.match(activity, /setContent \{ NexusTheme \{ if \(state\.assistantOverlay\) NexusAssistantOverlay\(state, ::dispatch\) else NexusInstantApp\(state, ::dispatch\) \} \}/);
   assert.match(manifest, /android:name="\.NexusAssistantActivity"[\s\S]*android\.intent\.action\.ASSIST/);
+  assert.match(styles, /Theme\.NexusRemote\.Assistant[\s\S]*windowIsTranslucent">true/);
+  assert.match(styles, /Theme\.NexusRemote\.Assistant[\s\S]*backgroundDimEnabled">false/);
+  assert.match(assistantActivity, /PixelFormat\.TRANSLUCENT/);
+  assert.match(activity, /private fun nexusComposerTransform[\s\S]{0,160}sizeTransform = null/, 'il composer non deve sovrapporre una molla alla transizione della tastiera Android');
+  assert.doesNotMatch(activity, /"assistantClose"\s*->[^\n]*assistantOverlay\s*=\s*false/, 'la chiusura Assist non deve comporre la UI opaca prima di terminare');
+  assert.match(assistantActivity, /clearFlags\(WindowManager\.LayoutParams\.FLAG_DIM_BEHIND\)/);
+  assert.doesNotMatch(assistantActivity, /addFlags\(WindowManager\.LayoutParams\.FLAG_DIM_BEHIND\)/, 'il richiamo assistente non deve oscurare o sostituire il contesto Android');
   assert.doesNotMatch(activity.match(/setContent[^\n]+/)?.[0] || '', /NexusApp\(/);
   assert.match(activity, /private fun NexusInstantApp/);
   assert.match(activity, /private fun NexusInstantCore/);

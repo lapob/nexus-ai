@@ -230,6 +230,9 @@ test('tutti i visualizer reagiscono in modo progressivo a mouse e touch', () => 
   assert.match(neural, /uPointerStrength/);
   assert.match(saturn, /uPointerStrength/);
   assert.match(reactor, /pointerEnergy\.current/);
+  for (const visualizer of [neural, saturn, reactor]) {
+    assert.match(visualizer, /VISUALIZER_POINTER_DAMPING\.release/, 'tutti i visualizer condividono il rientro lento indipendente dagli FPS');
+  }
   assert.match(neural, /Raycaster/);
   assert.match(saturn, /Raycaster/);
   assert.match(neural, /worldToLocal\(interactionPoint\)/);

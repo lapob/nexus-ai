@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AudioBus, EntityState, VisualQuality } from '../types/nexus';
-import { AnimationController } from '../systems/AnimationController';
+import { AnimationController, VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
 
 // #region 01 — Contratto e shader GPU
 
@@ -327,7 +327,7 @@ export function ParticleEngine({ state, audioBus, particleCount, reducedMotion, 
     material.current.uniforms.uPointerStrength.value = THREE.MathUtils.damp(
       material.current.uniforms.uPointerStrength.value,
       pointerPresence.current * 0.58,
-      pointerPresence.current > 0 ? 7.2 : 2.8,
+      pointerPresence.current > 0 ? VISUALIZER_POINTER_DAMPING.engage : VISUALIZER_POINTER_DAMPING.release,
       delta
     );
     const accent = state === 'error' ? '#d69a58'

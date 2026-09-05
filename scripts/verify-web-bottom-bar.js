@@ -7,6 +7,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { RemoteSessionGateway } = require('../src/remote/remote-session-gateway');
 const { browserExecutable, Cdp, evaluateWhenReady, freePort, waitForTarget, removeTemporaryPath } = require('./web-visual-regression');
+const { verifyIdleComposerSlide } = require('./verify-public-ai-experience');
 
 // #region 01 - Matrice dispositivi
 
@@ -35,6 +36,9 @@ async function main() {
     for (const [width, height] of VIEWPORTS) {
       await client.command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
       await client.command('Page.reload', { ignoreCache: true });
+      if ((width === 390 && height === 844) || (width === 1440 && height === 900)) {
+        await verifyIdleComposerSlide(client, `Source ${width}x${height}`);
+      }
       const status = await evaluateWhenReady(client, `new Promise(resolve=>{
         scrollTo(0,0);
         document.body.classList.add('status-active');

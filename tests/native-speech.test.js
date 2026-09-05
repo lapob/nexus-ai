@@ -233,8 +233,8 @@ test('whisper-cli trascrive una singola registrazione WAV e pulisce i file tempo
   const result = await service.transcribeAudio({ audio: wav });
   assert.equal(result.backend, 'whisper-cli');
   assert.equal(result.text, 'una sola frase riconosciuta');
-  assert.equal(whisperArguments[whisperArguments.indexOf('-bs') + 1], '10');
-  assert.equal(whisperArguments[whisperArguments.indexOf('-bo') + 1], '10');
+  assert.equal(whisperArguments.includes('-bs'), false, 'beam search e best-of non devono essere combinati su whisper.cpp 1.9');
+  assert.equal(whisperArguments.includes('-bo'), false, 'il decoder usa i default compatibili della build distribuita');
   assert.equal(whisperArguments[whisperArguments.indexOf('-nth') + 1], '0.68');
   assert.equal(whisperArguments.includes('-sns'), true);
   assert.equal(whisperArguments.includes('--prompt'), false);

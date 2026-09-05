@@ -50,8 +50,8 @@ android {
         applicationId = "local.nexus.remote"
         minSdk = 26
         targetSdk = 36
-        versionCode = 84
-        versionName = "6.4.5"
+        versionCode = 85
+        versionName = "6.4.6"
         buildConfigField "String", "NEXUS_URL", quotedBuildValue(publicNexusUrl)
         buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)
         buildConfigField "String", "NEXUS_FALLBACK_URL", quotedBuildValue(fallbackNexusUrl)

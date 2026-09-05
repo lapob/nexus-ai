@@ -54,7 +54,7 @@ class NexusServiceProvider {
     return this.getCapabilities();
   }
 
-  getCapabilities() { return { chat: true, streaming: true, embeddings: false, modelManagement: false, remoteInference: true }; }
+  getCapabilities() { return { chat: true, streaming: true, voiceTranscription: true, embeddings: false, modelManagement: false, remoteInference: true }; }
   getCurrentModel() { return this.currentModel; }
   breaker(endpoint) {
     if (!this.breakers.has(endpoint)) this.breakers.set(endpoint, new CircuitBreaker());
@@ -137,6 +137,28 @@ class NexusServiceProvider {
     return { status: 'ready', remote: true, warmed: true, endpoint: this.activeBaseUrl || this.baseUrl };
   }
   async embed() { throw new AIError(AI_ERROR_CODES.EMBEDDING_UNSUPPORTED, 'La ricerca locale usa l’indice lessicale protetto.', { provider: this.name }); }
+
+  async transcribeAudio(audio, { language = 'auto', signal } = {}, retried = false) {
+    const bytes = Buffer.isBuffer(audio) ? audio : Buffer.from(audio || []);
+    if (bytes.byteLength < 44 || bytes.byteLength > 2_000_000 || bytes.subarray(0, 4).toString('ascii') !== 'RIFF') {
+      throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'Registrazione vocale non valida.', { provider: this.name });
+    }
+    const token = await this.ensureToken(retried);
+    const response = await this.request('/api/guest/voice/transcribe', {
+      method: 'POST', body: bytes, signal, failover: true,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'audio/wav', 'X-Nexus-Language': String(language || 'auto').slice(0, 16) }
+    });
+    if (response.status === 401 && !retried) {
+      this.token = ''; this.tokenExpiresAt = 0;
+      return this.transcribeAudio(bytes, { language, signal }, true);
+    }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const code = response.status === 429 ? AI_ERROR_CODES.RATE_LIMITED : AI_ERROR_CODES.PROVIDER_UNAVAILABLE;
+      throw new AIError(code, result.error || 'Trascrizione NexusNXS non disponibile.', { provider: this.name, retryable: response.status >= 429 });
+    }
+    return { ...result, text: String(result.text || '').trim(), language: String(result.language || language || 'auto'), backend: 'nexus-service', available: true, local: false };
+  }
 
   async ensureToken(force = false) {
     if (this.token && !force && this.tokenExpiresAt > Date.now() + 5 * 60_000) return this.token;

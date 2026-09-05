@@ -547,5 +547,5 @@ if (require.main === module) main().catch((error) => {
   process.exitCode = 1;
 });
 
-module.exports = { main };
+module.exports = { main, verifyIdleComposerSlide };
 // #endregion

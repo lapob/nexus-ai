@@ -7,6 +7,7 @@ import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, MathUtils, Po
 import { useMemo, useRef, type RefObject } from 'react';
 import type { AudioBus, EntityState, VisualQuality } from '../types/nexus';
 import interactionStates from '../../../config/nexus-interaction-states.json';
+import { VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
 
 // #region 01 — Profilo e generazione
 
@@ -130,7 +131,7 @@ export function NexusCore({ state, audioBus, reducedMotion, quality, performance
     const motion = reducedMotion ? 0.1 : 1;
     const time = frame.clock.elapsedTime;
     emergence.current = MathUtils.damp(emergence.current, 1, reducedMotion ? 8 : 2.8, delta);
-    pointerEnergy.current = MathUtils.damp(pointerEnergy.current, pointerPresence.current * 0.52, pointerPresence.current > 0 ? 7 : 2.7, delta);
+    pointerEnergy.current = MathUtils.damp(pointerEnergy.current, pointerPresence.current * 0.52, pointerPresence.current > 0 ? VISUALIZER_POINTER_DAMPING.engage : VISUALIZER_POINTER_DAMPING.release, delta);
     // Whisper possiede il microfono in esclusiva: durante l'ascolto un
     // inviluppo organico mantiene vivo il reattore senza aprire un secondo
     // stream. Quando è disponibile, l'energia audio reale ha la precedenza.

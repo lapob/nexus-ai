@@ -300,7 +300,13 @@ private fun nexusExit(reduced: Boolean = false) =
     fadeOut(tween(if (reduced) NexusFlow.REDUCED else NexusFlow.EXIT, easing = NexusFlow.standard))
 
 private fun nexusTransform(reduced: Boolean = false) =
-    ContentTransform(nexusEnter(reduced), nexusExit(reduced), sizeTransform = SizeTransform(clip = false))
+    ContentTransform(nexusEnter(reduced), nexusExit(reduced), sizeTransform = SizeTransform(clip = false) { _, _ ->
+        tween(if (reduced) NexusFlow.REDUCED else NexusFlow.COMPOSER_RESIZE, easing = NexusFlow.emphasized)
+    })
+
+/** Android owns IME movement; the composer only cross-fades, without a second resize spring. */
+private fun nexusComposerTransform(reduced: Boolean = false) =
+    ContentTransform(nexusEnter(reduced), nexusExit(reduced), sizeTransform = null)
 
 /** Un nuovo turno sale dal composer mentre il precedente si dissolve verso l'alto. */
 private fun nexusExchangeTransform(reduced: Boolean = false): ContentTransform {
@@ -946,7 +952,9 @@ open class NexusMainActivity : ComponentActivity() {
             "remote" -> if (state.pairingAvailable || state.wakePairingAvailable || state.wakeAvailable) state = state.copy(screen = NexusScreen.REMOTE, drawer = false)
             "scheduled" -> if (state.remoteWorkAvailable) state = state.copy(screen = NexusScreen.SCHEDULED, drawer = false)
             "settings" -> state = state.copy(screen = NexusScreen.SETTINGS, drawer = false)
-            "assistantClose" -> { state = state.copy(assistantOverlay = false); finishAndRemoveTask() }
+            // Keep the translucent composition alive until Android removes its
+            // task. Switching to the full UI here flashes an opaque app frame.
+            "assistantClose" -> { finishAndRemoveTask() }
             "back" -> state = state.copy(screen = NexusScreen.CHAT)
             "modelSheet" -> state = state.copy(modelSheet = true)
             "closeModel" -> state = state.copy(modelSheet = false)
@@ -2755,7 +2763,7 @@ private fun JSONArray?.toTurns() = buildList {
                         AnimatedVisibility(state.attachment != null, enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
                             AttachmentPreview(state.composerState(), { dispatch("attach", "") })
                         }
-                        AnimatedContent(textMode, transitionSpec = { nexusTransform(reduceMotion) }, label = "instantComposer") { typing ->
+                        AnimatedContent(textMode, transitionSpec = { nexusComposerTransform(reduceMotion) }, label = "instantComposer") { typing ->
                             if (typing) Column(Modifier.fillMaxWidth()) {
                         AnimatedVisibility(instantSlashSuggestions.isNotEmpty(), enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
                             Surface(
@@ -2790,7 +2798,6 @@ private fun JSONArray?.toTurns() = buildList {
                             shape = RoundedCornerShape(28.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Hairline.copy(alpha = .55f)),
                             modifier = Modifier.fillMaxWidth().bringIntoViewRequester(composerBringIntoView)
-                                .animateContentSize(tween(NexusFlow.COMPOSER_RESIZE, easing = NexusFlow.emphasized))
                         ) {
                             Row(Modifier.padding(horizontal = 7.dp, vertical = 7.dp), verticalAlignment = Alignment.Bottom) {
                                 IconButton(
@@ -3030,7 +3037,7 @@ private fun JSONArray?.toTurns() = buildList {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
                 )
-                AnimatedContent(textMode, transitionSpec = { nexusTransform(state.reduceMotion) }, label = "assistantComposer") { typing ->
+                AnimatedContent(textMode, transitionSpec = { nexusComposerTransform(state.reduceMotion) }, label = "assistantComposer") { typing ->
                     if (typing) Surface(
                         color = Surface2.copy(alpha = .96f),
                         shape = RoundedCornerShape(24.dp),

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AudioBus, EntityState } from '../types/nexus';
+import { VISUALIZER_POINTER_DAMPING } from '../systems/AnimationController';
 
 // #region 01 — Contratto e shader condiviso
 
@@ -448,7 +449,7 @@ export function SaturnVisualizer({ state, audioBus, reducedMotion, quality, perf
       material.uniforms.uPointerStrength.value = THREE.MathUtils.damp(
         material.uniforms.uPointerStrength.value,
         pointerPresence.current * 0.54,
-        pointerPresence.current > 0 ? 7 : 2.7,
+        pointerPresence.current > 0 ? VISUALIZER_POINTER_DAMPING.engage : VISUALIZER_POINTER_DAMPING.release,
         delta
       );
       material.uniforms.uAccent.value.set(accent);

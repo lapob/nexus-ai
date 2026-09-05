@@ -13,8 +13,37 @@ test('il provider pubblico non offre download o creazione di modelli', async () 
   const provider = new NexusServiceProvider({ service: { baseUrl: '' } });
   assert.equal(provider.getCapabilities().remoteInference, true);
   assert.equal(provider.getCapabilities().modelManagement, false);
+  assert.equal(provider.getCapabilities().voiceTranscription, true);
   await assert.rejects(provider.pullModel('model'), /gestiti dal servizio/);
   await assert.rejects(provider.createModel({}), /sviluppatore/);
+});
+
+test('il client desktop pubblico trascrive il WAV tramite il servizio NexusNXS', async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url).endsWith('/api/guest/bootstrap')) return new Response(JSON.stringify({ token: 'voice-token', expiresAt: Date.now() + 86_400_000 }), { status: 201, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ text: 'Ciao Nexus', language: 'it' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  t.after(() => { global.fetch = originalFetch; });
+  const provider = new NexusServiceProvider({ service: { baseUrl: 'https://ai.example.com' } });
+  const wav = Buffer.alloc(48); wav.write('RIFF', 0, 'ascii'); wav.write('WAVE', 8, 'ascii');
+
+  const result = await provider.transcribeAudio(wav, { language: 'it' });
+
+  assert.equal(result.text, 'Ciao Nexus');
+  assert.equal(result.backend, 'nexus-service');
+  assert.equal(result.local, false);
+  assert.equal(calls.at(-1).url, 'https://ai.example.com/api/guest/voice/transcribe');
+  assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer voice-token');
+  assert.equal(calls.at(-1).options.headers['Content-Type'], 'audio/wav');
+  assert.ok(Buffer.isBuffer(calls.at(-1).options.body));
+});
+
+test('il servizio vocale pubblico rifiuta payload che non sono WAV', async () => {
+  const provider = new NexusServiceProvider({ service: { baseUrl: 'https://ai.example.com' } });
+  await assert.rejects(provider.transcribeAudio(Buffer.alloc(48)), /Registrazione vocale non valida/);
 });
 
 test('il provider pubblico inoltra la chat e ricompone lo stream NexusNXS', async (t) => {

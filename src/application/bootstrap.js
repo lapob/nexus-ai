@@ -535,7 +535,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         imageCapabilityProvider: () => imageGenerationService.capabilityState(),
         researchAvailable: webResearchService?.enabled !== false,
         researchCapabilityProvider: () => webResearchService.capabilityState(),
-        voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 20 }) => speechService.transcribeAudio({
+        voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 55 }) => speechService.transcribeAudio({
           audio,
           language,
           timeoutSeconds

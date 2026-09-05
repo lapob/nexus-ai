@@ -30,6 +30,14 @@ function findWhisperModel(directory) {
     .find((candidate) => fs.existsSync(candidate)) || null;
 }
 
+function findWhisperAudioModel(directory) {
+  // I clip gia delimitati dal VAD non richiedono il modello continuo piu
+  // pesante: base riduce drasticamente il cold start del server pubblico.
+  return ['ggml-base.bin', ...WHISPER_MODELS]
+    .map((name) => path.join(directory, name))
+    .find((candidate, index, list) => list.indexOf(candidate) === index && fs.existsSync(candidate)) || null;
+}
+
 function speechError(code, publicMessage, cause) {
   return new NexusError(publicMessage, { code, publicMessage, cause });
 }
@@ -424,7 +432,7 @@ class NativeSpeechService extends EventEmitter {
       return Promise.reject(speechError('VOICE_INVALID_AUDIO', 'La registrazione vocale non è valida.'));
     }
     const executable = path.join(this.whisperDirectory, 'whisper-cli.exe');
-    const model = findWhisperModel(this.whisperDirectory);
+    const model = findWhisperAudioModel(this.whisperDirectory);
     if (!fs.existsSync(executable) || !model) {
       return Promise.reject(speechError('VOICE_BACKEND_UNAVAILABLE', 'Il servizio vocale locale non è disponibile.'));
     }
@@ -439,8 +447,8 @@ class NativeSpeechService extends EventEmitter {
         '-f', inputPath,
         '-l', whisperLanguage(language),
         '-t', String(adaptiveThreadCount()),
-        '-bs', '10',
-        '-bo', '10',
+        // whisper.cpp 1.9 non accetta beam search e best-of nello stesso
+        // processo: i default del decoder sono stabili e piu rapidi sui clip.
         // L'audio arriva già da un VAD locale: una soglia no-speech meno
         // aggressiva conserva parole basse, mentre suppress-nst elimina
         // fischi, respiri e token non linguistici.
@@ -573,6 +581,6 @@ class NativeSpeechService extends EventEmitter {
   }
 }
 
-module.exports = { LANGUAGE_PATTERN, NativeSpeechService, detectedWhisperConfidence, detectedWhisperLanguage, findWhisperModel, normalizeTranscript, parseCaptureDevices, parseSpeechResult, sapiLanguage, transcriptStabilityThreshold, whisperLanguage };
+module.exports = { LANGUAGE_PATTERN, NativeSpeechService, detectedWhisperConfidence, detectedWhisperLanguage, findWhisperAudioModel, findWhisperModel, normalizeTranscript, parseCaptureDevices, parseSpeechResult, sapiLanguage, transcriptStabilityThreshold, whisperLanguage };
 
 // #endregion

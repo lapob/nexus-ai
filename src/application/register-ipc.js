@@ -1320,7 +1320,11 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     }
   });
   ipcMain.handle(CHANNELS.agentCapabilities, (event) => { assertTrustedSender(event); return actionRuntime.capabilities(); });
-  ipcMain.handle(CHANNELS.voiceCapabilities, (event) => { assertTrustedSender(event); return speechService.capabilities(); });
+  ipcMain.handle(CHANNELS.voiceCapabilities, (event) => {
+    assertTrustedSender(event);
+    if (distributionMode === 'public') return { available: true, backend: 'nexus-service', local: false, remote: true };
+    return speechService.capabilities();
+  });
   ipcMain.handle(CHANNELS.voiceDevices, async (event) => {
     assertTrustedSender(event);
     return speechService.captureDevices();
@@ -1378,7 +1382,11 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       throw new Error('Registrazione vocale non valida.');
     }
     try {
-      const result = await speechService.transcribeAudio({ audio: Buffer.from(bytes), language: 'auto', timeoutSeconds: 30 });
+      const localCapabilities = speechService.capabilities();
+      const useRemote = distributionMode === 'public' && localCapabilities?.backend !== 'whisper.cpp';
+      const result = useRemote
+        ? await aiRuntime.transcribeVoiceAudio(Buffer.from(bytes), { language: 'auto' })
+        : await speechService.transcribeAudio({ audio: Buffer.from(bytes), language: 'auto', timeoutSeconds: 30 });
       logger.info('Registrazione vocale trascritta.', {
         backend: result.backend,
         bytes: bytes.byteLength,
@@ -1388,7 +1396,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     } catch (error) {
       if (error?.code === 'VOICE_NO_SPEECH' || error?.code === 'VOICE_CANCELLED') return { text: '' };
       logger.warn('Trascrizione della registrazione non riuscita.', { error, bytes: bytes.byteLength });
-      return { text: '', error: publicErrorMessage(error, 'La trascrizione vocale locale non è riuscita.') };
+      return { text: '', error: publicErrorMessage(error, 'La trascrizione vocale non è riuscita.') };
     }
   });
   ipcMain.handle(CHANNELS.voiceTranscribe, async (event, options = {}) => {
