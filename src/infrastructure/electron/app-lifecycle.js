@@ -104,8 +104,11 @@ function startAppLifecycle({
   shutdownTimeoutMs = 10_000
 }) {
   let primaryWindow = null;
-  installShutdownBarrier({ application: app, onShutdown, logger, timeoutMs: shutdownTimeoutMs });
+  const shutdown = installShutdownBarrier({ application: app, onShutdown, logger, timeoutMs: shutdownTimeoutMs });
   const showPrimaryWindow = () => {
+    // A late bootstrap/activation must not resurrect the UI after the user
+    // has closed it while providers were still loading.
+    if (shutdown.state !== 'idle') return null;
     if (primaryWindow && !primaryWindow.isDestroyed()) return primaryWindow;
     primaryWindow = createWindow();
     primaryWindow.once('closed', () => { primaryWindow = null; });
@@ -141,6 +144,7 @@ function startAppLifecycle({
     // registrati, continuando poi inizializzazioni non essenziali. Il fallback
     // conserva la compatibilità con callback onReady che non usano l'hook.
     await onReady({ showPrimaryWindow });
+    if (shutdown.state !== 'idle') return;
     if (!headless) {
       const window = showPrimaryWindow();
       onExternalActivation({ window, commandLine: Array.isArray(initialCommandLine) ? initialCommandLine : [], initial: true });

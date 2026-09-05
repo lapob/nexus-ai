@@ -1,11 +1,19 @@
 # Stato attuale
 
-NEXUSNXS 0.3.11 distingue due profili: il client pubblico usa il servizio
+NEXUSNXS 0.3.12 distingue due profili: il client pubblico usa il servizio
 NexusNXS Core via HTTPS, mentre la workstation dello sviluppatore può usare e
 valutare runtime locali senza includerli nell'installer pubblico.
 
 ## Implementato
 
+- core Astral Continuum condiviso da web e Presence, con controparte Canvas
+  nativa Android: tre filamenti, stati reali, fase continua e budget adattivo;
+- ispezione 3D con trascinamento e ritorno smorzato sui tre visualizer desktop,
+  senza attivazione vocale al rilascio; chiusura protetta durante il bootstrap;
+- velocità del core verificata a 20, 60 e 120 Hz: l'animazione segue il tempo,
+  non il numero dei frame, e rispetta la riduzione movimento del sistema;
+- tastiera Android separata dall'ascolto e bordo della conversazione sfumato,
+  con blur GPU da Android 12 e gradiente leggero sui dispositivi precedenti;
 - shell React/TypeScript full-screen, minimale e priva di navigazione statica;
 - visualizer neurale e planetario WebGL caricati separatamente, con qualità
   adattiva, pausa in background e profili distinti per stato;

@@ -34,7 +34,7 @@ if (!process.versions.electron) {
     console.error(error);
     process.exitCode = 1;
     const { app } = require('electron');
-    app.quit();
+    app.exit(1);
   });
 }
 
@@ -86,7 +86,7 @@ async function runElectronQa() {
   // Il prodotto mantiene una sola Presence selezionabile: duplicarla su ogni
   // monitor sprecherebbe GPU e renderebbe ambiguo il punto di interazione.
   const windows = await waitForWindows(BrowserWindow, 1);
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await new Promise((resolve) => setTimeout(resolve, 1800));
 
   const report = [];
   const primaryDisplayId = String(screen.getPrimaryDisplay().id);
@@ -103,13 +103,14 @@ async function runElectronQa() {
       return {
         appearance: root?.dataset?.appearance || '',
         state: root?.dataset?.state || '',
-        visualCount: document.querySelectorAll('.visual').length,
-        particleCount: document.querySelectorAll('.presence-particles i').length,
+        canvasCount: document.querySelectorAll('.astral-canvas').length,
+        particleCount: Number(document.querySelector('.astral-canvas')?.dataset.astralParticles || 0),
+        canvasState: document.querySelector('.astral-canvas')?.dataset.astralState,
         hasCore: document.querySelector('.core') instanceof HTMLButtonElement
       };
     })()`);
-    if (visual.appearance !== 'jarvis-reactor' || visual.visualCount !== 3
-      || visual.particleCount !== 18 || !visual.hasCore) {
+    if (visual.canvasCount !== 1 || visual.canvasState !== 'listening'
+      || visual.particleCount < 210 || visual.particleCount > 900 || !visual.hasCore) {
       throw new Error(`Presence non renderizzata sul display ${index + 1}: ${JSON.stringify(visual)}.`);
     }
     const fileName = `presence-display-${index + 1}.png`;

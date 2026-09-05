@@ -37,7 +37,7 @@ test('gli stati vocali possono materializzare la Presence al centro senza perder
   });
 });
 
-test('la Presence usa solo i tre visualizer, CSS leggero e un hotspot esplicito', () => {
+test('la Presence usa il core astrale condiviso, trasparente e con hotspot esplicito', () => {
   const document = systemPresenceDocument({ interactive: true, locale: 'it-IT', configuration: { appearance: 'jarvis-reactor', state: 'listening', motion: 'full' } });
   assert.match(document, /data-appearance="jarvis-reactor"/);
   assert.match(document, /data-state="listening"/);
@@ -47,11 +47,11 @@ test('la Presence usa solo i tre visualizer, CSS leggero e un hotspot esplicito'
   assert.match(document, /data-action="minimize-main"/);
   assert.match(document, /data-action="hide-presence"/);
   assert.match(document, /data-action="quit-desktop"/);
-  assert.match(document, /class="visual neural"/);
-  assert.match(document, /class="visual saturn"/);
-  assert.match(document, /class="visual reactor"/);
+  assert.match(document, /function createAstralCore\(/);
+  assert.match(document, /astral-canvas/);
+  assert.match(document, /getReduced:\(\)=>root.dataset.motion/);
   assert.match(document, /prefers-reduced-motion/);
-  assert.doesNotMatch(document, /canvas|webgl|three|nexus-pet/i);
+  assert.doesNotMatch(document, /class="visual|presence-particles|webgl|nexus-pet/i);
 });
 
 test('la configurazione elimina i campi pet legacy e applica fallback sicuri', () => {

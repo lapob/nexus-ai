@@ -114,12 +114,37 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
             const startedAt = Date.now();
             const check = () => {
               const canvas = document.querySelector('.voice-visualizer canvas');
-              if (canvas && canvas.width > 0 && canvas.height > 0) return resolve(true);
+              if (canvas && canvas.width > 0 && canvas.height > 0 && canvas.dataset.inspection !== undefined) return resolve(true);
               if (Date.now() - startedAt >= 8000) return resolve(false);
               setTimeout(check, 120);
             };
             check();
           })`);
+          const bounds = await win.webContents.executeJavaScript(`(() => {
+            const rect = document.querySelector('.voice-visualizer canvas').getBoundingClientRect();
+            return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2), dx: Math.round(Math.min(rect.width, rect.height) * .2) };
+          })()`);
+          win.webContents.sendInputEvent({ type: 'mouseMove', x: bounds.x, y: bounds.y });
+          win.webContents.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, x: bounds.x, y: bounds.y });
+          for (let step = 1; step <= 5; step++) {
+            win.webContents.sendInputEvent({ type: 'mouseMove', x: bounds.x + Math.round(bounds.dx * step / 5), y: bounds.y + Math.round(bounds.dx * step / 10) });
+            await new Promise(resolve => setTimeout(resolve, 60));
+          }
+          await new Promise(resolve => setTimeout(resolve, 400));
+          const readRotation = () => win.webContents.executeJavaScript(`document.querySelector('.voice-visualizer canvas').dataset.inspection.split(',').map(Number)`);
+          const dragged = await readRotation();
+          win.webContents.sendInputEvent({ type: 'mouseUp', button: 'left', clickCount: 1, x: bounds.x + bounds.dx, y: bounds.y + Math.round(bounds.dx / 2) });
+          await new Promise(resolve => setTimeout(resolve, 2200));
+          const returned = await readRotation();
+          const state = await win.webContents.executeJavaScript(`document.querySelector('.voice-visualizer').dataset.entityState`);
+          const inspecting = await win.webContents.executeJavaScript(`document.querySelector('.voice-visualizer canvas').dataset.inspecting`);
+          const surface = await win.webContents.executeJavaScript(`({...document.querySelector('.entity-shell').dataset})`);
+          if (screenshotPath) fs.writeFileSync(`${screenshotPath}.interaction.json`, JSON.stringify({ dragged, returned, state, bounds, inspecting, surface }));
+          if (Math.hypot(...dragged) < .1 || Math.hypot(...returned) >= Math.hypot(...dragged) * .4 || state === 'listening') {
+            logger.error('Trascinamento 3D non verificato.', { dragged, returned, state, bounds });
+            app.exit(1);
+            return;
+          }
         }
         // Chromium sospende i frame di Framer Motion nelle finestre nascoste.
         // La vista composer non esegue il reload preparatorio usato dagli altri

@@ -453,9 +453,10 @@ test('Core e Presence si materializzano con particelle adattive senza nuove text
   assert.match(nexusCore, /layer: 'rings' \| 'core' \| 'scanner' \| 'aura'/);
   assert.match(nexusCore, /emergence\.current/);
   assert.match(nexusCore, /geometries\.aura/);
-  assert.match(companionWindow, /presenceParticles/);
-  assert.match(companionWindow, /presence-materialize/);
-  assert.match(companionWindow, /data-quality=efficient.*presence-particles/s);
+  assert.match(companionWindow, /createAstralCore/);
+  assert.match(companionWindow, /astral-canvas/);
+  assert.match(companionWindow, /efficient:root.dataset.quality==='efficient'/);
+  assert.doesNotMatch(companionWindow, /presenceParticles|presence-materialize/);
 });
 
 test('le generazioni al limite continuano prima di essere archiviate', () => {

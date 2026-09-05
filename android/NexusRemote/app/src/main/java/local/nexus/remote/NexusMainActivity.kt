@@ -439,6 +439,7 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val attachmentData: String = "",
     val busy: Boolean = false,
     val streaming: String = "",
+    val speechPlayback: String = "idle",
     val activity: String = "",
     val error: String? = null,
     val status: String = "Riconnessione automatica",
@@ -735,6 +736,8 @@ open class NexusMainActivity : ComponentActivity() {
     @Volatile private var chatGeneration = 0L
     private var textToSpeech: TextToSpeech? = null
     @Volatile private var speechConnection: HttpURLConnection? = null
+    @Volatile private var speechGeneration = 0L
+    private var speechUtterance = ""
     private var neuralSpeechPlayer: MediaPlayer? = null
     private var neuralSpeechFile: File? = null
     private var speakNextAnswer = false
@@ -852,6 +855,16 @@ open class NexusMainActivity : ComponentActivity() {
                 }
             }
         }
+        textToSpeech?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            private fun update(id: String?, value: String) = postUi {
+                if (id == speechUtterance && id?.isNotBlank() == true) state = state.copy(speechPlayback = value)
+            }
+            override fun onStart(utteranceId: String?) = update(utteranceId, "speaking")
+            override fun onDone(utteranceId: String?) = update(utteranceId, "idle")
+            @Deprecated("Compatibility with older engines")
+            override fun onError(utteranceId: String?) = update(utteranceId, "idle")
+            override fun onError(utteranceId: String?, errorCode: Int) = update(utteranceId, "idle")
+        })
         if (!prefs.getBoolean("legacyTransportErrorsCleaned", false)) {
             store.deleteLegacyTransportFailureConversations()
             prefs.edit { putBoolean("legacyTransportErrorsCleaned", true) }
@@ -1671,27 +1684,33 @@ open class NexusMainActivity : ComponentActivity() {
     }
 
     private fun speakOrStop(text: String) {
-        if (neuralSpeechPlayer?.isPlaying == true || textToSpeech?.isSpeaking == true) {
+        if (state.speechPlayback != "idle" || neuralSpeechPlayer?.isPlaying == true || textToSpeech?.isSpeaking == true) {
             stopAllSpeech()
             return
         }
+        stopAllSpeech()
         val token = secureTokens.read("guestToken")
         if (token.isBlank() || state.connection == NexusConnection.OFFLINE) {
             speakWithDeviceVoice(text)
             return
         }
-        stopAllSpeech()
+        val generation = speechGeneration
+        state = state.copy(speechPlayback = "preparing")
         runTask {
-            val audio = runCatching { requestNeuralSpeech(text, token) }.getOrNull()
-            if (destroyed) return@runTask
-            if (audio == null) postUi { speakWithDeviceVoice(text) }
-            else postUi { playNeuralSpeech(audio) }
+            val audio = runCatching { requestNeuralSpeech(text, token, generation) }.getOrNull()
+            if (destroyed || generation != speechGeneration) { audio?.delete(); return@runTask }
+            postUi {
+                if (generation != speechGeneration) audio?.delete()
+                else if (audio == null) speakWithDeviceVoice(text)
+                else playNeuralSpeech(audio)
+            }
         }
     }
 
-    private fun requestNeuralSpeech(text: String, token: String): File {
+    private fun requestNeuralSpeech(text: String, token: String, generation: Long): File {
         var failure: Exception? = null
         for (endpoint in endpointCandidates()) {
+            check(!destroyed && generation == speechGeneration) { "Speech cancelled" }
             var connection: HttpURLConnection? = null
             try {
                 connection = openTrackedConnection(endpoint.trimEnd('/') + "/api/guest/voice/synthesize")
@@ -1713,6 +1732,7 @@ open class NexusMainActivity : ComponentActivity() {
                     val buffer = ByteArray(16 * 1024)
                     var total = 0
                     while (true) {
+                        check(!destroyed && generation == speechGeneration) { "Speech cancelled" }
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -1733,24 +1753,31 @@ open class NexusMainActivity : ComponentActivity() {
     }
 
     private fun playNeuralSpeech(file: File) {
-        stopAllSpeech()
         neuralSpeechFile = file
         neuralSpeechPlayer = MediaPlayer().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             setDataSource(file.absolutePath)
             setOnCompletionListener { stopAllSpeech() }
             setOnErrorListener { _, _, _ -> stopAllSpeech(); true }
-            setOnPreparedListener { it.start() }
+            setOnPreparedListener { player ->
+                if (player === neuralSpeechPlayer && !destroyed) { player.start(); state = state.copy(speechPlayback = "speaking") }
+            }
             prepareAsync()
         }
     }
 
     private fun speakWithDeviceVoice(text: String) {
         textToSpeech?.language = spokenLocale(text, resources.configuration.locales[0])
-        textToSpeech?.speak(text.take(12_000), TextToSpeech.QUEUE_FLUSH, Bundle(), "nexus-${System.currentTimeMillis()}")
+        speechUtterance = "nexus-$speechGeneration"
+        state = state.copy(speechPlayback = "preparing")
+        val result = textToSpeech?.speak(text.take(12_000), TextToSpeech.QUEUE_FLUSH, Bundle(), speechUtterance)
+        if (result != TextToSpeech.SUCCESS) state = state.copy(speechPlayback = "idle")
     }
 
     private fun stopAllSpeech() {
+        speechGeneration++
+        speechUtterance = ""
+        if (!destroyed) state = state.copy(speechPlayback = "idle")
         speechConnection?.disconnect()
         speechConnection = null
         textToSpeech?.stop()
@@ -2601,6 +2628,7 @@ private fun JSONArray?.toTurns() = buildList {
  * nessuna cronologia visibile. Il database cifrato continua a fornire memoria
  * conversazionale al Core senza trasformarsi in una sezione dell'interfaccia.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable private fun NexusInstantApp(state: NexusUiState, dispatch: (String, String) -> Unit) {
     val context = LocalContext.current
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
@@ -2623,12 +2651,17 @@ private fun JSONArray?.toTurns() = buildList {
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
     val composerBringIntoView = remember { BringIntoViewRequester() }
+    val instantImeVisible = WindowInsets.isImeVisible
     val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
     // Una sessione microfono non deve mai essere ripristinata dal saved state
     // dopo un nuovo avvio o un ritorno dal task switcher.
     var voiceMode by remember { mutableStateOf(false) }
+    var inlineVoiceListening by remember { mutableStateOf(false) }
+    var inlineVoiceEnergy by remember { mutableFloatStateOf(0f) }
+    var inlineVoiceStatus by remember { mutableStateOf("") }
+    var inlineVoiceDetail by remember { mutableStateOf("") }
     var attachmentSheet by rememberSaveable { mutableStateOf(false) }
     val interactionAvailable = state.connection == NexusConnection.ONLINE
     val latestAnswer = if (state.busy) state.streaming else state.streaming.ifBlank { state.turns.lastOrNull { it.role == "assistant" }?.content.orEmpty() }
@@ -2675,6 +2708,8 @@ private fun JSONArray?.toTurns() = buildList {
     }
     LaunchedEffect(textMode) {
         if (textMode) {
+            voiceMode = false
+            dispatch("stopSpeech", "")
             kotlinx.coroutines.delay(70)
             focusRequester.requestFocus()
             keyboard?.show()
@@ -2703,7 +2738,7 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }
             }.statusBarsPadding().navigationBarsPadding().imePadding()
-                .padding(horizontal = metrics.horizontalPadding, vertical = 12.dp)
+                .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = if (instantImeVisible) 0.dp else 12.dp)
         ) {
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
             AnimatedVisibility(controlsAwake, modifier = Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
@@ -2723,7 +2758,7 @@ private fun JSONArray?.toTurns() = buildList {
                         AnimatedContent(
                             targetState = exchangeGeneration,
                             transitionSpec = { nexusExchangeTransform(reduceMotion) },
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            modifier = Modifier.weight(1f).fillMaxWidth().conversationGlass(instantImeVisible, metrics.adaptiveReducedMotion),
                             label = "instantExchange"
                         ) { generation ->
                             key(generation) { AnimatedContent(
@@ -2844,9 +2879,11 @@ private fun JSONArray?.toTurns() = buildList {
                     } else Box(Modifier.fillMaxSize()) {
                         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                             NexusInstantCore(
-                                active = state.busy,
+                                active = voiceMode || state.busy,
                                 offline = state.connection == NexusConnection.OFFLINE,
                                 reduceMotion = reduceMotion,
+                                energy = if (voiceMode) inlineVoiceEnergy else 0f,
+                                phaseState = when { !interactionAvailable -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" },
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     if (!interactionAvailable) {
@@ -2857,7 +2894,7 @@ private fun JSONArray?.toTurns() = buildList {
                                     textMode = false
                                     if (state.busy) dispatch("stop", "")
                                     dispatch("stopSpeech", "")
-                                    voiceMode = true
+                                    voiceMode = !voiceMode
                                 }
                             )
                             Spacer(Modifier.height(22.dp))
@@ -2865,6 +2902,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 targetState = when {
                                     state.connection == NexusConnection.OFFLINE -> nexusCopy("Server offline · tocca per riprovare", "Server offline · tap to retry")
                                     state.connection == NexusConnection.CHECKING -> nexusCopy("Connessione ai server…", "Connecting to servers…")
+                                    voiceMode -> inlineVoiceStatus.ifBlank { nexusCopy("Ti ascolto", "I'm listening") }
                                     state.busy -> state.activity.ifBlank { nexusCopy("Sto pensando…", "Thinking…") }
                                     else -> nexusCopy("Tocca il Core e parla", "Tap the Core and speak")
                                 },
@@ -2872,7 +2910,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 label = "instantStatus"
                             ) { label -> Text(label, color = if (state.connection == NexusConnection.OFFLINE) Color(0xFFFF9A91) else Mist, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
                             if (state.connection != NexusConnection.OFFLINE) Text(
-                                nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
+                                if (voiceMode) inlineVoiceDetail else nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
                                 color = Mist.copy(alpha = .72f), fontSize = 11.sp,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(top = 8.dp).fillMaxWidth(.82f)
@@ -2968,7 +3006,8 @@ private fun JSONArray?.toTurns() = buildList {
             voiceMode = false
             typedSession = false
             dispatch("voiceSend", phrase)
-        }
+        },
+        inlineState = { listening, energy, status, detail -> inlineVoiceListening = listening; inlineVoiceEnergy = energy; inlineVoiceStatus = status; inlineVoiceDetail = detail }
     )
     NexusAttachmentFlow(
         visible = attachmentSheet && interactionAvailable,
@@ -3004,6 +3043,10 @@ private fun JSONArray?.toTurns() = buildList {
     val focusRequester = remember { FocusRequester() }
     var textMode by rememberSaveable { mutableStateOf(false) }
     var voiceMode by remember { mutableStateOf(true) }
+    var inlineVoiceListening by remember { mutableStateOf(false) }
+    var inlineVoiceEnergy by remember { mutableFloatStateOf(0f) }
+    var inlineVoiceStatus by remember { mutableStateOf("") }
+    var inlineVoiceDetail by remember { mutableStateOf("") }
     var attachmentSheet by rememberSaveable { mutableStateOf(false) }
     val online = state.connection == NexusConnection.ONLINE
     val latestAnswer = state.streaming.ifBlank { state.turns.lastOrNull { it.role == "assistant" }?.content.orEmpty() }
@@ -3068,8 +3111,9 @@ private fun JSONArray?.toTurns() = buildList {
                         IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
                             Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
                         }
-                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, diameter = 118.dp) {
-                            if (online) voiceMode = true else dispatch("probe", "")
+                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, energy = if (voiceMode) inlineVoiceEnergy else 0f, diameter = 118.dp,
+                            phaseState = when { !online -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" }) {
+                            if (online) voiceMode = !voiceMode else dispatch("probe", "")
                         }
                         IconButton({ voiceMode = false; textMode = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
                             Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
@@ -3077,7 +3121,7 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }
                 Text(
-                    when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Assistente NexusNXS", "NexusNXS assistant") },
+                    when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); voiceMode -> inlineVoiceDetail.ifBlank { inlineVoiceStatus }; state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Assistente NexusNXS", "NexusNXS assistant") },
                     color = Mist, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)
                 )
             }
@@ -3093,7 +3137,8 @@ private fun JSONArray?.toTurns() = buildList {
         instantSubmit = { phrase -> voiceMode = false; dispatch("voiceSend", phrase) },
         compactOverlay = true,
         openKeyboard = { voiceMode = false; textMode = true },
-        openAttachment = { voiceMode = false; attachmentSheet = true }
+        openAttachment = { voiceMode = false; attachmentSheet = true },
+        inlineState = { listening, energy, status, detail -> inlineVoiceListening = listening; inlineVoiceEnergy = energy; inlineVoiceStatus = status; inlineVoiceDetail = detail }
     )
     NexusAttachmentFlow(
         visible = attachmentSheet && online,
@@ -3202,67 +3247,8 @@ private fun JSONArray?.toTurns() = buildList {
     }
 }
 
-@Composable private fun NexusInstantCore(active: Boolean, offline: Boolean, reduceMotion: Boolean, energy: Float = 0f, diameter: Dp = 214.dp, onClick: () -> Unit) {
-    val pulse = nexusLoopFloat(!reduceMotion && !offline, 0f, 1f, if (active) 620 else 1550, RepeatMode.Reverse, "instantCorePulse")
-    val rotation = nexusLoopFloat(!reduceMotion && active, 0f, 360f, 2600, RepeatMode.Restart, "instantCoreRotation", linear = true)
-    val emergence = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(reduceMotion) {
-        if (reduceMotion) emergence.snapTo(1f)
-        else {
-            emergence.snapTo(0f)
-            emergence.animateTo(1f, tween(NexusFlow.ENTER + NexusFlow.EXIT + NexusFlow.QUICK, easing = NexusFlow.emphasized))
-        }
-    }
-    val smoothEnergy by animateFloatAsState(if (active) energy.coerceIn(0f, 1f) else 0f, tween(NexusFlow.QUICK, easing = NexusFlow.standard), label = "instantCoreEnergy")
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .94f else 1f + pulse * .018f, tween(NexusFlow.QUICK, easing = NexusFlow.emphasized), label = "instantCoreScale")
-    val accent = if (offline) Color(0xFF627071) else Cyan
-    Canvas(
-        Modifier.size(diameter).graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(CircleShape).clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .semantics { contentDescription = if (offline) "NexusNXS offline" else "NexusNXS Core" }
-    ) {
-        val center = this.center
-        val signal = smoothEnergy * .075f
-        val outer = size.minDimension * (.43f + pulse * .018f + signal)
-        val reveal = emergence.value
-        val coreReveal = ((reveal - .48f) / .52f).coerceIn(0f, 1f)
-        drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = (.18f + smoothEnergy * .12f) * reveal), accent.copy(alpha = .045f * reveal), Color.Transparent)), radius = size.minDimension * .5f)
-        val neuralRadius = size.minDimension * (.29f + smoothEnergy * .055f)
-        val neuralNodes = 18
-        repeat(neuralNodes) { index ->
-            val response = .78f + smoothEnergy * (.18f + (index % 4) * .025f)
-            val angle = (index.toFloat() / neuralNodes.toFloat()) * (Math.PI * 2.0).toFloat() + pulse * .16f + Math.toRadians(rotation.toDouble()).toFloat()
-            val radius = neuralRadius * (if (index % 2 == 0) 1f else .72f) * response
-            val target = androidx.compose.ui.geometry.Offset(
-                center.x + kotlin.math.cos(angle) * radius,
-                center.y + kotlin.math.sin(angle) * radius
-            )
-            val sourceAngle = angle + 1.45f + (index % 5) * .17f
-            val sourceRadius = size.minDimension * (.47f + (index % 3) * .035f)
-            val source = androidx.compose.ui.geometry.Offset(center.x + kotlin.math.cos(sourceAngle) * sourceRadius, center.y + kotlin.math.sin(sourceAngle) * sourceRadius)
-            val delayedReveal = ((reveal - index * .018f) / .74f).coerceIn(0f, 1f)
-            val node = androidx.compose.ui.geometry.Offset(source.x + (target.x - source.x) * delayedReveal, source.y + (target.y - source.y) * delayedReveal)
-            val nextAngle = ((index + 2).toFloat() / neuralNodes.toFloat()) * (Math.PI * 2.0).toFloat() + pulse * .16f
-            val nextRadius = neuralRadius * (if ((index + 2) % 2 == 0) 1f else .72f)
-            val next = androidx.compose.ui.geometry.Offset(
-                center.x + kotlin.math.cos(nextAngle) * nextRadius,
-                center.y + kotlin.math.sin(nextAngle) * nextRadius
-            )
-            drawLine(accent.copy(alpha = (.16f + pulse * .08f + smoothEnergy * .24f) * delayedReveal), node, center, (0.7f + smoothEnergy * .65f).dp.toPx())
-            drawLine(accent.copy(alpha = (.08f + smoothEnergy * .12f) * delayedReveal), node, next, (.55f + smoothEnergy * .4f).dp.toPx())
-            drawCircle(accent.copy(alpha = (.48f + pulse * .22f) * delayedReveal), radius = (if (index % 4 == 0) 2.8f + smoothEnergy * 1.8f else 1.7f + smoothEnergy).dp.toPx(), center = node)
-        }
-        drawCircle(accent.copy(alpha = .13f * reveal), radius = outer, style = Stroke(width = 1.dp.toPx()))
-        repeat(3) { orbit ->
-            val inset = orbit * size.minDimension * .055f
-            drawArc(accent.copy(alpha = (.32f - orbit * .06f) * reveal), -72f + orbit * 101f + rotation * (if (orbit % 2 == 0) 1f else -1f), 78f + orbit * 13f, false, topLeft = androidx.compose.ui.geometry.Offset(center.x - outer + inset, center.y - outer + inset), size = androidx.compose.ui.geometry.Size((outer - inset) * 2, (outer - inset) * 2), style = Stroke(width = (1.1f + (2 - orbit) * .45f).dp.toPx()))
-        }
-        drawCircle(accent.copy(alpha = (.14f + pulse * .08f) * coreReveal), radius = size.minDimension * .235f)
-        drawCircle(Brush.radialGradient(listOf(Ice.copy(alpha = .98f * coreReveal), accent.copy(alpha = .92f * coreReveal), Color.Transparent)), radius = size.minDimension * .11f)
-        drawCircle(Ice.copy(alpha = .92f * coreReveal), radius = size.minDimension * .026f)
-    }
+@Composable private fun NexusInstantCore(active: Boolean, offline: Boolean, reduceMotion: Boolean, energy: Float = 0f, diameter: Dp = 214.dp, phaseState: String = if (offline) "offline" else if (active) "listening" else "idle", onClick: () -> Unit) {
+    AstralCore(diameter = diameter, state = phaseState, energy = energy, reduceMotion = reduceMotion, particleBudget = LocalNexusMetrics.current.particleBudget, onClick = onClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -4664,7 +4650,8 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     instantSubmit: ((String) -> Unit)? = null,
     compactOverlay: Boolean = false,
     openKeyboard: (() -> Unit)? = null,
-    openAttachment: (() -> Unit)? = null
+    openAttachment: (() -> Unit)? = null,
+    inlineState: ((Boolean, Float, String, String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -4851,7 +4838,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
             }
         }
     }
-    LaunchedEffect(instantSubmit) {
+    LaunchedEffect(Unit) {
         if (instantSubmit != null) beginCapture(NexusVoiceMode.SINGLE_TURN)
     }
     val voiceStatus = when {
@@ -4867,6 +4854,11 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
         listening -> nexusCopy("Parla naturalmente", "Speak naturally")
         else -> nexusCopy("Tocca il Core per riprovare", "Tap the Core to try again")
     }
+    val latestInlineState by rememberUpdatedState(inlineState)
+    LaunchedEffect(listening, voiceEnergy, voiceStatus, voiceDetail) {
+        latestInlineState?.invoke(listening, voiceEnergy, voiceStatus, voiceDetail)
+    }
+    if (inlineState != null) return
     if (compactOverlay) {
         Box(Modifier.fillMaxSize().navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Surface(

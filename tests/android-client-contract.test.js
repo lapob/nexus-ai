@@ -165,7 +165,7 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(activity, /\/api\/guest\/voice\/synthesize/);
   assert.match(activity, /MediaPlayer/);
   assert.match(activity, /if \(state\.busy\) dispatch\("stop", ""\)/, 'il Core deve consentire barge-in durante una risposta');
-  assert.match(activity, /dispatch\("stopSpeech", ""\)[\s\S]{0,80}voiceMode = true/);
+  assert.match(activity, /dispatch\("stopSpeech", ""\)[\s\S]{0,80}voiceMode = !voiceMode/);
   assert.match(activity, /keyboard\?\.hide\(\)[\s\S]{0,160}textMode = false[\s\S]{0,160}dispatch\("send"/);
   const instantSurface = activity.match(/@Composable private fun NexusInstantApp[\s\S]*?@Composable private fun NexusInstantCore/)?.[0] || '';
   assert.match(instantSurface, /navigationBarsPadding\(\)\.imePadding\(\)/, 'il composer deve restare sopra la tastiera edge-to-edge');
@@ -669,7 +669,9 @@ test('la voce Android parte dal Core, invia una frase e non resta attiva in back
   assert.match(activity, /SpeechRecognizer\.createOnDeviceSpeechRecognizer\(context\)/);
   assert.match(activity, /RecognizerIntent\.EXTRA_PREFER_OFFLINE, onDeviceAvailable/);
   assert.match(activity, /RecognizerIntent\.EXTRA_LANGUAGE, voiceLocale/);
-  assert.match(activity, /LaunchedEffect\(instantSubmit\)[\s\S]{0,120}beginCapture\(NexusVoiceMode\.SINGLE_TURN\)/);
+  assert.match(activity, /LaunchedEffect\(Unit\)[\s\S]{0,120}beginCapture\(NexusVoiceMode\.SINGLE_TURN\)/);
+  assert.doesNotMatch(activity, /LaunchedEffect\(instantSubmit\)/, 'Recomposition must not restart the microphone');
+  assert.match(activity, /if \(inlineState != null\) return/, 'Inline voice must keep the existing core, without a second dialog');
   assert.match(activity, /if \(instantSubmit != null\) instantSubmit\(value\)/);
   assert.match(activity, /dispatch\("voiceSend", phrase\)/);
   assert.match(activity, /event == Lifecycle\.Event\.ON_STOP\) haltCapture\(false, false\)/);

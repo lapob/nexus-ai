@@ -8,13 +8,13 @@ in base al PC dell'utente.
 
 - applicazione Electron;
 - provider NexusNXS Service, configurato con un'origine HTTPS durante la release;
-- Whisper locale con il modello `small`, che è anche il modello preferito dal
-  servizio vocale NEXUSNXS;
-- Kokoro locale per la sintesi vocale;
-- nessun peso LLM incorporato nel setup.
+- interfaccia vocale collegata al servizio e alle capacità del dispositivo;
+- nessun runtime o peso AI incorporato nel setup pubblico. Whisper e Kokoro
+  appartengono all'ambiente server/sviluppatore, non ai componenti da scaricare
+  durante l'installazione degli utenti.
 
 Il comando `npm run build:win` richiede `NEXUS_SERVICE_URL`, verifica che sia
-HTTPS e genera `release/NexusNXS-0.3.11-Setup.exe` senza runtime LLM locale.
+HTTPS e genera `release/NexusNXS-0.3.12-Setup.exe` senza runtime LLM locale.
 
 La disinstallazione rimuove l'applicazione ma conserva configurazione, dataset
 approvati e preferenze locali. Un'eventuale funzione “rimuovi anche i miei dati”

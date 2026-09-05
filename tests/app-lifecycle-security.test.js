@@ -66,3 +66,42 @@ test('la barriera di chiusura attende il cleanup una sola volta prima di uscire'
   assert.equal(cleanupCalls, 1);
   assert.equal(application.quitCalls, 3);
 });
+
+test('un bootstrap tardivo non riapre la UI dopo la chiusura durante il caricamento', async () => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const application = new EventEmitter();
+  application.whenReady = () => Promise.resolve();
+  application.requestSingleInstanceLock = () => true;
+  application.quit = () => application.emit('before-quit', { preventDefault() {} });
+  const session = { defaultSession: {
+    setPermissionCheckHandler() {}, setPermissionRequestHandler() {},
+    webRequest: { onBeforeRequest() {} }
+  } };
+  const fixture = { module: { exports: {} }, process, URL, setTimeout, clearTimeout,
+    require: () => ({ app: application, Menu: { setApplicationMenu() {} }, session }) };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../src/infrastructure/electron/app-lifecycle'), 'utf8'), fixture);
+  let releaseBootstrap, showWindow;
+  let windows = 0, activations = 0;
+  const pendingBootstrap = new Promise(resolve => { releaseBootstrap = resolve; });
+  const lifecycle = fixture.module.exports.startAppLifecycle({
+    createWindow: () => { windows++; return { once() {}, isDestroyed: () => false }; },
+    onReady: async ({ showPrimaryWindow }) => {
+      showWindow = showPrimaryWindow;
+      showPrimaryWindow();
+      await pendingBootstrap;
+    },
+    onShutdown: async () => {}, onExternalActivation: () => { activations++; },
+    logger: { error() {} }
+  });
+  await Promise.resolve();
+  assert.equal(windows, 1);
+  application.quit();
+  assert.equal(showWindow(), null);
+  releaseBootstrap();
+  await lifecycle;
+  assert.equal(windows, 1);
+  assert.equal(activations, 0);
+  application.emit('activate');
+  assert.equal(windows, 1);
+});

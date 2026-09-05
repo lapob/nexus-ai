@@ -3,8 +3,9 @@
  * @description NexusNXS AI pubblica: voce, memoria locale, allegati e download adattivo.
  */
 
-const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.11-preview.1/NexusNXS-0.3.11-Setup.exe';
-const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.11-preview.1/NexusNXS-Android-6.4.6.apk';
+const { createAstralCore } = require('../shared/astral-core');
+const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.12-preview.1/NexusNXS-0.3.12-Setup.exe';
+const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.12-preview.1/NexusNXS-Android-6.4.7.apk';
 
 const EXPERIENCE_STYLE = `<style>
 .brand-lockup{display:flex;align-items:center;gap:10px;min-width:0}.brand-mark{width:36px;height:36px;display:block;flex:0 0 auto;border-radius:11px;object-fit:cover;box-shadow:0 0 0 1px rgba(82,238,240,.1),0 8px 24px rgba(39,207,210,.12)}.identity-actions{display:flex;align-items:center;gap:9px}.shell{width:min(1180px,100%);padding-bottom:calc(112px + env(safe-area-inset-bottom))}.stage{width:min(860px,100%);margin-inline:auto}.lede{display:none}.download-trigger,.keyboard-toggle,.attachment-toggle,.memory-clear,.sheet-close{border:1px solid rgba(111,202,202,.14);color:#8ca8a9;background:rgba(10,24,25,.72);cursor:pointer;transition:transform .18s cubic-bezier(.2,0,0,1),border-color .18s ease,color .18s ease,background .18s ease}.download-trigger{min-height:38px;padding:0 14px;border-radius:999px;font-size:.7rem;font-weight:620;letter-spacing:.02em}.download-trigger:hover,.download-trigger:focus-visible,.keyboard-toggle:hover,.keyboard-toggle:focus-visible,.attachment-toggle:hover,.attachment-toggle:focus-visible{border-color:rgba(91,224,220,.34);color:#d7eeee;background:rgba(29,85,86,.23);outline:0;transform:translateY(-1px)}.download-trigger svg,.keyboard-toggle svg,.sheet-close svg,.send svg{display:block;width:21px;height:21px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.download-trigger svg{display:none;width:19px;height:19px}.core[data-state=listening] canvas{filter:drop-shadow(0 0 25px rgba(99,235,199,.34))}.core[data-state=speaking] canvas{filter:drop-shadow(0 0 28px rgba(109,180,255,.32))}.core[data-state=error] canvas{filter:drop-shadow(0 0 22px rgba(214,154,88,.27))}.dock{position:fixed;z-index:30;right:0;bottom:max(0px,env(safe-area-inset-bottom));left:0;width:min(720px,calc(100% - 36px));margin:auto;padding:16px 0 8px;background:linear-gradient(transparent,rgba(2,6,7,.96) 30%);contain:layout style}.composer{position:static;display:grid;grid-template-columns:52px minmax(0,1fr) 54px;gap:9px;align-items:end;width:100%;margin:0;padding:0;background:none}.keyboard-toggle{width:52px;height:52px;margin-bottom:2px;border-radius:50%;display:grid;place-items:center}.composer-box,.send{opacity:0;pointer-events:none;transform:translateY(8px) scale(.98);transition:opacity .2s ease,transform .24s cubic-bezier(.2,0,0,1),border-color .18s ease,background .18s ease,box-shadow .18s ease}.keyboard-open .composer-box,.keyboard-open .send{opacity:1;pointer-events:auto;transform:none}.keyboard-open .keyboard-toggle{color:#79dfdc;border-color:rgba(91,224,220,.28);background:rgba(29,85,86,.2)}.composer-box{min-height:54px}.send{width:54px;height:54px;margin:0;display:grid;place-items:center;color:#547273;background:rgba(21,42,43,.82)}.send:not(:disabled){color:#dffafa;border-color:rgba(87,230,224,.44);background:linear-gradient(145deg,rgba(61,190,186,.38),rgba(26,109,111,.24));box-shadow:0 0 0 1px rgba(85,222,219,.06),0 9px 28px rgba(21,125,127,.18)}.send:not(:disabled):hover,.send:not(:disabled):focus-visible{background:linear-gradient(145deg,rgba(68,210,205,.48),rgba(26,119,121,.3))}.send[data-mode=stop]{color:#e9ffff;border-color:rgba(126,229,224,.42);background:rgba(36,82,83,.92)}.send[data-mode=stop] svg{width:18px;height:18px}.send:disabled{opacity:.42}.memory-clear{padding:0;border:0;background:none;color:#577273;font-size:inherit;text-decoration:underline;text-underline-offset:3px}.privacy{max-width:660px;line-height:1.5}.download-sheet{width:min(440px,calc(100% - 28px));margin:auto;border:1px solid rgba(103,206,204,.17);border-radius:26px;padding:0;color:#d9e6e6;background:linear-gradient(160deg,rgba(10,25,26,.985),rgba(3,10,11,.99));box-shadow:0 30px 90px rgba(0,0,0,.62)}.download-sheet::backdrop{background:rgba(0,4,5,.72);backdrop-filter:blur(9px)}.sheet-body{padding:24px}.sheet-top{display:flex;align-items:center;justify-content:space-between;gap:18px}.sheet-label{margin:0;color:#557576;font:600 .63rem ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}.sheet-close{width:40px;height:40px;border-radius:50%;display:grid;place-items:center}.download-sheet h2{margin:24px 0 0;font-size:1.65rem;font-weight:460;letter-spacing:-.035em}.download-sheet p{margin:10px 0 0;color:#789091;line-height:1.58}.download-action{min-height:54px;margin-top:24px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:10px;color:#e7ffff;background:linear-gradient(135deg,rgba(53,202,197,.38),rgba(24,111,113,.3));text-decoration:none;font-weight:650;transition:transform .18s ease,filter .18s ease}.download-action:hover,.download-action:focus-visible{outline:0;filter:brightness(1.14);transform:translateY(-1px)}.download-action[hidden],.unavailable[hidden]{display:none}.device-note{font-size:.72rem}.unavailable{margin-top:20px;padding:15px;border:1px solid rgba(125,180,181,.12);border-radius:16px;color:#849b9c;background:rgba(255,255,255,.018);line-height:1.5}@media(max-width:560px){.shell{padding-inline:18px}.brand-mark{width:34px;height:34px;border-radius:10px}.download-trigger{width:38px;padding:0;display:grid;place-items:center}.download-trigger span{display:none}.download-trigger svg{display:block}.composer{grid-template-columns:50px minmax(0,1fr) 54px}.keyboard-toggle{width:50px;height:50px}.send{width:54px;height:54px}.send svg{width:24px;height:24px}.privacy{font-size:.62rem}.stage{padding-bottom:12px}}@media(max-height:650px){.dock{padding-top:8px}.privacy{margin-top:6px}.download-sheet h2{margin-top:14px}}@media(prefers-reduced-motion:reduce){.download-trigger,.keyboard-toggle,.attachment-toggle,.composer-box,.send,.download-action{transition:none}.download-sheet::backdrop{backdrop-filter:none}}
@@ -148,239 +149,19 @@ const COGNITION_STYLE = `<style>
  */
 // #region 01 — Runtime cosmico di NexusNXS AI
 
-function publicAiCosmicRuntime(corePalette, presentation) {
+function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   const button = document.getElementById('core');
   const canvas = document.getElementById('coreCanvas');
-  const context = canvas.getContext('2d', { alpha: true, desynchronized: true });
   const exchange = document.querySelector('.exchange');
   const userPrompt = document.getElementById('userPrompt');
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const connection = navigator.connection || {};
-  const memory = Number(navigator.deviceMemory || 4);
-  const threads = Number(navigator.hardwareConcurrency || 4);
-  const compact = Math.min(innerWidth, innerHeight) < 620;
-  const constrained = connection.saveData || memory <= 3 || threads <= 4;
-  const tierName = reduced || constrained ? 'efficient' : (memory >= 8 && threads >= 8 && !compact ? 'full' : 'balanced');
-  const tier = presentation.qualityTiers[tierName];
-  const count = Math.max(42, Math.round((compact ? 104 : 120) * tier.particleScale));
-  const linkCount = Math.max(18, Math.round(count * .34));
-  const angle = new Float32Array(count);
-  const seed = new Float32Array(count);
-  const speed = new Float32Array(count);
-  const ring = new Uint8Array(count);
-  const layer = new Uint8Array(count);
-  const positionX = new Float32Array(count);
-  const positionY = new Float32Array(count);
-  const links = new Uint16Array(linkCount * 2);
-  const random = (value) => {
-    const generated = Math.sin(value * 91.733) * 43758.5453;
-    return generated - Math.floor(generated);
-  };
-  for (let index = 0; index < count; index += 1) {
-    ring[index] = index % 6;
-    layer[index] = index % 7 === 0 ? 3 : index % 4 === 0 ? 2 : index % 6 === 0 ? 0 : 1;
-    angle[index] = random(index + .1) * Math.PI * 2;
-    seed[index] = random(index + 7.3);
-    speed[index] = .055 + random(index + 2.1) * .16;
-  }
-  for (let index = 0; index < linkCount; index += 1) {
-    links[index * 2] = index * 3 % count;
-    links[index * 2 + 1] = (index * 11 + 17) % count;
-  }
-
-  let frame = 0;
-  let state = 'idle';
-  let energy = .17;
-  let color = corePalette.idle;
-  let pointerX = 0;
-  let pointerY = 0;
-  let pointerActive = 0;
-  let transitionEnergy = 0;
-  let width = 1;
-  let height = 1;
-  let centerX = .5;
-  let centerY = .5;
-  let size = 1;
-  let lastFrame = 0;
-  let lastMetric = performance.now();
-  let metricFrames = 0;
-  let longFrames = 0;
-  let aura = null;
-  let lens = null;
-  const composeStarted = performance.now();
-
-  const metrics = { tier: tierName, targetFps: tier.targetFps, sampledFps: 0, longFrames: 0, particleCount: count };
-  globalThis.nexusCosmicMetrics = metrics;
-  const rgba = (alpha) => `rgba(${color[0]},${color[1]},${color[2]},${alpha})`;
-  const energyFor = (value) => {
-    if (value === 'executing') return .94;
-    if (value === 'responding' || value === 'speaking') return .84;
-    if (value === 'thinking' || value === 'transcribing') return .72;
-    if (value === 'listening') return .62;
-    if (value === 'ready') return .44;
-    if (value === 'error') return .58;
-    return .22;
-  };
-  const rebuildPaint = () => {
-    aura = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * .46);
-    aura.addColorStop(0, rgba(.14 + energy * .16));
-    aura.addColorStop(.22, rgba(.07 + energy * .08));
-    aura.addColorStop(.64, rgba(.018 + energy * .025));
-    aura.addColorStop(1, rgba(0));
-    lens = context.createRadialGradient(centerX - size * .018, centerY - size * .022, 0, centerX, centerY, size * .105);
-    lens.addColorStop(0, 'rgba(235,255,255,.96)');
-    lens.addColorStop(.08, rgba(.92));
-    lens.addColorStop(.28, rgba(.45 + energy * .2));
-    lens.addColorStop(.68, rgba(.08 + energy * .09));
-    lens.addColorStop(1, rgba(0));
-  };
-  const readState = () => {
-    const next = button.dataset.state || 'idle';
-    if (next !== state) {
-      state = next;
-      energy = energyFor(state);
-      transitionEnergy = 1;
-      color = corePalette[state] || corePalette.idle;
-      rebuildPaint();
-    }
-  };
+  const efficient = navigator.connection?.saveData || Number(navigator.deviceMemory || 4) <= 3;
+  const renderer = createAstralCore(canvas, { host: button, efficient, getState: () => button.dataset.state || 'idle' });
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
-  const resize = () => {
-    const rect = canvas.getBoundingClientRect();
-    const dprLimit = tierName === 'efficient' ? 1 : tierName === 'balanced' ? 1.35 : 1.55;
-    const dpr = Math.min(devicePixelRatio || 1, dprLimit);
-    width = Math.max(1, rect.width);
-    height = Math.max(1, rect.height);
-    centerX = width / 2;
-    centerY = height / 2;
-    size = Math.min(width, height);
-    canvas.width = Math.max(1, Math.round(width * dpr));
-    canvas.height = Math.max(1, Math.round(height * dpr));
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    rebuildPaint();
-  };
-  const schedule = () => {
-    if (!document.hidden) frame = requestAnimationFrame(draw);
-  };
-  const draw = (now) => {
-    const elapsed = now - lastFrame;
-    const interval = reduced ? 1000 : 1000 / tier.targetFps;
-    if (elapsed + .35 < interval) return schedule();
-    lastFrame = now - (elapsed % interval);
-    metricFrames += 1;
-    if (elapsed > 34) longFrames += 1;
-    if (now - lastMetric >= 1000) {
-      metrics.sampledFps = Math.round(metricFrames * 1000 / (now - lastMetric));
-      metrics.longFrames = longFrames;
-      metricFrames = 0;
-      longFrames = 0;
-      lastMetric = now;
-    }
-    const time = reduced ? 0 : now / 1000;
-    const composeRaw = reduced ? 1 : Math.min(1, Math.max(0, (now - composeStarted) / 980));
-    const compose = 1 - Math.pow(1 - composeRaw, 4);
-    transitionEnergy = reduced ? 0 : Math.max(0, transitionEnergy - elapsed / 620);
-    context.clearRect(0, 0, width, height);
-    context.globalCompositeOperation = 'lighter';
-    context.fillStyle = aura;
-    context.fillRect(0, 0, width, height);
-    for (let index = 0; index < 5; index += 1) {
-      context.save();
-      context.translate(centerX, centerY);
-      context.rotate(time * (index % 2 ? -.024 : .018) * (1 + energy) + index * .41);
-      context.scale(1, index % 2 ? .82 : .94);
-      context.beginPath();
-      context.setLineDash(index % 2 ? [size * .025, size * .045] : [size * .09, size * .025]);
-      context.lineDashOffset = time * (index % 2 ? 5 : -3);
-      context.strokeStyle = rgba(.035 + energy * .026);
-      context.lineWidth = .48 + index * .05;
-      context.arc(0, 0, size * (.14 + index * .077), 0, Math.PI * 2);
-      context.stroke();
-      context.restore();
-    }
-    for (let index = 0; index < count; index += 1) {
-      const pointLayer = layer[index];
-      const direction = ring[index] % 2 ? 1 : -1;
-      const turn = angle[index] + time * speed[index] * direction * (.72 + energy * .72);
-      const base = pointLayer === 0 ? .045 + seed[index] * .125
-        : pointLayer === 2 ? .12 + seed[index] * .22
-          : pointLayer === 3 ? .39 + seed[index] * .095
-            : .205 + ring[index] * .047 + (seed[index] - .5) * .012;
-      const pulse = 1 + Math.sin(time * (1.15 + energy * 2.5) + seed[index] * 8) * (.01 + energy * .026) + transitionEnergy * Math.sin(seed[index] * 19 + time * 4.2) * .045;
-      const radius = size * base * pulse;
-      const flatten = pointLayer === 3 ? .72 : pointLayer === 2 ? .9 : 1;
-      const targetX = centerX + Math.cos(turn) * radius;
-      const targetY = centerY + Math.sin(turn) * radius * flatten;
-      const sourceTurn = angle[index] * 1.37 + seed[index] * 4.2;
-      const sourceRadius = size * (.58 + seed[index] * .22);
-      const sourceX = centerX + Math.cos(sourceTurn) * sourceRadius;
-      const sourceY = centerY + Math.sin(sourceTurn) * sourceRadius;
-      const delayedCompose = Math.max(0, Math.min(1, (compose - (index % 9) * .018) / .84));
-      const rawX = sourceX + (targetX - sourceX) * delayedCompose;
-      const rawY = sourceY + (targetY - sourceY) * delayedCompose;
-      const deltaX = rawX - pointerX;
-      const deltaY = rawY - pointerY;
-      const distance = pointerActive ? Math.hypot(deltaX, deltaY) : size;
-      const influence = pointerActive * Math.max(0, 1 - distance / (size * .33));
-      const shift = (pointLayer === 3 ? 3 : 7) * influence;
-      positionX[index] = rawX + (distance ? deltaX / distance : 0) * shift;
-      positionY[index] = rawY + (distance ? deltaY / distance : 0) * shift;
-    }
-    for (let index = 0; index < linkCount; index += 1) {
-      const from = links[index * 2];
-      const to = links[index * 2 + 1];
-      const deltaX = positionX[from] - positionX[to];
-      const deltaY = positionY[from] - positionY[to];
-      const distance = Math.hypot(deltaX, deltaY);
-      if (distance < size * .34 && (layer[from] === 2 || layer[to] === 2 || distance < size * .18)) {
-        context.beginPath();
-        context.strokeStyle = rgba(Math.max(.018, .12 + energy * .08 - distance / size * .45) * compose);
-        context.lineWidth = .38 + energy * .18;
-        context.moveTo(positionX[from], positionY[from]);
-        context.lineTo(positionX[to], positionY[to]);
-        context.stroke();
-      }
-    }
-    for (let index = 0; index < count; index += 1) {
-      const pointLayer = layer[index];
-      const dot = (pointLayer === 0 ? 1.1 + energy * .8 : pointLayer === 2 ? .82 + energy * .42 : pointLayer === 3 ? .5 : .66 + energy * .26) + transitionEnergy * .34;
-      const alpha = Math.min(.92, ((pointLayer === 3 ? .1 + energy * .07 : pointLayer === 2 ? .24 + energy * .28 : .19 + energy * .25) + transitionEnergy * .16) * Math.max(.08, compose));
-      context.beginPath();
-      context.fillStyle = rgba(alpha);
-      context.arc(positionX[index], positionY[index], dot, 0, Math.PI * 2);
-      context.fill();
-    }
-    context.globalAlpha = compose;
-    context.fillStyle = lens;
-    context.beginPath();
-    context.arc(centerX, centerY, size * .105, 0, Math.PI * 2);
-    context.fill();
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = 'source-over';
-    schedule();
-  };
-
-  button.addEventListener('pointermove', (event) => {
-    const rect = canvas.getBoundingClientRect();
-    pointerX = event.clientX - rect.left;
-    pointerY = event.clientY - rect.top;
-    pointerActive = tier.pointerScale;
-  }, { passive: true });
-  button.addEventListener('pointerleave', () => { pointerActive = 0; }, { passive: true });
-  new ResizeObserver(resize).observe(canvas);
-  new MutationObserver(readExchange).observe(exchange, { subtree: true, childList: true, characterData: true });
-  new MutationObserver(readState).observe(button, { attributes: true, attributeFilter: ['data-state'] });
-  document.addEventListener('visibilitychange', () => {
-    cancelAnimationFrame(frame);
-    if (!document.hidden) {
-      lastFrame = performance.now();
-      schedule();
-    }
-  });
-  resize();
-  readState();
+  const observer = new MutationObserver(readExchange);
+  observer.observe(exchange, { subtree: true, childList: true, characterData: true });
+  globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => Number(canvas.dataset.astralParticles || 0) };
+  addEventListener('pagehide', () => { observer.disconnect(); renderer.dispose(); }, { once: true });
   readExchange();
-  schedule();
 }
 
 // #endregion
@@ -388,7 +169,7 @@ function publicAiCosmicRuntime(corePalette, presentation) {
 // #region 02 — Composizione e pubblicazione della pagina
 
 function publicAiCosmicCoreScript({ palette, presentation }) {
-  return `<script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)});</script>`;
+  return `<style>.core-glyph{display:none!important}.core canvas{inset:-15%;width:130%;height:130%;filter:none!important}.core[data-state] canvas{filter:none!important}</style><script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)},${createAstralCore.toString()});</script>`;
 }
 
 /** Renderer DOM sicuro condiviso dalla generazione e dalla risposta conclusa. */

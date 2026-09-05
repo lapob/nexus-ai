@@ -9,6 +9,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ACESFilmicToneMapping, HalfFloatType, NoToneMapping, SRGBColorSpace } from 'three';
 import type { AudioBus, EntityState, HardwareProfile, InterfacePreferences, VisualQuality } from '../types/nexus';
 import { markStartup } from '../systems/StartupMetrics';
+import { VisualizerInspection } from './VisualizerInspection';
 
 type StartupVisualPhase = 'shell' | 'balanced' | 'full';
 
@@ -345,6 +346,7 @@ export function MainScene({ state, audioBus, preferences, hardware, suspended }:
       }}
     >
       <Suspense fallback={null}>
+        <VisualizerInspection reduced={reducedMotion}>
         {preferences.coreAppearance === 'neural' ? (
           <ParticleEngine
             state={state}
@@ -373,6 +375,7 @@ export function MainScene({ state, audioBus, preferences, hardware, suspended }:
             pointerPresence={pointerPresence}
           />
         )}
+        </VisualizerInspection>
       </Suspense>
       {startupPhase !== 'shell' && effectiveQuality !== 'efficient' && (
         <EffectComposer multisampling={0} frameBufferType={hdrEnabled ? HalfFloatType : undefined}>
