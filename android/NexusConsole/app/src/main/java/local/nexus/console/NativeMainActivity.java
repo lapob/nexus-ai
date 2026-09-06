@@ -1991,8 +1991,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private TextView eyebrow(String value) {
-        TextView view = text(value, 10, Color.rgb(76, 132, 133));
-        view.setLetterSpacing(.16f);
+        TextView view = text(value, 12, Color.rgb(171, 186, 187));
+        view.setLetterSpacing(.08f);
         return view;
     }
 

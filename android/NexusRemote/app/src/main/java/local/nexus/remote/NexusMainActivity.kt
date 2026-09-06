@@ -2813,7 +2813,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 Column(Modifier.padding(7.dp)) {
                                     Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text(nexusCopy("COMANDI NEXUSNXS", "NEXUSNXS COMMANDS"), color = Mist, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
-                                        Text(nexusCopy("Tocca per inserire", "Tap to insert"), color = Mist.copy(alpha = .62f), fontSize = 10.sp)
+                                        Text(nexusCopy("Tocca per inserire", "Tap to insert"), color = Mist, fontSize = 12.sp)
                                     }
                                     instantSlashSuggestions.forEach { command ->
                                         Row(
@@ -2823,7 +2823,7 @@ private fun JSONArray?.toTurns() = buildList {
                                             Text("/${command.name}", color = Cyan, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 88.dp))
                                             Column(Modifier.weight(1f)) {
                                                 Text(command.label, color = Ice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                Text(command.description, color = Mist, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(command.description, color = Mist, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                             }
                                         }
                                     }
@@ -2914,7 +2914,7 @@ private fun JSONArray?.toTurns() = buildList {
                             ) { label -> Text(label, color = if (state.connection == NexusConnection.OFFLINE) Color(0xFFFF9A91) else Mist, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
                             if (state.connection != NexusConnection.OFFLINE) Text(
                                 if (voiceMode) inlineVoiceDetail else nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
-                                color = Mist.copy(alpha = .72f), fontSize = 11.sp,
+                                color = Mist, fontSize = 12.sp,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(top = 8.dp).fillMaxWidth(.82f)
                             )
@@ -4476,7 +4476,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 Column(Modifier.padding(7.dp)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(nexusCopy("COMANDI NEXUSNXS", "NEXUSNXS COMMANDS"), color = Mist, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, modifier = Modifier.weight(1f))
-                        Text(nexusCopy("Tocca per inserire", "Tap to insert"), color = Mist.copy(alpha = .62f), fontSize = 10.sp)
+                        Text(nexusCopy("Tocca per inserire", "Tap to insert"), color = Mist, fontSize = 12.sp)
                     }
                     slashSuggestions.forEach { command ->
                         Row(
@@ -4486,7 +4486,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                             Text("/${command.name}", color = Cyan, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold, modifier = Modifier.widthIn(min = 92.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(command.label, color = Ice, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(command.description, color = Mist, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(command.description, color = Mist, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                             }
                             if (command.custom) Text(nexusCopy("TUO", "YOURS"), color = Mist.copy(alpha = .66f), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                         }
@@ -5331,4 +5331,4 @@ private fun historyGroupLabel(updatedAt: Long, italian: Boolean = true): String 
     }
 }
 
-@Composable private fun SectionLabel(value: String) { Text(value, color = Mist, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp, modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 7.dp)) }
+@Composable private fun SectionLabel(value: String) { Text(value, color = Mist, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = .8.sp, modifier = Modifier.padding(start = 4.dp, top = 20.dp, bottom = 7.dp)) }

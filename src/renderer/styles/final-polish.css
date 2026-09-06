@@ -205,15 +205,15 @@
   margin-left: auto;
 }
 
-.conversation-transcript-turns small { margin-bottom: 0.24rem; color: rgba(125, 189, 192, 0.43); transition: color 150ms ease; }
-.conversation-transcript-turns article:hover > small { color: rgba(139, 207, 210, 0.66); }
+.conversation-transcript-turns small { margin-bottom: 0.24rem; color: #abbabb; transition: color 150ms ease; }
+.conversation-transcript-turns article:hover > small { color: #d2dede; }
 .conversation-transcript-turns p { line-height: 1.58; }
 .conversation-transcript-turns .answer-markdown { line-height: 1.58; }
-.conversation-turn-actions button { min-height: 2.15rem; padding: 0.38rem 0.58rem; font-size: 0.66rem; }
+.conversation-turn-actions button { min-height: 2.75rem; padding: 0.38rem 0.65rem; font-size: var(--nexus-caption-size); }
 .conversation-turn-actions { opacity: 0; }
 
 @media (hover: none), (pointer: coarse) {
-  .conversation-turn-actions { opacity: 0.38; }
+  .conversation-turn-actions { opacity: 1; }
 }
 .settings-overlay :is(.settings-copy, .settings-hint, .settings-field > small, .settings-tabs small) {
   color: rgba(190, 211, 212, 0.74);
@@ -1386,7 +1386,7 @@
   .slash-command-palette { backdrop-filter: none; }
 }
 .command-input > textarea::-webkit-scrollbar { display: none; }
-.command-input > textarea::placeholder { color: rgba(161, 194, 196, 0.35); }
+.command-input > textarea::placeholder { color: #abbabb; }
 
 .conversation-history {
   width: min(31rem, calc(100vw - 1.5rem));
@@ -1401,7 +1401,7 @@
 .conversation-transcript-turns { gap: 1.15rem; }
 .conversation-transcript-turns article { padding-block: 0.08rem; }
 .conversation-transcript-turns p,
-.conversation-transcript-turns .answer-markdown { line-height: 1.52; }
+.conversation-transcript-turns .answer-markdown { line-height: 1.65; }
 
 .settings-overlay :is(.settings-field, .settings-switch, .settings-subsection-title) {
   border-radius: 0.68rem;

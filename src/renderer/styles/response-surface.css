@@ -422,7 +422,7 @@
 .response-table-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
 .response-table-wrap th, .response-table-wrap td { min-width: 7rem; padding: 0.68rem 0.78rem; border-bottom: 1px solid rgba(108, 194, 197, 0.075); vertical-align: top; }
 .response-table-wrap th { color: rgba(216, 244, 245, 0.82); background: rgba(87, 174, 177, 0.045); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.045em; }
-.response-table-wrap td { color: rgba(188, 217, 219, 0.68); font-size: 0.79rem; line-height: 1.5; }
+.response-table-wrap td { color: #d2dede; font-size: 0.875rem; line-height: 1.6; }
 .response-table-wrap tbody tr:last-child td { border-bottom: 0; }
 
 .code-card {

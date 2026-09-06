@@ -192,7 +192,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
             fixture.dataset.streaming = 'false';
             fixture.dataset.reveal = 'ready';
             fixture.innerHTML = '<div class="answer-context" data-kind="code" role="status"><i></i><span><small>CODICE</small><strong>Risposta pronta</strong></span></div><div class="answer-scroll"><div class="answer-markdown"><h2>Risultato verificato</h2><aside class="response-callout" data-tone="result"><strong>Verifica completata</strong><p>La risposta è ordinata e immediata.</p></aside><h3>Codice</h3><section class="code-card"><div class="code-card-meta"><span>typescript</span><button>Copia</button></div><pre><code><span class="syntax-line"><i>1</i><b><span class="syntax-keyword">const</span> stato = <span class="syntax-string">&quot;pronto&quot;</span>;</b></span><span class="syntax-line"><i>2</i><b>console.log(stato);</b></span></code></pre></section><div class="response-table-wrap"><table><thead><tr><th>Area</th><th>Stato</th></tr></thead><tbody><tr><td>Rendering</td><td>Pronto</td></tr></tbody></table></div></div></div>';
-            document.body.append(fixture);
+            document.querySelector('#nexusShell').append(fixture);
           })()`);
           await new Promise((resolve) => setTimeout(resolve, 320));
         }
