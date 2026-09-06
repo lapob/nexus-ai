@@ -1,8 +1,9 @@
 /* One page-wide field. Semantic sections remain for navigation/accessibility,
    but never introduce a new background, frame or independent motion loop. */
-body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%) fixed; }
+body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%) fixed; }
 .hero > *:not(.scroll-cue) { width: min(100%, var(--content-max)); margin-inline: auto; }
-.nxs-field-dragging, .nxs-field-dragging * { cursor: none !important; }
+.astral-interlude, .astral-hero .home-neural-core { cursor: grab; }
+.nxs-field-dragging, .nxs-field-dragging * { cursor: grabbing !important; }
 .home-continuum, .inner-page { background: transparent; }
 .narrative-page .premium-footer { background: transparent; }
 .inner-page > section { background: transparent; border-color: transparent; box-shadow: none; }
@@ -119,8 +120,8 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-page .presence-grid article small { color: #92b0b4; font-size: 14px; line-height: 1.5; }
 .narrative-page .presence-grid article > i { display: none; }
 .narrative-forms { padding-block: 32px 80px; }
-.narrative-page .astral-interlude { max-width: none; min-height: 70svh; padding: 0; margin: 0; }
-.cosmic-stage { height: 60svh; }
+.narrative-page .astral-interlude { max-width: none; min-height: 100svh; padding: 0; margin: 0; }
+.cosmic-stage { height: 100svh; }
 .narrative-page .astral-interlude > p { position: relative; z-index: 1; max-width: 34ch; margin: -15svh auto 0; padding: 0 24px 10svh; }
 .narrative-page .one-nexus { padding-block: clamp(100px, 14vw, 200px); }
 .product-narrative .product-facts, .product-narrative .feature-grid { border: 0; background: none; }

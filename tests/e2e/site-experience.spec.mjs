@@ -518,9 +518,14 @@ test("the continuous field moves particles locally without scaling the interface
   const core = page.locator('.nxs-cosmic-field');
   await expect(core).toHaveAttribute('data-particles', /\d+/);
   const before = await core.boundingBox();
+  const scene = page.locator('.astral-interlude').first();
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveCSS('cursor', 'grab');
+  await expect(core).toHaveAttribute('data-background-particles', /\d+/);
+  const backgroundCount = await core.getAttribute('data-background-particles');
   await page.mouse.move(before.x + before.width * .4, before.y + before.height * .5);
   await page.mouse.down();
-  await expect(page.locator('html')).not.toHaveClass(/nxs-field-dragging/);
+  await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
   await page.mouse.move(before.x + before.width * .65, before.y + before.height * .57, {steps:24});
   await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
   await page.waitForTimeout(600);
@@ -532,6 +537,7 @@ test("the continuous field moves particles locally without scaling the interface
   await expect.poll(async () => Number(await core.getAttribute('data-max-drift')), {timeout:12000}).toBeLessThan(1);
   await expect.poll(async () => Math.max(...(await core.getAttribute('data-rotation')).split(',').map(v=>Math.abs(Number(v)))), {timeout:12000}).toBeLessThan(.01);
   expect(await core.boundingBox()).toEqual(before);
+  expect(await core.getAttribute('data-background-particles')).toBe(backgroundCount);
 });
 
 test("replay reassembles only the home artwork and remains bounded on mobile", async ({page}) => {

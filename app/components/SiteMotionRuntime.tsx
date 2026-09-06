@@ -131,6 +131,10 @@ export function SiteMotionRuntime() {
       velocityX: 0,
       velocityY: 0,
     }));
+    // Independent persistent stars: composing a shape never empties the sky.
+    const backgroundStars = Array.from({ length: tier === "lite" ? 180 : 520 }, () => ({
+      x: random(), y: random(), depth: random(), phase: random() * Math.PI * 2,
+    }));
 
     const resizeCosmicField = () => {
       if (!cosmicContext) return;
@@ -169,7 +173,7 @@ export function SiteMotionRuntime() {
         inspection[axis] = target + (error + acceleration * delta) * decay;
         inspection[velocity] = (inspection[velocity] - omega * acceleration * delta) * decay;
       }
-      if (!reduced) ambientTime += delta * .55;
+      if (!reduced) ambientTime += delta * .8;
       const time = reduced ? 0 : ambientTime;
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
@@ -281,6 +285,15 @@ export function SiteMotionRuntime() {
       cosmicContext.globalCompositeOperation = "lighter";
       const age = Math.max(0, now - fieldStarted) / 1000;
       cosmicContext.globalAlpha = reduced ? 1 : Math.min(1, age / .9);
+      for (const star of backgroundStars) {
+        const x = star.x * cosmicWidth + Math.sin(time * .09 + star.phase) * 5;
+        const y = ((star.y * cosmicHeight - window.scrollY * (.012 + star.depth * .025)) % cosmicHeight + cosmicHeight) % cosmicHeight;
+        const twinkle = .8 + Math.sin(time * .45 + star.phase) * .2;
+        cosmicContext.fillStyle = `rgba(185,225,236,${(.16 + star.depth * .42) * twinkle})`;
+        cosmicContext.beginPath();
+        cosmicContext.arc(x, y, .4 + star.depth ** 4 * 1.1, 0, Math.PI * 2);
+        cosmicContext.fill();
+      }
       let maxDrift = 0;
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
       const points = particles.slice(0, activeParticles).map((particle, index) => {
@@ -294,7 +307,7 @@ export function SiteMotionRuntime() {
         // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
-        const transitionScatter = Math.sin(sectionMix * Math.PI) * .48;
+        const transitionScatter = Math.sin(sectionMix * Math.PI) * .7;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
         const arrivalTime = Math.min(1, Math.max(0, age - .4) / 5);
@@ -349,8 +362,8 @@ export function SiteMotionRuntime() {
         cosmicContext.stroke();
       }
       for (const point of points) {
-        if (point.depth > .93) {
-          const glowSize = 8 + point.depth * 7;
+        if (point.depth > .85) {
+          const glowSize = 10 + point.depth * 10;
           cosmicContext.save();
           cosmicContext.globalAlpha *= point.visibility;
           cosmicContext.drawImage(glow,point.x-glowSize/2,point.y-glowSize/2,glowSize,glowSize);
@@ -370,6 +383,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.arrival = Math.min(1, Math.max(0, age - .4) / 5).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
       cosmicCanvas.dataset.particles = String(activeParticles);
+      cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
       cosmicCanvas.dataset.rotation = `${inspection.x.toFixed(3)},${inspection.y.toFixed(3)}`;
       if (!reduced && !document.hidden) cosmicFrame = requestAnimationFrame(drawCosmicField);
     };
@@ -484,7 +498,9 @@ export function SiteMotionRuntime() {
     const startDrag = (event: PointerEvent) => {
       if (event.button !== 0 || reducedMotion.matches || !(event.target instanceof Element)) return;
       if (event.target.closest('a,button,input,textarea,select,[contenteditable],h1,h2,p,li')) return;
+      if (!event.target.closest('.astral-interlude,.home-neural-core')) return;
       if (event.pointerType === 'touch') return;
+      root.classList.add('nxs-field-dragging');
       inspection.id = event.pointerId;
       inspection.startX = event.clientX; inspection.startY = event.clientY;
       inspection.targetX = inspection.x; inspection.targetY = inspection.y;

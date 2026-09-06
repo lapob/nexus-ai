@@ -26,7 +26,7 @@ export default function Home() {
       <p>Una domanda veloce, un testo da migliorare, un problema da risolvere. Parla con Nexus o scrivi: ricevi una risposta leggibile mentre prende forma.</p>
     </section>
     <section className="astral-interlude" aria-label="Un cursore si compone nello spazio" data-cosmic-scene="center" data-cosmic-form="cursor">
-      <div className="cosmic-stage" aria-hidden="true" /><p>La stessa intelligenza. Il tuo modo di usarla.</p>
+      <div className="cosmic-stage" aria-hidden="true" />
     </section>
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
       <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene={app.device === "desktop" ? "right" : "left"} data-cosmic-form={app.device === "desktop" ? "saturn" : "neural"}>
