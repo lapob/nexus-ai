@@ -4,6 +4,46 @@ import { expect, test } from "@playwright/test";
 const publicRoutes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
 const responsiveRoutes = [...publicRoutes, "/maintenance", "/percorso-che-non-esiste"];
 
+test("fast scroll reversals retain one field and recover the current chapter",async({page})=>{
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:844});
+    await page.goto('/');
+    const canvas=page.locator('.nxs-cosmic-field');
+    await expect(canvas).toHaveCount(1);
+    await page.evaluate(()=>{window.__originalField=document.querySelector('.nxs-cosmic-field')});
+    for(const ratio of [.85,.1,.6,0,.4]){
+      await page.evaluate(r=>scrollTo({top:(document.documentElement.scrollHeight-innerHeight)*r,behavior:'instant'}),ratio);
+      await page.waitForTimeout(80);
+    }
+    await expect.poll(()=>canvas.evaluate(el=>Math.abs(Number(el.dataset.sceneProgress)-Number(el.dataset.sceneTarget)))).toBeLessThan(.12);
+    expect(await page.evaluate(()=>window.__originalField===document.querySelector('.nxs-cosmic-field'))).toBe(true);
+    await expect(canvas).toHaveCount(1);
+  }
+});
+
+test("reading blur is feathered and transparent on desktop and mobile", async ({page}) => {
+  for(const width of [1440,390]) {
+    await page.setViewportSize({width,height:844});
+    await page.goto('/');
+    await page.locator('#vision').scrollIntoViewIfNeeded();
+    await expect(page.locator('#vision')).toHaveClass(/nxs-in-view/);
+    await page.waitForTimeout(2000);
+    const treatment=await page.locator('#vision h2').evaluate(el=>{
+      const style=getComputedStyle(el,'::before');
+      return {blur:style.backdropFilter,mask:style.maskImage,background:style.backgroundColor,html:el.outerHTML,parent:el.parentElement?.className};
+    });
+    expect(treatment.blur,JSON.stringify(treatment)).toMatch(/blur\(/);
+    expect(treatment.mask).toMatch(/radial-gradient/);
+    expect(treatment.background).toBe('rgba(0, 0, 0, 0)');
+    await expect(page.locator('#site-content')).toHaveCSS('mix-blend-mode','normal');
+    await page.screenshot({path:`outputs/reading-blur-${width}.png`});
+    if(width===390) {
+      const reserved=await page.locator('#vision').evaluate(el=>parseFloat(getComputedStyle(el).paddingBottom));
+      expect(reserved).toBeGreaterThan(400);
+    }
+  }
+});
+
 test("all public and operational pages render without horizontal overflow or oversized headings", async ({ page }) => {
   for (const route of responsiveRoutes) {
     const response = await page.goto(route, { waitUntil: "load" });

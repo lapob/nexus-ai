@@ -24,7 +24,6 @@ export default function Home() {
       <p className="section-label">DALL’IDEA AL RISULTATO</p>
       <h2>Meno passaggi.<br /><em>Più possibilità.</em></h2>
       <p>Una domanda veloce, un testo da migliorare, un problema da risolvere. Parla con Nexus o scrivi: ricevi una risposta leggibile mentre prende forma.</p>
-      <p>Allega ciò su cui vuoi lavorare. Quando serve una ricerca, Nexus mostra l’uso del web e le fonti disponibili. Puoi fermare la generazione in qualsiasi momento.</p>
     </section>
     <section className="astral-interlude" aria-label="Un cursore si compone nello spazio" data-cosmic-scene="center" data-cosmic-form="cursor">
       <div className="cosmic-stage" aria-hidden="true" /><p>La stessa intelligenza. Il tuo modo di usarla.</p>
@@ -36,7 +35,7 @@ export default function Home() {
       </article>)}</div>
     </section>
     <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right">
-      <div className="presence-copy"><p className="section-label">UN DIALOGO CONTINUO</p><h2 id="presence-title">Non solo una risposta.<br /><em>Un’interazione.</em></h2><p>Il Core segue gli stati reali dell’assistente. La voce è in primo piano; tastiera e dettagli sono disponibili quando servono.</p></div>
+      <div className="presence-copy"><p className="section-label">UN DIALOGO CONTINUO</p><h2 id="presence-title">Vedi cosa sta facendo.</h2><p>Il Core segue ascolto, elaborazione e risposta. Quando consulta il web, trovi le fonti; quando agisce, mantieni il controllo. Puoi fermarlo in qualsiasi momento.</p></div>
       <div className="presence-grid">{presenceStates.map(({Icon,label,detail,state}) => <article key={state} data-state={state}><span><Icon strokeWidth={1.4}/></span><div><strong>{label}</strong><small>{detail}</small></div><i aria-hidden="true"/></article>)}</div>
     </section>
     <section className="astral-interlude narrative-forms" aria-label="Saturno particellare" data-cosmic-scene="center" data-cosmic-form="saturn"><div className="cosmic-stage" aria-hidden="true" /></section>

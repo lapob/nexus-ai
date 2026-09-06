@@ -653,7 +653,7 @@ body {
    interferire con testo, controlli o scorrimento. Il runtime ne riduce
    automaticamente densità, DPR e frequenza sui dispositivi meno potenti. */
 body { isolation: isolate; }
-#site-content { position: relative; z-index: auto; mix-blend-mode: screen; }
+#site-content { position: relative; z-index: 1; }
 .nxs-cosmic-field {
   position: fixed;
   inset: 0;

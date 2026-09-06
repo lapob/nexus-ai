@@ -89,6 +89,8 @@ export function SiteMotionRuntime() {
     const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
     const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section:not(.narrative-apps), main > .narrative-apps .app-card, main > footer"));
     let sectionAnchors: number[] = [];
+    let mobileArtAnchors: number[] = [];
+    let readingHalos: {left:number;right:number;top:number;bottom:number}[] = [];
     let sceneProgress = 0;
     let paintMs = 0;
     let fieldStarted = performance.now();
@@ -139,6 +141,11 @@ export function SiteMotionRuntime() {
       cosmicCanvas.height = Math.round(cosmicHeight * ratio);
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
+      mobileArtAnchors = sections.map((section, index) => sectionAnchors[index] + section.offsetHeight - cosmicHeight * .32);
+      readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.product-narrative h1,.product-narrative h2,.product-narrative p')).map(element=>{
+        const rect=element.getBoundingClientRect();
+        return {left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY};
+      });
     };
 
     const drawCosmicField = (now: number) => {
@@ -172,9 +179,13 @@ export function SiteMotionRuntime() {
       const sectionStart = sectionAnchors[currentSection] || 0;
       const sectionEnd = sectionAnchors[currentSection + 1] || sectionStart + cosmicHeight;
       const fraction = (viewportAnchor - sectionStart) / Math.max(1, sectionEnd - sectionStart);
-      const hold = sections[currentSection]?.classList.contains('astral-interlude') ? .55 : .2;
+      const hold = sections[currentSection]?.classList.contains('astral-interlude') ? .65 : .35;
       const destination = currentSection + Math.min(1, Math.max(0, (fraction - hold) / (1 - hold)));
-      sceneProgress += (destination - sceneProgress) * (reduced ? 1 : 1 - Math.exp(-1.35 * delta));
+      // A fast fling must not leave old chapter geometry chasing new copy.
+      // Keep slow local inertia, but converge faster when several scenes were crossed.
+      const sceneDistance = destination - sceneProgress;
+      const catchup = 2.2 + Math.min(14, Math.abs(sceneDistance) * 7);
+      sceneProgress += sceneDistance * (reduced ? 1 : 1 - Math.exp(-catchup * delta));
       const sectionPosition = sceneProgress;
       const sectionIndex = Math.floor(sectionPosition);
       const sectionMixRaw = sectionPosition - sectionIndex;
@@ -185,9 +196,8 @@ export function SiteMotionRuntime() {
       };
       const responsiveLane = (index: number) => {
         const lane = laneFor(index);
-        return cosmicWidth < 760 && lane !== .5 ? (lane < .5 ? .04 : .96) : lane;
+        return cosmicWidth < 801 ? .5 : lane;
       };
-      const visualLane = responsiveLane(sectionIndex) + (responsiveLane(sectionIndex + 1) - responsiveLane(sectionIndex)) * sectionMix;
       const topology = sectionPosition;
       const topologyIndex = Math.floor(topology);
       const topologyMixRaw = topology - topologyIndex;
@@ -196,9 +206,12 @@ export function SiteMotionRuntime() {
         const form = sections[shape]?.dataset.cosmicForm;
         const kind = (((shape + routePhase) % 5) + 5) % 5;
         const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
-        const centerX = cosmicWidth * visualLane;
-        const centerY = cosmicHeight * .5;
-        const unit = Math.min(cosmicWidth, cosmicHeight) * (laneFor(shape) === .5 ? .95 : .66);
+        const centerX = cosmicWidth * responsiveLane(shape);
+        const mobileReading = cosmicWidth < 801 && sections[shape]?.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
+        // On phones the artwork occupies real space after the copy, rather
+        // than being clipped offscreen or projected behind readable text.
+        const centerY = mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
+        const unit = Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
         // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
         const depth = shape === 0 ? Math.min(1, sectionPosition * 3) : 1;
         const pitch = depth * (.22 + Math.sin(time * .04) * .08) + inspection.x;
@@ -269,6 +282,7 @@ export function SiteMotionRuntime() {
       const age = Math.max(0, now - fieldStarted) / 1000;
       cosmicContext.globalAlpha = reduced ? 1 : Math.min(1, age / .9);
       let maxDrift = 0;
+      const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
       const points = particles.slice(0, activeParticles).map((particle, index) => {
         const baseX = particle.x * cosmicWidth;
         // Never wrap a grain across the viewport while a form is dissolving.
@@ -305,7 +319,16 @@ export function SiteMotionRuntime() {
         const px = x + particle.offsetX, py = y + particle.offsetY;
         // One uninterrupted field: text must not punch rectangular holes in it.
         const edge = Math.max(0, Math.min(1, Math.min(px, py, cosmicWidth - px, cosmicHeight - py) / 48));
-        const visibility = edge * edge * (3 - 2 * edge);
+        // Attenuate the grains themselves, not a black panel over the scene.
+        // This also keeps copy clear while CSS reveal creates a backdrop root.
+        let readingFade=0;
+        for(const rect of visibleHalos){
+          const dx=Math.max(rect.left-px,0,px-rect.right);
+          const dy=Math.max(rect.top-window.scrollY-py,0,py-(rect.bottom-window.scrollY));
+          const weight=Math.max(0,1-Math.hypot(dx,dy)/80);
+          readingFade=Math.max(readingFade,weight*weight*(3-2*weight));
+        }
+        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
       cosmicContext.lineWidth = .55;
@@ -342,6 +365,7 @@ export function SiteMotionRuntime() {
       cosmicContext.globalAlpha = 1;
       paintMs += (performance.now() - paintStart - paintMs) * .1;
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
+      cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
       cosmicCanvas.dataset.arrival = Math.min(1, Math.max(0, age - .4) / 5).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);

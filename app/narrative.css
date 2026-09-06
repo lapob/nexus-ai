@@ -28,6 +28,29 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-page .section-label, .narrative-page .platform { color: #92b0b4; font-size: 12px; letter-spacing: .13em; }
 .narrative-page h2 em { color: #94e5e7; }
 
+/* Blur only the field behind reading surfaces, never the glyphs themselves.
+   A feathered mask removes the rectangular edge without adding a dark card. */
+.narrative-app-copy, .presence-copy, .one-nexus-copy,
+.narrative-copy > p, .narrative-copy > h2,
+.product-narrative h1, .product-narrative h2, .product-narrative p {
+  position:relative; isolation:isolate;
+}
+.narrative-app-copy::before, .presence-copy::before, .one-nexus-copy::before,
+.narrative-copy > p::before, .narrative-copy > h2::before,
+.product-narrative h1::before, .product-narrative h2::before, .product-narrative p::before {
+  content:''; position:absolute; inset:-32px -40px; z-index:-1;
+  pointer-events:none; background:transparent;
+  -webkit-backdrop-filter:blur(9px); backdrop-filter:blur(9px);
+  mask-image:radial-gradient(ellipse, #000 35%, transparent 72%);
+  -webkit-mask-image:radial-gradient(ellipse, #000 35%, transparent 72%);
+}
+@media(max-width:800px){
+  .narrative-app-copy::before, .presence-copy::before, .one-nexus-copy::before,
+  .narrative-copy > p::before, .narrative-copy > h2::before {
+    inset:-24px -20px; -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
+  }
+}
+
 /* The wordmarks flank the core without sharing its hit area. Narrow screens
    reflow the title below it, never shrink the core into an unreadable strip. */
 .home-continuum .astral-hero {
@@ -84,7 +107,6 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-apps .app-card:nth-child(2) .narrative-app-copy { order: 2; }
 .narrative-app-copy h2 { margin: 24px 0; }
 .narrative-apps .app-card::before, .narrative-apps .app-card::after { display: none; }
-.narrative-apps .app-card { mix-blend-mode: screen; }
 .narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
 .narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: clamp(300px, 40vw, 540px); overflow: visible; }
 .narrative-apps .app-card-visual.android .app-card-visual__screen { width: min(50%, 220px); }
@@ -115,9 +137,11 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
   .astral-hero .hero-intro { padding-top: 20px; }
   .home-continuum .astral-hero .hero-actions { margin-top: 22px !important; gap: 12px 24px; }
   .narrative-copy, .narrative-copy--right { max-width: 620px; margin-inline: auto; padding: 96px var(--page-pad); }
+  .narrative-page .narrative-copy { padding-bottom: 64svh; }
+  .narrative-page .presence-system, .narrative-page .one-nexus { padding-bottom:64svh; }
   .narrative-apps .app-card { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .narrative-apps .app-card:nth-child(2) .narrative-app-copy { order: initial; }
-  .narrative-apps .app-card-visual { height: clamp(240px, 70vw, 440px); }
+  .narrative-apps .app-card-visual { height:64svh; }
   .narrative-apps .app-card-visual.android { height: 440px; }
   .narrative-apps .app-card-visual.android .app-card-visual__screen { width: 210px; }
 }
