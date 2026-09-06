@@ -91,6 +91,7 @@ export function SiteMotionRuntime() {
     let sectionAnchors: number[] = [];
     let mobileArtAnchors: number[] = [];
     let readingHalos: {left:number;right:number;top:number;bottom:number}[] = [];
+    let heroCore: { x: number; y: number; size: number } | null = null;
     let sceneProgress = 0;
     let paintMs = 0;
     let fieldStarted = performance.now();
@@ -144,6 +145,9 @@ export function SiteMotionRuntime() {
       cosmicCanvas.width = Math.round(cosmicWidth * ratio);
       cosmicCanvas.height = Math.round(cosmicHeight * ratio);
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const heroBounds = document.querySelector('.home-neural-core')?.getBoundingClientRect();
+      heroCore = heroBounds ? { x: heroBounds.left + heroBounds.width / 2,
+        y: heroBounds.top + window.scrollY + heroBounds.height / 2, size: Math.min(heroBounds.width, heroBounds.height) } : null;
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
       mobileArtAnchors = sections.map((section, index) => sectionAnchors[index] + section.offsetHeight - cosmicHeight * .32);
       readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.product-narrative h1,.product-narrative h2,.product-narrative p')).map(element=>{
@@ -210,12 +214,13 @@ export function SiteMotionRuntime() {
         const form = sections[shape]?.dataset.cosmicForm;
         const kind = (((shape + routePhase) % 5) + 5) % 5;
         const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
-        const centerX = cosmicWidth * responsiveLane(shape);
+        const isHero = shape === 0 && heroCore !== null;
+        const centerX = isHero ? heroCore!.x : cosmicWidth * responsiveLane(shape);
         const mobileReading = cosmicWidth < 801 && sections[shape]?.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
         // On phones the artwork occupies real space after the copy, rather
         // than being clipped offscreen or projected behind readable text.
-        const centerY = mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
-        const unit = Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
+        const centerY = isHero ? heroCore!.y - window.scrollY : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
+        const unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
         // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
         const depth = shape === 0 ? Math.min(1, sectionPosition * 3) : 1;
         const pitch = depth * (.22 + Math.sin(time * .04) * .08) + inspection.x;
