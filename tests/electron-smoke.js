@@ -114,7 +114,7 @@ async function inspectBridge(target) {
             const afterPartialSave = await window.nexus.saveSettings({ temperature: data.settings.temperature });
             permissionPersistence = afterPartialSave.actionApprovalMode === 'full-access';
           }
-          for (let attempt = 0; attempt < 40 && !document.querySelector('.voice-visualizer'); attempt += 1) {
+          for (let attempt = 0; attempt < 200 && !document.querySelector('.voice-visualizer'); attempt += 1) {
             await new Promise((resolve) => setTimeout(resolve, 25));
           }
           // Il canvas compare nel commit React precedente agli effect globali:
@@ -283,6 +283,8 @@ async function inspectBridge(target) {
       const stages = fs.readFileSync(path.join(smokeProfile, 'smoke-stages.log'), 'utf8').trim();
       if (stages) console.error(`Bootstrap stages:\n${stages}`);
     }
-    fs.rmSync(smokeProfile, { recursive: true, force: true });
+    // Chromium child processes can release their profile after the main exit.
+    await Promise.race([exit, delay(2000)]);
+    fs.rmSync(smokeProfile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 })();

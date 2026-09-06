@@ -142,6 +142,46 @@ new MutationObserver(syncCoreTypingGuard).observe(document.body,{attributes:true
 syncCoreTypingGuard();
 `;
 
+// The native keyboard can resize either the visual viewport or both viewports.
+// Keep one baseline per orientation; browser chrome alone must not trigger IME mode.
+const keyboardViewportRuntime = `
+let keyboardBaseline=innerHeight;
+function syncKeyboardViewport(){
+  const view=globalThis.visualViewport,height=view?.height||innerHeight;
+  const focused=document.activeElement===prompt;
+  if(!focused)keyboardBaseline=Math.max(keyboardBaseline,innerHeight,height);
+  const mobile=matchMedia('(pointer:coarse)').matches||innerWidth<=560;
+  const open=mobile&&focused&&(view?.scale||1)<1.1&&(keyboardBaseline-height>120||height<560);
+  document.body.classList.toggle('ime-visible',open);
+  document.documentElement.style.setProperty('--nxs-vvh',height+'px');
+  document.documentElement.style.setProperty('--nxs-vv-top',(view?.offsetTop||0)+'px');
+}
+prompt.addEventListener('focus',syncKeyboardViewport);
+prompt.addEventListener('blur',syncKeyboardViewport);
+globalThis.visualViewport?.addEventListener('resize',syncKeyboardViewport,{passive:true});
+globalThis.visualViewport?.addEventListener('scroll',syncKeyboardViewport,{passive:true});
+addEventListener('resize',syncKeyboardViewport,{passive:true});
+addEventListener('orientationchange',()=>{keyboardBaseline=innerHeight;syncKeyboardViewport()},{passive:true});
+syncKeyboardViewport();
+`;
+
+const KEYBOARD_VIEWPORT_STYLE = `<style>
+@media(max-width:560px),(pointer:coarse){
+  body.keyboard-open:not(.conversation-active):not(.request-active) .copy{opacity:0;visibility:hidden;filter:none}
+  body.ime-visible .composer{grid-template-columns:44px 44px minmax(0,1fr);gap:8px;align-items:center}
+  body.ime-visible .composer-box{grid-column:1/-1;grid-row:1;min-height:48px}
+  body.ime-visible .composer textarea{font-size:16px;min-height:24px;max-height:min(100px,24dvh)}
+  body.ime-visible .attachment-toggle{grid-column:1;grid-row:2}
+  body.ime-visible .keyboard-toggle{grid-column:2;grid-row:2}
+  body.ime-visible .send{grid-column:3;grid-row:2;justify-self:end}
+  body.ime-visible .attachment-toggle,body.ime-visible .keyboard-toggle,body.ime-visible .send{width:44px;height:44px;margin:0}
+  body.ime-visible.keyboard-open:not(.request-active):not(.conversation-active) .dock,body.ime-visible.keyboard-open:is(.request-active,.conversation-active) .dock{top:calc(var(--nxs-vv-top) + var(--nxs-vvh) - var(--nxs-dock-height,120px) - 10px);bottom:auto;transform:none;transition:none;padding:8px 0;width:calc(100% - 24px)}
+  body.ime-visible .privacy{visibility:hidden;pointer-events:none}
+  body.ime-visible:not(.conversation-active) .core,body.ime-visible:not(.conversation-active) .copy{visibility:hidden}
+  body.ime-visible .web-slash-menu{bottom:calc(100dvh - var(--nxs-vv-top) - var(--nxs-vvh) + var(--nxs-dock-height,120px) + 16px);max-height:calc(var(--nxs-vvh) - var(--nxs-dock-height,120px) - 100px)}
+}
+</style>`;
+
 const ATTACHMENT_STYLE = `<style>
 .attachment-toggle{position:relative}.attachment-toggle:focus{outline:0}.attachment-toggle:focus-visible{border-color:rgba(91,224,220,.34);color:#d7eeee;background:rgba(29,85,86,.23);box-shadow:0 0 0 3px rgba(83,221,216,.055)}
 .composer{grid-template-columns:52px 52px minmax(0,1fr) 54px}.attachment-toggle{width:52px;height:52px;margin-bottom:2px;border-radius:50%;display:grid;place-items:center}.attachment-toggle svg{display:block;width:21px;height:21px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}.attachment-toggle[data-count]:not([data-count="0"]){color:#91e9e5;border-color:rgba(91,224,220,.3);background:rgba(29,85,86,.22)}.attachment-toggle[data-count]:not([data-count="0"])::after{content:attr(data-count);position:absolute;min-width:17px;height:17px;margin:-39px 0 0 35px;border:2px solid #020607;border-radius:999px;display:grid;place-items:center;color:#021011;background:#73ded9;font:700 .58rem Inter,system-ui,sans-serif}.attachment-tray{display:flex;flex-wrap:wrap;gap:7px;max-height:76px;margin:0 0 8px 61px;overflow:auto;scrollbar-width:none}.attachment-tray:empty{display:none}.attachment-tray::-webkit-scrollbar{display:none}.attachment-chip{max-width:min(280px,72vw);height:34px;padding:0 8px 0 11px;border:1px solid rgba(101,204,203,.14);border-radius:999px;display:flex;align-items:center;gap:8px;color:#8facad;background:rgba(10,24,25,.78);font-size:.68rem}.attachment-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment-chip button{width:24px;height:24px;border:0;border-radius:50%;color:#6e8c8d;background:transparent;cursor:pointer}.attachment-chip button:hover,.attachment-chip button:focus-visible{outline:0;color:#d8eeee;background:rgba(92,194,193,.12)}@media(max-width:560px){.composer{grid-template-columns:48px 48px minmax(0,1fr) 52px;gap:7px}.keyboard-toggle,.attachment-toggle{width:48px;height:48px}.send{width:52px;height:52px}.attachment-tray{margin-left:55px}}
@@ -377,7 +417,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("async function ask(value", "function isImageRequest(text){return /^\\s*(?:genera|crea|disegna|realizza|generate|create|draw)\\b[\\s\\S]{0,80}\\b(?:immagine|foto|illustrazione|image|picture|illustration)\\b/i.test(text)}async function generateImage(text){setVoiceState('thinking');setPhase('Genero l’immagine sul server…');const response=await authenticatedFetch('/api/guest/images/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,size:'1024x1024'})});if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Generazione immagine non disponibile')}if(imageObjectUrl)URL.revokeObjectURL(imageObjectUrl);imageObjectUrl=URL.createObjectURL(await response.blob());imageOutput.src=imageObjectUrl;imageOutput.alt='Immagine generata da NexusNXS';imageResult.hidden=false;answer.textContent='Immagine generata.';setVoiceState('ready');setPhase('Immagine pronta');return answer.textContent}async function ask(value")
     // Il callback evita che sequenze matematiche come `$'` vengano
     // interpretate come token speciali della replacement string.
-    .replace('function isImageRequest', () => attachmentRuntime + answerFormattingRuntime + artifactRuntime + feedbackRuntime + responseActionsRuntime + streamFollowRuntime + sessionExperienceRuntime + coreTypingGuardRuntime + idleKeyboardRuntime + slashCommandRuntime + 'function isImageRequest')
+    .replace('function isImageRequest', () => attachmentRuntime + answerFormattingRuntime + artifactRuntime + feedbackRuntime + responseActionsRuntime + streamFollowRuntime + sessionExperienceRuntime + coreTypingGuardRuntime + idleKeyboardRuntime + keyboardViewportRuntime + slashCommandRuntime + 'function isImageRequest')
     .replace("const text=String(value??prompt.value).trim();", "const rawText=String(value??prompt.value).trim(),slashResolution=resolveSlashInput(rawText);if(slashResolution.handled){prompt.value='';slashMenu.hidden=true;setPhase(slashResolution.message);setTimeout(()=>setPhase(''),1800);return}const text=slashResolution.text;")
     .replace("const allowed=/^(image/(?:jpeg|png|webp)|application/(?:pdf|json|xml)|text/(?:plain|markdown|csv|xml))$/i;if(!allowed.test(file.type))", "const allowed=['image/jpeg','image/png','image/webp','application/pdf','application/json','application/xml','text/plain','text/markdown','text/csv','text/xml'];if(!allowed.includes(String(file.type).toLowerCase()))")
     .replace("const pieces=String(text).split(/(https://[^\\s<>()]+)/g)", "const pieces=String(text).match(/\\S+|\\s+/g)||[]")
@@ -432,7 +472,7 @@ function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, and
     .replace('<div class="dock"><div class="composer">', '<div class="dock"><div id="attachmentTray" class="attachment-tray" aria-live="polite"></div><input id="attachmentInput" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/markdown,text/csv,application/json,application/xml,text/xml" multiple hidden><div class="composer"><button id="attachment" class="attachment-toggle" type="button" data-count="0" data-tooltip="Allegati" aria-label="Allega file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12.5l5.2-5.2a3 3 0 114.2 4.2l-7.1 7.1a5 5 0 01-7.1-7.1l7.4-7.4"/></svg></button>')
     .replace('<p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p>', '<p class="privacy"><span class="accuracy-note">NexusNXS può commettere errori.</span> Sessione temporanea: uscendo dalla pagina, la conversazione viene dimenticata. <button id="memoryClear" class="memory-clear" type="button">Cancella ora</button> · <a href="https://nexusnxs.com/">Scopri NexusNXS AI</a></p>')
     .replace('<p id="answer" class="answer"></p>', '<div id="cognition" class="cognition" data-step="understand" hidden aria-hidden="true"><span>Attività</span><ol><li data-step="understand">Comprende</li><li data-step="plan">Pianifica</li><li data-step="retrieve">Ricerca</li><li data-step="verify">Verifica</li><li data-step="respond">Risponde</li></ol></div><header id="answerContext" class="web-answer-context" data-kind="answer" hidden><i aria-hidden="true"></i><span><small id="answerKind">Risposta</small><strong id="answerStatus" hidden></strong></span></header><p id="answer" class="answer"></p><div id="responseActions" class="response-actions" hidden><button id="copyResponse" class="response-action" data-label="Copia" type="button">Copia</button><button id="deepenResponse" class="response-action" data-label="Approfondisci" type="button">Approfondisci</button><button id="exportResponse" class="response-action" data-label="Esporta" type="button">Esporta</button><button id="feedbackAction" class="feedback-action" type="button" title="Condividi volontariamente questa risposta per la revisione e il miglioramento di NexusNXS">Migliora NexusNXS</button><span id="feedbackStatus" class="feedback-status" role="status" aria-live="polite"></span></div><div id="artifacts" class="artifact-grid"></div><figure id="imageResult" class="generated-image" hidden><img id="imageOutput" alt=""><figcaption>Creato da NexusNXS</figcaption></figure>')
-    .replace('</head>', () => `${coreStyle}${EXPERIENCE_STYLE}${INTERACTION_VISIBILITY_STYLE}${ATTACHMENT_STYLE}${RESPONSE_STYLE}${RESPONSE_PRESENTATION_STYLE}${COGNITION_STYLE}${SESSION_EXPERIENCE_STYLE}${CONVERSATION_LAYOUT_STYLE}${SLASH_COMMAND_STYLE}</head>`)
+    .replace('</head>', () => `${coreStyle}${EXPERIENCE_STYLE}${INTERACTION_VISIBILITY_STYLE}${ATTACHMENT_STYLE}${RESPONSE_STYLE}${RESPONSE_PRESENTATION_STYLE}${COGNITION_STYLE}${SESSION_EXPERIENCE_STYLE}${CONVERSATION_LAYOUT_STYLE}${SLASH_COMMAND_STYLE}${KEYBOARD_VIEWPORT_STYLE}</head>`)
     .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog>${experienceScript({ windowsDownload, androidDownload })}${coreScript}</body>`);
 }
 
