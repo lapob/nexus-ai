@@ -18,7 +18,7 @@ if (!androidVersion) throw new Error('Versione Android pubblica non rilevata.');
 const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || `v${packageJson.version}-preview.2`;
 const assets = [
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), type: 'application/vnd.microsoft.portable-executable' },
-  { path: resolve(root, 'release-android', `NexusNXS-Android-${androidVersion}.apk`), type: 'application/vnd.android.package-archive' },
+  { path: resolve(root, 'release-android', 'NexusNXS-Android.apk'), type: 'application/vnd.android.package-archive' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'CHECKSUMS.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'release-manifest.preview.json'), type: 'application/json' },
 ];
