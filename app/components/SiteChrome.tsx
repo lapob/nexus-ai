@@ -194,8 +194,8 @@ export function SiteFooter({ ctaHref = "https://ai.nexusnxs.com", ctaLabel = "Ap
 export function ProductMockup({ type }: { type: "desktop" | "android" }) {
   const product = type === "desktop"
     ? {
-        src: "/products/desktop-core.png",
-        alt: "Interfaccia reale di NexusNXS per PC con il Core particellare attivo",
+        src: "/products/desktop-conversation.png",
+        alt: "Conversazione dimostrativa nell’app NexusNXS per PC",
         label: "APP PC REALE",
       }
     : {

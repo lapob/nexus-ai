@@ -74,9 +74,9 @@ test("the homepage loads real product captures without CSP or runtime errors", a
 
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator(".app-card-visual").first().scrollIntoViewIfNeeded();
-  // Desktop uses the continuous particle field, not a second static core card.
+  // Both clients show real captures; the ambient field remains shared.
   await expect(page.locator(".app-card-visual.android img")).toHaveCount(1);
-  await expect(page.locator(".app-card-visual.desktop img")).toHaveCount(0);
+  await expect(page.locator(".app-card-visual.desktop img")).toHaveCount(1);
   await expect(page.locator(".app-card[data-cosmic-form='saturn']")).toHaveCount(1);
   const captures = await page.locator(".app-card-visual img").evaluateAll((images) =>
     images.map((image) => ({ width: image.naturalWidth, height: image.naturalHeight })),
@@ -236,7 +236,7 @@ test("desktop navigation stays stable while scrolling and adapts to zoom", async
 
 test("product pages use real accessible app captures without hydration flashes", async ({ page }) => {
   for (const product of [
-    { route: "/desktop", image: "desktop-core.png", alt: /interfaccia reale.*PC/i },
+    { route: "/desktop", image: "desktop-conversation.png", alt: /conversazione dimostrativa.*PC/i },
     { route: "/android", image: "android-home.png", alt: /interfaccia reale.*Android/i },
   ]) {
     await page.goto(product.route, { waitUntil: "domcontentloaded" });

@@ -84,7 +84,7 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .hero-word:last-child .hero-letter:nth-child(2) { animation-delay: .55s; }
 .hero-word:last-child .hero-letter:nth-child(3) { animation-delay: .65s; }
 @keyframes nxs-letter-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-.astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(920px, 78svh); aspect-ratio: 1; margin: auto; filter: none; cursor: default; touch-action: pan-y; }
+.astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(760px, 58svh); aspect-ratio: 1; margin: auto; filter: none; cursor: default; touch-action: pan-y; }
 .astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
@@ -110,6 +110,8 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
 .narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: clamp(300px, 40vw, 540px); overflow: visible; }
 .narrative-apps .app-card-visual.android .app-card-visual__screen { width: min(50%, 220px); }
+.narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; max-width: 680px; transform: none; border: 1px solid #5b696a; border-radius: 12px; overflow: hidden; }
+.narrative-apps .app-card-visual.desktop img { display: block; width: 100%; height: auto; }
 .narrative-apps .app-card-visual__screen { background: transparent; border: 0; box-shadow: none; mix-blend-mode: screen; }
 .narrative-page .device-frame, .narrative-page .product-screen { background: transparent; box-shadow: none; mix-blend-mode: screen; }
 .narrative-page .presence-system { margin-block: clamp(120px, 18vw, 250px) clamp(64px, 8vw, 120px); }
@@ -117,8 +119,8 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-page .presence-grid article small { color: #92b0b4; font-size: 14px; line-height: 1.5; }
 .narrative-page .presence-grid article > i { display: none; }
 .narrative-forms { padding-block: 32px 80px; }
-.narrative-page .astral-interlude { max-width: none; min-height: 160svh; padding: 0; margin: 0; }
-.cosmic-stage { height: 100svh; }
+.narrative-page .astral-interlude { max-width: none; min-height: 70svh; padding: 0; margin: 0; }
+.cosmic-stage { height: 60svh; }
 .narrative-page .astral-interlude > p { position: relative; z-index: 1; max-width: 34ch; margin: -15svh auto 0; padding: 0 24px 10svh; }
 .narrative-page .one-nexus { padding-block: clamp(100px, 14vw, 200px); }
 .product-narrative .product-facts, .product-narrative .feature-grid { border: 0; background: none; }

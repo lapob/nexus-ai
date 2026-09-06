@@ -23,8 +23,8 @@ export function ConnectivityPresence() {
     <aside className="nexus-connectivity" data-visible="true" aria-live="polite">
       <NexusPresence state="offline" compact />
       <div>
-        <strong>Server NexusNXS non raggiungibili</strong>
-        <p>Riconnessione automatica in background.</p>
+        <strong>Connessione Internet assente</strong>
+        <p>Controlla la rete e riprova quando sei online.</p>
       </div>
       <button type="button" onClick={() => location.reload()} aria-label="Riprova la connessione">↻</button>
     </aside>
