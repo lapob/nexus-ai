@@ -22,3 +22,10 @@ Stable resta bloccata da firma Windows, keystore Android di produzione, firma de
 La matrice di layout non certifica riconoscimento vocale in ambienti rumorosi, qualità di microfoni diversi o percorsi completi di tastiera e conversazione. Questi punti richiedono evidenze dedicate; i test sintetici non li sostituiscono.
 
 I risultati dettagliati sono negli artefatti locali `qa-artifacts`: `android-device-current.log`, `current-control-connected.log`, `current-experience.log`, `current-security.log`, `product-slo-report.json`, `stable-release-readiness.json` e i manifest delle due matrici Android. Gli artefatti operativi restano fuori dalla documentazione pubblica.
+
+## Aggiornamento finale pubblicato
+
+- Preview `v0.3.14-preview.3`: Android pubblico 6.4.10, bug del composer con tastiera corretto e verificato sul Samsung fisico. Control 1.18.2 installato localmente. Inter incluso in entrambi i client, con licenza.
+- Hash degli asset pubblicati verificati tramite API GitHub e confrontati con i file locali.
+- Sito pubblicato sul dominio canonico, versione Cloudflare `b9917fc9-a37a-4939-9ae8-2e5d5b73c7b0`: sfondo particellare continuo, scene a tutta pagina, trascinamento delle forme senza zoom e geometria mobile corretta. 23 test browser e 14 percorsi pubblici verificati.
+- Servizio riavviato e disponibilità pubblica verificata; app Android online. SLO finali: 8 conformi, 0 fuori soglia, 1 finestra di disponibilità non misurata. Stable: 4 conformi, 11 requisiti ancora bloccati come elencato sopra.
