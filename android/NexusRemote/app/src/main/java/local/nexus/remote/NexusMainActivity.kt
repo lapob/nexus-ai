@@ -239,7 +239,12 @@ private val Ice = Color(0xFFF7FBFB)
 private val Mist = Color(0xFFABBABB)
 private val Cyan = Color(0xFF4BE7E9)
 private val Hairline = Color(0xFF5B696A)
-private val NexusSans = FontFamily.SansSerif
+private val NexusSans = FontFamily(
+    androidx.compose.ui.text.font.Font(R.font.inter_variable, FontWeight.Normal),
+    androidx.compose.ui.text.font.Font(R.font.inter_variable, FontWeight.Medium),
+    androidx.compose.ui.text.font.Font(R.font.inter_variable, FontWeight.SemiBold),
+    androidx.compose.ui.text.font.Font(R.font.inter_variable, FontWeight.Bold)
+)
 private val NexusSheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 private const val NEXUS_ACTIVITY_CHANNEL = "nexus_private_activity"
 
@@ -2650,7 +2655,6 @@ private fun JSONArray?.toTurns() = buildList {
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
-    val composerBringIntoView = remember { BringIntoViewRequester() }
     val instantImeVisible = WindowInsets.isImeVisible
     val coreConfiguration = LocalConfiguration.current
     val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .90f, coreConfiguration.screenHeightDp * .44f, 380f).dp
@@ -2715,8 +2719,6 @@ private fun JSONArray?.toTurns() = buildList {
             kotlinx.coroutines.delay(70)
             focusRequester.requestFocus()
             keyboard?.show()
-            kotlinx.coroutines.delay(140)
-            composerBringIntoView.bringIntoView()
         }
     }
     LaunchedEffect(latestAnswer, state.streaming) {
@@ -2726,6 +2728,7 @@ private fun JSONArray?.toTurns() = buildList {
         if (voiceMode) voiceMode = false
         else if (textMode) {
             keyboard?.hide()
+            focusManager.clearFocus(force = true)
             textMode = false
         } else typedSession = false
     }
@@ -2740,7 +2743,7 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }
             }.statusBarsPadding().navigationBarsPadding().imePadding()
-                .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = if (instantImeVisible) 0.dp else 12.dp)
+                .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = 10.dp)
         ) {
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
             AnimatedVisibility(controlsAwake, modifier = Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
@@ -2800,8 +2803,10 @@ private fun JSONArray?.toTurns() = buildList {
                         AnimatedVisibility(state.attachment != null, enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
                             AttachmentPreview(state.composerState(), { dispatch("attach", "") })
                         }
-                        AnimatedContent(textMode, transitionSpec = { nexusComposerTransform(reduceMotion) }, label = "instantComposer") { typing ->
-                            if (typing) Column(Modifier.fillMaxWidth()) {
+                        // Keep one text field during IME movement. Cross-fading
+                        // two composer trees briefly duplicated/clipped its shell.
+                        Box(Modifier.fillMaxWidth()) {
+                            if (textMode) Column(Modifier.fillMaxWidth()) {
                         AnimatedVisibility(instantSlashSuggestions.isNotEmpty(), enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
                             Surface(
                                 color = Surface.copy(alpha = .985f),
@@ -2834,7 +2839,7 @@ private fun JSONArray?.toTurns() = buildList {
                             color = Surface.copy(alpha = .96f),
                             shape = RoundedCornerShape(28.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Hairline.copy(alpha = .55f)),
-                            modifier = Modifier.fillMaxWidth().bringIntoViewRequester(composerBringIntoView)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(Modifier.padding(horizontal = 7.dp, vertical = 7.dp), verticalAlignment = Alignment.Bottom) {
                                 IconButton(
@@ -2851,7 +2856,7 @@ private fun JSONArray?.toTurns() = buildList {
                                     cursorBrush = SolidColor(Cyan),
                                     decorationBox = { inner ->
                                         Box {
-                                            if (state.draft.isBlank()) Text(nexusCopy("Scrivi a NexusNXS", "Write to NexusNXS"), color = Mist, style = MaterialTheme.typography.bodyLarge)
+                                            if (state.draft.isBlank()) Text(nexusCopy("Scrivi a NexusNXS", "Write to NexusNXS"), color = Mist, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             inner()
                                         }
                                     }

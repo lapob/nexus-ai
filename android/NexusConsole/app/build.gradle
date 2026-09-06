@@ -44,8 +44,8 @@ android {
         applicationId "local.nexus.console"
         minSdk 26
         targetSdk 36
-        versionCode 32
-        versionName "1.18.1-nexus-control"
+        versionCode 33
+        versionName "1.18.2-nexus-control"
         buildConfigField "String", "NEXUS_URL", quotedBuildValue(consoleUrl)
         buildConfigField "String", "NEXUS_FALLBACK_URL", quotedBuildValue(fallbackUrl)
         buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)

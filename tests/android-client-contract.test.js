@@ -169,8 +169,8 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(activity, /keyboard\?\.hide\(\)[\s\S]{0,160}textMode = false[\s\S]{0,160}dispatch\("send"/);
   const instantSurface = activity.match(/@Composable private fun NexusInstantApp[\s\S]*?@Composable private fun NexusInstantCore/)?.[0] || '';
   assert.match(instantSurface, /navigationBarsPadding\(\)\.imePadding\(\)/, 'il composer deve restare sopra la tastiera edge-to-edge');
-  assert.match(instantSurface, /BringIntoViewRequester\(\)/);
-  assert.match(instantSurface, /composerBringIntoView\.bringIntoView\(\)/, 'il campo attivo deve essere portato nell area visibile dopo l apertura IME');
+  assert.doesNotMatch(instantSurface.split('/** Superficie traslucida')[0], /composerBringIntoView|AnimatedContent\(textMode/, 'il composer non deve duplicarsi o riposizionarsi durante il movimento IME');
+  assert.match(instantSurface, /bottom = 10\.dp/, 'il composer mantiene un margine stabile sopra la tastiera');
   assert.match(instantSurface, /centeredExchange/);
   assert.match(instantSurface, /contentAlignment = Alignment\.Center/);
   assert.match(instantSurface, /InstantWrittenExchange/);

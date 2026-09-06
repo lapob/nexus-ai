@@ -517,7 +517,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         TextView eyebrow = eyebrow("NODO OPERATIVO PRIVATO");
         TextView title = text(host, 30, TEXT);
         title.setTag("value:host");
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         title.setPadding(0, dp(6), 0, dp(5));
         TextView detail = text("Acceso e raggiungibile", 15, MUTED);
         detail.setPadding(0, 0, 0, dp(22));
@@ -531,7 +531,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         TextView dot = text("●", 17, ACCENT);
         TextView online = text("  Tutto operativo", 16, TEXT);
         online.setTag("health-summary");
-        online.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        online.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         presenceRow.addView(dot);
         presenceRow.addView(online);
         TextView updated = text("Dati in tempo reale · aggiornato ora", 13, MUTED);
@@ -555,7 +555,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
         LinearLayout services = card();
         TextView servicesTitle = text("Servizi NexusNXS", 16, TEXT);
-        servicesTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        servicesTitle.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         servicesTitle.setPadding(0, 0, 0, dp(9));
         services.addView(servicesTitle);
         services.addView(infoRow("AI pubblica", nexusService != null && "online".equals(nexusService.optString("status")) ? "Operativa" : "Non disponibile"));
@@ -1343,7 +1343,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private LinearLayout metricCard(String label, int value) {
         LinearLayout metric = card(); metric.setGravity(Gravity.CENTER);
         TextView name = text(label, 10, MUTED); name.setLetterSpacing(.12f); name.setGravity(Gravity.CENTER);
-        TextView number = text(value + "%", 19, value >= 90 ? DANGER : TEXT); number.setTag("metric:" + label); number.setTypeface(Typeface.DEFAULT, Typeface.BOLD); number.setGravity(Gravity.CENTER);
+        TextView number = text(value + "%", 19, value >= 90 ? DANGER : TEXT); number.setTag("metric:" + label); number.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD); number.setGravity(Gravity.CENTER);
         metric.addView(name); metric.addView(number); return metric;
     }
 
@@ -1359,7 +1359,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         metric.setBackground(rounded(Color.rgb(7, 24, 25), 14, Color.argb(22, 101, 220, 216)));
         TextView number = text(String.valueOf(Math.max(0, value)), 19, TEXT);
         number.setTag("service:" + tag);
-        number.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        number.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         number.setGravity(Gravity.CENTER);
         TextView name = text(label, 9, MUTED);
         name.setGravity(Gravity.CENTER);
@@ -1532,7 +1532,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         eyebrow.setTextColor(DANGER);
         eyebrow.setGravity(Gravity.CENTER);
         TextView title = text("Arrestare il server?", 29, TEXT);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, dp(10), 0, dp(13));
         TextView detail = text("Le connessioni NexusNXS resteranno offline fino al prossimo accesso a Windows o avvio manuale del server.", 15, MUTED);
@@ -1572,7 +1572,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         eyebrow.setTextColor(DANGER);
         eyebrow.setGravity(Gravity.CENTER);
         TextView title = text(shutdown ? "Spegnere il PC?" : "Riavviare il PC?", 29, TEXT);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, dp(10), 0, dp(13));
         TextView detail = text("Salva prima il lavoro aperto. L’azione partirà soltanto dopo la conferma.", 15, MUTED);
@@ -1608,7 +1608,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             content.setGravity(Gravity.CENTER);
             ImageView mark = logo(.62f);
             TextView title = text(shutdown ? "Spegnimento inviato" : "Riavvio inviato", 27, TEXT);
-            title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
             title.setGravity(Gravity.CENTER);
             title.setPadding(0, dp(18), 0, dp(10));
             TextView detail = text(message, 15, MUTED);
@@ -1642,7 +1642,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             ControlCoreView core = new ControlCoreView(true);
             core.setContentDescription("PC offline");
             TextView title = text("OFFLINE", 20, Color.rgb(166, 181, 182));
-            title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
             title.setLetterSpacing(.18f);
             title.setGravity(Gravity.CENTER);
             title.setPadding(0, dp(2), 0, dp(10));
@@ -2001,6 +2001,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         view.setText(value);
         view.setTextSize(sp);
         view.setTextColor(color);
+        view.setTypeface(getResources().getFont(R.font.inter_variable));
         return view;
     }
 
@@ -2008,7 +2009,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         Button button = new NexusButton();
         button.setText(label);
         button.setTextSize(15);
-        button.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        button.setTypeface(getResources().getFont(R.font.inter_variable));
         button.setIncludeFontPadding(false);
         button.setLetterSpacing(.005f);
         button.setTextColor(danger ? Color.rgb(244, 193, 178) : primary ? Color.rgb(211, 242, 241) : Color.rgb(153, 188, 189));
