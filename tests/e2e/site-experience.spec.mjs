@@ -34,7 +34,10 @@ test("the homepage loads real product captures without CSP or runtime errors", a
 
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator(".app-card-visual").first().scrollIntoViewIfNeeded();
-  await expect(page.locator(".app-card-visual img")).toHaveCount(2);
+  // Desktop uses the continuous particle field, not a second static core card.
+  await expect(page.locator(".app-card-visual.android img")).toHaveCount(1);
+  await expect(page.locator(".app-card-visual.desktop img")).toHaveCount(0);
+  await expect(page.locator(".app-card[data-cosmic-form='saturn']")).toHaveCount(1);
   const captures = await page.locator(".app-card-visual img").evaluateAll((images) =>
     images.map((image) => ({ width: image.naturalWidth, height: image.naturalHeight })),
   );
@@ -79,7 +82,7 @@ test("real product captures keep Android system bars visible and use precise hov
   await page.waitForTimeout(520);
   expect(await desktopFrame.evaluate((frame) => new DOMMatrix(getComputedStyle(frame).transform).m42)).toBeLessThan(-3);
 
-  const desktopCardScreen = page.locator(".app-card-visual.desktop .app-card-visual__screen");
+  const desktopCardScreen = page.locator(".app-card-visual.android .app-card-visual__screen");
   await desktopCardScreen.scrollIntoViewIfNeeded();
   const cardScreenBox = await desktopCardScreen.boundingBox();
   expect(cardScreenBox).not.toBeNull();
