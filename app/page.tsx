@@ -30,9 +30,9 @@ export default function Home() {
       <div className="cosmic-stage" aria-hidden="true" /><p>La stessa intelligenza. Il tuo modo di usarla.</p>
     </section>
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
-      <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device}>
+      <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene={app.device === "desktop" ? "right" : "left"} data-cosmic-form={app.device === "desktop" ? "saturn" : "neural"}>
         <div className="narrative-app-copy"><p className="platform">{app.platform}</p><h2>{app.name}</h2><p>{app.description}</p><HardNavigationLink className="text-link" href={app.href}>Esplora {app.device === "desktop" ? "NexusNXS per PC" : "NexusNXS per Android"} <ArrowUpRight size={16} /></HardNavigationLink></div>
-        <div className={`app-card-visual ${app.device}`}><div className="app-card-visual__screen"><Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 88vw, 650px" : "220px"} unoptimized /></div></div>
+        <div className={`app-card-visual ${app.device}`} aria-hidden={app.device === "desktop" ? true : undefined}>{app.device === "android" && <div className="app-card-visual__screen"><Image src={app.image} alt={app.alt} width={360} height={640} sizes="220px" unoptimized /></div>}</div>
       </article>)}</div>
     </section>
     <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right">

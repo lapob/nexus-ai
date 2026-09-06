@@ -87,9 +87,8 @@ export function SiteMotionRuntime() {
     const pointer = { x: 0, y: 0, vx: 0, vy: 0, time: 0, active: 0 };
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
     const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
-    const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section, main > footer"));
+    const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section:not(.narrative-apps), main > .narrative-apps .app-card, main > footer"));
     let sectionAnchors: number[] = [];
-    let readingZones: { left: number; right: number; top: number; bottom: number }[] = [];
     let sceneProgress = 0;
     let paintMs = 0;
     let fieldStarted = performance.now();
@@ -140,10 +139,6 @@ export function SiteMotionRuntime() {
       cosmicCanvas.height = Math.round(cosmicHeight * ratio);
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
-      readingZones = Array.from(document.querySelectorAll<HTMLElement>("main h1:not(.hero-product-name),main .hero-product-name > span,main h2,main p,main li")).map(element => {
-        const rect = element.getBoundingClientRect();
-        return { left: rect.left - 24, right: rect.right + 24, top: rect.top + window.scrollY - 20, bottom: rect.bottom + window.scrollY + 20 };
-      });
     };
 
     const drawCosmicField = (now: number) => {
@@ -233,6 +228,19 @@ export function SiteMotionRuntime() {
           const latitude = Math.acos(2 * (particle.depth-.25)/.75 - 1), r = .23;
           return project(Math.cos(a)*Math.sin(latitude)*r,Math.cos(latitude)*r,Math.sin(a)*Math.sin(latitude)*r);
         }
+        if (form === 'neural') {
+          const ribbon = index % 3;
+          const a = ((Math.floor(index / 3) * .61803398875) % 1) * Math.PI * 2 + time * .1 + ribbon * 2.094;
+          const radius = .28 + .024 * Math.sin(a * 3 + time * .3 + ribbon);
+          const tube = .018 + particle.depth * .038;
+          const x = (radius + tube * Math.cos(particle.phase)) * Math.cos(a);
+          const y = (radius + tube * Math.cos(particle.phase)) * Math.sin(a);
+          const z = tube * Math.sin(particle.phase);
+          const tilt = (ribbon - 1) * 1.04 + .28;
+          const ry = y * Math.cos(tilt) - z * Math.sin(tilt);
+          const roll = ribbon * .85;
+          return project(x * Math.cos(roll) - ry * Math.sin(roll), x * Math.sin(roll) + ry * Math.cos(roll), y * Math.sin(tilt) + z * Math.cos(tilt));
+        }
         if (kind === 0) {
           const radius = Math.min(cosmicWidth, cosmicHeight) * (.19 + (index % 3) * .052);
           return { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
@@ -260,14 +268,11 @@ export function SiteMotionRuntime() {
       cosmicContext.globalCompositeOperation = "lighter";
       const age = Math.max(0, now - fieldStarted) / 1000;
       cosmicContext.globalAlpha = reduced ? 1 : Math.min(1, age / .9);
-      // Only nearby text can mask this viewport. Checking the entire document
-      // per particle made long narrative pages needlessly expensive.
-      const scrollY = window.scrollY;
-      const visibleZones = readingZones.filter(rect => rect.bottom >= scrollY - 44 && rect.top <= scrollY + cosmicHeight + 44);
       let maxDrift = 0;
       const points = particles.slice(0, activeParticles).map((particle, index) => {
         const baseX = particle.x * cosmicWidth;
-        const baseY = ((particle.y + scroll * particle.depth * .13) % 1) * cosmicHeight;
+        // Never wrap a grain across the viewport while a form is dissolving.
+        const baseY = (particle.y + Math.sin(scroll * Math.PI) * particle.depth * .13) * cosmicHeight;
         const first = topologyPoint(particle, index, topologyIndex);
         const second = topologyPoint(particle, index, topologyIndex + 1);
         const targetX = first.x + (second.x - first.x) * topologyMix;
@@ -298,15 +303,9 @@ export function SiteMotionRuntime() {
         particle.velocityY = (particle.velocityY - omega * ay * delta) * decay;
         maxDrift = Math.max(maxDrift, Math.hypot(particle.offsetX, particle.offsetY));
         const px = x + particle.offsetX, py = y + particle.offsetY;
-        let visibility = 1;
-        for (const rect of visibleZones) {
-          const dx = Math.max(rect.left - px, 0, px - rect.right);
-          const dy = Math.max(rect.top - py - scrollY, 0, py + scrollY - rect.bottom);
-          if (dx >= 44 || dy >= 44) continue;
-          const edge = Math.min(1, Math.hypot(dx, dy) / 44);
-          visibility = Math.min(visibility, .24 + .76 * edge * edge * (3 - 2 * edge));
-          if (visibility <= .24) break;
-        }
+        // One uninterrupted field: text must not punch rectangular holes in it.
+        const edge = Math.max(0, Math.min(1, Math.min(px, py, cosmicWidth - px, cosmicHeight - py) / 48));
+        const visibility = edge * edge * (3 - 2 * edge);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
       cosmicContext.lineWidth = .55;
@@ -336,7 +335,7 @@ export function SiteMotionRuntime() {
         }
         cosmicContext.beginPath();
         cosmicContext.fillStyle = `rgba(${point.depth > .96 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
-        cosmicContext.arc(point.x, point.y, .35 + point.depth ** 4 * 1.35, 0, Math.PI * 2);
+        cosmicContext.arc(point.x, point.y, .55 + point.depth ** 4 * 1.55, 0, Math.PI * 2);
         cosmicContext.fill();
       }
       cosmicContext.globalCompositeOperation = "source-over";

@@ -4,6 +4,7 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .hero > *:not(.scroll-cue) { width: min(100%, var(--content-max)); margin-inline: auto; }
 .nxs-field-dragging, .nxs-field-dragging * { cursor: none !important; }
 .home-continuum, .inner-page { background: transparent; }
+.narrative-page .premium-footer { background: transparent; }
 .inner-page > section { background: transparent; border-color: transparent; box-shadow: none; }
 .client-performance dl { background: transparent; }
 .client-performance dl > div { background: rgba(9, 20, 24, .3); }
@@ -14,7 +15,6 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .inner-page .security-summary,
 .inner-page .service-list > div,
 .inner-page .uptime-empty { background: transparent; box-shadow: none; }
-.nxs-cosmic-field { opacity: .74; }
 .service-list span, .service-list small, .service-list b, .service-list .neutral { font-size: 12px; line-height: 1.5; }
 .narrative-page, .product-narrative { position: relative; isolation: auto; }
 .narrative-page > section, .product-narrative > section,
@@ -88,7 +88,6 @@ body { background: radial-gradient(ellipse at 50% 50%, #020405 18%, #060e12 100%
 .narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
 .narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: clamp(300px, 40vw, 540px); overflow: visible; }
 .narrative-apps .app-card-visual.android .app-card-visual__screen { width: min(50%, 220px); }
-.narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; }
 .narrative-apps .app-card-visual__screen { background: transparent; border: 0; box-shadow: none; mix-blend-mode: screen; }
 .narrative-page .device-frame, .narrative-page .product-screen { background: transparent; box-shadow: none; mix-blend-mode: screen; }
 .narrative-page .presence-system { margin-block: clamp(120px, 18vw, 250px) clamp(64px, 8vw, 120px); }
