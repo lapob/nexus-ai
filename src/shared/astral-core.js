@@ -19,6 +19,8 @@ function createAstralCore(canvas, options = {}) {
   const seed = new Float32Array(capacity);
   for (let i = 0; i < capacity; i++) { const n = Math.sin((i + 1) * 91.733) * 43758.5453; seed[i] = n - Math.floor(n); }
   const colors = [[125, 245, 250], [225, 249, 255], [161, 137, 250]];
+  // Keep state hue, but never confuse a quiet state with an invisible core.
+  const luminous = color => color.map(value => Math.round(value + (255 - value) * .26));
   const glows = colors.map(color => {
     const sprite = document.createElement('canvas'); sprite.width = sprite.height = 32;
     const paint = sprite.getContext('2d');
@@ -63,7 +65,8 @@ function createAstralCore(canvas, options = {}) {
     const targetCount = Math.max(210, Math.floor(budget * (quality >= .5 ? 1 : .55 + quality * .9) / 3) * 3);
     count += Math.sign(targetCount - count) * Math.min(3, Math.abs(targetCount - count));
     const target = states[state]; energy += (target - energy) * (1 - Math.exp(-dt * 4.5));
-    for (let channel = 0; channel < 3; channel++) colors[0][channel] += (stateColors[state][channel] - colors[0][channel]) * (1 - Math.exp(-dt * 4.5));
+    const stateLight = luminous(stateColors[state]);
+    for (let channel = 0; channel < 3; channel++) colors[0][channel] += (stateLight[channel] - colors[0][channel]) * (1 - Math.exp(-dt * 4.5));
     offline += ((state === 'offline' || state === 'error' ? 1 : 0) - offline) * (1 - Math.exp(-dt * 3));
     const requestedEnergy = Number(options.getEnergy?.() || 0);
     const audioTarget = (state === 'listening' || state === 'speaking') && Number.isFinite(requestedEnergy) ? Math.min(1, Math.max(0, requestedEnergy)) : 0;
@@ -82,6 +85,12 @@ function createAstralCore(canvas, options = {}) {
     }
     const reveal = 1 - Math.pow(1 - emergence, 3), cx = width / 2, cy = height / 2, unit = size * 1.15;
     context.clearRect(0, 0, width, height);
+    // Fade individual grains before they reach the backing-store edge. A CSS
+    // mask alone exposes the canvas silhouette during the scattered entrance.
+    const edgeOpacity = (xx, yy) => {
+      const edge = Math.max(0, Math.min(1, Math.min(xx, yy, width - xx, height - yy) / (size * .14)));
+      return edge * edge * (3 - 2 * edge);
+    };
     context.globalCompositeOperation = 'lighter';
     const flow = phase, scale = 1 + Math.sin(flow * .67) * .026 + audio * .055;
     for (let i = 0; i < count; i++) {
@@ -133,15 +142,20 @@ function createAstralCore(canvas, options = {}) {
       const peer = (i + (i % 11 === 0 ? 33 : 9)) % count;
       const distance = Math.hypot(x[i] - x[peer], y[i] - y[peer]);
       if (distance > size * .25) continue;
-      context.strokeStyle = `rgba(136,218,238,${(.05 + energy * .1) * reveal * (1 - offline * .7)})`;
+      context.strokeStyle = `rgba(136,218,238,${(.05 + energy * .1) * reveal * (1 - offline * .7) * Math.min(edgeOpacity(x[i], y[i]), edgeOpacity(x[peer], y[peer]))})`;
       context.lineWidth = Math.max(.4, size * .0011);
       context.beginPath(); context.moveTo(x[i], y[i]); context.lineTo(x[peer], y[peer]); context.stroke();
     }
     for (let i = 0; i < count; i++) {
       const depth = Math.min(1, Math.max(.15, .55 + z[i] * 1.3));
       const colorIndex = i % 19 === 0 ? 2 : i % 3 === 0 ? 1 : 0;
-      const dot = Math.max(.55, size * (.0017 + seed[i] * .0015)) * (.65 + depth * .7);
-      context.globalAlpha = Math.min(1, reveal * (.36 + depth * .52 + audio * .28) * (1 - offline * .65));
+      const dot = Math.max(.7, size * (.0019 + seed[i] * .0015)) * (.65 + depth * .7);
+      context.globalAlpha = Math.min(1, reveal * (.55 + depth * .42 + audio * .28) * (1 - offline * .5)) * edgeOpacity(x[i], y[i]);
+      if (options.contrastUnderlay) {
+        context.globalCompositeOperation = 'source-over';
+        context.fillStyle = 'rgba(2,9,14,.7)'; context.beginPath(); context.arc(x[i], y[i], dot + Math.max(.7, size * .002), 0, Math.PI * 2); context.fill();
+        context.globalCompositeOperation = 'lighter';
+      }
       if (quality > .25 && i % (quality < .75 ? 26 : 13) === 0) { const glowSize = dot * (8 + energy * 3 + audio * 2); context.drawImage(glows[colorIndex], x[i] - glowSize / 2, y[i] - glowSize / 2, glowSize, glowSize); }
       context.fillStyle = `rgb(${colors[colorIndex]})`; context.beginPath(); context.arc(x[i], y[i], dot, 0, Math.PI * 2); context.fill();
     }

@@ -8,7 +8,7 @@ const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0
 const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.1/NexusNXS-Android-6.4.9.apk';
 
 const EXPERIENCE_STYLE = `<style>
-.core canvas{background:transparent;mask-image:radial-gradient(ellipse at center,#000 0 65%,transparent 99%);-webkit-mask-image:radial-gradient(ellipse at center,#000 0 65%,transparent 99%)}
+.core canvas{background:transparent;mask-image:none;-webkit-mask-image:none}
 /* The two chrome surfaces share the same viewport, typography and frosted edge. */
 .shell .identity{position:fixed;z-index:40;top:0;left:0;right:0;width:min(1180px,100%);margin:auto;padding:max(14px,env(safe-area-inset-top)) clamp(18px,5vw,44px) 14px;min-height:76px;isolation:isolate;gap:16px}
 .identity::before{content:"";position:absolute;z-index:-1;inset:0 0 -24px;pointer-events:none;background:rgba(2,6,7,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);mask-image:linear-gradient(#000 0 72%,transparent);-webkit-mask-image:linear-gradient(#000 0 72%,transparent)}

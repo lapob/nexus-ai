@@ -4875,7 +4875,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
             ) {
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    NexusInstantCore(active = listening, offline = connection == NexusConnection.OFFLINE, reduceMotion = reduceMotion, energy = voiceEnergy, diameter = minOf(176f, LocalConfiguration.current.screenWidthDp - 160f).coerceAtLeast(96f).dp) {
+                    NexusInstantCore(active = listening, offline = connection == NexusConnection.OFFLINE, reduceMotion = reduceMotion, energy = voiceEnergy, diameter = minOf(244f, LocalConfiguration.current.screenWidthDp - 88f, LocalConfiguration.current.screenHeightDp * .32f).coerceAtLeast(112f).dp) {
                         if (mode != NexusVoiceMode.IDLE || listening) { haltCapture(false, true); close() } else beginCapture(NexusVoiceMode.SINGLE_TURN)
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {

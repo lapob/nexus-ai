@@ -82,7 +82,8 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
     val count = ((particleBudget * 6).coerceIn(210, 660) / 3) * 3
     val xs = remember(count) { FloatArray(count) }; val ys = remember(count) { FloatArray(count) }; val zs = remember(count) { FloatArray(count) }
     val seeds = remember(count) { FloatArray(count) { i -> val n = sin((i + 1) * 91.733) * 43758.5453; (n - floor(n)).toFloat() } }
-    val palette = arrayOf(stateColor, Color(0xFFE1F9FF), Color(0xFFA189FA))
+    val luminousColor = Color(stateColor.red + (1f - stateColor.red) * .26f, stateColor.green + (1f - stateColor.green) * .26f, stateColor.blue + (1f - stateColor.blue) * .26f)
+    val palette = arrayOf(luminousColor, Color(0xFFE1F9FF), Color(0xFFA189FA))
     val inspection = remember { AstralInspection() }
     val driftX = remember(count) { FloatArray(count) }; val driftY = remember(count) { FloatArray(count) }
     val velocityX = remember(count) { FloatArray(count) }; val velocityY = remember(count) { FloatArray(count) }
@@ -134,6 +135,10 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
         val reveal = 1f - (1f - emergence.value).pow(3)
         val unit = size.minDimension * 1.15f; val scale = 1f + sin(flow * .67f) * .026f + audio * .055f
         val dim = opacity.value
+        fun edgeOpacity(x: Float, y: Float): Float {
+            val edge = (minOf(x, y, size.width - x, size.height - y) / (size.minDimension * .14f)).coerceIn(0f, 1f)
+            return edge * edge * (3f - 2f * edge)
+        }
         repeat(visibleCount) { i ->
             val ribbon = i % 3; val progress = (((i / 3) * .61803398875) % 1.0).toFloat()
             val a = progress * (PI * 2).toFloat() + flow * .17f + ribbon * 2.094f
@@ -176,13 +181,15 @@ internal fun AstralCore(diameter: Dp, state: String, energy: Float, reduceMotion
         for (i in 0 until visibleCount step 3) {
             val peer = (i + if (i % 11 == 0) 33 else 9) % visibleCount
             if (hypot(xs[i] - xs[peer], ys[i] - ys[peer]) < size.minDimension * .25f)
-                drawLine(Color(0xFF88DAEE).copy(alpha = (.05f + activityLevel * .1f) * reveal * dim), Offset(xs[i],ys[i]), Offset(xs[peer],ys[peer]), max(.4f, size.minDimension * .0011f))
+                drawLine(Color(0xFF88DAEE).copy(alpha = (.05f + activityLevel * .1f) * reveal * dim * min(edgeOpacity(xs[i], ys[i]), edgeOpacity(xs[peer], ys[peer]))), Offset(xs[i],ys[i]), Offset(xs[peer],ys[peer]), max(.4f, size.minDimension * .0011f))
         }
         repeat(visibleCount) { i ->
             val depth = (.55f + zs[i] * 1.3f).coerceIn(.15f, 1f)
             val color = palette[if (i % 19 == 0) 2 else if (i % 3 == 0) 1 else 0]
-            val dot = max(.55f, size.minDimension * (.0017f + seeds[i] * .0015f)) * (.65f + depth * .7f)
-            val point = Offset(xs[i],ys[i]); val alpha = (reveal * (.36f + depth * .52f + audio * .28f) * dim).coerceIn(0f, 1f)
+            val dot = max(.7f, size.minDimension * (.0019f + seeds[i] * .0015f)) * (.65f + depth * .7f)
+            val point = Offset(xs[i],ys[i]); val alpha = (reveal * (.55f + depth * .42f + audio * .28f) * dim).coerceIn(0f, 1f) * edgeOpacity(xs[i], ys[i])
+            // A local dark edge preserves contrast over other apps, without a panel.
+            drawCircle(Color(0xFF02090E).copy(alpha = alpha * .7f), dot + max(.7f, size.minDimension * .002f), point)
             if (quality > .25f && i % (if (quality < .75f) 26 else 13) == 0) {
                 drawCircle(color.copy(alpha = alpha * .045f), dot * 7f, point)
                 drawCircle(color.copy(alpha = alpha * .09f), dot * 3.7f, point)

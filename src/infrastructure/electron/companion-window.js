@@ -149,12 +149,12 @@ html .presence{width:168px;height:168px;transform:scale(var(--presence-scale,1))
 <html lang="${language}"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <meta name="viewport" content="width=device-width,initial-scale=1"><style>${contextualStateStyles}</style>
-<script>addEventListener('DOMContentLoaded',()=>{const fit=()=>document.documentElement.style.setProperty('--presence-scale',String(innerWidth/168));fit();addEventListener('resize',fit);const root=document.querySelector('.presence');const canvas=document.createElement('canvas');canvas.className='astral-canvas';canvas.setAttribute('aria-hidden','true');document.querySelector('.drag-ring').prepend(canvas);(${createAstralCore.toString()})(canvas,{host:document.querySelector('.drag-ring'),efficient:root.dataset.quality==='efficient',getReduced:()=>root.dataset.motion==='reduced',getState:()=>root.dataset.state||'idle'});});</script>
+<script>addEventListener('DOMContentLoaded',()=>{const fit=()=>document.documentElement.style.setProperty('--presence-scale',String(innerWidth/168));fit();addEventListener('resize',fit);const root=document.querySelector('.presence');const canvas=document.createElement('canvas');canvas.className='astral-canvas';canvas.setAttribute('aria-hidden','true');document.querySelector('.drag-ring').prepend(canvas);(${createAstralCore.toString()})(canvas,{host:document.querySelector('.drag-ring'),contrastUnderlay:true,efficient:root.dataset.quality==='efficient',getReduced:()=>root.dataset.motion==='reduced',getState:()=>root.dataset.state||'idle'});});</script>
 <style>
 :root{color-scheme:dark;--accent:86,222,224}
 *{box-sizing:border-box}
 html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent!important;font-family:Inter,system-ui,sans-serif;user-select:none}
-.presence{position:relative;display:grid;place-items:center;isolation:isolate;opacity:.82;transition:opacity .6s ease;background:transparent}
+.presence{position:relative;display:grid;place-items:center;isolation:isolate;opacity:1;transition:opacity .6s ease;background:transparent}
 .presence:hover,.presence:focus-within,.presence:not([data-state=idle]){opacity:1}
 .drag-ring{position:relative;width:118px;height:118px;border-radius:50%}
 .drag-ring[data-interactive=true]{-webkit-app-region:drag;cursor:default}
@@ -363,7 +363,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     const activeState = currentPresenceState !== 'idle';
     const opacity = entry.menuOpen || entry.pointerActive || entry.window.isFocused?.()
       ? 1
-      : activeState ? 0.9 : applicationVisible ? 0.48 : 0.66;
+      : activeState ? 1 : applicationVisible ? 0.78 : 0.9;
     entry.window.setOpacity(opacity);
   }
 

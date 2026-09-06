@@ -33,10 +33,13 @@ async function until(predicate, label) {
     if (!active(presence)) throw new Error('Presence closed with UI');
     await launchInteractiveDesktop(options);
     await until(() => active(ui), 'UI did not reopen from packaged launcher');
-    console.log('PASS packaged ASAR: UI, Presence, tray initialization, UI close/reopen and persistent Presence.');
   } finally {
     requestProcessShutdown(ui);
+    // A reopening UI may still be ensuring its Presence child exists. Close
+    // the parent first so teardown cannot race that child launch.
+    await until(() => !active(ui), 'QA UI did not stop');
     requestProcessShutdown(presence);
     await until(() => !active(ui) && !active(presence), 'QA processes did not stop');
   }
+  console.log('PASS packaged ASAR: UI, Presence, tray initialization, UI close/reopen, persistent Presence and clean shutdown.');
 })().catch(error => { console.error(error.message); process.exitCode = 1; });
