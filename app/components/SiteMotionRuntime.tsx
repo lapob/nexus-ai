@@ -367,8 +367,8 @@ export function SiteMotionRuntime() {
         cosmicContext.stroke();
       }
       for (const point of points) {
-        if (point.depth > .85) {
-          const glowSize = 10 + point.depth * 10;
+        if (point.depth > .94) {
+          const glowSize = 8 + point.depth * 7;
           cosmicContext.save();
           cosmicContext.globalAlpha *= point.visibility;
           cosmicContext.drawImage(glow,point.x-glowSize/2,point.y-glowSize/2,glowSize,glowSize);
