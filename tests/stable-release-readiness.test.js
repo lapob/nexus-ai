@@ -8,9 +8,23 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { runBackupRecoveryDrill } = require('../scripts/run-backup-recovery-drill');
+const { artifactCheck } = require('../scripts/check-stable-release-readiness');
 
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
+
+test('Stable riconosce timestamp PowerShell e rifiuta prove scadute o future', () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-stable-evidence-'));
+  const file = path.join(temporary, 'matrix.json');
+  try {
+    for (const [offset, expected] of [[-1000, 'pass'], [-25 * 3600000, 'blocked'], [3600000, 'blocked']]) {
+      fs.writeFileSync(file, JSON.stringify({ CapturedAt: new Date(Date.now() + offset).toISOString(), valid: true }));
+      const result = artifactCheck('android', path.relative(root, file), 24, value => value.valid, 'matrix');
+      assert.equal(result.status, expected);
+      assert.equal(result.evidence.fresh, expected === 'pass');
+    }
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+});
 
 test('il drill ripristina snapshot e archivio cifrato senza usare dati reali', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexusnxs-drill-test-'));

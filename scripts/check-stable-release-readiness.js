@@ -12,7 +12,7 @@ const strict = process.argv.includes('--strict');
 // #region Lettura evidenze e credenziali senza segreti
 
 function readJson(relativePath) {
-  try { return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8')); }
+  try { return JSON.parse(fs.readFileSync(path.resolve(root, relativePath), 'utf8')); }
   catch { return null; }
 }
 
@@ -45,8 +45,12 @@ function signingChecks() {
 
 function artifactCheck(id, relativePath, maximumAgeHours, predicate, detail) {
   const artifact = readJson(relativePath);
-  const fresh = artifact && ageHours(artifact.generatedAt || artifact.capturedAt) <= maximumAgeHours;
-  return check(id, Boolean(fresh && predicate(artifact)), detail);
+  const capturedAt = artifact?.generatedAt || artifact?.capturedAt || artifact?.CapturedAt || artifact?.evaluatedAt;
+  const age = ageHours(capturedAt);
+  const fresh = artifact && age >= 0 && age <= maximumAgeHours;
+  return { ...check(id, Boolean(fresh && predicate(artifact)), detail),
+    evidence: { path: relativePath, capturedAt: capturedAt || null, ageHours: Number.isFinite(age) ? age : null,
+      maximumAgeHours, fresh: Boolean(fresh) } };
 }
 
 function androidMatrixCheck(id, relativePath) {
@@ -97,6 +101,6 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { buildStableReadinessReport, main };
+module.exports = { artifactCheck, buildStableReadinessReport, main };
 
 // #endregion
