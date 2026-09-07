@@ -235,8 +235,8 @@ export function SiteMotionRuntime() {
         };
         if (form === 'sigil') {
           const reach = (Math.floor(index / 10) * .61803398875) % 1;
-          const turn = index % 10 * Math.PI / 5 + reach * 1.55 + time * .015;
-          const width = .009 + Math.sin(reach * Math.PI) * .022;
+          const turn = index % 10 * Math.PI / 5 + reach * 2.3 + time * .015;
+          const width = .003 + Math.sin(reach * Math.PI) * .009;
           const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
           return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2);
         }
@@ -315,15 +315,15 @@ export function SiteMotionRuntime() {
         // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
-        const transitionScatter = Math.sin(sectionMix * Math.PI) * .7;
+        const transitionScatter = Math.sin(sectionMix * Math.PI) * .22;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
         const arrivalTime = Math.min(1, Math.max(0, age - .4) / 5);
         // Zero velocity at both ends: acceleration never snaps into the final form.
         const arrival = reduced ? 1 : arrivalTime ** 3 * (arrivalTime * (arrivalTime * 6 - 15) + 10);
         const compose = (1 - transitionScatter) * arrival;
-        const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (4 + particle.depth * 9);
-        const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (3 + particle.depth * 7);
+        const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (1 + particle.depth * 2);
+        const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (1 + particle.depth * 2);
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
         const influence = (reduced ? 0 : pointer.active) * Math.max(0, 1 - distance / 240) * (index % 9 < 3 ? .3 : 1);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
@@ -364,14 +364,14 @@ export function SiteMotionRuntime() {
         }
         if (!nearest) continue;
         cosmicContext.beginPath();
-        cosmicContext.strokeStyle = `rgba(86, 232, 234, ${.1 * point.visibility * nearest.visibility * (1 - nearestDistance / 128)})`;
+        cosmicContext.strokeStyle = `rgba(86, 232, 234, ${.025 * point.visibility * nearest.visibility * (1 - nearestDistance / 128)})`;
         cosmicContext.moveTo(point.x, point.y);
         cosmicContext.lineTo(nearest.x, nearest.y);
         cosmicContext.stroke();
       }
       for (const point of points) {
-        if (point.depth > .94) {
-          const glowSize = 8 + point.depth * 7;
+        if (point.depth > .985) {
+          const glowSize = 5 + point.depth * 4;
           cosmicContext.save();
           cosmicContext.globalAlpha *= point.visibility;
           cosmicContext.drawImage(glow,point.x-glowSize/2,point.y-glowSize/2,glowSize,glowSize);
@@ -379,7 +379,7 @@ export function SiteMotionRuntime() {
         }
         cosmicContext.beginPath();
         cosmicContext.fillStyle = `rgba(${point.depth > .96 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
-        cosmicContext.arc(point.x, point.y, .55 + point.depth ** 4 * 1.55, 0, Math.PI * 2);
+        cosmicContext.arc(point.x, point.y, .4 + point.depth ** 4 * .85, 0, Math.PI * 2);
         cosmicContext.fill();
       }
       cosmicContext.globalCompositeOperation = "source-over";
