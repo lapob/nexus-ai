@@ -1,3 +1,4 @@
+import { DesktopHomePreview } from "./components/DesktopHomePreview";
 import Image from "next/image";
 import { ArrowUpRight, BrainCircuit, MessageCircle, Mic2, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
@@ -31,7 +32,7 @@ export default function Home() {
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
       <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene={app.device === "desktop" ? "right" : "left"} data-cosmic-form={app.device === "desktop" ? "saturn" : "neural"}>
         <div className="narrative-app-copy"><p className="platform">{app.platform}</p><h2>{app.name}</h2><p>{app.description}</p><HardNavigationLink className="text-link" href={app.href}>Esplora {app.device === "desktop" ? "NexusNXS per PC" : "NexusNXS per Android"} <ArrowUpRight size={16} /></HardNavigationLink></div>
-        <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen"><Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 92vw, 640px" : "220px"} unoptimized /></div></div>
+        <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen">{app.device === "desktop" ? <DesktopHomePreview /> : <Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 92vw, 640px" : "220px"} unoptimized />}</div></div>
       </article>)}</div>
     </section>
     <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right">

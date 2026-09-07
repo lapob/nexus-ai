@@ -18,7 +18,7 @@ const LABELS: Record<VisualizerVariant, string> = {
   neural: "Neural",
   saturn: "Saturn",
   reactor: "Reactor",
-  android: "Mobile Core",
+  android: "NexusNXS Core",
   sigil: "NexusNXS astrale",
 };
 
@@ -285,7 +285,7 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
 
 export function VisualizerCollection({ mode, compact = false }: { mode: "all" | "desktop" | "android"; compact?: boolean }) {
   const variants: VisualizerVariant[] = mode === "desktop"
-    ? ["neural", "saturn", "reactor"]
+    ? ["android"]
     : mode === "android"
       ? ["android"]
       : ["neural", "saturn", "reactor", "android"];

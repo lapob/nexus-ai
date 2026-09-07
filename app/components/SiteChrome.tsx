@@ -1,4 +1,5 @@
 "use client";
+import { DesktopHomePreview } from "./DesktopHomePreview";
 
 import { useEffect, useRef, useState } from "react";
 import { Activity, ArrowDownToLine, ArrowUpRight, BrainCircuit, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
@@ -196,7 +197,7 @@ export function ProductMockup({ type }: { type: "desktop" | "android" }) {
     ? {
         src: "/products/desktop-conversation.png",
         alt: "Conversazione dimostrativa nell’app NexusNXS per PC",
-        label: "APP PC REALE",
+        label: "APP PC · CORE ANIMATO",
       }
     : {
         src: "/products/android-home.png",
@@ -209,7 +210,7 @@ export function ProductMockup({ type }: { type: "desktop" | "android" }) {
     <div className="device-frame">
       <div className="device-bar" aria-hidden="true"><i /><i /><i /><span>NEXUSNXS / {type.toUpperCase()}</span></div>
       <div className="product-screen">
-        <Image src={product.src} alt={product.alt} width={type === "desktop" ? 1090 : 360} height={type === "desktop" ? 613 : 640} sizes={type === "desktop" ? "(max-width: 900px) 92vw, 760px" : "(max-width: 900px) 50vw, 245px"} draggable={false} unoptimized />
+        {type === "desktop" ? <DesktopHomePreview /> : <Image src={product.src} alt={product.alt} width={360} height={640} sizes="(max-width: 900px) 50vw, 245px" draggable={false} unoptimized />}
       </div>
       <figcaption><i aria-hidden="true" />{product.label}</figcaption>
     </div>
