@@ -23,7 +23,7 @@ test("uses one account-owned Cloudflare Worker and no OpenAI Sites runtime", asy
     { pattern: "www.nexusnxs.com", custom_domain: true },
     { pattern: "ai.nexusnxs.com/*", zone_name: "nexusnxs.com" },
   ]);
-  assert.match(worker, /Il Core sta/);
+  assert.match(worker, /publicAiShell/);
   assert.match(worker, /X-NexusNXS-Edge-State/);
   assert.equal(wrangler.assets.binding, "ASSETS");
   assert.equal(wrangler.assets.html_handling, "none");

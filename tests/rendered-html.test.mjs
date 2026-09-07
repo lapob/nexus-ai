@@ -381,9 +381,9 @@ test("replaces a failed AI tunnel with the branded offline experience", async ()
   assert.equal(navigation.headers.get("retry-after"), "8");
   assert.match(navigation.headers.get("content-security-policy") ?? "", /script-src 'nonce-/);
   const html = await navigation.text();
-  assert.match(html, /NexusNXS AI · Riconnessione/);
-  assert.match(html, /Il Core sta/);
-  assert.match(html, /Riprova ora/);
+  assert.match(html, /<title>NexusNXS AI<\/title>/);
+  assert.match(html, /publicReadinessRuntime/);
+  assert.match(html, /ambientParticles/);
   assert.doesNotMatch(html, /Cloudflare|1033|workstation|tunnel/i);
 
   const health = await fetchWorker("https://ai.nexusnxs.com/readyz", {
