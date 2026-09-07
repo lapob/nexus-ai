@@ -4,8 +4,8 @@
  */
 
 const { createAstralCore } = require('../shared/astral-core');
-const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.1/NexusNXS-0.3.14-Setup.exe';
-const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.1/NexusNXS-Android-6.4.9.apk';
+const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-0.3.14-Setup.exe';
+const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-Android.apk';
 
 const EXPERIENCE_STYLE = `<style>
 .core canvas{background:transparent;mask-image:none;-webkit-mask-image:none}
@@ -218,12 +218,55 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   const exchange = document.querySelector('.exchange');
   const userPrompt = document.getElementById('userPrompt');
   const efficient = navigator.connection?.saveData || Number(navigator.deviceMemory || 4) <= 3;
+  const field = document.createElement('canvas');
+  field.id = 'ambientParticles'; field.setAttribute('aria-hidden', 'true');
+  field.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
+  const surface = document.querySelector('.shell');
+  if (surface) { surface.style.position = 'relative'; surface.style.zIndex = '1'; }
+  document.body.prepend(field);
+  const paint = field.getContext('2d');
+  const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  const stars = Array.from({ length: efficient ? 140 : 360 }, (_, i) => ({
+    x: ((i + 1) * .61803398875) % 1, y: ((i + 1) * .41421356237) % 1,
+    radius: .55 + (i % 7) * .13, phase: i * 2.399963
+  }));
+  let fieldFrame = 0, width = 0, height = 0, elapsed = 0, previous = 0, lastPaint = 0;
+  const resizeField = () => { width = innerWidth; height = innerHeight; const dpr = Math.min(devicePixelRatio || 1, 1.5); field.width = width * dpr; field.height = height * dpr; paint?.setTransform(dpr, 0, 0, dpr, 0, 0); };
+  const drawField = now => {
+    if (!motion.matches && now - lastPaint < 33) { fieldFrame = requestAnimationFrame(drawField); return; }
+    lastPaint = now;
+    elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
+    if (paint) {
+      paint.clearRect(0, 0, width, height);
+      const bounds = canvas.getBoundingClientRect(), cx = bounds.left + bounds.width / 2, cy = bounds.top + bounds.height / 2;
+      const progress = motion.matches ? 1 : Math.min(1, elapsed / 2.4);
+      const gather = 1 - Math.pow(1 - progress, 3);
+      for (let i = 0; i < stars.length; i++) {
+        const star = stars[i], incoming = i % 4 === 0;
+        let x = star.x * width, y = star.y * height;
+        if (incoming) { const radius = bounds.width * .24; x += (cx + Math.cos(star.phase) * radius - x) * gather; y += (cy + Math.sin(star.phase) * radius - y) * gather; }
+        else if (!motion.matches) { x += Math.sin(elapsed * .07 + star.phase) * 5; y += Math.cos(elapsed * .06 + star.phase) * 4; }
+        const side = Math.min(1, Math.abs(x - width / 2) / Math.min(460, width * .48));
+        const readingFade = .04 + .5 * side * side;
+        paint.fillStyle = `rgba(166,224,234,${incoming ? (1-progress)*.65 : readingFade})`;
+        paint.beginPath(); paint.arc(x,y,star.radius,0,Math.PI*2); paint.fill();
+      }
+      field.dataset.assembled = String(progress === 1);
+    }
+    if (!document.hidden && !motion.matches) fieldFrame = requestAnimationFrame(drawField);
+  };
+  const resumeField = () => { cancelAnimationFrame(fieldFrame); previous = 0; if (!document.hidden) fieldFrame = requestAnimationFrame(drawField); };
+  resizeField(); resumeField();
+  const onFieldResize = () => { resizeField(); resumeField(); };
+  addEventListener('resize', onFieldResize, { passive: true });
+  document.addEventListener('visibilitychange', resumeField);
+  motion.addEventListener('change', resumeField);
   const renderer = createAstralCore(canvas, { host: button, efficient, getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) });
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
   globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => Number(canvas.dataset.astralParticles || 0) };
-  addEventListener('pagehide', () => { observer.disconnect(); renderer.dispose(); }, { once: true });
+  addEventListener('pagehide', () => { observer.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); }, { once: true });
   readExchange();
 }
 

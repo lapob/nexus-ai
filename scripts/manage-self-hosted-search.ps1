@@ -34,8 +34,12 @@ $env:DOCKER_CONFIG = $dockerConfig
 $env:DOCKER_HOST = 'npipe:////./pipe/dockerDesktopLinuxEngine'
 
 function Test-DockerReady {
-  & $dockerCli info --format '{{.ServerVersion}}' *> $null
-  return $LASTEXITCODE -eq 0
+  $previousPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    & $dockerCli info --format '{{.ServerVersion}}' *> $null
+    return $LASTEXITCODE -eq 0
+  } finally { $ErrorActionPreference = $previousPreference }
 }
 
 function Wait-DockerReady([int]$TimeoutSeconds = 90) {
@@ -134,6 +138,17 @@ if ($Action -eq 'start') {
     [IO.File]::WriteAllText($settingsPath, $template.Replace('__NEXUS_SEARXNG_SECRET__', $secret), [Text.UTF8Encoding]::new($false))
   }
   if (-not (Test-DockerReady)) {
+    # The portable per-user installation may retain its uninstall record but
+    # lose the launcher registration. Restore only the verified existing path.
+    $launcherKey = 'HKCU:\Software\Docker Inc.\Docker Desktop'
+    $installRecord = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop' -ErrorAction SilentlyContinue
+    if (-not (Test-Path $launcherKey) -and $installRecord.InstallLocation -eq $dockerRoot) {
+      if ((Get-AuthenticodeSignature -LiteralPath $dockerDesktop).Status -ne 'Valid') {
+        throw 'Firma del launcher Docker non valida: ripristino registrazione interrotto.'
+      }
+      New-Item -Path $launcherKey -Force | Out-Null
+      New-ItemProperty -Path $launcherKey -Name InstallLocation -Value $dockerRoot -PropertyType String | Out-Null
+    }
     Remove-StaleDockerSockets
     # ProcessStartInfo treats the working directory literally; Start-Process
     # interprets the square brackets in the portable volume name as wildcards.
