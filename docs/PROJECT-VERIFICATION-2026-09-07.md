@@ -22,7 +22,7 @@
 
 ## Limiti e lavoro residuo del programma complessivo
 
-- ADB non rileva attualmente il dispositivo: le nuove prove reali di tastiera, rumore, Bluetooth e interruzione voce non sono certificate da questo passaggio.
+- Android fisico collegato: entrambi i client superano cinque profili di display/font; tastiera Samsung, composizione multilinea, invio reale e risposta verificati nell'app pubblica. Rumore, Bluetooth e interruzione voce restano da provare separatamente.
 - Le conversazioni autenticate dispongono già di API di sincronizzazione/importazione e revoca. La web app pubblica mantiene la promessa di sessione temporanea; la nuova sincronizzazione pubblica facoltativa tra dispositivi non è stata implementata.
 - Il controllo del marchio non equivale a una completa centralizzazione di tutti i token tipografici e dimensionali tra Kotlin, desktop e sito.
 - Stable non pronta: mancano firme di produzione Windows/Android/manifest e origine aggiornamenti, oltre a evidenze di backup esterno, continuità elettrica e rete, rotazione chiavi, aggiornamento su Windows pulito, esercitazione incidenti e verifica indipendente di sicurezza.
@@ -36,3 +36,18 @@
 - “Senza limiti artificiali” non significa contesto infinito o assenza di timeout: restano capacità hardware, cancellazione, autenticazione e consenso operativo.
 - Verifica corrente: `intelligence-tests.log` 834/834; `intelligence-security.log` 132/132; `intelligence-check.log` build e controlli superati; `intelligence-experience.log` AI 8b 17/18 e 14b 18/18, voce, Electron, chiusura e 250 cicli senza richieste orfane.
 - Suite sintetica estesa 1.3.0 sul 14b: 39/40, nessun caso obbligatorio fallito; 9 casi deterministici e 31 inferenze, 93,55% corrette al primo tentativo, 2 revisioni. `it-vincolo-04` rispetta le sei parole ma non contiene il termine tematico richiesto dallo scorer. Questi risultati non certificano capacità generali o assenza di errori.
+
+## Verifica Android fisica
+
+- Rafforzata la matrice: errore ADB interrompe il gate; ogni cattura deve contenere il package atteso e un PNG valido. Impostazioni originali del display ripristinate in `finally`.
+- `qa-artifacts/android-qa-contracts.log`: 48 test superati, inclusa una prova eseguibile di comando nativo fallito che non deve raggiungere il successo.
+- `qa-artifacts/android-device-current.log`: Control e Public, telefono piccolo/compatto, font grandi, landscape e tablet. I risultati misurano avvio e layout; non certificano tutte le funzioni Control dietro autenticazione.
+- `qa-artifacts/android-keyboard.png` e `android-answer.png`: casella sopra la tastiera, bozza multilinea visibile, risposta ricevuta e IME chiusa. Le immagini sono locali e non destinate al sito pubblico.
+- La prova aritmetica remota produce 36 MB correttamente, ma aggiunge un'espressione nonostante “solo il totale”: aggiungere copertura dei formati numerici concisi nelle eval e nella validazione della risposta.
+
+## Miglioramenti prioritari successivi
+
+1. Verifica del formato oltre alla correttezza: risultati numerici senza spiegazioni quando richiesti esplicitamente.
+2. Prove di continuità durante cambio rete e ritorno dal background, con Stop e recupero della bozza.
+3. Sincronizzazione pubblica facoltativa con identità, revoca e cancellazione complete; nessuna esposizione delle conversazioni proprietarie.
+4. Generazione dei token condivisi per superfici e controlli, preservando tutti i Core desktop originali.
