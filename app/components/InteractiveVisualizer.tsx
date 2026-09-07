@@ -285,7 +285,7 @@ export function InteractiveVisualizer({ variant, compact = false }: { variant: V
 
 export function VisualizerCollection({ mode, compact = false }: { mode: "all" | "desktop" | "android"; compact?: boolean }) {
   const variants: VisualizerVariant[] = mode === "desktop"
-    ? ["android"]
+    ? ["neural", "saturn", "reactor"]
     : mode === "android"
       ? ["android"]
       : ["neural", "saturn", "reactor", "android"];

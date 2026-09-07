@@ -102,7 +102,7 @@ test("allows the production domain enough time to converge before rollback", asy
     /verifySite\("https:\/\/nexusnxs\.com", deployedVersion, \{ attempts: 12 \}\)/,
   );
   assert.match(releaseScript, /runWrangler\(\["deploy", "--strict"/);
-  assert.match(releaseScript, /const deployedVersion = await currentVersion\(\)/);
+  assert.match(releaseScript, /const deployedVersion = await waitForDeployment\(currentVersion, previous\)/);
   assert.match(releaseScript, /await refreshProductionTriggers\(\)/);
 });
 

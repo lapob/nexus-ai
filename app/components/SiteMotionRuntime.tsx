@@ -193,7 +193,7 @@ export function SiteMotionRuntime() {
       // A fast fling must not leave old chapter geometry chasing new copy.
       // Keep slow local inertia, but converge faster when several scenes were crossed.
       const sceneDistance = destination - sceneProgress;
-      const catchup = 2.2 + Math.min(14, Math.abs(sceneDistance) * 7);
+      const catchup = 5 + Math.min(14, Math.abs(sceneDistance) * 7);
       sceneProgress += sceneDistance * (reduced ? 1 : 1 - Math.exp(-catchup * delta));
       const sectionPosition = sceneProgress;
       const sectionIndex = Math.floor(sectionPosition);
@@ -213,6 +213,7 @@ export function SiteMotionRuntime() {
       const topologyMix = topologyMixRaw * topologyMixRaw * (3 - 2 * topologyMixRaw);
       const topologyPoint = (particle: CosmicParticle, index: number, shape: number) => {
         const form = sections[shape]?.dataset.cosmicForm;
+        if (form === 'ambient') return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
         const kind = (((shape + routePhase) % 5) + 5) % 5;
         const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
         const isHero = shape === 0 && heroCore !== null;
@@ -225,8 +226,8 @@ export function SiteMotionRuntime() {
         // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
         const travel = reduced ? 0 : Math.min(1, Math.max(0, (viewportAnchor - (sectionAnchors[shape] || 0)) / cosmicHeight));
         const depth = shape === 0 ? travel : 1;
-        const pitch = depth * (.22 + Math.sin(time * .04) * .08) + travel * 1.05 + inspection.x;
-        const yaw = depth * Math.sin(time * .03) * .22 + travel * .48 + inspection.y;
+        const pitch = depth * .16 + travel * 1.15 + inspection.x;
+        const yaw = depth * Math.sin(time * .025) * .06 + travel * .28 + inspection.y;
         const project = (x: number, y: number, z: number) => {
           const rx = x * Math.cos(yaw) + z * Math.sin(yaw);
           const rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
@@ -315,7 +316,7 @@ export function SiteMotionRuntime() {
         // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
-        const transitionScatter = Math.sin(sectionMix * Math.PI) * .22;
+        const transitionScatter = Math.sin(sectionMix * Math.PI) * .08;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
         const arrivalTime = Math.min(1, Math.max(0, age - .4) / 5);

@@ -111,6 +111,8 @@ test("real product captures keep Android system bars visible and use precise hov
   await expect(androidImage).toBeVisible();
 
   const desktopFrame = showcase.locator(".product-mockup--real.desktop .device-frame");
+  await expect(desktopFrame.locator("canvas")).toHaveCount(0);
+  await expect(desktopFrame.locator("img")).toHaveAttribute("src", "/products/desktop-home.png");
   const frameBox = await desktopFrame.boundingBox();
   expect(frameBox).not.toBeNull();
 
@@ -400,8 +402,8 @@ test("astral hero reserves separate space for text at mobile, tablet and desktop
     if (width <= 800) expect(core.y + core.height).toBeLessThanOrEqual(intro.y + 1);
     else expect(core.y + core.height).toBeLessThanOrEqual(intro.y + 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
-    await page.locator(".footer-astral-mark").scrollIntoViewIfNeeded();
-    expect((await page.locator(".footer-astral-mark").boundingBox()).width).toBeGreaterThan(200);
+    await page.locator(".premium-footer").scrollIntoViewIfNeeded();
+    await expect(page.locator(".premium-footer canvas")).toHaveCount(0);
   }
 });
 

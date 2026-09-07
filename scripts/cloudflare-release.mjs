@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { waitForDeployment } from "./wait-for-deployment.mjs";
 import {
   CLOUDFLARE_ACCOUNT_ID,
   resolveAccountToken,
@@ -417,10 +418,7 @@ async function promote() {
   // deployment. The atomic deploy path creates and activates the same tested
   // build in one operation and updates its triggers as one production change.
   runWrangler(["deploy", "--strict", "--message", `production ${sha.slice(0, 12)}`], { artifact: true });
-  const deployedVersion = await currentVersion();
-  if (!deployedVersion || deployedVersion === previous) {
-    throw new Error("Cloudflare did not activate a new atomic production version.");
-  }
+  const deployedVersion = await waitForDeployment(currentVersion, previous);
   try {
     try {
       await verifySite("https://nexusnxs.com", deployedVersion);

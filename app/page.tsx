@@ -50,6 +50,6 @@ export default function Home() {
       <p>NexusNXS è in Preview e può commettere errori. Verifica i risultati importanti; l’accesso richiede che i servizi siano disponibili.</p>
       <HardNavigationLink className="text-link" href="/security">Come proteggiamo il servizio <ArrowUpRight size={16}/></HardNavigationLink>
     </section>
-    <SiteFooter continuous />
+    <SiteFooter />
   </main>;
 }

@@ -4,7 +4,6 @@ import { DesktopHomePreview } from "./DesktopHomePreview";
 import { useEffect, useRef, useState } from "react";
 import { Activity, ArrowDownToLine, ArrowUpRight, BrainCircuit, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
 import Image from "next/image";
-import { InteractiveVisualizer } from "./InteractiveVisualizer";
 import { usePathname } from "next/navigation";
 import { PRIMARY_NAV_ITEMS } from "../lib/site-navigation";
 import { HardNavigationLink } from "./HardNavigationLink";
@@ -183,9 +182,8 @@ export function SiteHeader() {
   </>;
 }
 
-export function SiteFooter({ ctaHref = "https://ai.nexusnxs.com", ctaLabel = "Apri NexusNXS AI", continuous = false }: { ctaHref?: string; ctaLabel?: string; continuous?: boolean } = {}) {
-  return <footer className="premium-footer" data-cosmic-scene="center" data-cosmic-form="sigil">
-    <div className="footer-astral-mark" role="img" aria-label="NexusNXS, intelligenza connessa">{!continuous && <InteractiveVisualizer variant="sigil" />}</div>
+export function SiteFooter({ ctaHref = "https://ai.nexusnxs.com", ctaLabel = "Apri NexusNXS AI" }: { ctaHref?: string; ctaLabel?: string } = {}) {
+  return <footer className="premium-footer" data-cosmic-scene="center" data-cosmic-form="ambient">
     <div className="footer-callout"><h2>Un solo NexusNXS.<br /><em>Ovunque tu sia.</em></h2><HardNavigationLink className="primary-button" href={ctaHref}>{ctaLabel} <ArrowUpRight size={15} /></HardNavigationLink></div>
     <div className="footer-links"><div><strong>Prodotti</strong><HardNavigationLink href="https://ai.nexusnxs.com">NexusNXS AI</HardNavigationLink><HardNavigationLink href="/desktop">NexusNXS per PC</HardNavigationLink><HardNavigationLink href="/android">NexusNXS per Android</HardNavigationLink><HardNavigationLink href="/downloads">Download verificati</HardNavigationLink></div><div><strong>Fiducia</strong><HardNavigationLink href="/security">Trust Center</HardNavigationLink><HardNavigationLink href="/status">Stato servizi</HardNavigationLink><a href="mailto:security@nexusnxs.com">Segnala una vulnerabilità</a></div><div><strong>Informazioni</strong><HardNavigationLink href="/privacy">Privacy</HardNavigationLink><HardNavigationLink href="/terms">Termini d’uso</HardNavigationLink><a href="mailto:hello@nexusnxs.com">Contatti</a></div></div>
     <div className="footer-bottom"><span>© 2026 NEXUSNXS</span><span>PRIVACY-FIRST · MADE IN ITALY</span></div>
@@ -197,7 +195,7 @@ export function ProductMockup({ type }: { type: "desktop" | "android" }) {
     ? {
         src: "/products/desktop-conversation.png",
         alt: "Conversazione dimostrativa nell’app NexusNXS per PC",
-        label: "APP PC · CORE ANIMATO",
+        label: "APP PC REALE",
       }
     : {
         src: "/products/android-home.png",
