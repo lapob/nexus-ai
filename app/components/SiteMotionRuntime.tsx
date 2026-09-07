@@ -305,6 +305,9 @@ export function SiteMotionRuntime() {
       }
       let maxDrift = 0;
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
+      const footerIndex = sections.findIndex(section => section.tagName === 'FOOTER');
+      const footerEntry = footerIndex < 0 ? 0 : Math.max(0, Math.min(1, (viewportAnchor - sectionAnchors[footerIndex] + cosmicHeight * .7) / (cosmicHeight * .7)));
+      const footerQuiet = 1 - .88 * footerEntry * footerEntry * (3 - 2 * footerEntry);
       const points = particles.slice(0, activeParticles).map((particle, index) => {
         const baseX = particle.x * cosmicWidth;
         // Never wrap a grain across the viewport while a form is dissolving.
@@ -350,7 +353,8 @@ export function SiteMotionRuntime() {
           const weight=Math.max(0,1-Math.hypot(dx,dy)/80);
           readingFade=Math.max(readingFade,weight*weight*(3-2*weight));
         }
-        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade);
+
+        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet;
         return { x: px, y: py, depth: particle.depth, visibility };
       });
       cosmicContext.lineWidth = .55;
