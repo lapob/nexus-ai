@@ -259,6 +259,8 @@ function buildModelReport({ suite, model, mode, results }) {
   const passRate = results.length ? Number((passed / results.length * 100).toFixed(2)) : 0;
   const mustPassFailures = results.filter((row) => row.mustPass && !row.passed).map((row) => row.caseId).sort();
   const durations = results.map((row) => row.durationMs);
+  const inferred = results.filter((row) => row.execution === 'model');
+  const firstPassCount = inferred.filter((row) => row.firstPassPassed === true).length;
   const gatePassed = passRate >= suite.gate.minimumPassRate
     && Object.values(categories).every((category) => category.gatePassed)
     && mustPassFailures.length === 0;
@@ -272,6 +274,11 @@ function buildModelReport({ suite, model, mode, results }) {
       minimumPassRate: suite.gate.minimumPassRate,
       medianLatencyMs: percentile(durations, 0.5),
       p95LatencyMs: percentile(durations, 0.95),
+      deterministicCases: results.filter((row) => row.execution === 'deterministic').length,
+      modelCases: inferred.length,
+      modelFirstPassRate: inferred.length ? Number((firstPassCount / inferred.length * 100).toFixed(2)) : null,
+      reviewedCases: inferred.filter((row) => row.reviewed).length,
+      modelP95LatencyMs: inferred.length ? percentile(inferred.map((row) => row.durationMs), 0.95) : null,
       mustPassFailures,
       gatePassed,
     },
@@ -344,7 +351,7 @@ async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs }) {
     const startedAt = performance.now();
     const deterministicAnswer = productionFastPathReply(casePrompt(item));
     if (deterministicAnswer !== null) {
-      results.push(scoreCase(item, deterministicAnswer, performance.now() - startedAt));
+      results.push({ ...scoreCase(item, deterministicAnswer, performance.now() - startedAt), execution: 'deterministic' });
       continue;
     }
     const response = await fetch(`${endpoint}/api/chat`, {
@@ -357,6 +364,7 @@ async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs }) {
     const payload = await response.json();
     let answer = extractAnswer(payload);
     let scored = scoreCase(item, answer, performance.now() - startedAt);
+    const firstPassPassed = scored.passed;
     // La pipeline reale esegue una revisione mirata quando un vincolo
     // osservabile fallisce. Il gate deve misurare quel prodotto completo, non
     // fermarsi alla prima decodifica grezza del provider.
@@ -383,7 +391,7 @@ async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs }) {
       if (exactWords) answer = strictWordCountAnswer(casePrompt(item), answer) || answer;
       scored = scoreCase(item, answer, performance.now() - startedAt);
     }
-    results.push(scored);
+    results.push({ ...scored, execution: 'model', firstPassPassed, reviewed: !firstPassPassed });
   }
   return buildModelReport({ suite, model, mode: deep ? 'deep' : 'quick', results });
 }

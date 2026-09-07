@@ -10,8 +10,8 @@ const PROMPT_INJECTION_PATTERNS = Object.freeze([
   /\b(?:ignora|dimentica|sovrascrivi|aggira)\b.{0,80}\b(?:istruzioni|regole|prompt|messaggio)\b.{0,40}\b(?:precedent|sistema|sviluppatore|sicurezza)\b/isu,
   /\b(?:reveal|print|show|return|send|upload|exfiltrate|dump|display)\b.{0,100}\b(?:system prompt|developer message|password|secret|token|api[ -]?key|credential)s?\b/isu,
   /\b(?:rivela|stampa|mostra|restituisci|invia|carica|esfiltra)\b.{0,100}\b(?:prompt di sistema|messaggio dello sviluppatore|password|segreto|token|chiave api|credenziali)\b/isu,
-  /\b(?:you are now|act as|new system message|developer mode|jailbreak|do not tell (?:the )?user)\b/isu,
-  /\b(?:sei ora|fingi di essere|nuovo messaggio di sistema|modalit[aà] sviluppatore|non dirlo all['’]?utente)\b/isu,
+  /\b(?:(?:you are now|act as)\s+(?:(?:a|an|the)\s+)?(?:system|developer|unrestricted|uncensored|root|administrator)\b|new system message|developer mode|jailbreak|do not tell (?:the )?user)\b/isu,
+  /\b(?:(?:sei ora|fingi di essere)\s+(?:(?:un|uno|il|lo)\s+)?(?:sistema|sviluppatore|amministratore|assistente senza (?:limiti|restrizioni))\b|nuovo messaggio di sistema|modalit[aà] sviluppatore|non dirlo all['’]?utente)\b/isu,
   /(?:^|\n)\s*(?:system|developer|assistant|tool)\s*[:>]/imu,
   /<\/?(?:system|developer|assistant|tool|instructions?)\b[^>]*>/iu
 ]);

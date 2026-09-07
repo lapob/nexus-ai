@@ -10,6 +10,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const {
   buildReport,
+  buildModelReport,
   buildInferencePayload,
   checkAssertion,
   composeSystemPrompt,
@@ -24,6 +25,25 @@ const {
 
 const root = path.resolve(__dirname, '..');
 const suitePath = path.join(root, 'config', 'evals', 'nexusnxs-core-v1.json');
+
+test('separa qualita al primo tentativo, revisioni e risposte deterministiche', () => {
+  const suite = { gate: { minimumPassRate: 80, categoryMinimums: { reasoning: 80 } } };
+  const rows = [
+    { caseId: 'a', category: 'reasoning', passed: true, durationMs: 1, execution: 'deterministic' },
+    { caseId: 'b', category: 'reasoning', passed: true, durationMs: 1000, execution: 'model', firstPassPassed: true, reviewed: false },
+    { caseId: 'c', category: 'reasoning', passed: true, durationMs: 3000, execution: 'model', firstPassPassed: false, reviewed: true },
+  ];
+  const { summary } = buildModelReport({ suite, model: 'test', mode: 'quick', results: rows });
+  assert.equal(summary.passRate, 100);
+  assert.equal(summary.modelFirstPassRate, 50);
+  assert.equal(summary.modelCases, 2);
+  assert.equal(summary.deterministicCases, 1);
+  assert.equal(summary.reviewedCases, 1);
+  assert.equal(summary.modelP95LatencyMs, 3000);
+  const unknown = buildModelReport({ suite, model: 'fixture', mode: 'fixture', results: [] }).summary;
+  assert.equal(unknown.modelFirstPassRate, null);
+  assert.equal(unknown.modelP95LatencyMs, null);
+});
 
 function passingAnswers(suite) {
   return {
