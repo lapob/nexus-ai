@@ -19,6 +19,9 @@ const EXPERIENCE_STYLE = `<style>
 .phase,.core-caption,.web-answer-context small,.web-answer-context strong,.response-action,.feedback-action,.sheet-label,.device-note{font-family:inherit}
 .phase{font-size:.78rem;letter-spacing:.03em;text-transform:none}.web-answer-context small{font-size:.72rem}.web-answer-context strong{font-size:.75rem}.response-actions button{font-size:.75rem;min-height:36px}
 body:not(.request-active):not(.conversation-active) .privacy,body:not(.request-active):not(.conversation-active) .identity .state{visibility:hidden;pointer-events:none}
+body[data-service-readiness="warming"] .identity .state,body[data-service-readiness="offline"] .identity .state{visibility:visible!important;color:#d8e8eb}
+body[data-service-readiness="offline"] .state:before{background:#a6b4b8;box-shadow:none;animation:none}
+@media(max-width:560px){body[data-service-readiness="offline"] .identity .state,body[data-service-readiness="warming"] .identity .state{position:absolute;right:18px;top:70px;font-size:.73rem}}
 body:not(.request-active):not(.conversation-active) .core-caption,body:not(.request-active):not(.conversation-active) .cognition{visibility:hidden}
 body:not(.request-active):not(.conversation-active):not(.memory-cleared) .phase:not([data-microphone=true]){visibility:hidden}
 @media(max-width:560px){.identity .brand-mark{width:38px;height:38px}.identity .wordmark{font-size:.79rem;letter-spacing:.12em}.identity .download-trigger{width:44px}.identity .state{font-size:.73rem}.shell .identity{gap:8px;padding-inline:18px}}
@@ -270,6 +273,57 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   readExchange();
 }
 
+function publicReadinessRuntime() {
+  const badge = document.querySelector('.identity .state');
+  const labels = { checking: 'Verifica servizio…', ready: 'Operativo', warming: 'In preparazione', offline: 'Non raggiungibile' };
+  let timer, pending, generation = 0;
+  const render = state => {
+    const previous = document.body.dataset.serviceReadiness;
+    if (badge) { badge.textContent = labels[state]; badge.dataset.readiness = state; badge.setAttribute('role', 'status'); }
+    document.body.dataset.serviceReadiness = state;
+    const core = document.getElementById('core');
+    const send = document.getElementById('send');
+    if (core) core.disabled = state !== 'ready';
+    if (send && state !== 'ready') send.disabled = true;
+    if (state === 'ready' && previous !== 'ready') document.getElementById('prompt')?.dispatchEvent(new Event('input', { bubbles: true }));
+    return state === 'ready';
+  };
+  const check = () => {
+    if (navigator.onLine === false) return Promise.resolve(render('offline'));
+    if (pending) return pending;
+    pending = (async () => {
+      try {
+        const response = await fetch('/readyz', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        const data = await response.json();
+        return render(response.ok && data.status === 'ready' ? 'ready' : response.status === 503 && data.status === 'not_ready' ? 'warming' : 'offline');
+      } catch { return render('offline'); }
+      finally { pending = null; }
+    })();
+    return pending;
+  };
+  const poll = async () => {
+    const current = ++generation;
+    clearTimeout(timer);
+    if (document.hidden) return;
+    const ready = await check();
+    if (current === generation && !document.hidden) timer = setTimeout(poll, ready ? 30000 : 5000);
+  };
+  render('checking');
+  globalThis.nexusCheckReadiness = check;
+  document.addEventListener('visibilitychange', poll);
+  document.addEventListener('input', () => queueMicrotask(() => {
+    if (document.body.dataset.serviceReadiness !== 'ready') {
+      const send = document.getElementById('send');
+      if (send) send.disabled = true;
+    }
+  }));
+  addEventListener('online', poll);
+  addEventListener('offline', () => { ++generation; clearTimeout(timer); render('offline'); });
+  addEventListener('pagehide', () => { ++generation; clearTimeout(timer); });
+  addEventListener('pageshow', poll);
+  poll();
+}
+
 // #endregion
 
 // #region 02 — Composizione e pubblicazione della pagina
@@ -467,6 +521,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("if(/^https:///.test(piece))", "if(piece.startsWith('https://'))")
     .replace("answer.textContent='';pendingAnswer='';answer.classList.add", "answer.textContent='';pendingAnswer='';rawAnswer='';followStream=true;lastAnswerScroll=0;lastStreamRender=0;lastStreamValue='';hideAnswerContext();responseActions.hidden=true;feedbackStatus.textContent='';answer.classList.remove('rich');imageResult.hidden=true;answer.classList.add")
     .replace("if(!text||busy)return;busy=true;send.disabled=true;", "if(!text||busy)return;busy=true;stopRequested=false;requestAbort=new AbortController();requestMessageId=globalThis.crypto?.randomUUID?.()||('019fa53a-'+Date.now().toString(16)+'-'+Math.random().toString(16).slice(2));setSendMode(true);")
+    .replace('if(!text||busy)return;busy=true;', "if(!text||busy)return;busy=true;if(globalThis.nexusCheckReadiness&&!await globalThis.nexusCheckReadiness()){busy=false;prompt.value=text;document.body.classList.add('keyboard-open');setPhase('Il servizio non è ancora pronto. La richiesta è conservata: riprova tra poco.',true);send.disabled=false;return;}")
     .replace("setSendMode(true);document.body.classList.remove('keyboard-open');prompt.blur();", "setSendMode(true);enterRequestLayout();prompt.blur();")
     .replace("const credential=await session();const response=await fetch('/api/guest/messages/stream'", "await session();if(isImageRequest(text)&&capability('image-generation')==='available'){const responseText=await generateImage(text);turns.push({role:'user',content:text},{role:'assistant',content:responseText});await memoryWrite();answer.classList.remove('streaming');return}const response=await authenticatedFetch('/api/guest/messages/stream'")
     .replace("headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:JSON.stringify({text,history:previous", "headers:{'Content-Type':'application/json'},body:JSON.stringify({text,history:previous")
@@ -480,7 +535,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("if(frame.type==='token'){setVoiceState('responding');queueAnswer(frame.token)}", "if(frame.type==='token'){setVoiceState('responding');streamCursor=Math.max(streamCursor,Number(frame.cursor)||streamCursor+String(frame.token||'').length);queueAnswer(frame.token)}")
     .replace("if(frame.type==='complete'){if(!answer.textContent&&!pendingAnswer)queueAnswer(frame.message||'');renderArtifacts(frame.artifacts)}", "if(frame.type==='complete'){streamComplete=true;streamCursor=Math.max(streamCursor,Number(frame.cursor)||0);flushAnswer();const verified=String(frame.message||'');if(verified&&verified!==rawAnswer){rawAnswer=verified;answer.classList.remove('rich');answer.textContent=rawAnswer;followAnswer()}renderArtifacts(frame.artifacts)}")
     .replace("if(frame.type==='error')throw new Error(frame.error||'Risposta non completata')}}flushAnswer();", "if(frame.type==='error'){const frameError=new Error(frame.error||'Risposta non completata');frameError.retryable=false;throw frameError}}}if(!streamComplete)throw new Error('Connessione interrotta durante la risposta')}catch(streamError){if(stopRequested||streamError?.retryable===false||++streamAttempt>=3)throw streamError;setVoiceState('thinking');setPhase('Riprendo la risposta…');await new Promise(resolve=>setTimeout(resolve,250*streamAttempt))}}flushAnswer();")
-    .replace("catch(error){answer.classList.remove('streaming');setPhase(error.message||'Servizio momentaneamente non disponibile',true)}finally{busy=false;send.disabled=!prompt.value.trim()}", "catch(error){answer.classList.remove('streaming');if(stopRequested){flushAnswer();const responseText=(rawAnswer||answer.textContent).trim();if(responseText){formatAnswer(responseText);turns.push({role:'user',content:text},{role:'assistant',content:responseText});await memoryWrite();showFeedback()}setVoiceState('ready');setPhase('Risposta interrotta')}else setPhase(error.message||'Servizio momentaneamente non disponibile',true)}finally{busy=false;send.disabled=!prompt.value.trim()}")
+    .replace("catch(error){answer.classList.remove('streaming');setPhase(error.message||'Servizio momentaneamente non disponibile',true)}finally{busy=false;send.disabled=!prompt.value.trim()}", "catch(error){answer.classList.remove('streaming');if(stopRequested){flushAnswer();const responseText=(rawAnswer||answer.textContent).trim();if(responseText){formatAnswer(responseText);turns.push({role:'user',content:text},{role:'assistant',content:responseText});await memoryWrite();showFeedback()}setVoiceState('ready');setPhase('Risposta interrotta')}else{if(!rawAnswer.trim()){prompt.value=text;document.body.classList.add('keyboard-open')}setPhase(error.message||'Servizio momentaneamente non disponibile',true)}}finally{busy=false;send.disabled=!prompt.value.trim()}")
     .replace("finally{busy=false;send.disabled=!prompt.value.trim()}", "finally{busy=false;setSendMode(false);leaveRequestLayout()}")
     .replace('rawAnswer=recentAnswer.content;answer.textContent=recentAnswer.content;setPhase', 'rawAnswer=recentAnswer.content;formatAnswer(recentAnswer.content);showFeedback();setPhase')
     .replace("recordingTimer=0,currentAudio", "recordingTimer=0,voiceMonitor=null,currentAudio")
@@ -507,7 +562,7 @@ function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, and
     .replace('background:radial-gradient(circle,#61d9d4 1.4px,transparent 2px) 0 50%/6px 6px repeat-x;animation:flow .95s steps(3) infinite', 'background:#78deda;box-shadow:0 0 0 3px rgba(80,211,208,.07),0 0 16px rgba(80,211,208,.46)')
     .replace('@keyframes flow{50%{opacity:.34;transform:translateX(3px)}}', '');
   return unifiedMotionBase
-    .replace('<div class="identity"><span class="wordmark">NexusNXS</span><span class="state">Operativo</span></div>', '<div class="identity"><button id="refreshApp" class="brand-lockup" type="button" aria-label="NexusNXS AI"><img class="brand-mark" src="/nexus-icon.png" width="36" height="36" alt=""><span class="wordmark">NexusNXS AI</span></button><div class="identity-actions"><span class="state">Operativo</span><button id="download" class="download-trigger" type="button" aria-label="Scarica NexusNXS AI"><span>Scarica</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg></button></div></div>')
+    .replace('<div class="identity"><span class="wordmark">NexusNXS</span><span class="state">Operativo</span></div>', '<div class="identity"><button id="refreshApp" class="brand-lockup" type="button" aria-label="NexusNXS AI"><img class="brand-mark" src="/nexus-icon.png" width="36" height="36" alt=""><span class="wordmark">NexusNXS AI</span></button><div class="identity-actions"><span class="state" role="status">Verifica servizio…</span><button id="download" class="download-trigger" type="button" aria-label="Scarica NexusNXS AI"><span>Scarica</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg></button></div></div>')
     .replace('Una sessione essenziale per provare risposte rapide, ragionamento guidato e continuità naturale.', 'Parla al Core. Se preferisci, passa alla tastiera. La continuità resta su questo dispositivo.')
     .replace('<div class="core" aria-hidden="true"><span class="ring"></span><span class="node"></span></div>', '<button id="core" class="core" type="button" aria-label="Attiva NexusNXS"><canvas id="coreCanvas" aria-hidden="true"></canvas><span id="coreCaption" class="core-caption">Core pronto</span></button>')
     .replace('<div class="exchange" aria-live="polite"><p id="userPrompt" class="prompt-copy"></p>', '<div class="exchange" aria-live="polite"><div id="sessionHistory" class="session-history"></div><p id="userPrompt" class="prompt-copy"></p>')
@@ -516,7 +571,7 @@ function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, and
     .replace('<p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p>', '<p class="privacy"><span class="accuracy-note">NexusNXS può commettere errori.</span> Sessione temporanea: uscendo dalla pagina, la conversazione viene dimenticata. <button id="memoryClear" class="memory-clear" type="button">Cancella ora</button> · <a href="https://nexusnxs.com/">Scopri NexusNXS AI</a></p>')
     .replace('<p id="answer" class="answer"></p>', '<div id="cognition" class="cognition" data-step="understand" hidden aria-hidden="true"><span>Attività</span><ol><li data-step="understand">Comprende</li><li data-step="plan">Pianifica</li><li data-step="retrieve">Ricerca</li><li data-step="verify">Verifica</li><li data-step="respond">Risponde</li></ol></div><header id="answerContext" class="web-answer-context" data-kind="answer" hidden><i aria-hidden="true"></i><span><small id="answerKind">Risposta</small><strong id="answerStatus" hidden></strong></span></header><p id="answer" class="answer"></p><div id="responseActions" class="response-actions" hidden><button id="copyResponse" class="response-action" data-label="Copia" type="button">Copia</button><button id="deepenResponse" class="response-action" data-label="Approfondisci" type="button">Approfondisci</button><button id="exportResponse" class="response-action" data-label="Esporta" type="button">Esporta</button><button id="feedbackAction" class="feedback-action" type="button" title="Condividi volontariamente questa risposta per la revisione e il miglioramento di NexusNXS">Migliora NexusNXS</button><span id="feedbackStatus" class="feedback-status" role="status" aria-live="polite"></span></div><div id="artifacts" class="artifact-grid"></div><figure id="imageResult" class="generated-image" hidden><img id="imageOutput" alt=""><figcaption>Creato da NexusNXS</figcaption></figure>')
     .replace('</head>', () => `${coreStyle}${EXPERIENCE_STYLE}${INTERACTION_VISIBILITY_STYLE}${ATTACHMENT_STYLE}${RESPONSE_STYLE}${RESPONSE_PRESENTATION_STYLE}${COGNITION_STYLE}${SESSION_EXPERIENCE_STYLE}${CONVERSATION_LAYOUT_STYLE}${SLASH_COMMAND_STYLE}${KEYBOARD_VIEWPORT_STYLE}</head>`)
-    .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog>${experienceScript({ windowsDownload, androidDownload })}${coreScript}</body>`);
+    .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog><script>(${publicReadinessRuntime.toString()})();</script>${experienceScript({ windowsDownload, androidDownload })}${coreScript}</body>`);
 }
 
 // Nomi pubblici canonici. Gli alias storici restano esportati per una release,

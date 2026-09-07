@@ -75,7 +75,7 @@ const { CrashReportStore } = require('../infrastructure/storage/crash-report-sto
 const { createUpdateManager } = require('../infrastructure/electron/update-manager');
 const { ProcessLock, isProcessAlive, readLock } = require('../infrastructure/electron/process-lock');
 const { coordinateShutdown } = require('./shutdown-coordinator');
-const { runtimeWarmupPolicy } = require('./runtime-warmup-policy');
+const { runtimeWarmupPolicy, warmupRetryDelay } = require('./runtime-warmup-policy');
 const { ProactiveEventBus } = require('./proactive-event-bus');
 const { ProactiveSensorHub } = require('./proactive-sensor-hub');
 const { createHeadlessDesktopControl } = require('./headless-desktop-control');
@@ -651,11 +651,12 @@ function bootstrapElectron({ env = process.env } = {}) {
         const runHeadlessWarmup = () => {
           if (cancelled) return;
           ipcServices.warmupAI().catch((error) => {
-            if (cancelled || retryIndex >= aiWarmupPolicy.retryDelaysMs.length) {
+            if (cancelled) return;
+            const delay = warmupRetryDelay(error, retryIndex++, aiWarmupPolicy);
+            if (delay === null) {
               logger.warn('Warm-up AI headless non completato; il servizio resta non pronto.', { error });
               return;
             }
-            const delay = aiWarmupPolicy.retryDelaysMs[retryIndex++];
             logger.warn('Warm-up AI headless rimandato.', { error, retryInMs: delay });
             retryTimer = setTimeout(runHeadlessWarmup, delay);
             retryTimer.unref?.();

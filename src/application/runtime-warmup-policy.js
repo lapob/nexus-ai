@@ -3,6 +3,8 @@
  * @description Mantiene pronto soltanto il modello rapido, senza coinvolgere i client pubblici.
  */
 
+// #region Policy and residency
+
 function keepWarmIntervalMs(keepAlive = '10m') {
   const match = String(keepAlive || '').trim().match(/^(\d+)([smh])$/i);
   const amount = match ? Number(match[1]) : 10;
@@ -22,6 +24,9 @@ function residentModelOptions({ maxLoadedModels = 1, mode = 'fast', fastModel, p
     reusableModels: Object.freeze([fast, primary])
   });
 }
+
+// #endregion
+// #region Singleflight and recovery
 
 function createWarmupSingleflight(task, { now = () => Date.now() } = {}) {
   if (typeof task !== 'function') throw new TypeError('Il task di warm-up deve essere una funzione.');
@@ -53,6 +58,12 @@ function createWarmupSingleflight(task, { now = () => Date.now() } = {}) {
   return Object.freeze({ reset, run, status });
 }
 
+function warmupRetryDelay(error, attempt, policy) {
+  if (attempt < policy.retryDelaysMs.length) return policy.retryDelaysMs[attempt];
+  const transient = error?.retryable === true || ['AI_PROVIDER_TIMEOUT', 'AI_PROVIDER_UNAVAILABLE', 'ECONNREFUSED', 'ETIMEDOUT'].includes(error?.code);
+  return transient ? policy.recoveryDelayMs : null;
+}
+
 function runtimeWarmupPolicy({ publicClientMode = false, serverMode = false, managedRuntimeAvailable = false, performanceLevel = 1, keepAlive = '10m' } = {}) {
   const enabled = publicClientMode !== true && (serverMode === true || managedRuntimeAvailable === true);
   return Object.freeze({
@@ -68,8 +79,11 @@ function runtimeWarmupPolicy({ publicClientMode = false, serverMode = false, man
     keepWarmIntervalMs: keepWarmIntervalMs(keepAlive),
     // Retry limitati e distanziati: recuperano un runtime appena avviato senza
     // trasformare /readyz o i client pubblici in un polling del modello.
-    retryDelaysMs: Object.freeze(serverMode ? [5_000, 15_000, 30_000] : [])
+    retryDelaysMs: Object.freeze(serverMode ? [5_000, 15_000, 30_000] : []),
+    recoveryDelayMs: serverMode ? 60_000 : null
   });
 }
 
-module.exports = { createWarmupSingleflight, keepWarmIntervalMs, residentModelOptions, runtimeWarmupPolicy };
+module.exports = { createWarmupSingleflight, keepWarmIntervalMs, residentModelOptions, runtimeWarmupPolicy, warmupRetryDelay };
+
+// #endregion

@@ -255,6 +255,7 @@ async function exercise(client, { stop = false } = {}) {
     let maxY = initialY;
     let dockDrift = 0;
     let activeDockInset = null;
+    let requestActiveAt = null;
     let finishedAt = 0;
     let stopped = false;
     let progressiveRich = false;
@@ -272,13 +273,14 @@ async function exercise(client, { stop = false } = {}) {
     const sample = setInterval(() => {
       maxY = Math.max(maxY, scrollY);
       const requestActive = document.body.classList.contains('request-active');
+      if (requestActive && requestActiveAt === null) requestActiveAt = performance.now();
       if (answer.classList.contains('streaming') && answer.classList.contains('rich') && answer.textContent.trim()) progressiveRich = true;
       if (answer.classList.contains('streaming') && answer.querySelector('h2,h3,ul,ol,.web-code-card,.web-table-wrap,.web-math-block')) progressiveStructure = true;
       const currentDockInset = innerHeight - dock.getBoundingClientRect().bottom;
       // La transizione centro -> dock parte 420 ms dopo l'avvio ed è lunga
       // 280 ms. Lasciamo anche due frame di assestamento e campioniamo soltanto
       // lo stato ancorato, non l'animazione intenzionale.
-      if (requestActive && performance.now() - startedAt >= 1_000) {
+      if (requestActive && performance.now() - requestActiveAt >= 1_000) {
         if (activeDockInset === null) activeDockInset = currentDockInset;
         else dockDrift = Math.max(dockDrift, Math.abs(currentDockInset - activeDockInset));
       }

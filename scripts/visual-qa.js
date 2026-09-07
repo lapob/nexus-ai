@@ -13,6 +13,7 @@ const root = path.resolve(__dirname, '..');
 const electron = require('electron');
 const output = path.join(root, 'qa-artifacts');
 const cases = [
+  ['home', 1090, 613],
   ['settings', 720, 560],
   ['settings-ai', 900, 700],
   ['settings-pets', 1080, 760],

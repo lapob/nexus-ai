@@ -78,3 +78,12 @@ test('riusa la residenza soltanto per turni rapidi su runtime a slot singolo', (
   assert.deepEqual(residentModelOptions({ maxLoadedModels: 1, mode: 'deep', fastModel: 'fast', primaryModel: 'primary' }), {});
   assert.deepEqual(residentModelOptions({ maxLoadedModels: 2, mode: 'fast', fastModel: 'fast', primaryModel: 'primary' }), {});
 });
+
+const { warmupRetryDelay } = require('../src/application/runtime-warmup-policy');
+test('recupera timeout persistenti senza ritentare errori permanenti', () => {
+  const policy = runtimeWarmupPolicy({ serverMode: true });
+  assert.equal(warmupRetryDelay({ code: 'AI_PROVIDER_TIMEOUT' }, 3, policy), 60000);
+  assert.equal(warmupRetryDelay({ retryable: true }, 100, policy), 60000);
+  assert.equal(warmupRetryDelay({ code: 'AI_MODEL_NOT_FOUND' }, 3, policy), null);
+  assert.equal(warmupRetryDelay({}, 0, policy), 5000);
+});
