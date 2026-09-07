@@ -55,17 +55,17 @@ body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%
 /* The wordmarks flank the core without sharing its hit area. Narrow screens
    reflow the title below it, never shrink the core into an unreadable strip. */
 .home-continuum .astral-hero {
-  min-height: 100svh;
+  min-height: 155svh;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: space-between;
   padding: 76px clamp(24px, 2vw, 48px) 44px;
   gap: 0;
   text-align: center;
   overflow: clip;
 }
-.astral-hero__scene { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, min(62vw, 920px)) minmax(0, 1fr); align-items: center; flex: 1; width: 100%; }
+.astral-hero__scene { position: sticky; top: 76px; min-height: 66svh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, min(62vw, 920px)) minmax(0, 1fr); align-items: center; flex: 0; width: 100%; }
 .home-continuum .astral-hero > .astral-hero__scene { width: 100%; margin-inline: 0; }
 .astral-hero .hero-product-name {
   display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; grid-row: 1;
@@ -86,7 +86,7 @@ body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%
 .hero-word:last-child .hero-letter:nth-child(3) { animation-delay: .65s; }
 @keyframes nxs-letter-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(760px, 58svh); aspect-ratio: 1; margin: auto; filter: none; cursor: grab; touch-action: pan-y; }
-.astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; }
+.astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; margin-top: 55svh; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
 .astral-hero .hero-actions a { font-size: 14px; }
@@ -94,6 +94,7 @@ body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%
 .astral-hero__replay:hover { background: #10292cb3; color: #e1ffff; }
 .astral-hero__replay:focus-visible { outline: 2px solid #91e9ec; outline-offset: 4px; }
 .home-continuum .astral-hero > .astral-hero__replay { width: 44px; margin: 0; }
+.home-continuum .astral-hero > .astral-hero__replay { top: calc(100svh - 64px); bottom: auto; }
 .astral-hero .hero-product-name, .astral-hero__replay { opacity: var(--hero-label-opacity, 1); }
 .astral-hero__replay:disabled { visibility: hidden; pointer-events: none; }
 

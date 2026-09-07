@@ -182,6 +182,7 @@ export function SiteMotionRuntime() {
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
       const viewportAnchor = window.scrollY;
+      const liveHeroBounds = heroCore ? document.querySelector('.home-neural-core')?.getBoundingClientRect() : null;
       let currentSection = Math.max(0, sectionAnchors.findLastIndex(top => top <= viewportAnchor));
       currentSection = Math.min(currentSection, Math.max(0, sections.length - 1));
       const sectionStart = sectionAnchors[currentSection] || 0;
@@ -219,23 +220,25 @@ export function SiteMotionRuntime() {
         const mobileReading = cosmicWidth < 801 && sections[shape]?.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
         // On phones the artwork occupies real space after the copy, rather
         // than being clipped offscreen or projected behind readable text.
-        const centerY = isHero ? heroCore!.y - window.scrollY : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
+        const centerY = isHero ? (liveHeroBounds ? liveHeroBounds.top + liveHeroBounds.height / 2 : heroCore!.y - window.scrollY) : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
         const unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
         // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
-        const depth = shape === 0 ? Math.min(1, sectionPosition * 3) : 1;
-        const pitch = depth * (.22 + Math.sin(time * .04) * .08) + inspection.x;
-        const yaw = depth * Math.sin(time * .03) * .22 + inspection.y;
+        const travel = reduced ? 0 : Math.min(1, Math.max(0, (viewportAnchor - (sectionAnchors[shape] || 0)) / cosmicHeight));
+        const depth = shape === 0 ? travel : 1;
+        const pitch = depth * (.22 + Math.sin(time * .04) * .08) + travel * 1.05 + inspection.x;
+        const yaw = depth * Math.sin(time * .03) * .22 + travel * .48 + inspection.y;
         const project = (x: number, y: number, z: number) => {
           const rx = x * Math.cos(yaw) + z * Math.sin(yaw);
           const rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
-          return { x:centerX+rx*unit, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit };
+          const perspective = 1 / (1 - (y * Math.sin(pitch) + rz * Math.cos(pitch)) * .65);
+          return { x:centerX+rx*unit*perspective, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit*perspective };
         };
         if (form === 'sigil') {
           const reach = (Math.floor(index / 10) * .61803398875) % 1;
           const turn = index % 10 * Math.PI / 5 + reach * 1.55 + time * .015;
           const width = .009 + Math.sin(reach * Math.PI) * .022;
           const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
-          return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.cos(particle.phase)*width*2);
+          return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2);
         }
         if (form === 'cursor') {
           const vertices = [[-.27,-.38],[-.23,.31],[-.07,.14],[.05,.39],[.18,.33],[.05,.09],[.29,.07],[-.27,-.38]];
