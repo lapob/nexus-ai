@@ -6,6 +6,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.RenderProcessGoneDetail
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -49,6 +50,7 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
     var web by remember { mutableStateOf<WebView?>(null) }
     var origin by remember { mutableStateOf(Rect.Zero) }
     var loaded by remember { mutableStateOf(false) }
+    var generation by remember { mutableIntStateOf(0) }
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -60,6 +62,7 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); web?.stopLoading(); web?.destroy(); web = null }
     }
+    key(generation) {
     AndroidView(modifier = modifier.onGloballyPositioned { origin = it.boundsInWindow() }, factory = { context ->
         WebView(context).apply {
             web = this
@@ -81,11 +84,20 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
                 override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?) =
                     WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
                 override fun onPageFinished(view: WebView?, url: String?) { loaded = true }
+                override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                    (view?.parent as? android.view.ViewGroup)?.removeView(view)
+                    view?.destroy()
+                    if (web === view) web = null
+                    loaded = false
+                    generation += 1
+                    return true
+                }
             }
             val html = context.assets.open("cosmic-visualizers.html").bufferedReader().use { it.readText() }
             loadDataWithBaseURL("https://visualizer.nexus.invalid/", html, "text/html", "UTF-8", null)
         }
     })
+    }
     val current by rememberUpdatedState(scene)
     val currentOrigin by rememberUpdatedState(origin)
     LaunchedEffect(loaded, density) {
