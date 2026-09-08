@@ -1,6 +1,8 @@
 /* One page-wide field. Semantic sections remain for navigation/accessibility,
    but never introduce a new background, frame or independent motion loop. */
 body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%) fixed; }
+.home-neural-core,.cosmic-stage,.astral-interlude,.product-image-open { user-select:none; -webkit-tap-highlight-color:transparent; }
+.product-image-open:focus:not(:focus-visible) { outline:none; }
 .product-image-open { display:block; width:100%; padding:0; border:0; background:none; cursor:zoom-in; border-radius:inherit; }
 .product-image-open:focus-visible { outline:2px solid #8de4df; outline-offset:6px; }
 .product-image-dialog { width:fit-content; max-width:96vw; max-height:94dvh; padding:48px 12px 12px; border:1px solid #6caaaa55; border-radius:14px; background:#071214; overflow:auto; }
