@@ -239,7 +239,7 @@ test("desktop navigation stays stable while scrolling and adapts to zoom", async
 test("product pages use real accessible app captures without hydration flashes", async ({ page }) => {
   for (const product of [
     { route: "/desktop", image: "desktop-home.png", alt: /schermata principale.*PC/i },
-    { route: "/android", image: "android-home.png", alt: /interfaccia reale.*Android/i },
+    { route: "/android", image: "android-home-astral.png", alt: /interfaccia reale.*Android/i },
   ]) {
     await page.goto(product.route, { waitUntil: "domcontentloaded" });
     const hero = page.locator(".product-hero");

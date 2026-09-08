@@ -198,7 +198,7 @@ export function ProductMockup({ type }: { type: "desktop" | "android" }) {
         label: "APP PC REALE",
       }
     : {
-        src: "/products/android-home.png",
+        src: "/products/android-home-astral.png",
         alt: "Interfaccia reale di NexusNXS per Android pronta per una nuova richiesta",
         label: "APP ANDROID REALE",
       };

@@ -8,7 +8,7 @@ import { AstralHero } from "./components/AstralHero";
 
 const apps = [
   { name: "Sul tuo computer.", platform: "NexusNXS per Windows", description: "Scrivi, analizza documenti e prepara codice. Con gli strumenti autorizzati, Nexus può aprire applicazioni e lavorare sui tuoi file. La Presence resta a portata di voce anche quando chiudi la finestra.", device: "desktop", image: "/products/desktop-conversation.png", alt: "Conversazione dimostrativa nell’app NexusNXS per PC", href: "/desktop" },
-  { name: "Dove nasce un’idea.", platform: "NexusNXS per Android", description: "Tocca il Core e parla, oppure scrivi e allega una foto o un documento. Imposta Nexus come assistente di sistema sui dispositivi compatibili e richiama la voce senza aprire l’intera app.", device: "android", image: "/products/android-home.png", alt: "Interfaccia reale di NexusNXS per Android", href: "/android" },
+  { name: "Dove nasce un’idea.", platform: "NexusNXS per Android", description: "Tocca il Core e parla, oppure scrivi e allega una foto o un documento. Imposta Nexus come assistente di sistema sui dispositivi compatibili e richiama la voce senza aprire l’intera app.", device: "android", image: "/products/android-home-astral.png", alt: "Interfaccia reale di NexusNXS per Android", href: "/android" },
 ];
 const presenceStates = [
   { Icon: Mic2, label: "Ascolta", detail: "La tua voce diventa una richiesta.", state: "listening" },

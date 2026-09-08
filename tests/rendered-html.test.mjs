@@ -72,7 +72,7 @@ test("selects a private client motion tier without rendering device telemetry", 
   assert.match(styles, /\.nxs-motion-ultra/);
   assert.match(packageJson, /verify:performance/);
   assert.match(budget, /JavaScript client/);
-  assert.match(budget, /products\/android-home\.png/);
+  assert.match(budget, /products\/android-home-astral\.png/);
 });
 
 test("animates initially visible product cards after the prepared frame", async () => {
