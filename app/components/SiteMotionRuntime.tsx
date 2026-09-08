@@ -87,7 +87,6 @@ export function SiteMotionRuntime() {
     const pointer = { x: 0, y: 0, vx: 0, vy: 0, time: 0, active: 0 };
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
     const quietPage = routeName !== "home";
-    const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
     const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section:not(.narrative-apps), main > .narrative-apps .app-card, main > footer"));
     let sectionAnchors: number[] = [];
     let mobileArtAnchors: number[] = [];
@@ -219,8 +218,6 @@ export function SiteMotionRuntime() {
       const topologyPoint = (particle: CosmicParticle, index: number, shape: number) => {
         const form = sections[shape]?.dataset.cosmicForm;
         if (form === 'ambient' || quietPage) return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
-        const kind = (((shape + routePhase) % 5) + 5) % 5;
-        const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
         const isHero = shape === 0 && heroCore !== null;
         const centerX = isHero ? heroCore!.x : cosmicWidth * responsiveLane(shape);
         const mobileReading = cosmicWidth < 801 && sections[shape]?.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
@@ -228,10 +225,9 @@ export function SiteMotionRuntime() {
         // than being clipped offscreen or projected behind readable text.
         const centerY = isHero ? (liveHeroBounds ? liveHeroBounds.top + liveHeroBounds.height / 2 : heroCore!.y - window.scrollY) : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
         let unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
-        if (form === 'cursor' && cosmicWidth < 801) unit *= 1.4;
         // Fit the projected artwork, not only its DOM anchor, inside safe edges.
         const horizontalSpace = Math.max(1, Math.min(centerX - 24, cosmicWidth - 24 - centerX));
-        unit = Math.min(unit, horizontalSpace / (form === 'cursor' ? .34 : .58), cosmicHeight * .42 / (form === 'cursor' ? .5 : .58));
+        unit = Math.min(unit, horizontalSpace / .58, cosmicHeight * .42 / .58);
         // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
         const travel = reduced ? 0 : Math.min(1, Math.max(0, (viewportAnchor - (sectionAnchors[shape] || 0)) / cosmicHeight));
         const depth = shape === 0 ? travel : 1;
@@ -243,19 +239,11 @@ export function SiteMotionRuntime() {
           const perspective = Math.min(1.32, 1 / (1 - (y * Math.sin(pitch) + rz * Math.cos(pitch)) * .45));
           return { x:centerX+rx*unit*perspective, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit*perspective };
         };
-        if (form === 'sigil') {
-          const reach = (Math.floor(index / 10) * .61803398875) % 1;
-          const turn = index % 10 * Math.PI / 5 + reach * 2.3 + time * .015;
-          const width = .003 + Math.sin(reach * Math.PI) * .009;
-          const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
-          return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2);
-        }
-        if (form === 'cursor') {
-          const vertices = [[-.27,-.38],[-.23,.31],[-.07,.14],[.05,.39],[.18,.33],[.05,.09],[.29,.07],[-.27,-.38]];
-          const along = index / particles.length * 7, edge = Math.floor(along), t = along - edge;
-          const a = vertices[edge], b = vertices[edge + 1];
-          const thickness = Math.sin(particle.phase) * .006;
-          return project(a[0]+(b[0]-a[0])*t+thickness,a[1]+(b[1]-a[1])*t+thickness,(index%2-.5)*.025);
+        if (form === 'reactor') {
+          const ring = index % 7;
+          const a = particle.phase + time * (ring % 2 ? .055 : -.04);
+          const radius = ring === 0 ? Math.sqrt(particle.depth) * .09 : .12 + ring * .045;
+          return project(Math.cos(a) * radius, Math.sin(a) * radius, Math.sin(particle.phase * 3) * .008);
         }
         if (form === 'saturn') {
           const a = index * 2.399963 + time * .015;
@@ -264,40 +252,14 @@ export function SiteMotionRuntime() {
           return project(Math.cos(a)*Math.sin(latitude)*r,Math.cos(latitude)*r,Math.sin(a)*Math.sin(latitude)*r);
         }
         if (form === 'neural') {
-          const ribbon = index % 3;
-          const a = ((Math.floor(index / 3) * .61803398875) % 1) * Math.PI * 2 + time * .1 + ribbon * 2.094;
-          const radius = .28 + .024 * Math.sin(a * 3 + time * .3 + ribbon);
-          const tube = .018 + particle.depth * .038;
-          const x = (radius + tube * Math.cos(particle.phase)) * Math.cos(a);
-          const y = (radius + tube * Math.cos(particle.phase)) * Math.sin(a);
-          const z = tube * Math.sin(particle.phase);
-          const tilt = (ribbon - 1) * 1.04 + .28;
-          const ry = y * Math.cos(tilt) - z * Math.sin(tilt);
-          const roll = ribbon * .85;
-          return project(x * Math.cos(roll) - ry * Math.sin(roll), x * Math.sin(roll) + ry * Math.cos(roll), y * Math.sin(tilt) + z * Math.cos(tilt));
+          const along = ((index + 1) * .61803398875) % 1;
+          const x = (along - .5) * .92;
+          const envelope = Math.sin(along * Math.PI);
+          const wave = Math.sin(along * Math.PI * 2.6 + time * .35) * .07;
+          const radius = .018 + envelope * .045 * particle.depth;
+          return project(x, wave + Math.cos(particle.phase) * radius, Math.sin(particle.phase) * radius);
         }
-        if (kind === 0) {
-          const radius = Math.min(cosmicWidth, cosmicHeight) * (.19 + (index % 3) * .052);
-          return { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
-        }
-        if (kind === 1) {
-          const side = index % 2 === 0 ? -1 : 1;
-          const lobeAngle = angle * 1.45;
-          const radius = Math.min(cosmicWidth, cosmicHeight) * (.11 + particle.depth * .12);
-          return { x: centerX + side * cosmicWidth * .105 + Math.cos(lobeAngle) * radius, y: centerY + Math.sin(lobeAngle) * radius * 1.18 };
-        }
-        if (kind === 2) {
-          const radius = Math.min(cosmicWidth, cosmicHeight) * (.035 + index / particles.length * .38);
-          return { x: centerX + Math.cos(angle * 2.35) * radius, y: centerY + Math.sin(angle * 2.35) * radius };
-        }
-        if (kind === 3) {
-          const column = index / Math.max(1, particles.length - 1);
-          return { x: cosmicWidth * (.12 + column * .76), y: centerY + Math.sin(column * Math.PI * 4 + routePhase) * cosmicHeight * .19 };
-        }
-        const orbit = index % 4;
-        const radiusX = cosmicWidth * (.12 + orbit * .055);
-        const radiusY = cosmicHeight * (.09 + orbit * .04);
-        return { x: centerX + Math.cos(angle + orbit * .42) * radiusX, y: centerY + Math.sin(angle + orbit * .42) * radiusY };
+        return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
       };
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";

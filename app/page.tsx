@@ -26,7 +26,7 @@ export default function Home() {
       <h2>Meno passaggi.<br /><em>Più possibilità.</em></h2>
       <p>Una domanda veloce, un testo da migliorare, un problema da risolvere. Parla con Nexus o scrivi: ricevi una risposta leggibile mentre prende forma.</p>
     </section>
-    <section className="astral-interlude" aria-label="Un cursore si compone nello spazio" data-cosmic-scene="center" data-cosmic-form="cursor">
+    <section className="astral-interlude" aria-label="Un Core ad anelli si compone nello spazio" data-cosmic-scene="center" data-cosmic-form="reactor">
       <div className="cosmic-stage" aria-hidden="true" />
     </section>
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
