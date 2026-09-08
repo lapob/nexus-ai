@@ -86,6 +86,7 @@ export function SiteMotionRuntime() {
     let cosmicHeight = 1;
     const pointer = { x: 0, y: 0, vx: 0, vy: 0, time: 0, active: 0 };
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
+    const quietPage = routeName !== "home";
     const routePhase = Array.from(routeName).reduce((total, character) => total + character.charCodeAt(0), 0) % 5;
     const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section:not(.narrative-apps), main > .narrative-apps .app-card, main > footer"));
     let sectionAnchors: number[] = [];
@@ -114,7 +115,7 @@ export function SiteMotionRuntime() {
       gradient.addColorStop(1,'rgba(120,225,245,0)');
       glowContext.fillStyle = gradient; glowContext.fillRect(0,0,32,32);
     }
-    const particleCount = tier === "ultra" ? 1800 : tier === "balanced" ? 1200 : 480;
+    const particleCount = tier === "ultra" ? 2400 : tier === "balanced" ? 1600 : 720;
     let activeParticles = particleCount;
     let seed = 0x4e5853;
     const random = () => {
@@ -136,6 +137,10 @@ export function SiteMotionRuntime() {
     const backgroundStars = Array.from({ length: tier === "lite" ? 180 : 520 }, () => ({
       x: random(), y: random(), depth: random(), phase: random() * Math.PI * 2,
     }));
+    // A visible subset of the persistent field becomes the shape; other stars stay.
+    backgroundStars.forEach((star, index) => {
+      if (index % 4 === 0) Object.assign(particles[index], { x: star.x, y: star.y, phase: star.phase });
+    });
 
     const resizeCosmicField = () => {
       if (!cosmicContext) return;
@@ -150,7 +155,7 @@ export function SiteMotionRuntime() {
         y: heroBounds.top + window.scrollY + heroBounds.height / 2, size: Math.min(heroBounds.width, heroBounds.height) } : null;
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
       mobileArtAnchors = sections.map((section, index) => sectionAnchors[index] + section.offsetHeight - cosmicHeight * .32);
-      readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.product-narrative h1,.product-narrative h2,.product-narrative p')).map(element=>{
+      readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.presence-grid,.inner-page h1,.inner-page h2,.inner-page p,.service-list,.legal-content,.legal-nav,.release-list,.security-summary')).map(element=>{
         const rect=element.getBoundingClientRect();
         return {left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY};
       });
@@ -201,7 +206,7 @@ export function SiteMotionRuntime() {
       const sectionMix = sectionMixRaw * sectionMixRaw * (3 - 2 * sectionMixRaw);
       const laneFor = (index: number) => {
         const scene = sections[index]?.dataset.cosmicScene;
-        return scene === "center" ? .5 : scene === "left" ? .13 : scene === "right" ? .87 : index % 2 === 0 ? .87 : .13;
+        return scene === "center" ? .5 : scene === "left" ? .24 : scene === "right" ? .76 : index % 2 === 0 ? .76 : .24;
       };
       const responsiveLane = (index: number) => {
         const lane = laneFor(index);
@@ -213,7 +218,7 @@ export function SiteMotionRuntime() {
       const topologyMix = topologyMixRaw * topologyMixRaw * (3 - 2 * topologyMixRaw);
       const topologyPoint = (particle: CosmicParticle, index: number, shape: number) => {
         const form = sections[shape]?.dataset.cosmicForm;
-        if (form === 'ambient') return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
+        if (form === 'ambient' || quietPage) return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
         const kind = (((shape + routePhase) % 5) + 5) % 5;
         const angle = (index / particles.length) * Math.PI * 2 + particle.phase * .18;
         const isHero = shape === 0 && heroCore !== null;
@@ -222,7 +227,11 @@ export function SiteMotionRuntime() {
         // On phones the artwork occupies real space after the copy, rather
         // than being clipped offscreen or projected behind readable text.
         const centerY = isHero ? (liveHeroBounds ? liveHeroBounds.top + liveHeroBounds.height / 2 : heroCore!.y - window.scrollY) : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
-        const unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
+        let unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
+        if (form === 'cursor' && cosmicWidth < 801) unit *= 1.4;
+        // Fit the projected artwork, not only its DOM anchor, inside safe edges.
+        const horizontalSpace = Math.max(1, Math.min(centerX - 24, cosmicWidth - 24 - centerX));
+        unit = Math.min(unit, horizontalSpace / (form === 'cursor' ? .34 : .58), cosmicHeight * .42 / (form === 'cursor' ? .5 : .58));
         // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
         const travel = reduced ? 0 : Math.min(1, Math.max(0, (viewportAnchor - (sectionAnchors[shape] || 0)) / cosmicHeight));
         const depth = shape === 0 ? travel : 1;
@@ -231,7 +240,7 @@ export function SiteMotionRuntime() {
         const project = (x: number, y: number, z: number) => {
           const rx = x * Math.cos(yaw) + z * Math.sin(yaw);
           const rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
-          const perspective = 1 / (1 - (y * Math.sin(pitch) + rz * Math.cos(pitch)) * .65);
+          const perspective = Math.min(1.32, 1 / (1 - (y * Math.sin(pitch) + rz * Math.cos(pitch)) * .45));
           return { x:centerX+rx*unit*perspective, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit*perspective };
         };
         if (form === 'sigil') {
@@ -293,25 +302,38 @@ export function SiteMotionRuntime() {
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
       const age = Math.max(0, now - fieldStarted) / 1000;
+      const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
+      const readingOpacity = (x: number, y: number) => {
+        let fade = 0;
+        for (const rect of visibleHalos) {
+          const dx = Math.max(rect.left-x,0,x-rect.right);
+          const dy = Math.max(rect.top-window.scrollY-y,0,y-(rect.bottom-window.scrollY));
+          const weight = Math.max(0,1-Math.hypot(dx,dy)/80);
+          fade = Math.max(fade,weight*weight*(3-2*weight));
+        }
+        return 1-.94*fade;
+      };
       cosmicContext.globalAlpha = reduced ? 1 : Math.min(1, age / .9);
-      for (const star of backgroundStars) {
+      for (const [index, star] of backgroundStars.entries()) {
+        // These grains are rendered below and travel into the current form.
+        if (!quietPage && index % 4 === 0) continue;
         const x = star.x * cosmicWidth + Math.sin(time * .09 + star.phase) * 5;
         const y = ((star.y * cosmicHeight - window.scrollY * (.012 + star.depth * .025)) % cosmicHeight + cosmicHeight) % cosmicHeight;
         const twinkle = .8 + Math.sin(time * .45 + star.phase) * .2;
-        cosmicContext.fillStyle = `rgba(185,225,236,${(.16 + star.depth * .42) * twinkle})`;
+        cosmicContext.fillStyle = `rgba(185,225,236,${(.16 + star.depth * .42) * twinkle * readingOpacity(x,y) * (quietPage ? .3 : 1)})`;
         cosmicContext.beginPath();
         cosmicContext.arc(x, y, .4 + star.depth ** 4 * 1.1, 0, Math.PI * 2);
         cosmicContext.fill();
       }
       let maxDrift = 0;
-      const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
       const footerIndex = sections.findIndex(section => section.tagName === 'FOOTER');
       const footerEntry = footerIndex < 0 ? 0 : Math.max(0, Math.min(1, (viewportAnchor - sectionAnchors[footerIndex] + cosmicHeight * .7) / (cosmicHeight * .7)));
       const footerQuiet = 1 - .88 * footerEntry * footerEntry * (3 - 2 * footerEntry);
       const points = particles.slice(0, activeParticles).map((particle, index) => {
-        const baseX = particle.x * cosmicWidth;
+        const sourceStar = !quietPage && index < backgroundStars.length && index % 4 === 0 ? backgroundStars[index] : undefined;
+        const baseX = particle.x * cosmicWidth + (sourceStar ? Math.sin(time * .09 + sourceStar.phase) * 5 : 0);
         // Never wrap a grain across the viewport while a form is dissolving.
-        const baseY = (particle.y + Math.sin(scroll * Math.PI) * particle.depth * .13) * cosmicHeight;
+        const baseY = sourceStar ? ((sourceStar.y * cosmicHeight - window.scrollY * (.012 + sourceStar.depth * .025)) % cosmicHeight + cosmicHeight) % cosmicHeight : (particle.y + Math.sin(scroll * Math.PI) * particle.depth * .13) * cosmicHeight;
         const first = topologyPoint(particle, index, topologyIndex);
         const second = topologyPoint(particle, index, topologyIndex + 1);
         const targetX = first.x + (second.x - first.x) * topologyMix;
@@ -319,7 +341,7 @@ export function SiteMotionRuntime() {
         // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
         // e si ricompone nella topologia seguente. Il campo resta continuo:
         // non ci sono cambi di scena o salti di corsia a meta scroll.
-        const transitionScatter = Math.sin(sectionMix * Math.PI) * .08;
+        const transitionScatter = Math.sin(sectionMix * Math.PI) * .025;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
         const arrivalTime = Math.min(1, Math.max(0, age - .4) / 5);
@@ -354,7 +376,7 @@ export function SiteMotionRuntime() {
           readingFade=Math.max(readingFade,weight*weight*(3-2*weight));
         }
 
-        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet;
+        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (quietPage ? .12 : 1);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
       cosmicContext.lineWidth = .55;
@@ -383,7 +405,7 @@ export function SiteMotionRuntime() {
           cosmicContext.restore();
         }
         cosmicContext.beginPath();
-        cosmicContext.fillStyle = `rgba(${point.depth > .96 ? '161,137,250' : point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
+        cosmicContext.fillStyle = `rgba(${point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
         cosmicContext.arc(point.x, point.y, .4 + point.depth ** 4 * .85, 0, Math.PI * 2);
         cosmicContext.fill();
       }

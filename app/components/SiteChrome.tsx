@@ -1,5 +1,6 @@
 "use client";
 import { DesktopHomePreview } from "./DesktopHomePreview";
+import { ProductImageZoom } from "./ProductImageZoom";
 
 import { useEffect, useRef, useState } from "react";
 import { Activity, ArrowDownToLine, ArrowUpRight, BrainCircuit, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
@@ -208,7 +209,7 @@ export function ProductMockup({ type }: { type: "desktop" | "android" }) {
     <div className="device-frame">
       <div className="device-bar" aria-hidden="true"><i /><i /><i /><span>NEXUSNXS / {type.toUpperCase()}</span></div>
       <div className="product-screen">
-        {type === "desktop" ? <DesktopHomePreview /> : <Image src={product.src} alt={product.alt} width={360} height={640} sizes="(max-width: 900px) 50vw, 245px" draggable={false} unoptimized />}
+        {type === "desktop" ? <DesktopHomePreview /> : <ProductImageZoom src={product.src} label={product.alt}><Image src={product.src} alt={product.alt} width={360} height={640} sizes="(max-width: 900px) 50vw, 245px" draggable={false} unoptimized /></ProductImageZoom>}
       </div>
       <figcaption><i aria-hidden="true" />{product.label}</figcaption>
     </div>

@@ -1,12 +1,32 @@
 /* One page-wide field. Semantic sections remain for navigation/accessibility,
    but never introduce a new background, frame or independent motion loop. */
 body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%) fixed; }
+.product-image-open { display:block; width:100%; padding:0; border:0; background:none; cursor:zoom-in; border-radius:inherit; }
+.product-image-open:focus-visible { outline:2px solid #8de4df; outline-offset:6px; }
+.product-image-dialog { width:fit-content; max-width:96vw; max-height:94dvh; padding:48px 12px 12px; border:1px solid #6caaaa55; border-radius:14px; background:#071214; overflow:auto; }
+.product-image-dialog::backdrop { background:#010607ed; }
+.product-image-dialog img { display:block; max-width:100%; max-height:calc(94dvh - 64px); width:auto; height:auto; object-fit:contain; }
+.product-image-close { position:absolute; right:10px; top:4px; min-height:40px; padding:0 14px; border:0; border-radius:8px; color:#e0eeee; background:#153034; cursor:pointer; }
 .hero > *:not(.scroll-cue) { width: min(100%, var(--content-max)); margin-inline: auto; }
 .astral-interlude, .astral-hero .home-neural-core { cursor: grab; }
 .nxs-field-dragging, .nxs-field-dragging * { cursor: grabbing !important; }
 .home-continuum, .inner-page { background: transparent; }
 .narrative-page .premium-footer { background: transparent; }
 .inner-page > section { background: transparent; border-color: transparent; box-shadow: none; }
+.legal-page, .legal-page .legal-hero, .legal-page .legal-layout { background: transparent; }
+html { scroll-padding-top: 96px; }
+[id] { scroll-margin-top: 96px; }
+.inner-page :is(p,.service-list small,.legal-nav a) { color: #a6bfc1; }
+.trust-seal { background: transparent !important; clip-path: none; border: 1px solid #80d8d52b; border-radius: 50%; box-shadow: inset 0 0 70px #59cbc80b; }
+.trust-seal::before, .trust-seal::after { display: none; }
+.trust-seal > span, .trust-seal small { color: #a6cbcd; }
+@media(max-width:959px) {
+  .nxs-floating-brand::before, .nxs-menu-toggle::before { content:''; position:absolute; inset:-14px; z-index:-1; pointer-events:none; border-radius:50%; background:radial-gradient(#020607e6 38%,#02060700 74%); }
+  .nxs-floating-brand, .nxs-menu-toggle { isolation:isolate; }
+  .premium-footer .footer-links { gap:28px; }
+  .premium-footer .footer-links > div { gap:8px; }
+  .premium-footer .footer-links a { min-height:44px; display:flex; align-items:center; }
+}
 .client-performance dl { background: transparent; }
 .client-performance dl > div { background: rgba(9, 20, 24, .3); }
 .inner-page .security-policies article,
