@@ -2,6 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { intelligenceSignals, resolveIntelligenceMode, shouldUseDeliberateThinking, shouldPreferFastExecutionModel, instantConversationalReply } = require('../src/application/intelligence-routing');
 
+test('modalita profonda e allegati non cancellano il rischio o la revisione', () => {
+  for (const options of [{ requestedMode: 'deep' }, { attachmentCount: 1 }]) {
+    const result = intelligenceSignals({ question: 'Analizza questa prompt injection e il rischio per una API key.', ...options });
+    assert.equal(result.mode, 'deep');
+    assert.equal(result.risk, 'critical');
+    assert.equal(result.needsReview, true);
+    assert.ok(result.reasons.includes('security-critical'));
+  }
+});
+
 test('espone confidenza, rischio e revisione selettiva', () => {
   const simple = intelligenceSignals({ question: 'Ciao' });
   assert.equal(simple.confidence, 0.99);

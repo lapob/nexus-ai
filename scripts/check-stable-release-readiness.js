@@ -59,8 +59,16 @@ function androidMatrixCheck(id, relativePath) {
     const metrics = Array.isArray(artifact.frameMetrics) ? artifact.frameMetrics : Array.isArray(artifact.FrameMetrics) ? artifact.FrameMetrics : [];
     return profiles.length >= policy.android.requiredProfiles
       && metrics.length >= policy.android.requiredProfiles
-      && metrics.every((entry) => Number(entry.TotalFrames ?? entry.totalFrames) >= policy.android.minimumFramesPerProfile
-        && Number(entry.JankyPercent ?? entry.jankyPercent) <= policy.android.maximumJankyPercent);
+      && new Set(profiles).size === profiles.length
+      && metrics.length === profiles.length
+      && new Set(metrics.map((entry) => entry.Profile ?? entry.profile)).size === profiles.length
+      && metrics.every((entry) => {
+        const frames = entry.TotalFrames ?? entry.totalFrames;
+        const jank = entry.JankyPercent ?? entry.jankyPercent;
+        return profiles.includes(entry.Profile ?? entry.profile)
+          && typeof frames === 'number' && Number.isFinite(frames) && frames >= policy.android.minimumFramesPerProfile
+          && typeof jank === 'number' && Number.isFinite(jank) && jank >= 0 && jank <= policy.android.maximumJankyPercent;
+      });
   }, `Matrice reale recente con ${policy.android.requiredProfiles} profili e jank <= ${policy.android.maximumJankyPercent}%`);
 }
 
@@ -101,6 +109,6 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { artifactCheck, buildStableReadinessReport, main };
+module.exports = { artifactCheck, androidMatrixCheck, buildStableReadinessReport, main };
 
 // #endregion

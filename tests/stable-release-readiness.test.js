@@ -8,10 +8,28 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { runBackupRecoveryDrill } = require('../scripts/run-backup-recovery-drill');
-const { artifactCheck } = require('../scripts/check-stable-release-readiness');
+const { artifactCheck, androidMatrixCheck } = require('../scripts/check-stable-release-readiness');
 
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
+
+test('la matrice rifiuta metriche mancanti negative o profili duplicati', () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-matrix-'));
+  const file = path.join(temporary, 'matrix.json');
+  const profiles = ['small', 'compact', 'font', 'landscape', 'tablet'];
+  const base = () => ({ CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
+    FrameMetrics: profiles.map(Profile => ({ Profile, TotalFrames: 100, JankyPercent: 2 })) });
+  const check = data => { fs.writeFileSync(file, JSON.stringify(data)); return androidMatrixCheck('device', file).status; };
+  try {
+    assert.equal(check(base()), 'pass');
+    for (const value of [null, '', -1, '2']) {
+      const data = base(); data.FrameMetrics[0].JankyPercent = value;
+      assert.equal(check(data), 'blocked');
+    }
+    const duplicate = base(); duplicate.FrameMetrics[1].Profile = 'small';
+    assert.equal(check(duplicate), 'blocked');
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+});
 
 test('Stable riconosce timestamp PowerShell e rifiuta prove scadute o future', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-stable-evidence-'));

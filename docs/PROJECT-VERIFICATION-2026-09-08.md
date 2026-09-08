@@ -11,6 +11,15 @@
 
 ## Sicurezza e attività non concluse
 
+### Secondo controllo dell'8 settembre
+
+- Corretto il routing: modalità approfondita e allegati conservano ora valutazione del rischio, incertezza e necessità di revisione; prima il ritorno anticipato le azzerava.
+- Rafforzato il gate Android Stable: metriche mancanti, stringhe numeriche, valori negativi e profili duplicati non possono certificare una matrice valida.
+- Verifiche superate: 840 test, 132 regressioni sicurezza, build/typecheck e `verify:experience` completo. Soak: 250 cicli, zero richieste orfane, crescita heap 0,07 MB. Gateway sotto carico: 7 richieste servite, 13 respinte per backpressure su 20, coda massima 5, p95 320 ms. Log locali `security-pass-*.log`.
+- Esaminato separatamente il candidato ufficiale Ollama 0.33.3: checksum degli archivi verificati e firma dell'eseguibile valida. Anche questo eseguibile produce 45 finding High/Critical (42 identificativi distinti), come 0.32.15. Lo scanner segnala assenza di simboli delle funzioni e confronto a granularità modulo: i finding richiedono valutazione, non costituiscono prova di 45 vulnerabilità sfruttabili. Il candidato non è stato promosso e il gate di distribuzione resta bloccante. Evidenze locali `ollama-review.json` e `ollama-candidate/security.log`.
+- Docker e SearXNG riavviati correttamente tramite `search:start`; voce di avvio e registrazione utente coerenti. Avvio al login ancora da verificare senza riavviare il PC.
+- Telefono non più raggiungibile al precedente indirizzo ADB: prove Android aggiuntive in attesa dell'indirizzo attuale.
+
 - Audit npm runtime: zero vulnerabilità segnalate. Questo risultato non comprende tutte le dipendenze native.
 - Il gate di distribuzione Ollama 0.32.15 blocca il runtime per 45 finding High/Critical a granularità modulo. Uso locale limitato a loopback; non dichiarare risolti i finding o distribuibile il runtime. Evidenza `current-ollama-distribution.log`.
 - Stable: 4 requisiti conformi, 11 bloccati; firme, origine aggiornamenti, backup esterno, continuità elettrica/rete, rotazione chiavi, upgrade su PC pulito, esercitazione incidenti e pentest indipendente restano mancanti.

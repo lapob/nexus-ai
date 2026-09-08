@@ -28,8 +28,11 @@ function requiresClarification(question) { return CLARIFICATION_REQUIRED_INTENT.
 
 function intelligenceSignals({ question, requestedMode = 'fast', attachmentCount = 0, historyCount = 0 } = {}) {
   const text = String(question || '').trim();
-  if (requestedMode === 'deep') return { mode: 'deep', score: 10, confidence: 1, risk: 'normal', needsReview: false, reasons: ['user-requested'] };
-  if (attachmentCount > 0) return { mode: 'deep', score: 10, confidence: 1, risk: 'normal', needsReview: false, reasons: ['attachments'] };
+  if (requestedMode === 'deep' || attachmentCount > 0) {
+    const assessed = intelligenceSignals({ question, requestedMode: 'fast', attachmentCount: 0, historyCount });
+    return { ...assessed, mode: 'deep', score: Math.max(10, assessed.score),
+      reasons: [...assessed.reasons, ...(requestedMode === 'deep' ? ['user-requested'] : []), ...(attachmentCount > 0 ? ['attachments'] : [])] };
+  }
   const clarificationRequired = requiresClarification(text);
   const shortSimpleEscalation = clarificationRequired
     || countMatches(text, SECURITY_CRITICAL_INTENT) > 0
