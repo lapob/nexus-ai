@@ -43,6 +43,20 @@ test('all desktop state energies are shared by the portable core', () => {
   f.renderer.dispose();
 });
 
+test('public viewport gathers the same grains and reduced motion assembles immediately', () => {
+  const f = fixture({ viewport: true });
+  f.frame(1);
+  assert.equal(f.canvas.dataset.assembled, 'false');
+  for (let i = 1; i < 260; i++) f.frame(1 + i * 1000 / 60);
+  assert.equal(f.canvas.dataset.assembled, 'true');
+  assert.ok(f.arcs() > 0);
+  f.renderer.dispose();
+  const reduced = fixture({ viewport: true, reduced: true });
+  reduced.frame(1);
+  assert.equal(reduced.canvas.dataset.assembled, 'true');
+  reduced.renderer.dispose();
+});
+
 test('web microphone level drives the core and resets when capture stops', () => {
   const web = fs.readFileSync(path.join(__dirname,'../src/remote/public-demo.js'),'utf8');
   const monitor = JSON.parse(web.match(/const voiceMonitor = (".*");/)[1]);

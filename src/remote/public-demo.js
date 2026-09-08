@@ -227,10 +227,13 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   const surface = document.querySelector('.shell');
   if (surface) { surface.style.position = 'relative'; surface.style.zIndex = '1'; }
   document.body.prepend(field);
+  // The drawing surface belongs to the page, while the accessible button stays in layout.
+  field.after(canvas);
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;background:transparent';
   const paint = field.getContext('2d');
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const stars = Array.from({ length: efficient ? 140 : 360 }, (_, i) => ({
-    x: ((i + 1) * .61803398875) % 1, y: ((i + 1) * .41421356237) % 1,
+    x: ((i + 901) * .61803398875) % 1, y: ((i + 901) * .41421356237) % 1,
     radius: .55 + (i % 7) * .13, phase: i * 2.399963
   }));
   let fieldFrame = 0, width = 0, height = 0, elapsed = 0, previous = 0, lastPaint = 0;
@@ -241,22 +244,16 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
     if (paint) {
       paint.clearRect(0, 0, width, height);
-      const progress = motion.matches ? 1 : Math.min(1, elapsed / 2.4);
-      const bounds = progress < 1 ? canvas.getBoundingClientRect() : null;
-      const cx = bounds ? bounds.left + bounds.width / 2 : 0, cy = bounds ? bounds.top + bounds.height / 2 : 0;
-      const gather = 1 - Math.pow(1 - progress, 3);
       for (let i = 0; i < stars.length; i++) {
-        const star = stars[i], incoming = i % 4 === 0;
-        if (incoming && progress === 1) continue;
+        const star = stars[i];
         let x = star.x * width, y = star.y * height;
-        if (incoming) { const radius = bounds.width * .24; x += (cx + Math.cos(star.phase) * radius - x) * gather; y += (cy + Math.sin(star.phase) * radius - y) * gather; }
-        else if (!motion.matches) { x += Math.sin(elapsed * .07 + star.phase) * 5; y += Math.cos(elapsed * .06 + star.phase) * 4; }
+        if (!motion.matches) { x += Math.sin(elapsed * .07 + star.phase) * 5; y += Math.cos(elapsed * .06 + star.phase) * 4; }
         const side = Math.min(1, Math.abs(x - width / 2) / Math.min(460, width * .48));
         const readingFade = .04 + .5 * side * side;
-        paint.fillStyle = `rgba(166,224,234,${incoming ? (1-progress)*.65 : readingFade})`;
+        paint.fillStyle = `rgba(166,224,234,${readingFade})`;
         paint.beginPath(); paint.arc(x,y,star.radius,0,Math.PI*2); paint.fill();
       }
-      field.dataset.assembled = String(progress === 1);
+      field.dataset.assembled = canvas.dataset.assembled || 'false';
     }
     if (!document.hidden && !motion.matches) fieldFrame = requestAnimationFrame(drawField);
   };
@@ -266,11 +263,11 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   addEventListener('resize', onFieldResize, { passive: true });
   document.addEventListener('visibilitychange', resumeField);
   motion.addEventListener('change', resumeField);
-  const renderer = createAstralCore(canvas, { host: button, efficient, getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) });
+  const renderer = createAstralCore(canvas, { host: button, viewport: true, efficient, getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) });
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
-  globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => Number(canvas.dataset.astralParticles || 0) };
+  globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => Number(canvas.dataset.astralParticles || 0), renderer: () => renderer.getMetrics() };
   addEventListener('pagehide', () => { observer.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); }, { once: true });
   readExchange();
 }

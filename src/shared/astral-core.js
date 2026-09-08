@@ -37,14 +37,24 @@ function createAstralCore(canvas, options = {}) {
   let px = 0, py = 0, touched = false, pointer = 0, reducedPainted = false, draws = 0, drawMs = 0;
   let pointerVX = 0, pointerVY = 0, pointerTime = 0, maxDrift = 0;
   let budget = 360, quality = 1, strainedSeconds = 0, healthySeconds = 0;
+  // Opt-in public-web stage; existing desktop/Presence callers keep local geometry.
+  let offsetX = 0, offsetY = 0, ratio = 1;
+  const viewport = options.viewport === true;
+  const updateOrigin = () => {
+    if (!viewport) return;
+    const rect = host.getBoundingClientRect();
+    offsetX = rect.left - rect.width * .15; offsetY = rect.top - rect.height * .15;
+  };
   const rotation = [0, 0], rotationVelocity = [0, 0], rotationTarget = [0, 0];
   let dragId = null, dragX = 0, dragY = 0, dragging = false, suppressClickUntil = 0;
   const reduced = () => media.matches || (options.getReduced?.() ?? options.reduced) === true;
   const setState = value => { const next = Object.hasOwn(states, value) ? value : 'idle'; if (next !== state) { state = next; reducedPainted = false; } };
   const resize = () => {
-    const rect = canvas.getBoundingClientRect(); width = Math.max(1, rect.width); height = Math.max(1, rect.height); size = Math.min(width, height);
-    const ratio = Math.min(devicePixelRatio || 1, options.efficient ? 1 : 1.65);
-    canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const rect = (viewport ? host : canvas).getBoundingClientRect(); width = Math.max(1, rect.width * (viewport ? 1.3 : 1)); height = Math.max(1, rect.height * (viewport ? 1.3 : 1)); size = Math.min(width, height);
+    ratio = Math.min(devicePixelRatio || 1, options.efficient ? 1 : 1.65);
+    const backing = canvas.getBoundingClientRect();
+    canvas.width = Math.round((viewport ? backing.width : width) * ratio); canvas.height = Math.round((viewport ? backing.height : height) * ratio); context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    updateOrigin();
     budget = Math.min(capacity, options.efficient ? 210 : size < 200 ? 300 : size < 420 ? 540 : 840);
     count = Math.min(count === 360 && draws === 0 ? budget : count, budget);
     count -= count % 3; reducedPainted = false;
@@ -71,7 +81,7 @@ function createAstralCore(canvas, options = {}) {
     const requestedEnergy = Number(options.getEnergy?.() || 0);
     const audioTarget = (state === 'listening' || state === 'speaking') && Number.isFinite(requestedEnergy) ? Math.min(1, Math.max(0, requestedEnergy)) : 0;
     audio += (audioTarget - audio) * (1 - Math.exp(-dt * 12));
-    if (!reduced()) { phase += dt * (.55 + energy * .35) * motion.ambientScale; emergence = Math.min(1, emergence + dt / 2.4); }
+    if (!reduced()) { phase += dt * (.55 + energy * .35) * motion.ambientScale; emergence = Math.min(1, emergence + dt / (viewport ? 3.8 : 2.4)); }
     else { emergence = 1; energy = target; }
     pointer += ((touched && !reduced() ? 1 : 0) - pointer) * (1 - Math.exp(-dt * (touched ? 7 : motion.pointerRelease)));
     if (now - pointerTime > 80) { pointerVX *= Math.exp(-dt * 5); pointerVY *= Math.exp(-dt * 5); }
@@ -84,10 +94,17 @@ function createAstralCore(canvas, options = {}) {
       rotationVelocity[axis] = (rotationVelocity[axis] - omega * acceleration * dt) * decay;
     }
     const reveal = 1 - Math.pow(1 - emergence, 3), cx = width / 2, cy = height / 2, unit = size * 1.15;
-    context.clearRect(0, 0, width, height);
+    updateOrigin();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, canvas.width / ratio, canvas.height / ratio);
+    context.setTransform(ratio, 0, 0, ratio, offsetX * ratio, offsetY * ratio);
     // Fade individual grains before they reach the backing-store edge. A CSS
     // mask alone exposes the canvas silhouette during the scattered entrance.
     const edgeOpacity = (xx, yy) => {
+      if (viewport) {
+        const edge = Math.max(0, Math.min(1, Math.min(xx + offsetX, yy + offsetY, canvas.width / ratio - xx - offsetX, canvas.height / ratio - yy - offsetY) / 40));
+        return edge * edge * (3 - 2 * edge);
+      }
       const edge = Math.max(0, Math.min(1, Math.min(xx, yy, width - xx, height - yy) / (size * .14)));
       return edge * edge * (3 - 2 * edge);
     };
@@ -116,9 +133,20 @@ function createAstralCore(canvas, options = {}) {
       const inspectY = yy * Math.cos(rotation[0]) - zz * Math.sin(rotation[0]);
       zz = yy * Math.sin(rotation[0]) + zz * Math.cos(rotation[0]); yy = inspectY;
       const perspective = 1 / (1 - zz * .75);
-      const scatter = (1 - reveal) * (.28 + seed[i] * .28);
-      const tx = cx + (xx * perspective * scale + Math.cos(phi) * scatter) * unit;
-      const ty = cy + (yy * perspective * scale + Math.sin(phi) * scatter) * unit;
+      const scatter = viewport ? 0 : (1 - reveal) * (.28 + seed[i] * .28);
+      let tx = cx + (xx * perspective * scale + Math.cos(phi) * scatter) * unit;
+      let ty = cy + (yy * perspective * scale + Math.sin(phi) * scatter) * unit;
+      if (viewport && emergence < 1) {
+        // These same grains travel all the way into the ribbons; no disappearing ring.
+        const originX = ((i + 1) * .61803398875 % 1) * canvas.width / ratio - offsetX;
+        const originY = ((i + 1) * .41421356237 % 1) * canvas.height / ratio - offsetY;
+        const delay = seed[i] * .18;
+        const progress = Math.max(0, Math.min(1, (emergence - delay) / (1 - delay)));
+        const arrival = progress * progress * (3 - 2 * progress);
+        const curl = Math.sin(progress * Math.PI) * size * .12;
+        tx = originX + (tx - originX) * arrival + Math.cos(phi) * curl;
+        ty = originY + (ty - originY) * arrival + Math.sin(phi) * curl;
+      }
       const dx = tx - px, dy = ty - py, distance = Math.max(1, Math.hypot(dx, dy));
       const structural = i % 9 < 3;
       const influence = Math.max(0, 1 - distance / (size * .38)) * pointer * (structural ? .22 : 1);
@@ -150,7 +178,7 @@ function createAstralCore(canvas, options = {}) {
       const depth = Math.min(1, Math.max(.15, .55 + z[i] * 1.3));
       const colorIndex = i % 19 === 0 ? 2 : i % 3 === 0 ? 1 : 0;
       const dot = Math.max(.7, size * (.0019 + seed[i] * .0015)) * (.65 + depth * .7);
-      context.globalAlpha = Math.min(1, reveal * (.55 + depth * .42 + audio * .28) * (1 - offline * .5)) * edgeOpacity(x[i], y[i]);
+      context.globalAlpha = Math.min(1, (viewport ? .35 + reveal * .65 : reveal) * (.55 + depth * .42 + audio * .28) * (1 - offline * .5)) * edgeOpacity(x[i], y[i]);
       if (options.contrastUnderlay) {
         context.globalCompositeOperation = 'source-over';
         context.fillStyle = 'rgba(2,9,14,.7)'; context.beginPath(); context.arc(x[i], y[i], dot + Math.max(.7, size * .002), 0, Math.PI * 2); context.fill();
@@ -165,6 +193,7 @@ function createAstralCore(canvas, options = {}) {
     context.fillStyle = '#e9ffff'; context.beginPath(); context.arc(cx, cy, Math.max(1, size * .006), 0, Math.PI * 2); context.fill();
     context.globalAlpha = 1; context.globalCompositeOperation = 'source-over'; reducedPainted = reduced();
     canvas.dataset.astralState = state; canvas.dataset.astralParticles = String(count);
+    if (viewport) canvas.dataset.assembled = String(emergence === 1);
     canvas.dataset.astralRotation = rotation.map(value => value.toFixed(3)).join(',');
     draws++; drawMs += (performance.now() - paintStarted - drawMs) * .1;
   };
@@ -173,7 +202,7 @@ function createAstralCore(canvas, options = {}) {
   const resume = () => { cancelAnimationFrame(frame); last = 0; reducedPainted = false; if (visible && !document.hidden && !disposed) frame = requestAnimationFrame(draw); };
   const move = event => {
     const rect = canvas.getBoundingClientRect(), now = performance.now();
-    const nx = event.clientX - rect.left, ny = event.clientY - rect.top;
+    const nx = event.clientX - (viewport ? offsetX : rect.left), ny = event.clientY - (viewport ? offsetY : rect.top);
     const seconds = Math.max(.008, (now - pointerTime) / 1000);
     const limit = size * 1.5;
     pointerVX = touched ? Math.max(-limit, Math.min(limit, (nx - px) / seconds)) : 0;
@@ -202,13 +231,14 @@ function createAstralCore(canvas, options = {}) {
   const click = event => { if (performance.now() < suppressClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); } };
   const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; resume(); });
   const resizeObserver = new ResizeObserver(() => { resize(); resume(); });
-  resizeObserver.observe(canvas); observer.observe(canvas);
+  resizeObserver.observe(canvas); if (viewport) resizeObserver.observe(host); observer.observe(canvas);
+  if (viewport) document.defaultView?.addEventListener('scroll', resume, { passive: true });
   host.addEventListener('pointermove', move, {passive:true}); host.addEventListener('pointerleave', leave); host.addEventListener('pointerup', leave); host.addEventListener('pointercancel', leave);
   host.addEventListener('pointerdown', down); host.addEventListener('click', click, true);
   document.defaultView?.addEventListener('blur', leave);
   host.addEventListener('lostpointercapture', leave);
   document.addEventListener('visibilitychange', resume); media.addEventListener('change', resume); resize(); resume();
-  return { setState, getMetrics: () => ({ state, phase, energy, audio, quality, particles: count, draws, drawMs, maxDrift }), dispose() { leave(); document.defaultView?.removeEventListener('blur', leave); host.removeEventListener('lostpointercapture', leave); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); resizeObserver.disconnect(); host.removeEventListener('pointermove', move); host.removeEventListener('pointerdown', down); host.removeEventListener('click', click, true); host.removeEventListener('pointerleave', leave); host.removeEventListener('pointerup', leave); host.removeEventListener('pointercancel', leave); document.removeEventListener('visibilitychange', resume); media.removeEventListener('change', resume); } };
+  return { setState, getMetrics: () => ({ state, phase, energy, audio, quality, particles: count, draws, drawMs, maxDrift }), dispose() { leave(); if (viewport) document.defaultView?.removeEventListener('scroll', resume); document.defaultView?.removeEventListener('blur', leave); host.removeEventListener('lostpointercapture', leave); disposed = true; cancelAnimationFrame(frame); observer.disconnect(); resizeObserver.disconnect(); host.removeEventListener('pointermove', move); host.removeEventListener('pointerdown', down); host.removeEventListener('click', click, true); host.removeEventListener('pointerleave', leave); host.removeEventListener('pointerup', leave); host.removeEventListener('pointercancel', leave); document.removeEventListener('visibilitychange', resume); media.removeEventListener('change', resume); } };
   // #endregion
 }
 
