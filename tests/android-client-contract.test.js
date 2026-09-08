@@ -172,7 +172,9 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.doesNotMatch(instantSurface.split('/** Superficie traslucida')[0], /composerBringIntoView|AnimatedContent\(textMode/, 'il composer non deve duplicarsi o riposizionarsi durante il movimento IME');
   assert.match(instantSurface, /bottom = 10\.dp/, 'il composer mantiene un margine stabile sopra la tastiera');
   assert.match(instantSurface, /centeredExchange/);
-  assert.match(instantSurface, /contentAlignment = Alignment\.Center/);
+  assert.match(instantSurface, /BiasAlignment\(0f, alignmentBias\)/);
+  assert.match(instantSurface, /targetValue = if \(centeredExchange\) 0f else -1f/);
+  assert.doesNotMatch(instantSurface, /targetState = centeredExchange/, 'la fine streaming non deve ricreare il Markdown');
   assert.match(instantSurface, /InstantWrittenExchange/);
   assert.match(instantSurface, /shape = RoundedCornerShape\(18\.dp\)/, 'prompt e stato devono condividere superfici arrotondate coerenti');
   assert.match(instantSurface, /var typedSession by rememberSaveable/);

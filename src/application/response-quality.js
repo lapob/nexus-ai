@@ -4,6 +4,7 @@
  */
 const { requiresClarification } = require('./intelligence-routing');
 const { arithmeticAnswerValid, simpleArithmeticSolution } = require('./simple-arithmetic');
+const NUMERIC_ONLY_REQUEST = /\b(?:rispondi|restituisci|scrivi|reply|return|answer)\s+(?:soltanto|solo|esclusivamente|only)\s+(?:(?:con|with)\s+)?(?:(?:il|un|the|a)\s+)?(?:totale|numero|valore numerico|total|number|numeric result)\b/iu;
 
 const NUMBER_WORDS = Object.freeze({
   zero: 0, uno: 1, una: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10,
@@ -67,6 +68,7 @@ function hasStrictOutputConstraint(question = '') {
   const text = String(question || '');
   return Boolean(
     wordCountConstraint(text)
+    || NUMERIC_ONLY_REQUEST.test(text)
     || /\b(?:solo|soltanto)\s+(?:json|un json)|json valido\b/iu.test(text)
     || /\b(?:una|un')\s+(?:sola\s+)?frase\b|\bin one sentence\b/iu.test(text)
     || /\b(?:rispondi|restituisci|scrivi)\s+(?:soltanto|solo|esclusivamente)\s+(?:con\s+)?(?:l['’])?output\b/iu.test(text)
@@ -80,6 +82,7 @@ function responseRequirements(question = '') {
   const requirements = [];
   const arithmetic = simpleArithmeticSolution(text);
   const words = wordCountConstraint(text);
+  if (NUMERIC_ONLY_REQUEST.test(text)) requirements.push('Restituisci soltanto il valore numerico finale con l’unità pertinente: niente formula, passaggi, prefissi o spiegazioni.');
   if (arithmetic) requirements.push(`Usa il risultato aritmetico verificato: ${arithmetic.normalizedExpression} = ${arithmetic.formatted}.`);
   if (/\b(?:solo|soltanto)\s+(?:json|un json)|json valido\b/iu.test(text)) requirements.push('Restituisci JSON valido senza testo esterno.');
   if (words) {
@@ -125,6 +128,7 @@ function validateResponse(question = '', answer = '', security = {}) {
   const output = String(answer || '').trim();
   const issues = [];
   if (!output) return { valid: false, issues: ['empty-response'] };
+  if (NUMERIC_ONLY_REQUEST.test(prompt) && !/^[+−-]?(?:\d+(?:[.,]\d+)?)(?:[eE][+−-]?\d+)?(?:\s?(?:%|€|\$|£|[\p{L}µ°]{1,10}(?:[²³]|\/[\p{L}µ]{1,6})?))?\.?$/u.test(output)) issues.push('numeric-only-format');
 
   if (arithmeticAnswerValid(prompt, output) === false) issues.push('arithmetic-mismatch');
 

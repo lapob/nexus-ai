@@ -2721,8 +2721,8 @@ private fun JSONArray?.toTurns() = buildList {
             keyboard?.show()
         }
     }
-    LaunchedEffect(latestAnswer, state.streaming) {
-        if (latestAnswer.isNotBlank() && !scrollState.isScrollInProgress) scrollState.scrollTo(scrollState.maxValue)
+    LaunchedEffect(latestAnswer, state.streaming, state.busy) {
+        if (state.busy && latestAnswer.isNotBlank() && !scrollState.isScrollInProgress) scrollState.scrollTo(scrollState.maxValue)
     }
     BackHandler(enabled = voiceMode || textMode || typedSession) {
         if (voiceMode) voiceMode = false
@@ -2766,39 +2766,34 @@ private fun JSONArray?.toTurns() = buildList {
                             modifier = Modifier.weight(1f).fillMaxWidth().conversationGlass(instantImeVisible, metrics.adaptiveReducedMotion),
                             label = "instantExchange"
                         ) { generation ->
-                            key(generation) { AnimatedContent(
-                                targetState = centeredExchange,
-                                transitionSpec = { nexusTransform(reduceMotion) },
-                                modifier = Modifier.fillMaxSize(),
-                                label = "instantExchangeAlignment"
-                            ) { centered ->
-                                if (centered) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    InstantWrittenExchange(
-                                        latestPrompt = latestPrompt,
-                                        latestAnswer = latestAnswer,
-                                        error = state.error,
-                                        centered = true,
-                                        busy = state.busy,
-                                        activity = state.activity,
-                                        reduceMotion = reduceMotion,
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 24.dp)
-                                    )
-                                } else Column(
-                                    Modifier.fillMaxSize().verticalScroll(scrollState).padding(top = 10.dp, bottom = 18.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    InstantWrittenExchange(
-                                        latestPrompt = latestPrompt,
-                                        latestAnswer = latestAnswer,
-                                        error = state.error,
-                                        centered = false,
-                                        busy = state.busy,
-                                        activity = state.activity,
-                                        reduceMotion = reduceMotion,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                            key(generation) {
+                                val alignmentBias by animateFloatAsState(
+                                    targetValue = if (centeredExchange) 0f else -1f,
+                                    animationSpec = tween(if (reduceMotion) 0 else NexusFlow.ENTER, easing = NexusFlow.standard),
+                                    label = "instantExchangePosition"
+                                )
+                                // Keep the same Markdown tree and width when streaming ends.
+                                // Only its placement changes; long answers remain scrollable.
+                                BoxWithConstraints(Modifier.fillMaxSize()) {
+                                    val viewportHeight = maxHeight
+                                    Box(
+                                        Modifier.fillMaxWidth().verticalScroll(scrollState).heightIn(min = viewportHeight)
+                                            .padding(horizontal = 8.dp, vertical = 24.dp),
+                                        contentAlignment = androidx.compose.ui.BiasAlignment(0f, alignmentBias)
+                                    ) {
+                                        InstantWrittenExchange(
+                                            latestPrompt = latestPrompt,
+                                            latestAnswer = latestAnswer,
+                                            error = state.error,
+                                            centered = centeredExchange,
+                                            busy = state.busy,
+                                            activity = state.activity,
+                                            reduceMotion = reduceMotion,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
-                            } }
+                            }
                         }
                         AnimatedVisibility(state.attachment != null, enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
                             AttachmentPreview(state.composerState(), { dispatch("attach", "") })
@@ -3193,10 +3188,10 @@ private fun JSONArray?.toTurns() = buildList {
             InstantReasoningPhase(
                 label = activity.ifBlank { nexusCopy("Comprendo la richiesta…", "Understanding your request…") },
                 reduceMotion = reduceMotion,
-                modifier = Modifier.fillMaxWidth(if (centered) .92f else 1f).padding(top = 18.dp)
+                modifier = Modifier.fillMaxWidth(.92f).padding(top = 18.dp)
             )
         }
-        if (latestAnswer.isNotBlank()) Box(Modifier.fillMaxWidth(if (centered) .92f else 1f).widthIn(max = 680.dp).padding(top = if (latestPrompt.isBlank()) 0.dp else 18.dp)) {
+        if (latestAnswer.isNotBlank()) Box(Modifier.fillMaxWidth(.92f).widthIn(max = 680.dp).padding(top = if (latestPrompt.isBlank()) 0.dp else 18.dp)) {
             MarkdownMessage(streamSafeMarkdown(latestAnswer), streamingTailChars = if (busy) 48 else 0, streamingAccent = if (busy) .65f else 0f)
         }
         if (latestPrompt.isBlank() && latestAnswer.isBlank()) Text(
@@ -3211,7 +3206,7 @@ private fun JSONArray?.toTurns() = buildList {
             color = Color(0xFFFF9A91),
             style = MaterialTheme.typography.bodySmall,
             textAlign = if (centered) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
-            modifier = Modifier.fillMaxWidth(if (centered) .92f else 1f).padding(top = 14.dp)
+            modifier = Modifier.fillMaxWidth(.92f).padding(top = 14.dp)
         ) }
     }
 }

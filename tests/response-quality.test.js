@@ -5,6 +5,18 @@ const {
   wordCountConstraint, strictWordCountSchema, strictWordCountAnswer, hasStrictOutputConstraint
 } = require('../src/application/response-quality');
 
+test('il totale numerico richiesto esclude formule e spiegazioni', () => {
+  const question = 'Quattro file da 12 MB ridotti di un quarto. Rispondi solo con il totale.';
+  assert.equal(hasStrictOutputConstraint(question), true);
+  assert.match(responseQualityDirective(question), /niente formula/);
+  assert.equal(validateResponse(question, '36 MB').valid, true);
+  assert.ok(validateResponse(question, '36 MB perché ogni file si riduce.').issues.includes('numeric-only-format'));
+  assert.equal(validateResponse(question, '36.5 MB').valid, true);
+  assert.ok(validateResponse(question, '12 MB × 4 × ¾ = 36 MB').issues.includes('numeric-only-format'));
+  assert.ok(validateResponse('Return only the total.', 'The total is 36 MB.').issues.includes('numeric-only-format'));
+  assert.equal(validateResponse('Spiega come calcolare il totale.', '12 × 3 = 36').valid, true);
+});
+
 test('la revisione è selettiva per rischio o non conformità', () => {
   assert.equal(shouldReviewResponse({ signals: { risk: 'normal' }, validation: { valid: true }, sourceCount: 1 }), false);
   assert.equal(shouldReviewResponse({ signals: { risk: 'critical' }, validation: { valid: true }, sourceCount: 2 }), true);

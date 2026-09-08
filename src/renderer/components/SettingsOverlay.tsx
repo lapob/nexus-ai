@@ -1126,9 +1126,9 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     </div>
                   </section>}
                   {memories.length > 0 && <div className="memory-list settings-wide">
-                    <div className="memory-list-heading"><span><strong>Ciò che NexusNXS ricorda</strong><small>Puoi rimuovere un singolo elemento senza cancellare tutto.</small></span></div>
-                    {memories.slice(0, 8).map((memory) => <article key={memory.id}>
-                      <span><small>{memory.type === 'preference' ? 'Preferenza' : memory.type === 'project' ? 'Progetto' : memory.type === 'procedural' ? 'Procedura' : memory.type === 'episodic' ? 'Evento' : 'Informazione'}</small><strong>{memory.content}</strong></span>
+                    <div className="memory-list-heading"><span><strong>Ciò che NexusNXS ricorda</strong><small>Puoi rimuovere un elemento o scrivere in chat: Correggi il ricordo #numero: nuovo contenuto.</small></span></div>
+                    {memories.map((memory) => <article key={memory.id}>
+                      <span><small>#{memory.id} · {memory.type === 'preference' ? 'Preferenza' : memory.type === 'project' ? 'Progetto' : memory.type === 'procedural' ? 'Procedura' : memory.type === 'episodic' ? 'Evento' : 'Informazione'}</small><strong>{memory.content}</strong></span>
                       <button type="button" className="settings-quiet-action" disabled={busy} onClick={async () => {
                         setBusy(true);
                         try {

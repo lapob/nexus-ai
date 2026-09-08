@@ -5,6 +5,21 @@ const path = require('node:path');
 const test = require('node:test');
 const { PersonalMemoryStore, explicitMemoryInstruction } = require('../src/infrastructure/storage/personal-memory-store');
 
+test('correzione esplicita aggiorna solo il ricordo attivo indicato', () => {
+  assert.deepEqual(explicitMemoryInstruction('Correggi il ricordo #12: Il progetto usa Rust'), { action: 'update', id: 12, content: 'Il progetto usa Rust' });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-edit-'));
+  const store = new PersonalMemoryStore({ filePath: path.join(directory, 'memory.sqlite3') });
+  try {
+    const original = store.remember({ content: 'Il progetto Aurora usa Java' });
+    store.updateById(original.id, 'Il progetto Aurora usa Rust');
+    assert.equal(store.list()[0].content, 'Il progetto Aurora usa Rust');
+    assert.equal(store.list()[0].id, original.id);
+    store.forgetById(original.id);
+    assert.throws(() => store.updateById(original.id, 'Il progetto usa Go'), /non disponibile/);
+    assert.equal(store.list().length, 0);
+  } finally { store.close(); fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('riconosce solo richieste esplicite di memoria', () => {
   assert.deepEqual(explicitMemoryInstruction('Ricorda che preferisco risposte concise'), {
     action: 'remember', content: 'preferisco risposte concise', type: 'preference'

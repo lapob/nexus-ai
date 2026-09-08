@@ -2,6 +2,19 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { compactConversationHistory } = require('../src/application/context-compaction');
 
+test('mantiene obiettivo iniziale e rettifica recente nelle conversazioni lunghe', () => {
+  const history = [
+    { role: 'user', content: 'Obiettivo: documentare il progetto Atlas.' },
+    ...Array.from({ length: 60 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `Turno ordinario ${i}.` })),
+    { role: 'user', content: 'Correzione: escludi Windows e considera Linux.' },
+    ...Array.from({ length: 8 }, () => ({ role: 'assistant', content: 'Ulteriori dettagli.' }))
+  ];
+  const summary = compactConversationHistory(history)[0].content;
+  assert.match(summary, /documentare il progetto Atlas/);
+  assert.match(summary, /escludi Windows e considera Linux/);
+  assert.match(summary, /non può prevalere sul messaggio corrente/);
+});
+
 test('compatta i turni vecchi e conserva integralmente quelli recenti', () => {
   const history = Array.from({ length: 14 }, (_, index) => ({ role: index % 2 ? 'assistant' : 'user', content: `turno ${index} ${'x'.repeat(500)}` }));
   const compacted = compactConversationHistory(history, { tier: 'performance' });

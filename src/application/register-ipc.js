@@ -764,6 +764,9 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
   const applyExplicitMemoryInstruction = (question, requestId) => {
     const instruction = explicitMemoryInstruction(question);
     if (!instruction || !memoryStore) return null;
+    if (instruction.action === 'update') {
+      return { action: 'remember', count: memoryStore.updateById(instruction.id, instruction.content) };
+    }
     if (instruction.action === 'remember') {
       const memory = memoryStore.remember({ content: instruction.content, type: instruction.type, sourceId: requestId });
       logger.info('Ricordo esplicito salvato.', { requestId, type: memory.type });

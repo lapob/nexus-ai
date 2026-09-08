@@ -44,6 +44,8 @@ function classifyMemory(content) {
 
 function explicitMemoryInstruction(question) {
   const text = normalizeText(question, 12_000);
+  const correction = text.match(/^(?:correggi il ricordo|update memory)\s+#?(\d+)\s*:\s*(.+)$/iu);
+  if (correction) return { action: 'update', id: Number(correction[1]), content: normalizeText(correction[2]) };
   const remember = text.match(/^\s*(?:nexus[,;:]?\s*)?(?:ricorda(?:ti)?\s+che|memorizza(?:\s+che)?|remember\s+that)\s+(.+)$/iu);
   if (remember) return { action: 'remember', content: normalizeText(remember[1]), type: classifyMemory(remember[1]) };
   const forget = text.match(/^\s*(?:nexus[,;:]?\s*)?(?:dimentica(?:\s+che)?|rimuovi\s+dalla\s+memoria|forget\s+that)\s+(.+)$/iu);
@@ -178,6 +180,28 @@ class PersonalMemoryStore {
   forgetById(id) {
     if (!Number.isInteger(id) || id < 1) return 0;
     return this.database.prepare("UPDATE memories SET status='forgotten', updated_at=? WHERE id=? AND status='active'").run(Date.now(), id).changes;
+  }
+
+  updateById(id, content) {
+    const clean = normalizeText(content);
+    if (!Number.isSafeInteger(id) || id < 1 || clean.length < 3) throw new Error('Ricordo non valido.');
+    this.expireStale();
+    const existing = this.database.prepare("SELECT id FROM memories WHERE id=? AND status='active'").get(id);
+    if (!existing) throw new Error('Ricordo non disponibile.');
+    const key = memoryKey(clean);
+    const duplicate = this.database.prepare('SELECT id FROM memories WHERE memory_key=? AND id<>?').get(key, id);
+    if (duplicate) throw new Error('Questo ricordo esiste già.');
+    const type = classifyMemory(clean);
+    const now = Date.now();
+    const subject = exclusiveMemorySubject(clean, type) || null;
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      this.database.prepare('UPDATE memories SET content=?, memory_key=?, type=?, subject_key=?, updated_at=?, expires_at=? WHERE id=?')
+        .run(clean, key, type, subject, now, type === 'episodic' ? now + 30 * 86_400_000 : null, id);
+      if (subject) this.database.prepare("UPDATE memories SET status='superseded', superseded_by=?, updated_at=? WHERE subject_key=? AND id<>? AND status='active'").run(id, now, subject, id);
+      this.database.exec('COMMIT');
+    } catch (error) { this.database.exec('ROLLBACK'); throw error; }
+    return 1;
   }
 
   clear() {

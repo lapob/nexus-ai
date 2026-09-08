@@ -236,16 +236,18 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   let fieldFrame = 0, width = 0, height = 0, elapsed = 0, previous = 0, lastPaint = 0;
   const resizeField = () => { width = innerWidth; height = innerHeight; const dpr = Math.min(devicePixelRatio || 1, 1.5); field.width = width * dpr; field.height = height * dpr; paint?.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const drawField = now => {
-    if (!motion.matches && now - lastPaint < 33) { fieldFrame = requestAnimationFrame(drawField); return; }
+    if (!motion.matches && efficient && now - lastPaint < 32) { fieldFrame = requestAnimationFrame(drawField); return; }
     lastPaint = now;
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
     if (paint) {
       paint.clearRect(0, 0, width, height);
-      const bounds = canvas.getBoundingClientRect(), cx = bounds.left + bounds.width / 2, cy = bounds.top + bounds.height / 2;
       const progress = motion.matches ? 1 : Math.min(1, elapsed / 2.4);
+      const bounds = progress < 1 ? canvas.getBoundingClientRect() : null;
+      const cx = bounds ? bounds.left + bounds.width / 2 : 0, cy = bounds ? bounds.top + bounds.height / 2 : 0;
       const gather = 1 - Math.pow(1 - progress, 3);
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i], incoming = i % 4 === 0;
+        if (incoming && progress === 1) continue;
         let x = star.x * width, y = star.y * height;
         if (incoming) { const radius = bounds.width * .24; x += (cx + Math.cos(star.phase) * radius - x) * gather; y += (cy + Math.sin(star.phase) * radius - y) * gather; }
         else if (!motion.matches) { x += Math.sin(elapsed * .07 + star.phase) * 5; y += Math.cos(elapsed * .06 + star.phase) * 4; }

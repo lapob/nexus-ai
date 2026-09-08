@@ -1,0 +1,19 @@
+# Verifica del progetto — 8 settembre 2026
+
+## Modifiche e prove
+
+- Android Preview 6.4.10 compilata e installata sul telefono: il ricentramento conserva lo stesso albero Markdown e la stessa larghezza; lo scroll automatico termina con lo streaming. Risposta reale acquisita in `qa-artifacts/current-finish.png`. La misura dell'intero ciclo comprende ancora 22 frame janky su 147 (14,97%, p95 15 ms, p99 400 ms): non certifica fluidità assoluta né isola il solo ricentramento.
+- Web: particelle ambientali sincronizzate al display sui dispositivi adeguati; limite ridotto conservato per risparmio dati/memoria. Dopo l'assemblaggio non vengono ridisegnate particelle invisibili né letto il layout del Core. Campione browser 300 frame: mediana 16,7 ms, p95 16,8 ms, nessun frame oltre 50 ms, nessun errore JS (`current-web-metrics.log`).
+- AI: controllo esplicito del formato numerico finale; conservazione di obiettivo iniziale e correzioni nelle conversazioni lunghe; correzione locale dei ricordi con `Correggi il ricordo #12: nuovo contenuto`. Ricordi cancellati non riattivati; preferenze sullo stesso argomento consolidate. Impostazioni mostrano tutti i ricordi restituiti dal backend (massimo 100), con identificativi.
+- Docker: l'avvio automatico utente ora usa `scripts/start-docker-desktop.ps1`, verifica firma e percorso dell'installazione, ripristina la registrazione utente e avvia il launcher. Valore precedente conservato localmente in `qa-artifacts/docker-startup-before.txt`. Docker e SearXNG avviati con successo. Il prossimo login Windows non è stato provato; nessun riavvio del PC eseguito.
+- 838 test completi, 132 regressioni sicurezza, build/typecheck, AI/voce/Electron/shutdown/250 cicli superati. Backup cifrato sintetico: 4 file ripristinati. Evidenze `current-tests-memory.log`, `current-security-final.log`, `current-check-memory.log`, `current-experience-final.log`, `current-backup.log`.
+- Sito commit `040e152`, Worker produzione `f7f69808-7ff4-421d-a2c4-66fc2e08efa0`: 34 test unitari, 23 browser, 14 percorsi pubblici e intestazioni verificati. Nessun Core desktop modificato.
+
+## Sicurezza e attività non concluse
+
+- Audit npm runtime: zero vulnerabilità segnalate. Questo risultato non comprende tutte le dipendenze native.
+- Il gate di distribuzione Ollama 0.32.15 blocca il runtime per 45 finding High/Critical a granularità modulo. Uso locale limitato a loopback; non dichiarare risolti i finding o distribuibile il runtime. Evidenza `current-ollama-distribution.log`.
+- Stable: 4 requisiti conformi, 11 bloccati; firme, origine aggiornamenti, backup esterno, continuità elettrica/rete, rotazione chiavi, upgrade su PC pulito, esercitazione incidenti e pentest indipendente restano mancanti.
+- Sincronizzazione pubblica facoltativa non implementata: servono identità isolata dal proprietario, revoca, cancellazione e gestione conflitti. Le API proprietarie non devono diventare pubbliche.
+- Ulteriori prove richieste: fluidità Android a fine streaming isolata dal resto del ciclo, cambio rete/background, voce/Bluetooth, test estesi di incertezza e allegati discordanti. Le funzionalità preesistenti di calcolo, ricerca, strumenti con consenso e routing non equivalgono al completamento di tutta la roadmap.
+- APK installata come Preview locale; nessun nuovo installer Windows o bundle Play firmato distribuito in questo passaggio.
