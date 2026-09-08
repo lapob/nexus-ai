@@ -3,47 +3,26 @@
  * @description Esegue la suite Node e rimuove soltanto i temporanei NexusNXS creati dalla stessa esecuzione.
  */
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const testsDirectory = path.join(root, 'tests');
-const temporaryRoot = path.resolve(os.tmpdir());
+const temporaryRoot = path.join(root, 'qa-artifacts', 'test-tmp');
 
 // #region 01 — Confine temporaneo della singola suite
 
-function nexusTemporaryDirectories() {
-  try {
-    return fs.readdirSync(temporaryRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && /^nexus(?:nxs)?-/iu.test(entry.name))
-      .map((entry) => entry.name);
-  } catch {
-    return [];
-  }
-}
-
-function removeCreatedTemporaryDirectories(previousNames) {
-  const created = nexusTemporaryDirectories().filter((name) => !previousNames.has(name));
-  let removed = 0;
-  for (const name of created) {
-    const candidate = path.resolve(temporaryRoot, name);
-    if (path.dirname(candidate) !== temporaryRoot) continue;
-    try {
-      fs.rmSync(candidate, { recursive: true, force: true, maxRetries: 3, retryDelay: 80 });
-      removed += 1;
-    } catch (error) {
-      process.stderr.write(`Temporaneo di test non rimosso: ${name} (${error.message})\n`);
-    }
-  }
-  return removed;
+// Ogni processo figlio eredita una directory esclusiva. Il confronto prima/dopo
+// nella TEMP globale non dimostra proprieta e coinvolgeva altre verifiche attive.
+function createSuiteTemporaryDirectory() {
+  fs.mkdirSync(temporaryRoot, { recursive: true });
+  return fs.mkdtempSync(path.join(temporaryRoot, 'suite-'));
 }
 
 // #endregion
 
 // #region 02 — Esecuzione deterministica
 
-const before = new Set(nexusTemporaryDirectories());
 const testFiles = fs.readdirSync(testsDirectory)
   .filter((name) => name.endsWith('.test.js'))
   .sort();
@@ -53,19 +32,25 @@ if (testFiles.length === 0) {
 }
 
 let result;
+const suiteTemporary = createSuiteTemporaryDirectory();
 try {
   // Node espande nativamente il glob. Passare tutti i percorsi assoluti
   // superava il limite della command line di Windows e avviava una suite vuota.
   process.stdout.write(`Suite Node: ${testFiles.length} file.\n`);
   result = spawnSync(process.execPath, ['--test', 'tests/*.test.js'], {
     cwd: root,
-    env: process.env,
+    env: { ...process.env, TEMP: suiteTemporary, TMP: suiteTemporary, TMPDIR: suiteTemporary },
     stdio: 'inherit',
     windowsHide: true
   });
 } finally {
-  const removed = removeCreatedTemporaryDirectories(before);
-  if (removed > 0) process.stdout.write(`Temporanei della suite rimossi: ${removed}\n`);
+  try {
+    if (path.dirname(path.resolve(suiteTemporary)) !== path.resolve(temporaryRoot)) throw new Error('Directory test fuori confine');
+    fs.rmSync(suiteTemporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 80 });
+    process.stdout.write('Directory temporanea esclusiva della suite rimossa.\n');
+  } catch (error) {
+    process.stderr.write(`Pulizia temporanei della suite fallita: ${error.message}\n`);
+  }
 }
 
 if (result?.error) {

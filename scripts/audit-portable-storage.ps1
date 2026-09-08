@@ -20,6 +20,7 @@ function Get-PathState {
     Location = $resolved
     Exists = Test-Path -LiteralPath $resolved
     Portable = $resolved.StartsWith($portableDrive, [StringComparison]::OrdinalIgnoreCase)
+    InWorkspace = $resolved.StartsWith($workspaceRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)
   }
 }
 
@@ -46,6 +47,22 @@ $items = @(
 )
 
 $items | Format-Table -AutoSize
+
+# Gli alias del loader non sono copie: rendere visibile e verificare il loro target.
+foreach ($alias in @(
+  @{ Name = 'NexusNXS-Models'; Target = Join-Path $workspaceRoot '.ollama' },
+  @{ Name = 'NexusNXS-Runtime'; Target = Join-Path $projectRoot 'vendor\ollama\windows-x64' }
+)) {
+  $aliasPath = Join-Path $developmentLayout.VolumeRoot $alias.Name
+  $entry = Get-Item -LiteralPath $aliasPath -Force -ErrorAction SilentlyContinue
+  if (-not $entry) { continue }
+  $actual = @($entry.Target)[0]
+  if (-not ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -or -not $actual -or
+      [IO.Path]::GetFullPath([string]$actual) -ine [IO.Path]::GetFullPath($alias.Target)) {
+    throw "Alias runtime non conforme: $aliasPath"
+  }
+  Write-Host ("Alias verificato: {0} -> {1}" -f $alias.Name, $alias.Target)
+}
 
 $knownPortable = $items | Where-Object { $_.Exists -and $_.Portable }
 $knownSystem = $items | Where-Object { $_.Exists -and -not $_.Portable }
