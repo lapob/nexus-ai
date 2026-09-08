@@ -237,22 +237,24 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     radius: .55 + (i % 7) * .13, phase: i * 2.399963
   }));
   let fieldFrame = 0, width = 0, height = 0, elapsed = 0, previous = 0, lastPaint = 0;
-  const resizeField = () => { width = innerWidth; height = innerHeight; const dpr = Math.min(devicePixelRatio || 1, 1.5); field.width = width * dpr; field.height = height * dpr; paint?.setTransform(dpr, 0, 0, dpr, 0, 0); };
+  const resizeField = () => { width = innerWidth; height = innerHeight; const dpr = Math.min(devicePixelRatio || 1, 1.5, Math.sqrt(2073600 / (width * height))); field.width = width * dpr; field.height = height * dpr; paint?.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const drawField = now => {
-    if (!motion.matches && efficient && now - lastPaint < 32) { fieldFrame = requestAnimationFrame(drawField); return; }
+    if (!motion.matches && now - lastPaint < 32) { fieldFrame = requestAnimationFrame(drawField); return; }
     lastPaint = now;
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
     if (paint) {
       paint.clearRect(0, 0, width, height);
-      const gatheredArrival = !document.body.classList.contains('keyboard-open') && !document.body.classList.contains('conversation-active') ? renderer.getMetrics().arrival : 0;
+      const coreVisible = !document.body.classList.contains('keyboard-open') && !document.body.classList.contains('conversation-active');
+      const visual = renderer.getMetrics();
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
+        if (coreVisible && i % 4 === 0 && visual.backend === 'webgl') continue;
         let x = star.x * width, y = star.y * height;
-        if (!motion.matches) { x += Math.sin(elapsed * .07 + star.phase) * 5; y += Math.cos(elapsed * .06 + star.phase) * 4; }
+        const starTime = motion.matches ? 0 : visual.elapsed;
+        x += Math.sin(starTime * .07 + star.phase) * 5; y += Math.cos(starTime * .06 + star.phase) * 4;
         const side = Math.min(1, Math.abs(x - width / 2) / Math.min(460, width * .48));
         const readingFade = .04 + .5 * side * side;
-        const gathered = i % 4 === 0 ? gatheredArrival : 0;
-        paint.fillStyle = `rgba(166,224,234,${readingFade * (1-gathered)})`;
+        paint.fillStyle = `rgba(166,224,234,${readingFade})`;
         paint.beginPath(); paint.arc(x,y,star.radius,0,Math.PI*2); paint.fill();
       }
       field.dataset.assembled = String(renderer.getMetrics().arrival === 1);
@@ -334,6 +336,7 @@ function publicReadinessRuntime() {
 
 function publicAiCosmicCoreScript({ palette, presentation }) {
   return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}
+.core{user-select:none;-webkit-tap-highlight-color:transparent}.core:focus:not(:focus-visible){outline:none;box-shadow:none}
 body.keyboard-open:not(.request-active):not(.conversation-active) .copy{opacity:0;visibility:hidden;filter:none}
 @media(max-height:540px) and (min-width:600px){
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:30px;min-height:0;padding-top:0}

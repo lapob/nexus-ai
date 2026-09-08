@@ -45,6 +45,15 @@ test('hidden pages freeze both transition clock and drawing',()=>{
   assert.equal(f.renderer.getMetrics().draws,before.draws);assert.equal(f.renderer.getMetrics().arrival,before.arrival);
   f.document.hidden=false;f.renderer.refresh();f.tick();assert.ok(f.renderer.getMetrics().draws>before.draws);f.renderer.dispose();
 });
+
+test('returning from the composer gathers the Core again without an instant pop',()=>{
+  let shown=true;const f=fixture({getVisible:()=>shown});f.tick(250);
+  assert.equal(f.renderer.getMetrics().arrival,1);
+  shown=false;f.tick(10);shown=true;f.tick();
+  assert.equal(f.renderer.getMetrics().arrival,0);
+  f.tick(120);assert.ok(f.renderer.getMetrics().arrival>0&&f.renderer.getMetrics().arrival<1);
+  f.tick(120);assert.equal(f.renderer.getMetrics().arrival,1);f.renderer.dispose();
+});
 test('Android visual scene has no network, file, content or JavaScript bridge access',()=>{
   const native=fs.readFileSync(path.join(root,'android/NexusRemote/app/src/main/java/local/nexus/remote/CosmicVisualizers.kt'),'utf8');
   for(const token of ['allowFileAccess = false','allowContentAccess = false','blockNetworkLoads = true','domStorageEnabled = false','MIXED_CONTENT_NEVER_ALLOW'])assert.ok(native.includes(token));

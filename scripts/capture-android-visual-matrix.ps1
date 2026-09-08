@@ -70,7 +70,8 @@ try {
     Invoke-CheckedAdb -s $device shell am force-stop $package | Out-Null
     Invoke-CheckedAdb -s $device shell dumpsys gfxinfo $package reset | Out-Null
     Invoke-CheckedAdb -s $device shell am start -W -n $activity | Out-Null
-    Start-Sleep -Milliseconds 1400
+    # Capture the settled visualizer, not its deliberate full-screen assembly.
+    Start-Sleep -Milliseconds 5200
     $remotePng = "/sdcard/$($profile.Name).png"
     $remoteXml = "/sdcard/$($profile.Name).xml"
     Invoke-CheckedAdb -s $device shell screencap -p $remotePng | Out-Null

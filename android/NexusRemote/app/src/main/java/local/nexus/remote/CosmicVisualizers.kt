@@ -8,6 +8,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.RenderProcessGoneDetail
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
@@ -129,7 +130,7 @@ internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion
             onDragCancel = { scene.inspection = listOf(0f, 0f, 0f) },
             onDrag = { change, _ -> change.consume(); scene.inspection = listOf(change.position.x / size.width * 2f - 1f, change.position.y / size.height * 2f - 1f, 1f) }
         ) }
-        .semantics { contentDescription = "NexusNXS Core" }.clickable(onClick = onClick))
+        .semantics { contentDescription = "NexusNXS Core" }.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick))
 }
 
 @Composable
