@@ -45,7 +45,7 @@ test('il protocollo di stato è completo, valido e non espone chain-of-thought',
   assert.equal(client.privacy.exposeChainOfThought, false);
 });
 
-test('desktop, Presence, Android e NexusNXS AI consumano la palette autoritativa', () => {
+test('i contratti visuali condividono identità e palette generata tra i client', () => {
   const palette = interactionStatePalette();
   const desktop = fs.readFileSync(path.join(root, 'src/renderer/scene/NexusCore.tsx'), 'utf8');
   const presence = fs.readFileSync(path.join(root, 'src/infrastructure/electron/companion-window.js'), 'utf8');
@@ -59,7 +59,7 @@ test('desktop, Presence, Android e NexusNXS AI consumano la palette autoritativa
   assert.match(gateway, /publicAiCosmicCoreScript/);
   assert.match(desktop, /interactionStates\.states\[state\]/);
   assert.match(android, /NEXUS_COSMIC_CONTINUUM_ID = NexusInteractionStates\.CONTINUUM_ID/);
-  assert.match(android, /Color\(NexusInteractionStates\.THINKING\)/);
+  assert.match(android, /CosmicScene\(/);
   assert.match(generatedDesktop, /nexus-cosmic-continuum-v1/);
   for (const state of ['booting', 'idle', 'listening', 'thinking', 'responding', 'executing', 'offline', 'error']) {
     assert.match(generatedAndroid, new RegExp(palette[state].replace('#', '0xFF'), 'i'));

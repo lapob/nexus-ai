@@ -58,3 +58,22 @@ Preview Android finale: SHA-256
 `21B909B6AAB1F6217CE86D3AF07C22DE59429A06C0A00982DF8A1056961C7506`.
 Include ricreazione della scena locale in caso di perdita del processo grafico.
 Build e lint passati; le prove sul dispositivo e la promozione APK restano aperte.
+
+## Revisione delle proporzioni e pulizia
+
+Saturno a riposo usa un'inquadratura più ampia, raccordata gradualmente
+all'apertura degli anelli tramite lo stesso clock. Geometrie e visualizer
+desktop restano invariati. Nel fallback software la scena nascosta viene
+svuotata, con la stessa scala e orientamento dei livelli GPU; il movimento
+ridotto applica subito lo stato stabile degli anelli.
+
+Verifica browser: tre preset a 390 e 1280 px, p95 16,7–16,8 ms e nessun
+intervallo oltre 50 ms nei campioni. Controllate anche le nove combinazioni
+320x568, 390x568 e 844x390; nessun overflow orizzontale o errore JavaScript.
+Il fallback senza WebGL è stato provato mostrando e nascondendo il Core,
+verificando i pixel del canvas. Sono misure della workstation, non Android.
+
+Preview Android 6.5.0 ricompilata dopo la pulizia della UI legacy e gli
+aggiustamenti condivisi, SHA-256:
+`801984FC518BA8F3EDE36FEC90E4392350940BE9C2C66A0FA57753E756B30828`.
+Sostituisce la precedente build locale della stessa Preview; non è promossa.

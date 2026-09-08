@@ -8,7 +8,8 @@ const { readLock, isProcessAlive, requestProcessShutdown } = require('../src/inf
 const root = path.resolve(__dirname, '..');
 const executable = process.env.NEXUS_PACKAGED_EXECUTABLE || path.join(root, 'release', 'win-unpacked', 'NexusNXS.exe');
 const parent = path.join(root, 'qa-artifacts');
-const profile = fs.mkdtempSync(path.join(parent, 'packaged-presence-'));
+const ownedProfile = require('./qa-profile').createQaProfile(parent, 'packaged-presence-');
+const profile = ownedProfile.path;
 const ui = path.join(profile, 'desktop-ui.lock');
 const presence = path.join(profile, 'system-presence.lock');
 const active = file => { const lock = readLock(file); return lock && isProcessAlive(lock.pid); };
@@ -40,6 +41,7 @@ async function until(predicate, label) {
     await until(() => !active(ui), 'QA UI did not stop');
     requestProcessShutdown(presence);
     await until(() => !active(ui) && !active(presence), 'QA processes did not stop');
+    ownedProfile.dispose();
   }
   console.log('PASS packaged ASAR: UI, Presence, tray initialization, UI close/reopen, persistent Presence and clean shutdown.');
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

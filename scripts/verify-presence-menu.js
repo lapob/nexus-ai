@@ -14,16 +14,20 @@ if (!process.versions.electron) {
   const { spawnSync } = require('node:child_process');
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
+  const profile = require('./qa-profile').createQaProfile(output, 'presence-menu-profile-');
+  env.NEXUS_PRESENCE_QA_PROFILE = profile.path;
   const result = spawnSync(require('electron'), [__filename], {
     cwd: root, env, windowsHide: true, stdio: 'inherit', timeout: 45_000
   });
   if (result.error) throw result.error;
+  profile.dispose();
   process.exitCode = result.status ?? 1;
 } else {
   const { app, BrowserWindow } = require('electron');
   const { systemPresenceDocument } = require('../src/infrastructure/electron/companion-window');
   fs.mkdirSync(output, { recursive: true });
-  app.setPath('userData', fs.mkdtempSync(path.join(output, 'presence-menu-profile-')));
+  if (!process.env.NEXUS_PRESENCE_QA_PROFILE) throw new Error('Run Presence QA through its Node launcher');
+  app.setPath('userData', process.env.NEXUS_PRESENCE_QA_PROFILE);
   app.disableHardwareAcceleration();
   app.on('window-all-closed', () => {});
   // #endregion

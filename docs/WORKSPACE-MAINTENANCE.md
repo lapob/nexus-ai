@@ -34,3 +34,23 @@ La pulizia senza `-Apply` inventaria soltanto. La lista è chiusa: archivi scari
 La pulizia rifiuta junction e link negli antenati o nell'albero candidato, si ferma sugli errori e controlla Gradle/Kotlin prima di rimuovere output Android. Eseguirla a compilazioni terminate; non fare pulizie contemporanee a installazioni o modifiche delle stesse directory. I vecchi flag per cache di sistema, cestino e residui esterni sono rimossi intenzionalmente.
 
 Spostare il workspace non sposta automaticamente attività pianificate, registrazioni Windows o credenziali protette dall'account. Dopo un cambio di percorso verificare autostart, Docker, alias, ricerca, health/readiness pubbliche e compilazioni. Non distribuire una copia della cartella privata come installer.
+
+## Pulizia verificata dell'8 settembre 2026
+
+Rimossi 46 composable privati della vecchia superficie Android, irraggiungibili
+dall'entry point `NexusInstantApp`, e la regola CSS duplicata del composer web.
+I contratti statici ora verificano la superficie effettiva: invio e IME,
+streaming, stato della connessione e autorizzazione Work. I controlli su
+cifratura, consenso, ticket, persistenza e trasporto sono conservati.
+
+Rimossi 19 profili Electron di prova non in uso (303.916.147 byte) e output
+Android ricostruibili (78.137.878 byte), dopo l'arresto ordinario del daemon
+Gradle. Totale rimosso: 382.054.025 byte. Screenshot, report, dati e APK sono
+conservati; Android 6.4.10 resta disponibile per il ripristino della Preview.
+I due runner Presence eliminano ora soltanto il profilo creato dalla propria
+esecuzione, dopo la chiusura dei processi. La pulizia rifiuta link e junction.
+
+Verificati 850 test, check completo, build/lint Android, menu Presence e
+avvio/riapertura ASAR. `verify:experience` superato: AI, voce, Electron,
+chiusura e 250 cicli senza richieste orfane. Le prove fisiche Android restano
+distinte dalla compilazione e dalla verifica dell'asset nel browser.

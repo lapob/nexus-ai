@@ -152,13 +152,9 @@ test('Work e pairing pubblici sono capability-driven e non degradano chat o voce
   assert.match(activity, /if \(!source\.has\("remoteWork"\) && !source\.has\("pairing"\)\) return null/);
   assert.match(activity, /getJsonAt\(endpoint, "\/api\/status", token\)/);
   assert.match(activity, /"work" -> if \(state\.remoteWorkAvailable\)/);
+  assert.match(activity, /state\.remoteWorkAvailable && state\.workTicketId\.isNotBlank\(\)/);
   assert.match(activity, /"pair" -> if \(state\.pairingAvailable\)/);
-  assert.match(activity, /if \(!remoteWorkAvailable\)[\s\S]*Text\("Chat"/);
-  assert.match(activity, /if \(state\.remoteWorkAvailable\) DrawerItem\(Icons\.Outlined\.Folder/);
-  assert.match(activity, /if \(state\.pairingAvailable \|\| state\.wakePairingAvailable \|\| state\.wakeAvailable\) RemoteDrawerItem/);
   assert.match(activity, /if \(!state\.pairingAvailable\) return[\s\S]*secureTokens\.read\("remoteToken"\)/);
-  assert.match(activity, /if \(state\.pairingAvailable\) DropdownMenuItem[\s\S]*"continueOnPc"/);
-  assert.match(activity, /if \(!user && !state\.temporary && canRegenerate && state\.pairingAvailable\)/);
   assert.doesNotMatch(activity, /pairingOptional/);
   assert.doesNotMatch(activity, /if \(reachable\) \{ refreshRemoteCapabilities\(\); if \(!appVisible\) retryPendingRequests\(\); loadDevices\(\) \}/);
   assert.match(activity, /SpeechRecognizer\.createSpeechRecognizer\(context\)/);

@@ -735,6 +735,12 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     const coreVisible=options.getVisible?.()!==false;
     if(!coreVisible){stage[0]=0;stage[1]=0;stage[2]=4;stage[3]=4;}
     const accent=colors[state]||colors.idle,t=isReduced?0:elapsed*.55;
+    // The dormant planet has a much smaller footprint than its deployed rings.
+    // Ease its framing with the same ring clock, keeping active rings inside the stage.
+    const ringTarget={listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
+    ringVisibility=isReduced?ringTarget:ringVisibility+(ringTarget-ringVisibility)*(1-Math.exp(-dt*1.65));
+    const saturnFraming=2.65-smooth(ringVisibility/.56)*1.65;
+    const fieldScale=kind=>preset==='saturn-experimental'?saturnFraming*(kind===0?.94:1):preset==='jarvis-reactor'?1.48:1;
     // Adaptive detail does not change point positions or restart the shared clock.
     strain=dt>.028||drawMs>8?strain+dt:Math.max(0,strain-dt);healthy=dt<.021&&drawMs<5?healthy+dt:0;
     if(strain>1.5){quality=Math.max(.35,quality-.15);strain=0;}if(healthy>10){quality=Math.min(1,quality+.05);healthy=0;}
@@ -745,21 +751,32 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     }
     if(gl){
       gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);const p=programs[preset];gl.useProgram(p.p);
-      const ringTarget={listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
-      ringVisibility+=(ringTarget-ringVisibility)*(1-Math.exp(-dt*1.65));
       for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uArrival:arrival,uDpr:dpr,uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:1.08,uPointScale:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
       for(const [key,value] of Object.entries(profile))uniform(p,'u'+key[0].toUpperCase()+key.slice(1),value);
       for(const field of coreVisible?fields[preset]:[]){
         const saturn=preset==='saturn-experimental',reactor=preset==='jarvis-reactor';
         const rx=(saturn?(field.kind>0?1.38:-.03):reactor?-.12:-.2)+rotation[0];
-        uniform(p,'modelViewMatrix',matrix(rx,rotation[1]+(saturn?.04:0),saturn&&field.kind>0?-.16:reactor?.16:0,saturn&&field.kind===0?.94:reactor?1.48:1));uniform(p,'uKind',field.kind);
+        uniform(p,'modelViewMatrix',matrix(rx,rotation[1]+(saturn?.04:0),saturn&&field.kind>0?-.16:reactor?.16:0,fieldScale(field.kind)));uniform(p,'uKind',field.kind);
         for(const [name,attribute]of Object.entries(field.gpu)){if(!p.attributes.has(name))p.attributes.set(name,gl.getAttribLocation(p.p,name));const loc=p.attributes.get(name);if(loc<0)continue;gl.bindBuffer(gl.ARRAY_BUFFER,attribute.buffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,attribute.size,gl.FLOAT,false,0,0);}
         gl.drawArrays(gl.POINTS,0,Math.floor(field.positions.length/3*quality));
       }
     }else if(context2d){
       // Software fallback uses the same sampled desktop positions; never old ribbons.
       const ctx=context2d;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);ctx.fillStyle=`rgb(${accent.map(v=>Math.round(v*255))})`;
-      for(const field of fields[preset]){const points=field.positions,step=Math.max(3,Math.ceil(points.length/3600)*3);for(let i=0;i<points.length;i+=step){const x=rect.left+rect.width/2+points[i]*side/13.2;const y=rect.top+rect.height/2-(points[i+1]*.92-points[i+2]*.38)*side/13.2;const originX=((i+1)*.61803398875%1)*width,originY=((i+1)*.41421356237%1)*height;ctx.globalAlpha=.15+arrival*.5;ctx.fillRect(originX+(x-originX)*arrival,originY+(y-originY)*arrival,1,1);}}
+      for(const field of coreVisible?fields[preset]:[]){
+        const saturn=preset==='saturn-experimental',reactor=preset==='jarvis-reactor';
+        if(saturn&&field.kind>0&&ringVisibility<.01)continue;
+        const transform=matrix((saturn?(field.kind>0?1.38:-.03):reactor?-.12:-.2)+rotation[0],rotation[1]+(saturn?.04:0),saturn&&field.kind>0?-.16:reactor?.16:0,fieldScale(field.kind));
+        const points=field.positions,step=Math.max(3,Math.ceil(points.length/3600)*3);
+        for(let i=0;i<points.length;i+=step){
+          const px=points[i],py=points[i+1],pz=points[i+2];
+          const x=rect.left+rect.width/2+(transform[0]*px+transform[4]*py+transform[8]*pz)*side/13.2;
+          const y=rect.top+rect.height/2-(transform[1]*px+transform[5]*py+transform[9]*pz)*side/13.2;
+          const originX=((i+1)*.61803398875%1)*width,originY=((i+1)*.41421356237%1)*height;
+          ctx.globalAlpha=(.15+arrival*.5)*(saturn&&field.kind>0?ringVisibility:1);
+          ctx.fillRect(originX+(x-originX)*arrival,originY+(y-originY)*arrival,1,1);
+        }
+      }
       ctx.globalAlpha=1;
     }
     canvas.dataset.visualizer=preset;canvas.dataset.assembled=String(arrival===1);canvas.dataset.astralParticles=String(Math.floor(budget*quality));

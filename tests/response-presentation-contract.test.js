@@ -125,9 +125,8 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
 test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
   const activity = fs.readFileSync(path.join(root, 'android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt'), 'utf8');
   assert.match(activity, /enum class ResponsePresentationKind/);
-  assert.match(activity, /ResponseContextHeader\(value, streaming = true/);
-  assert.match(activity, /Text\("NEXUSNXS", color = Color\(0xFF648485\)/);
-  assert.match(activity, /ResponseContextHeader\(turn\.content, streaming = false\)/);
+  assert.match(activity, /InstantWrittenExchange\(/);
+  assert.match(activity, /MarkdownMessage\(streamSafeMarkdown\(latestAnswer\), streamingTailChars = if \(busy\) 48 else 0/);
   assert.match(activity, /streamSafeMarkdown\(value\)/);
   assert.match(activity, /HighlightedCodeText\(code/);
   assert.match(activity, /\[!\(NOTE\|TIP\|WARNING\|RESULT\)\]/);
@@ -139,7 +138,6 @@ test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
   assert.match(activity, /val superscripts/);
   assert.match(activity, /§NEXUS_MATH§/);
   assert.match(activity, /fontFamily = FontFamily\.Serif/);
-  assert.match(activity, /nexusCopy\("TU", "YOU"\) else "NEXUSNXS"/);
   assert.match(activity, /private fun spokenLocale\(/);
   assert.match(activity, /val language = spokenLocale\(text/);
   assert.match(activity, /textToSpeech\?\.language = spokenLocale\(text/);
