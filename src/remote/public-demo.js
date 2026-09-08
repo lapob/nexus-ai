@@ -244,11 +244,10 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
     if (paint) {
       paint.clearRect(0, 0, width, height);
-      const coreVisible = !document.body.classList.contains('keyboard-open') && !document.body.classList.contains('conversation-active');
       const visual = renderer.getMetrics();
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
-        if (coreVisible && i % 4 === 0 && visual.backend === 'webgl') continue;
+        if (visual.backend === 'webgl') continue;
         let x = star.x * width, y = star.y * height;
         const starTime = motion.matches ? 0 : visual.elapsed;
         x += Math.sin(starTime * .07 + star.phase) * 5; y += Math.cos(starTime * .06 + star.phase) * 4;
@@ -267,9 +266,12 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   addEventListener('resize', onFieldResize, { passive: true });
   document.addEventListener('visibilitychange', resumeField);
   motion.addEventListener('change', resumeField);
-  const renderer = createCosmicVisualizers(canvas, { host: button, efficient, getVisible: () => !document.body.classList.contains('keyboard-open') && !document.body.classList.contains('conversation-active'), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) }, createDesktopRecipes);
+  let voiceCore = false;
+  const retainVoiceCore = () => { voiceCore = true; };
+  button.addEventListener('click', retainVoiceCore, true);
+  const renderer = createCosmicVisualizers(canvas, { host: button, efficient, gatherBackground: true, disperseOnHide: true, getVisible: () => !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) }, createDesktopRecipes);
   // The GPU canvas belongs to the page, so host opacity cannot hide it.
-  const layoutObserver = new MutationObserver(() => renderer.refresh());
+  const layoutObserver = new MutationObserver(() => { if (document.body.classList.contains('keyboard-open')) voiceCore = false; renderer.refresh(); });
   layoutObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
   const observer = new MutationObserver(readExchange);

@@ -54,6 +54,14 @@ test('returning from the composer gathers the Core again without an instant pop'
   f.tick(120);assert.ok(f.renderer.getMetrics().arrival>0&&f.renderer.getMetrics().arrival<1);
   f.tick(120);assert.equal(f.renderer.getMetrics().arrival,1);f.renderer.dispose();
 });
+
+test('web writing releases the same matter to the background and holds it there',()=>{
+  let shown=true;const f=fixture({getVisible:()=>shown,disperseOnHide:true,gatherBackground:true});f.tick(250);
+  shown=false;f.tick(30);const partial=f.renderer.getMetrics().arrival;
+  assert.ok(partial>0&&partial<1);f.tick(120);assert.equal(f.renderer.getMetrics().arrival,0);
+  f.tick(200);assert.equal(f.renderer.getMetrics().arrival,0);assert.equal(f.renderer.getMetrics().phase,'background');
+  shown=true;f.tick(250);assert.equal(f.renderer.getMetrics().arrival,1);f.renderer.dispose();
+});
 test('Android visual scene has no network, file, content or JavaScript bridge access',()=>{
   const native=fs.readFileSync(path.join(root,'android/NexusRemote/app/src/main/java/local/nexus/remote/CosmicVisualizers.kt'),'utf8');
   for(const token of ['allowFileAccess = false','allowContentAccess = false','blockNetworkLoads = true','domStorageEnabled = false','MIXED_CONTENT_NEVER_ALLOW'])assert.ok(native.includes(token));

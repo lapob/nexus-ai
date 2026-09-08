@@ -628,7 +628,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   let deck = [], preset = '', previousPreset = '', age = 0, elapsed = 0, phase = 'assembling';
   let arrival = 0, hold = 24, last = 0, raf = 0, disposed = false, lost = false, visible = true;
   let draws = 0, drawMs = 0, quality = 1, strain = 0, healthy = 0, state = 'idle', audio = 0;
-  let resolutionScale = 1;
+  let resolutionScale = 1, releaseAge = 0, releaseArrival = 0, releaseStage = null;
   let width = 1, height = 1, dpr = 1, rect = {left:0,top:0,width:1,height:1};
   let pointer = [0,0], pointerStrength = 0, touching = false, dragging = false, dragStart = [0,0], rotation = [0,0], targetRotation = [0,0];
   let suppressClick = 0, paintedReduced = false, ringVisibility = 0, wasCoreVisible = true;
@@ -700,7 +700,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     for(const list of Object.values(fields)){let offset=0;for(const field of list){
       field.gpu={};const count=field.positions.length/3;
       const journey=new Float32Array(count*4);
-      for(let i=0;i<count;i++){const grain=i+offset,carrier=grain<(efficient?140:360)&&grain%4===0,source=carrier?grain+901:grain+1;journey[i*4]=(source*.61803398875)%1;journey[i*4+1]=(source*.41421356237)%1;journey[i*4+2]=((grain+1)*.754877666)%1;journey[i*4+3]=carrier?grain+1:0;}
+      for(let i=0;i<count;i++){const grain=i+offset,carrier=grain<(efficient?140:360)&&(options.gatherBackground||grain%4===0),source=carrier?grain+901:grain+1;journey[i*4]=(source*.61803398875)%1;journey[i*4+1]=(source*.41421356237)%1;journey[i*4+2]=((grain+1)*.754877666)%1;journey[i*4+3]=carrier?grain+1:0;}
       offset+=count;
       for(const [name,data] of Object.entries({position:field.positions,aSeed:field.seeds,aImportance:field.importance,aJourney:journey})){
         if(!data)continue;const buffer=gl.createBuffer();buffers.push(buffer);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);field.gpu[name]={buffer,size:data.length/count};
@@ -741,9 +741,11 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     for(let a=0;a<2;a++)rotation[a]+=((dragging&&!isReduced?targetRotation[a]:0)-rotation[a])*(1-Math.exp(-dt*(dragging?8:1.1)));
     rect=host.getBoundingClientRect();const side=Math.min(rect.width,rect.height)*1.25;
     const stage=[side/width,side/height,(rect.left+rect.width/2)/width*2-1,1-(rect.top+rect.height/2)/height*2];
-    const coreVisible=options.getVisible?.()!==false;
-    if(coreVisible&&!wasCoreVisible&&!isReduced){age=0;arrival=0;phase='assembling';}
-    wasCoreVisible=coreVisible;
+    const requestedVisible=options.getVisible?.()!==false;
+    const coreVisible=requestedVisible||options.disperseOnHide===true;
+    if(options.disperseOnHide&&!requestedVisible){if(wasCoreVisible){releaseAge=0;releaseArrival=arrival;}releaseAge+=dt;arrival=isReduced?0:releaseArrival*(1-smooth(releaseAge/1.4));phase="background";if(releaseStage)stage.splice(0,4,...releaseStage);}else if(requestedVisible){if(options.disperseOnHide&&releaseStage&&side<1)stage.splice(0,4,...releaseStage);else releaseStage=[...stage];}
+    if(requestedVisible&&!wasCoreVisible&&!isReduced){age=0;arrival=0;phase='assembling';}
+    wasCoreVisible=requestedVisible;
     if(!coreVisible){stage[0]=0;stage[1]=0;stage[2]=4;stage[3]=4;}
     const accent=colors[state]||colors.idle,t=isReduced?0:elapsed*.55;
     // The dormant planet has a much smaller footprint than its deployed rings.
