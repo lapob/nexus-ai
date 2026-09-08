@@ -77,3 +77,13 @@ Preview Android 6.5.0 ricompilata dopo la pulizia della UI legacy e gli
 aggiustamenti condivisi, SHA-256:
 `801984FC518BA8F3EDE36FEC90E4392350940BE9C2C66A0FA57753E756B30828`.
 Sostituisce la precedente build locale della stessa Preview; non è promossa.
+
+Verificato inoltre un ciclo reale completo di dispersione, cambio preset senza
+ripetizione immediata e ricomposizione, seguito da perdita/ripristino WebGL.
+Il controllo ripetibile dei layout e del fallback è `npm run qa:ai:layout`
+(usa Playwright del repository sito nello stesso workspace).
+
+Revisione pubblicata dal commit sito `61a53af`, Worker attivo al 100%
+`5117a4cd-1667-4af1-9dcd-bb9e6cb0eaa6`. Gate sito: 34 test e 23 prove browser;
+verifica successiva sul dominio reale: 14 percorsi, navbar, header, AI health
+e recupero GPU. Le catture live 390x568 e 844x390 sono state ispezionate.
