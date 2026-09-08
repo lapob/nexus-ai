@@ -142,13 +142,12 @@ if ($Action -eq 'start') {
     # lose the launcher registration. Restore only the verified existing path.
     $launcherKey = 'HKCU:\Software\Docker Inc.\Docker Desktop'
     $installRecord = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop' -ErrorAction SilentlyContinue
-    if (-not (Test-Path $launcherKey) -and $installRecord.InstallLocation -eq $dockerRoot) {
-      if ((Get-AuthenticodeSignature -LiteralPath $dockerDesktop).Status -ne 'Valid') {
-        throw 'Firma del launcher Docker non valida: ripristino registrazione interrotto.'
-      }
-      New-Item -Path $launcherKey -Force | Out-Null
-      New-ItemProperty -Path $launcherKey -Name InstallLocation -Value $dockerRoot -PropertyType String | Out-Null
+    if ($installRecord.InstallLocation -ne $dockerRoot) { throw 'Installazione Docker non corrispondente: avvio interrotto.' }
+    if ((Get-AuthenticodeSignature -LiteralPath $dockerDesktop).Status -ne 'Valid') {
+      throw 'Firma del launcher Docker non valida: ripristino registrazione interrotto.'
     }
+    New-Item -Path $launcherKey -Force | Out-Null
+    New-ItemProperty -LiteralPath $launcherKey -Name InstallLocation -Value $dockerRoot -PropertyType String -Force | Out-Null
     Remove-StaleDockerSockets
     # ProcessStartInfo treats the working directory literally; Start-Process
     # interprets the square brackets in the portable volume name as wildcards.

@@ -1,21 +1,43 @@
 <#
   @module scripts/start-docker-desktop
-  @description Verifica la registrazione della installazione Docker prima dell'avvio al login.
+  @description Avvio al login con lo stesso recupero socket e health check della ricerca locale.
 #>
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$dockerRoot = Join-Path $workspaceRoot '.toolchains\docker-desktop'
-$launcher = Join-Path $dockerRoot 'Docker Desktop.exe'
-$record = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Docker Desktop'
-if ($record.InstallLocation -ne $dockerRoot) { throw 'Installazione Docker non corrispondente.' }
-if ((Get-AuthenticodeSignature -LiteralPath $launcher).Status -ne 'Valid') { throw 'Firma Docker non valida.' }
-$launcherKey = 'HKCU:\Software\Docker Inc.\Docker Desktop'
-if (-not (Test-Path -LiteralPath $launcherKey)) { New-Item -Path $launcherKey -Force | Out-Null }
-New-ItemProperty -LiteralPath $launcherKey -Name InstallLocation -Value $dockerRoot -PropertyType String -Force | Out-Null
-$startInfo = [Diagnostics.ProcessStartInfo]::new()
-$startInfo.FileName = $launcher
-$startInfo.Arguments = '--autostart'
-$startInfo.WorkingDirectory = $dockerRoot
-$startInfo.UseShellExecute = $true
-$startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
-[Diagnostics.Process]::Start($startInfo) | Out-Null
+$logs = Join-Path $workspaceRoot '.nexus-data\logs'
+[IO.Directory]::CreateDirectory($logs) | Out-Null
+$log = Join-Path $logs 'docker-startup.log'
+$mutex = [Threading.Mutex]::new($false, 'Local\NexusNXSDockerStartup')
+$owned = $false
+try {
+  try { $owned = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $owned = $true }
+  if (-not $owned) { exit 0 }
+  Add-Content -LiteralPath $log -Value "[$([DateTime]::UtcNow.ToString('o'))] Startup requested."
+  # Questo processo figlio conserva un codice di uscita verificabile e non apre
+  # finestre console. Usa la stessa procedura manuale, incluso il recupero socket.
+  $engine = Join-Path $PSHOME 'powershell.exe'
+  if (-not (Test-Path -LiteralPath $engine)) { $engine = Join-Path $PSHOME 'pwsh.exe' }
+  $start = [Diagnostics.ProcessStartInfo]::new()
+  $start.FileName = $engine
+  $start.Arguments = '-NoProfile -NonInteractive -File "' + (Join-Path $PSScriptRoot 'manage-self-hosted-search.ps1') + '" -Action start'
+  $start.UseShellExecute = $false
+  $start.CreateNoWindow = $true
+  $start.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  $start.RedirectStandardOutput = $true
+  $start.RedirectStandardError = $true
+  $child = [Diagnostics.Process]::Start($start)
+  $output = $child.StandardOutput.ReadToEndAsync()
+  $errors = $child.StandardError.ReadToEndAsync()
+  $child.WaitForExit()
+  [IO.File]::AppendAllText($log, $output.GetAwaiter().GetResult() + $errors.GetAwaiter().GetResult())
+  $exitCode = $child.ExitCode
+  $child.Dispose()
+  if ($exitCode -ne 0) { throw "Docker/Search startup failed (exit $exitCode). See $log" }
+  Add-Content -LiteralPath $log -Value "[$([DateTime]::UtcNow.ToString('o'))] Docker and search healthy."
+} catch {
+  Add-Content -LiteralPath $log -Value "[$([DateTime]::UtcNow.ToString('o'))] FAILED: $($_.Exception.Message)"
+  throw
+} finally {
+  if ($owned) { $mutex.ReleaseMutex() }
+  $mutex.Dispose()
+}
