@@ -2611,7 +2611,8 @@ private fun JSONArray?.toTurns() = buildList {
 
 @Composable private fun NexusTheme(content: @Composable () -> Unit) {
     val metrics = rememberNexusMetrics()
-    CompositionLocalProvider(LocalNexusMetrics provides metrics) { MaterialTheme(
+    val cosmicScene = remember { CosmicSceneState() }
+    CompositionLocalProvider(LocalNexusMetrics provides metrics, LocalCosmicScene provides cosmicScene) { MaterialTheme(
     colorScheme = darkColorScheme(primary = Cyan, background = Ink, surface = Surface, surfaceVariant = Surface2, outline = Hairline, onPrimary = Color(0xFF002223), onBackground = Ice, onSurface = Ice, onSurfaceVariant = Mist),
     typography = Typography(
         displaySmall = TextStyle(fontFamily = NexusSans, fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.72).sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
@@ -2745,6 +2746,7 @@ private fun JSONArray?.toTurns() = buildList {
             }.statusBarsPadding().navigationBarsPadding().imePadding()
                 .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = 10.dp)
         ) {
+            CosmicScene(Modifier.fillMaxSize())
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
             AnimatedVisibility(controlsAwake, modifier = Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
                 IconButton(onClick = { keyboard?.hide(); settingsOpen = true }, modifier = Modifier.size(48.dp).clip(CircleShape).background(Surface.copy(alpha = .8f))) { PremiumMenuGlyph() }
@@ -2881,6 +2883,7 @@ private fun JSONArray?.toTurns() = buildList {
                     } else Box(Modifier.fillMaxSize()) {
                         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                             NexusInstantCore(
+                                fullScene = true,
                                 active = voiceMode || state.busy,
                                 offline = state.connection == NexusConnection.OFFLINE,
                                 reduceMotion = reduceMotion,
@@ -3252,8 +3255,9 @@ private fun JSONArray?.toTurns() = buildList {
     }
 }
 
-@Composable private fun NexusInstantCore(active: Boolean, offline: Boolean, reduceMotion: Boolean, energy: Float = 0f, diameter: Dp = 214.dp, phaseState: String = if (offline) "offline" else if (active) "listening" else "idle", onClick: () -> Unit) {
-    AstralCore(diameter = diameter, state = phaseState, energy = energy, reduceMotion = reduceMotion, particleBudget = LocalNexusMetrics.current.particleBudget, onClick = onClick)
+@Composable private fun NexusInstantCore(active: Boolean, offline: Boolean, reduceMotion: Boolean, energy: Float = 0f, diameter: Dp = 214.dp, phaseState: String = if (offline) "offline" else if (active) "listening" else "idle", fullScene: Boolean = false, onClick: () -> Unit) {
+    if (fullScene) CosmicCore(diameter = diameter, state = phaseState, energy = energy, reduceMotion = reduceMotion, onClick = onClick)
+    else CosmicStandaloneCore(diameter = diameter, state = phaseState, energy = energy, reduceMotion = reduceMotion, onClick = onClick)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -4903,7 +4907,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 ) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi", "Close"), modifier = Modifier.size(23.dp)) }
                 Column(Modifier.align(Alignment.Center).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.fillMaxWidth().height(238.dp), contentAlignment = Alignment.Center) {
-                        VoiceAura(listening, voiceEnergy, reduceMotion)
+
                         NexusInstantCore(
                             active = listening,
                             offline = connection == NexusConnection.OFFLINE,
@@ -4935,33 +4939,6 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)
                 )
             }
-        }
-    }
-}
-
-@Composable private fun VoiceAura(active: Boolean, energy: Float, reduceMotion: Boolean) {
-    val pulse = nexusLoopFloat(!reduceMotion, 0f, 1f, 1350, RepeatMode.Reverse, "voiceAuraPulse")
-    val smoothEnergy by animateFloatAsState(if (active) energy else 0f, tween(NexusFlow.QUICK, easing = NexusFlow.standard), label = "voiceEnergy")
-    Canvas(Modifier.size(188.dp)) {
-        val signal = if (reduceMotion) smoothEnergy else smoothEnergy + pulse * .12f
-        drawCircle(Brush.radialGradient(listOf(Cyan.copy(alpha = .13f + signal * .10f), Cyan.copy(alpha = .025f), Color.Transparent)), radius = size.minDimension * (.42f + signal * .08f))
-        repeat(3) { ring ->
-            val radius = size.minDimension * (.22f + ring * .105f + signal * (.018f + ring * .008f))
-            drawCircle(Cyan.copy(alpha = (if (active) .28f else .10f) / (ring + 1)), radius = radius, style = Stroke(width = (1.4f - ring * .2f).dp.toPx()))
-        }
-    }
-}
-
-@Composable private fun VoiceWaveform(active: Boolean, energy: Float, reduceMotion: Boolean) {
-    val phase = nexusLoopFloat(!reduceMotion, 0f, 6.28f, NexusFlow.VOICE_WAVE, RepeatMode.Restart, "wavePhase")
-    Canvas(Modifier.fillMaxWidth(.62f).height(92.dp)) {
-        val bars = 23
-        val gap = size.width / bars
-        repeat(bars) { index ->
-            val normalized = kotlin.math.sin((index / bars.toFloat()) * 3.14f).coerceAtLeast(.12f)
-            val motion = if (active && !reduceMotion) (.5f + .5f * kotlin.math.sin(phase + index * .72f)) else .18f
-            val height = size.height * normalized * (.18f + motion * (.30f + energy * .52f))
-            drawLine(if (active) Cyan else Mist.copy(alpha = .72f), androidx.compose.ui.geometry.Offset(gap * index + gap / 2, size.height / 2 - height / 2), androidx.compose.ui.geometry.Offset(gap * index + gap / 2, size.height / 2 + height / 2), strokeWidth = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
         }
     }
 }

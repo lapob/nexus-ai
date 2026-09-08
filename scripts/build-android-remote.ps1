@@ -10,6 +10,8 @@ $ErrorActionPreference = "Stop"
 #region Configurazione ambiente e credenziali
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+& node (Join-Path $PSScriptRoot 'generate-cosmic-visualizers.js') --check
+if ($LASTEXITCODE -ne 0) { throw 'Asset visualizer non sincronizzati con il desktop.' }
 $developmentPaths = Join-Path $PSScriptRoot 'lib\development-paths.ps1'
 . $developmentPaths
 $developmentLayout = Get-NexusDevelopmentLayout -ProjectRoot $projectRoot

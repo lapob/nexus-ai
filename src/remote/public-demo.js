@@ -3,7 +3,8 @@
  * @description NexusNXS AI pubblica: voce, memoria locale, allegati e download adattivo.
  */
 
-const { createAstralCore } = require('../shared/astral-core');
+const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
+const { createDesktopRecipes } = require('../shared/desktop-recipes');
 const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-0.3.14-Setup.exe';
 const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-Android.apk';
 
@@ -215,7 +216,7 @@ const COGNITION_STYLE = `<style>
  */
 // #region 01 — Runtime cosmico di NexusNXS AI
 
-function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
+function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizers, createDesktopRecipes) {
   const button = document.getElementById('core');
   const canvas = document.getElementById('coreCanvas');
   const exchange = document.querySelector('.exchange');
@@ -253,7 +254,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
         paint.fillStyle = `rgba(166,224,234,${readingFade})`;
         paint.beginPath(); paint.arc(x,y,star.radius,0,Math.PI*2); paint.fill();
       }
-      field.dataset.assembled = canvas.dataset.assembled || 'false';
+      field.dataset.assembled = String(renderer.getMetrics().arrival === 1);
     }
     if (!document.hidden && !motion.matches) fieldFrame = requestAnimationFrame(drawField);
   };
@@ -263,12 +264,12 @@ function publicAiCosmicRuntime(corePalette, presentation, createAstralCore) {
   addEventListener('resize', onFieldResize, { passive: true });
   document.addEventListener('visibilitychange', resumeField);
   motion.addEventListener('change', resumeField);
-  const renderer = createAstralCore(canvas, { host: button, viewport: true, efficient, getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) });
+  const renderer = createCosmicVisualizers(canvas, { host: button, efficient, getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) }, createDesktopRecipes);
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
-  globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => Number(canvas.dataset.astralParticles || 0), renderer: () => renderer.getMetrics() };
-  addEventListener('pagehide', () => { observer.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); }, { once: true });
+  globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => renderer.getMetrics().particles, renderer: () => renderer.getMetrics() };
+  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
   readExchange();
 }
 
@@ -328,7 +329,7 @@ function publicReadinessRuntime() {
 // #region 02 — Composizione e pubblicazione della pagina
 
 function publicAiCosmicCoreScript({ palette, presentation }) {
-  return `<style>.core-glyph{display:none!important}.core canvas{inset:-15%;width:130%;height:130%;filter:none!important}.core[data-state] canvas{filter:none!important}</style><script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)},${createAstralCore.toString()});</script>`;
+  return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}</style><script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)},${createCosmicVisualizers.toString()},${createDesktopRecipes.toString()});</script>`;
 }
 
 /** Renderer DOM sicuro condiviso dalla generazione e dalla risposta conclusa. */

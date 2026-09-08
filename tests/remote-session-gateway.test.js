@@ -1256,9 +1256,9 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /navigator\.deviceMemory/);
     assert.match(publicHtml, /classList\.toggle\('has-response'/);
     assert.match(publicHtml, /nexusCosmicMetrics/);
-    assert.match(publicHtml, /new Float32Array\(capacity\)/);
-    assert.match(publicHtml, /function createAstralCore\(/);
-    assert.match(publicHtml, /Math\.min\(capacity/);
+    assert.match(publicHtml, /new Float32Array\(count\*3\)/);
+    assert.match(publicHtml, /function createCosmicVisualizers\(/);
+    assert.match(publicHtml, /Math\.floor\(budget\*quality\)/);
     assert.match(publicHtml, /button\.dataset\.state/);
     assert.match(publicHtml, /stateTransitionsPreservePhase/);
     assert.match(publicHtml, /id="cognition"/);

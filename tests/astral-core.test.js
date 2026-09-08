@@ -151,16 +151,13 @@ test('slow ambient motion does not delay voice feedback or simple core clicks', 
   f.renderer.dispose();
 });
 
-test('Android and all desktop visualizers share the same decorative motion rates', () => {
-  const android = fs.readFileSync(path.join(__dirname, '../android/NexusRemote/app/src/main/java/local/nexus/remote/AstralCore.kt'), 'utf8');
+test('Presence and all desktop visualizers retain their decorative motion rates', () => {
   const animation = fs.readFileSync(path.join(__dirname, '../src/renderer/systems/AnimationController.ts'), 'utf8');
   for (const [name, value] of [['ambientScale', '.55'], ['returnOmega', '1.1']]) {
     assert.ok(source.includes(`${name}: ${value}`));
     assert.ok(animation.includes(`${name}: ${value}`));
-    assert.ok(android.includes(`${name} = ${value}f`));
   }
   assert.ok(source.includes('pointerRelease: .8'));
-  assert.ok(android.includes('pointerRelease = .8f'));
   assert.ok(animation.includes('release: .8'));
   for (const name of ['ParticleEngine', 'SaturnVisualizer', 'NexusCore']) {
     const visualizer = fs.readFileSync(path.join(__dirname, `../src/renderer/scene/${name}.tsx`), 'utf8');
@@ -171,13 +168,14 @@ test('Android and all desktop visualizers share the same decorative motion rates
   assert.match(inspection, /dragging \? 9 : VISUALIZER_MOTION\.returnOmega/);
 });
 
-test('Android uses the same topology and keeps capture inline through recomposition', () => {
+test('Android loads the shared desktop scene and keeps capture inline through recomposition', () => {
   const base = path.join(__dirname, '../android/NexusRemote/app/src/main/java/local/nexus/remote');
-  const core = fs.readFileSync(path.join(base, 'AstralCore.kt'), 'utf8');
+  const core = fs.readFileSync(path.join(base, 'CosmicVisualizers.kt'), 'utf8');
   const activity = fs.readFileSync(path.join(base, 'NexusMainActivity.kt'), 'utf8');
-  for (const token of ['.61803398875', '91.733', '43758.5453']) { assert.ok(core.includes(token)); assert.ok(source.includes(token)); }
+  assert.match(core, /assets.open\("cosmic-visualizers.html"\)/);
+  assert.equal(fs.existsSync(path.join(base, 'AstralCore.kt')), false);
   assert.match(core, /LocalLifecycleOwner.current.lifecycle/);
-  assert.match(core, /LaunchedEffect\(visible, reduceMotion\)/);
+  assert.match(core, /Lifecycle.Event.ON_STOP/);
   assert.doesNotMatch(core, /LaunchedEffect\(state/);
   assert.match(activity, /if \(inlineState != null\) return/);
   assert.match(activity, /generation != speechGeneration/);
