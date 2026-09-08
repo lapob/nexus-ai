@@ -45,7 +45,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
       vec2 target=gl_Position.xy/gl_Position.w*uStage.xy+uStage.zw;
       float journeyProgress=clamp((uArrival-aJourney.z*.16)/(1.-aJourney.z*.16),0.,1.);
       float settle=journeyProgress*journeyProgress*(3.-2.*journeyProgress);
-      vec2 origin=aJourney.xy*2.-1.;
+      vec2 origin=vec2(aJourney.x*2.-1.,1.-aJourney.y*2.);
       vec2 curl=vec2(sin(aJourney.z*19.),cos(aJourney.z*23.))*sin(journeyProgress*3.14159)*.12;
       gl_Position=vec4(mix(origin,target,settle)+curl,0.,1.);
       gl_PointSize=max(.8,gl_PointSize)*uDpr;
@@ -76,7 +76,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     for(const list of Object.values(fields))for(const field of list){
       field.gpu={};const count=field.positions.length/3;
       const journey=new Float32Array(count*3);
-      for(let i=0;i<count;i++){journey[i*3]=((i+1)*.61803398875)%1;journey[i*3+1]=((i+1)*.41421356237)%1;journey[i*3+2]=((i+1)*.754877666)%1;}
+      for(let i=0;i<count;i++){const source=i<(efficient?140:360)&&i%4===0?i+901:i+1;journey[i*3]=(source*.61803398875)%1;journey[i*3+1]=(source*.41421356237)%1;journey[i*3+2]=((i+1)*.754877666)%1;}
       for(const [name,data] of Object.entries({position:field.positions,aSeed:field.seeds,aImportance:field.importance,aJourney:journey})){
         if(!data)continue;const buffer=gl.createBuffer();buffers.push(buffer);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);field.gpu[name]={buffer,size:data.length/count};
       }

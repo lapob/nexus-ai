@@ -244,13 +244,15 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
     if (paint) {
       paint.clearRect(0, 0, width, height);
+      const gatheredArrival = !document.body.classList.contains('keyboard-open') && !document.body.classList.contains('conversation-active') ? renderer.getMetrics().arrival : 0;
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
         let x = star.x * width, y = star.y * height;
         if (!motion.matches) { x += Math.sin(elapsed * .07 + star.phase) * 5; y += Math.cos(elapsed * .06 + star.phase) * 4; }
         const side = Math.min(1, Math.abs(x - width / 2) / Math.min(460, width * .48));
         const readingFade = .04 + .5 * side * side;
-        paint.fillStyle = `rgba(166,224,234,${readingFade})`;
+        const gathered = i % 4 === 0 ? gatheredArrival : 0;
+        paint.fillStyle = `rgba(166,224,234,${readingFade * (1-gathered)})`;
         paint.beginPath(); paint.arc(x,y,star.radius,0,Math.PI*2); paint.fill();
       }
       field.dataset.assembled = String(renderer.getMetrics().arrival === 1);
@@ -263,12 +265,15 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   addEventListener('resize', onFieldResize, { passive: true });
   document.addEventListener('visibilitychange', resumeField);
   motion.addEventListener('change', resumeField);
-  const renderer = createCosmicVisualizers(canvas, { host: button, efficient, getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) }, createDesktopRecipes);
+  const renderer = createCosmicVisualizers(canvas, { host: button, efficient, getVisible: () => !document.body.classList.contains('keyboard-open') && !document.body.classList.contains('conversation-active'), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) }, createDesktopRecipes);
+  // The GPU canvas belongs to the page, so host opacity cannot hide it.
+  const layoutObserver = new MutationObserver(() => renderer.refresh());
+  layoutObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
   globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => renderer.getMetrics().particles, renderer: () => renderer.getMetrics() };
-  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
+  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); layoutObserver.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
   readExchange();
 }
 
@@ -329,6 +334,7 @@ function publicReadinessRuntime() {
 
 function publicAiCosmicCoreScript({ palette, presentation }) {
   return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}
+body.keyboard-open:not(.request-active):not(.conversation-active) .copy{opacity:0;visibility:hidden;filter:none}
 @media(max-height:540px) and (min-width:600px){
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:30px;min-height:0;padding-top:0}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(34dvh,180px)!important;flex:0 0 min(34dvh,180px);margin:0!important}
