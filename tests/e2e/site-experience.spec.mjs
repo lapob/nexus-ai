@@ -77,7 +77,7 @@ test("the homepage loads real product captures without CSP or runtime errors", a
   // Both clients show real captures; the ambient field remains shared.
   await expect(page.locator(".app-card-visual.android img")).toHaveCount(1);
   await expect(page.locator(".app-card-visual.desktop img")).toHaveCount(1);
-  await expect(page.locator(".app-card[data-cosmic-form='saturn']")).toHaveCount(1);
+  await expect(page.locator(".app-card[data-cosmic-form='ambient']")).toHaveCount(2);
   const captures = await page.locator(".app-card-visual img").evaluateAll((images) =>
     images.map((image) => ({ width: image.naturalWidth, height: image.naturalHeight })),
   );
