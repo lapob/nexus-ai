@@ -329,7 +329,14 @@ function publicReadinessRuntime() {
 // #region 02 — Composizione e pubblicazione della pagina
 
 function publicAiCosmicCoreScript({ palette, presentation }) {
-  return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}</style><script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)},${createCosmicVisualizers.toString()},${createDesktopRecipes.toString()});</script>`;
+  return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}
+@media(max-height:540px) and (min-width:600px){
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:30px;min-height:0;padding-top:0}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(34dvh,180px)!important;flex:0 0 min(34dvh,180px);margin:0!important}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy{max-width:420px;margin:0;text-align:left}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy h1{font-size:clamp(24px,4vw,36px)!important;line-height:1.1;white-space:normal}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .phase{display:none}
+}</style><script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)},${createCosmicVisualizers.toString()},${createDesktopRecipes.toString()});</script>`;
 }
 
 /** Renderer DOM sicuro condiviso dalla generazione e dalla risposta conclusa. */
