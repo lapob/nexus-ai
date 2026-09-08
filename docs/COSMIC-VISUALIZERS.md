@@ -43,3 +43,18 @@ la scena completa, gli overlay mantengono una superficie locale indipendente.
 
 Evidenze locali: `cosmic-final-browser.json`, `cosmic-tests-final.log`,
 `cosmic-final-targeted.log`, `cosmic-experience.log`, `cosmic-android-verified.log`.
+
+## Chiusura web
+
+Pubblicato il Worker `321cc589-75a0-429f-80c6-a1b1079c4bfe` dal commit sito
+`af92e9b`: 34 test unitari, 23 browser e 14 percorsi pubblici verificati.
+Richiesta AI pubblica reale di solo totale 7 + 5: `12`. Perdita e ripristino
+del contesto GPU provati nel browser senza errori. Corretta una collisione
+del titolo con i controlli a 844x390; ispezionati anche 390x568 e la risposta.
+Il primo candidato era stato bloccato da un 503 durante il riavvio del servizio;
+la verifica successiva è stata completata prima della promozione.
+
+Preview Android finale: SHA-256
+`21B909B6AAB1F6217CE86D3AF07C22DE59429A06C0A00982DF8A1056961C7506`.
+Include ricreazione della scena locale in caso di perdita del processo grafico.
+Build e lint passati; le prove sul dispositivo e la promozione APK restano aperte.
