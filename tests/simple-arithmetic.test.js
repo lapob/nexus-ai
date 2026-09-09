@@ -13,6 +13,8 @@ const {
 test('verifica il calcolo richiesto direttamente tramite vincolo di formato', () => {
   for (const [question, expected] of [
     ['Rispondi solo con il totale: 17 × 23 + 19.', '410'],
+    ['125+275+10. Solo il totale.', '410'],
+    ['125+275+10? Only the total.', '410'],
     ['Rispondi solo con il risultato: 12 × 7 - 9.', '75'],
     ['Reply only with the total: 31 * 4 + 6.', '130']
   ]) assert.equal(deterministicArithmeticReply(question), expected);

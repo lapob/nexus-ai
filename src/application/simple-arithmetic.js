@@ -126,7 +126,7 @@ function cueIsBoundToExpression(text, cue, expression) {
     return /^\s*(?:(?:di|of|dell['’]?operazione|della\s+operazione)\s*)?[:=]?\s*$/iu.test(gap);
   }
   const gap = text.slice(expression.index + expression[0].length, cue.index);
-  return /^\s*[:;,-]?\s*$/u.test(gap);
+  return /^\s*[:;,.!?-]?\s*$/u.test(gap);
 }
 
 function detectLanguage(question) {
