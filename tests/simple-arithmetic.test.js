@@ -10,6 +10,21 @@ const {
   simpleArithmeticSolution
 } = require('../src/application/simple-arithmetic');
 
+test('verifica il calcolo richiesto direttamente tramite vincolo di formato', () => {
+  for (const [question, expected] of [
+    ['Rispondi solo con il totale: 17 × 23 + 19.', '410'],
+    ['Rispondi solo con il risultato: 12 × 7 - 9.', '75'],
+    ['Reply only with the total: 31 * 4 + 6.', '130']
+  ]) assert.equal(deterministicArithmeticReply(question), expected);
+  assert.equal(simpleArithmeticSolution('Rispondi solo con il totale: il codice 17 × 23 + 19 è stampato sul prodotto.'), null);
+});
+
+test('ricontrolla la richiesta precedente senza fidarsi del risultato del modello', () => {
+  const history = [{ role: 'user', content: 'Rispondi solo con il totale: 17 × 23 + 19.' }, { role: 'assistant', content: '390' }];
+  assert.equal(deterministicArithmeticReply('Controlla di nuovo il calcolo precedente usando uno strumento, se disponibile.', history), '410. Ho verificato con il calcolatore aritmetico interno.');
+  assert.equal(deterministicArithmeticReply('Controlla il calcolo precedente', [...history, {role: 'user', content: 'Parliamo del meteo'}]), null);
+});
+
 test('interpreta per come moltiplicazione nel caso italiano osservato', () => {
   const question = 'Rispondi in italiano con una sola frase: qual è il risultato di 17 per 6?';
   assert.deepEqual(simpleArithmeticSolution(question), {
@@ -107,6 +122,6 @@ test('calcola un totale aggregato con una sola variazione percentuale esplicita'
 
 test('il percorso desktop e guest applica il fast path prima del modello', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'application', 'register-ipc.js'), 'utf8');
-  assert.match(source, /deterministicArithmeticReply\(question\)/u);
-  assert.match(source, /deterministicArithmeticReply\(parsed\.question\)/u);
+  assert.match(source, /deterministicArithmeticReply\(question, history\)/u);
+  assert.match(source, /deterministicArithmeticReply\(parsed\.question, parsed\.history\)/u);
 });

@@ -15,7 +15,7 @@ const MATH_CUE = /\b(?:quanto\s+(?:fa|fanno)|qual\s+[èe]\s+(?:il\s+)?(?:risulta
 const EXPLANATION_CUE = /\b(?:spiega|explain)\b/iu;
 const DETAILED_EXPLANATION_CUE = /\b(?:mostra\s+(?:i\s+)?passaggi|passo\s+passo|dimostra|show\s+(?:the\s+)?work|step\s+by\s+step|prove)\b/iu;
 const CODE_CONTEXT = /```|\b(?:javascript|typescript|python|java|c\+\+|codice|code|script|regex)\b/iu;
-const OUTPUT_NUMBER_ONLY = /\b(?:(?:rispondi|restituisci|scrivi)\s+(?:solo|soltanto|esclusivamente)\s+(?:con\s+)?(?:il\s+)?(?:numero|risultato)|(?:solo|soltanto|esclusivamente)\s+(?:il\s+)?(?:numero|risultato)|(?:reply|answer|return|write)\s+(?:only|just|exclusively)\s+(?:with\s+)?(?:the\s+)?(?:number|result)|(?:only|just)\s+(?:the\s+)?(?:number|result))\b/iu;
+const OUTPUT_NUMBER_ONLY = /\b(?:(?:rispondi|restituisci|scrivi)\s+(?:solo|soltanto|esclusivamente)\s+(?:con\s+)?(?:il\s+)?(?:numero|risultato|totale)|(?:solo|soltanto|esclusivamente)\s+(?:il\s+)?(?:numero|risultato|totale)|(?:reply|answer|return|write)\s+(?:only|just|exclusively)\s+(?:with\s+)?(?:the\s+)?(?:number|result|total)|(?:only|just)\s+(?:the\s+)?(?:number|result|total))\b/iu;
 const OUTPUT_NUMBER_AND_UNIT = /\b(?:(?:rispondi|restituisci|scrivi)\s+(?:solo|soltanto)\s+con\s+(?:il\s+)?(?:numero|totale(?:\s+finale)?|risultato)\s+e\s+(?:l['’]\s*)?unit[aà]|(?:reply|answer)\s+(?:only|just)\s+with\s+(?:the\s+)?(?:number|final\s+total|result)\s+and\s+unit)(?=$|[^\p{L}])/iu;
 const PERCENT_CHANGE_CUE = /\b(?:aument|increment|cres|miglior|riduc|ridott|dimin|cal|perd|fall|scart|scont|increase|grow|improv|reduce|decrease|drop|lose|lost|fail|discard|discount)/iu;
 const PERCENT_INCREASE_CUE = /\b(?:aument|increment|cres|miglior|increase|grow|improv|gain)\p{L}*/iu;
@@ -243,6 +243,8 @@ function simpleArithmeticSolution(question = '') {
   if (ARITHMETIC_CONTINUATION.test(remainder)) return null;
   MATH_CUE.lastIndex = 0;
   const cues = [...text.matchAll(MATH_CUE)];
+  const formatCue = text.match(OUTPUT_NUMBER_ONLY);
+  if (formatCue) cues.push(formatCue);
   const symbolicOnly = /^[\s\d.,+\-*/^x×÷−]+[?!.\s]*$/u.test(text);
   if (!symbolicOnly && !cues.some((cue) => cueIsBoundToExpression(text, cue, expression))) return null;
   const tokens = tokenize(expression[0]);
@@ -258,8 +260,17 @@ function simpleArithmeticSolution(question = '') {
   };
 }
 
-function deterministicArithmeticReply(question = '') {
+function deterministicArithmeticReply(question = '', history = []) {
   const prompt = String(question || '');
+  if (/\b(?:controlla|verifica|ricontrolla|check|verify)\b/iu.test(prompt)
+      && /\b(?:calcolo precedente|risultato precedente|previous calculation|previous result)\b/iu.test(prompt)
+      && !/\d/u.test(prompt) && !CODE_CONTEXT.test(prompt)) {
+    const previous = [...history].reverse().find(turn => turn.role === 'user');
+    const checked = previous && simpleArithmeticSolution(previous.content);
+    if (checked) return checked.language === 'it'
+      ? `${checked.formatted}. Ho verificato con il calcolatore aritmetico interno.`
+      : `${checked.formatted}. I verified it with the internal arithmetic calculator.`;
+  }
   if (DETAILED_EXPLANATION_CUE.test(prompt)) return null;
   const percentage = percentageAggregateSolution(question) || percentageSequenceSolution(question);
   if (percentage) {

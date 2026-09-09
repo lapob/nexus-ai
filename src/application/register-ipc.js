@@ -1505,7 +1505,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     const requestId = payload.requestId ? parseRequestId(payload.requestId) : randomUUID();
     cancelSenderRequest(event.sender.id);
     const instantReply = attachmentIds.length === 0 && parsed.mode !== 'deep'
-      ? strictToolRoutingReply(question) || deterministicUtilityReply(question) || deterministicSecurityReply(question) || deterministicArithmeticReply(question) || deterministicCodeOutputReply(question) || instantConversationalReply(question)
+      ? strictToolRoutingReply(question) || deterministicUtilityReply(question) || deterministicSecurityReply(question) || deterministicArithmeticReply(question, history) || deterministicCodeOutputReply(question) || instantConversationalReply(question)
       : null;
     if (instantReply) return { answer: instantReply, sources: [], mode: 'instant', requestId, usage: { promptTokens: 0, completionTokens: 0 } };
     senderRequests.set(event.sender.id, requestId);
@@ -1591,7 +1591,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     };
     cancelSenderRequest(event.sender.id);
     const instantReply = attachmentIds.length === 0 && parsed.mode !== 'deep'
-      ? strictToolRoutingReply(question) || deterministicUtilityReply(question) || deterministicSecurityReply(question) || deterministicArithmeticReply(question) || deterministicCodeOutputReply(question) || instantConversationalReply(question)
+      ? strictToolRoutingReply(question) || deterministicUtilityReply(question) || deterministicSecurityReply(question) || deterministicArithmeticReply(question, history) || deterministicCodeOutputReply(question) || instantConversationalReply(question)
       : null;
     if (instantReply) {
       const result = { requestId, message: { role: 'assistant', content: instantReply }, finishReason: 'stop', usage: { promptTokens: 0, completionTokens: 0 } };
@@ -1819,7 +1819,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     report('Comprendo la richiesta e preparo il contesto…');
     const parsed = parseChatRequest({ question: text, mode, history: conversation.turns });
     const instantReply = parsed.mode !== 'deep'
-      ? strictToolRoutingReply(parsed.question) || deterministicUtilityReply(parsed.question) || deterministicSecurityReply(parsed.question) || deterministicArithmeticReply(parsed.question) || deterministicCodeOutputReply(parsed.question) || instantConversationalReply(parsed.question)
+      ? strictToolRoutingReply(parsed.question) || deterministicUtilityReply(parsed.question) || deterministicSecurityReply(parsed.question) || deterministicArithmeticReply(parsed.question, parsed.history) || deterministicCodeOutputReply(parsed.question) || instantConversationalReply(parsed.question)
       : null;
     if (instantReply) {
       const answer = instantReply;

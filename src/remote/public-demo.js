@@ -220,6 +220,25 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const canvas = document.getElementById('coreCanvas');
   const exchange = document.querySelector('.exchange');
   const userPrompt = document.getElementById('userPrompt');
+  const fitCore = () => {
+    if (document.body.matches('.keyboard-open,.request-active,.conversation-active')) return;
+    const copy = document.querySelector('.copy');
+    const dock = document.querySelector('.dock');
+    const header = document.querySelector('.identity');
+    if (!copy || !dock || !header || (innerHeight <= 540 && innerWidth >= 600)) return;
+    const style = getComputedStyle(copy);
+    const copyHeight = copy.getBoundingClientRect().height + parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0);
+    const stage = document.querySelector('.stage');
+    const coreStyle = getComputedStyle(button);
+    const stageTop = Math.max(header.getBoundingClientRect().bottom + 16, stage.getBoundingClientRect().top + parseFloat(getComputedStyle(stage).paddingTop || 0));
+    const available = dock.getBoundingClientRect().top - stageTop - copyHeight - parseFloat(coreStyle.marginBottom || 0) - parseFloat(coreStyle.marginTop || 0) - 24;
+    button.style.setProperty('--nxs-core-fit', `${Math.max(80, available)}px`);
+  };
+  const fitObserver = new ResizeObserver(fitCore);
+  for (const element of document.querySelectorAll('.copy,.dock,.identity')) fitObserver.observe(element);
+  addEventListener('resize', fitCore, { passive: true });
+  document.fonts?.ready.then(fitCore);
+  setTimeout(fitCore, 800);
   const efficient = navigator.connection?.saveData || Number(navigator.deviceMemory || 4) <= 3;
   const field = document.createElement('canvas');
   field.id = 'ambientParticles'; field.setAttribute('aria-hidden', 'true');
@@ -271,14 +290,52 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   button.addEventListener('click', retainVoiceCore, true);
   const renderer = createCosmicVisualizers(canvas, { host: button, efficient, gatherBackground: true, disperseOnHide: true, getVisible: () => !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusDemoState?.voiceEnergy || 0) }, createDesktopRecipes);
   // The GPU canvas belongs to the page, so host opacity cannot hide it.
-  const layoutObserver = new MutationObserver(() => { if (document.body.classList.contains('keyboard-open')) voiceCore = false; renderer.refresh(); });
+  const layoutObserver = new MutationObserver(() => { if (document.body.classList.contains('keyboard-open')) voiceCore = false; renderer.refresh(); fitCore(); });
   layoutObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
   const readExchange = () => document.body.classList.toggle('has-response', Boolean(userPrompt.textContent));
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
   globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => renderer.getMetrics().particles, renderer: () => renderer.getMetrics() };
-  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); layoutObserver.disconnect(); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
+  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); removeEventListener('resize', fitCore); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
   readExchange();
+}
+
+function publicDraftRuntime() {
+  const input = document.getElementById('prompt');
+  const box = document.querySelector('.composer-box');
+  if (!input || !box) return;
+  const key = 'nxs.tab-draft.v1';
+  const label = document.createElement('label');
+  label.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 10px;color:#b6cecf';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  label.append(checkbox, document.createTextNode('Conserva la bozza in questa scheda'));
+  box.append(label);
+  const save = () => {
+    try {
+      if (checkbox.checked) sessionStorage.setItem(key, JSON.stringify({ text: input.value.slice(0,12000), savedAt: Date.now() }));
+      else sessionStorage.removeItem(key);
+    } catch { checkbox.checked = false; }
+  };
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (stored && typeof stored.text === 'string' && Date.now() - stored.savedAt < 86400000) {
+      checkbox.checked = true;
+      input.value = stored.text.slice(0,12000);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    } else sessionStorage.removeItem(key);
+  } catch { /* Storage may be unavailable in private browser configurations. */ }
+  checkbox.addEventListener('change', save);
+  input.addEventListener('input', save);
+  addEventListener('pagehide', save);
+  const submitted = new MutationObserver(() => { if (!input.value) save(); });
+  submitted.observe(document.getElementById('userPrompt'), { childList: true, subtree: true, characterData: true });
+  document.getElementById('memoryClear')?.addEventListener('click', () => {
+    checkbox.checked = false;
+    input.value = '';
+    save();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 function publicReadinessRuntime() {
@@ -339,8 +396,9 @@ function publicReadinessRuntime() {
 function publicAiCosmicCoreScript({ palette, presentation }) {
   return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}
 .core{user-select:none;-webkit-tap-highlight-color:transparent}.core:focus:not(:focus-visible){outline:none;box-shadow:none}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active):not(.status-active) .core{width:min(94vw,60dvh,1100px)}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{width:min(94vw,60dvh,1100px)}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .exchange{display:none}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active):not(.status-active) .core{width:min(94vw,60dvh,1100px,var(--nxs-core-fit,60dvh))}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{width:min(94vw,60dvh,1100px,var(--nxs-core-fit,60dvh))}
 body.keyboard-open:not(.request-active):not(.conversation-active) .copy{opacity:0;visibility:hidden;filter:none}
 @media(max-height:540px) and (min-width:600px){
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:30px;min-height:0;padding-top:0}
@@ -591,7 +649,7 @@ function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, and
     .replace('<p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p>', '<p class="privacy"><span class="accuracy-note">NexusNXS può commettere errori.</span> Sessione temporanea: uscendo dalla pagina, la conversazione viene dimenticata. <button id="memoryClear" class="memory-clear" type="button">Cancella ora</button> · <a href="https://nexusnxs.com/">Scopri NexusNXS AI</a></p>')
     .replace('<p id="answer" class="answer"></p>', '<div id="cognition" class="cognition" data-step="understand" hidden aria-hidden="true"><span>Attività</span><ol><li data-step="understand">Comprende</li><li data-step="plan">Pianifica</li><li data-step="retrieve">Ricerca</li><li data-step="verify">Verifica</li><li data-step="respond">Risponde</li></ol></div><header id="answerContext" class="web-answer-context" data-kind="answer" hidden><i aria-hidden="true"></i><span><small id="answerKind">Risposta</small><strong id="answerStatus" hidden></strong></span></header><p id="answer" class="answer"></p><div id="responseActions" class="response-actions" hidden><button id="copyResponse" class="response-action" data-label="Copia" type="button">Copia</button><button id="deepenResponse" class="response-action" data-label="Approfondisci" type="button">Approfondisci</button><button id="exportResponse" class="response-action" data-label="Esporta" type="button">Esporta</button><button id="feedbackAction" class="feedback-action" type="button" title="Condividi volontariamente questa risposta per la revisione e il miglioramento di NexusNXS">Migliora NexusNXS</button><span id="feedbackStatus" class="feedback-status" role="status" aria-live="polite"></span></div><div id="artifacts" class="artifact-grid"></div><figure id="imageResult" class="generated-image" hidden><img id="imageOutput" alt=""><figcaption>Creato da NexusNXS</figcaption></figure>')
     .replace('</head>', () => `${coreStyle}${EXPERIENCE_STYLE}${INTERACTION_VISIBILITY_STYLE}${ATTACHMENT_STYLE}${RESPONSE_STYLE}${RESPONSE_PRESENTATION_STYLE}${COGNITION_STYLE}${SESSION_EXPERIENCE_STYLE}${CONVERSATION_LAYOUT_STYLE}${SLASH_COMMAND_STYLE}${KEYBOARD_VIEWPORT_STYLE}</head>`)
-    .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog><script>(${publicReadinessRuntime.toString()})();</script>${experienceScript({ windowsDownload, androidDownload })}${coreScript}</body>`);
+    .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog><script>(${publicReadinessRuntime.toString()})();</script>${experienceScript({ windowsDownload, androidDownload })}<script>(${publicDraftRuntime.toString()})();</script>${coreScript}</body>`);
 }
 
 // Nomi pubblici canonici. Gli alias storici restano esportati per una release,

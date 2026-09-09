@@ -2848,7 +2848,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 BasicTextField(
                                     value = state.draft,
                                     onValueChange = { dispatch("draft", it.take(12_000)) },
-                                    enabled = interactionAvailable,
+                                    enabled = true,
                                     modifier = Modifier.weight(1f).heightIn(min = 42.dp, max = 132.dp).focusRequester(focusRequester).padding(start = 8.dp, top = 10.dp, bottom = 10.dp),
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = Ice),
                                     cursorBrush = SolidColor(Cyan),
@@ -2876,7 +2876,7 @@ private fun JSONArray?.toTurns() = buildList {
                             } else Box(Modifier.fillMaxWidth().height(54.dp)) {
                                 IconButton(
                                     onClick = { textMode = true },
-                                    enabled = interactionAvailable,
+                                    enabled = true,
                                     modifier = Modifier.align(Alignment.CenterStart).size(50.dp).clip(CircleShape).background(Surface.copy(alpha = .9f))
                                 ) { Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice, modifier = Modifier.size(22.dp)) }
                             }
@@ -2943,7 +2943,7 @@ private fun JSONArray?.toTurns() = buildList {
                         }
                         IconButton(
                             onClick = { typedSession = true; textMode = true },
-                            enabled = interactionAvailable,
+                            enabled = true,
                             modifier = Modifier.align(Alignment.BottomStart).size(52.dp).clip(CircleShape).background(Surface.copy(alpha = .9f))
                         ) { Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice, modifier = Modifier.size(23.dp)) }
                     }
@@ -3119,7 +3119,7 @@ private fun JSONArray?.toTurns() = buildList {
                             BasicTextField(
                                 value = state.draft,
                                 onValueChange = { dispatch("draft", it.take(12_000)) },
-                                enabled = online,
+                                enabled = true,
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = Ice),
                                 cursorBrush = SolidColor(Cyan),
                                 modifier = Modifier.weight(1f).heightIn(min = 44.dp, max = 112.dp).focusRequester(focusRequester).padding(11.dp),
@@ -3141,7 +3141,7 @@ private fun JSONArray?.toTurns() = buildList {
                             IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
                                 Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
                             }
-                            IconButton({ voiceMode = false; textMode = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                            IconButton({ voiceMode = false; textMode = true }, enabled = true, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
                                 Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
                             }
                         }
@@ -3819,7 +3819,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                         IconButton({ openAttachment?.invoke() }, enabled = openAttachment != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
                             Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
                         }
-                        IconButton({ haltCapture(false, false); openKeyboard?.invoke() }, enabled = openKeyboard != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
+                        IconButton({ haltCapture(false, false); openKeyboard?.invoke() }, enabled = openKeyboard != null, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
                             Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
                         }
                     }

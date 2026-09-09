@@ -12,7 +12,7 @@ const assert = require('node:assert/strict');
   const browser = await chromium.launch({ headless: true });
   const report = [];
   try {
-    for (const [width, height] of [[320,568],[390,568],[844,390]]) for (const seed of [.1,.5,.99]) {
+    for (const [width, height] of [[320,568],[390,568],[844,390],[1440,900],[1920,1080]]) for (const seed of [.1,.5,.99]) {
       const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       await page.route('https://ai.nexusnxs.com/', r => r.fulfill({ contentType: 'text/html', body: PUBLIC_AI_HTML.replace('{ host: button, efficient,', `{ host: button, efficient, random:()=>${seed},`) }));
@@ -21,12 +21,17 @@ const assert = require('node:assert/strict');
       const framing = await page.evaluate(() => {
         const core = document.getElementById('core').getBoundingClientRect();
         const title = document.querySelector('h1').getBoundingClientRect();
-        return { core: core.toJSON(), title: title.toJSON(), overflow: document.documentElement.scrollWidth > innerWidth, ...nexusCosmicMetrics.renderer() };
+        const controls = ['keyboard','attachment'].map(id => document.getElementById(id).getBoundingClientRect().toJSON());
+        return { core: core.toJSON(), title: title.toJSON(), controls, overflow: document.documentElement.scrollWidth > innerWidth, ...nexusCosmicMetrics.renderer() };
       });
       assert.equal(framing.overflow, false);
       assert.equal(framing.backend, 'webgl');
       const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
       assert.equal(overlaps(framing.core, framing.title), false, 'Idle Core must not overlap its title');
+      for (const control of framing.controls) {
+        assert.equal(overlaps(control, framing.title), false, 'Controls must not overlap the title');
+        assert.ok(control.bottom <= height && control.top >= 0, 'Controls fit the viewport');
+      }
       assert.deepEqual(errors, []);
       await page.screenshot({ path: `qa-artifacts/core-framing-${width}-${framing.preset}.png` });
       await page.locator('#keyboard').click();
@@ -59,6 +64,6 @@ const assert = require('node:assert/strict');
     assert.equal(await page.evaluate(() => document.querySelector('canvas').getContext('2d').getImageData(0,0,390,568).data.some((value,index)=>index%4===3&&value>0)),false);
     report.push({ fallbackHiddenClearsCanvas:true });
     fs.writeFileSync('qa-artifacts/core-framing-report.json',JSON.stringify(report,null,2));
-    console.log('PASS 9 compact layouts, Core/title separation, composer bounds, gather/release and reduced motion; software fallback clears hidden Core.');
+    console.log('PASS 15 layouts, Core/title/control separation, composer bounds, gather/release and reduced motion; software fallback clears hidden Core.');
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
