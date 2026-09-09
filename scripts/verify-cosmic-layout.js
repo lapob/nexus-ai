@@ -1,12 +1,15 @@
 /** @module scripts/verify-cosmic-layout
  * Browser checks using the workspace site's Playwright toolchain.
  */
+// #region Browser dependencies
 const { chromium } = require('../../.SITE/node_modules/@playwright/test');
 const { PUBLIC_AI_HTML } = require('../src/remote/remote-session-gateway');
 const { createCosmicVisualizers } = require('../src/shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../src/shared/desktop-recipes');
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
+// #endregion
+// #region Layout and interaction verification
 (async () => {
   fs.mkdirSync('qa-artifacts', { recursive: true });
   const browser = await chromium.launch({ headless: true });
@@ -78,3 +81,4 @@ const assert = require('node:assert/strict');
     console.log('PASS 15 layouts, Core/title/control separation, composer bounds, gather/release and reduced motion; software fallback clears hidden Core.');
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
+// #endregion

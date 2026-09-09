@@ -32,6 +32,7 @@ if (-not $ApkPath) {
   $ApkPath = Join-Path $projectRoot $(if ($App -eq 'Public') { 'release-android\NexusNXS-Android.apk' } else { 'release-android\NexusNXS-Control.apk' })
 }
 if (-not (Test-Path -LiteralPath $ApkPath)) { throw "APK non trovato: $ApkPath" }
+$apkSha256 = (Get-FileHash -LiteralPath $ApkPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot $(if ($App -eq 'Public') { 'qa-artifacts\android-public-matrix' } else { 'qa-artifacts\android-control-matrix' }) }
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
@@ -118,15 +119,19 @@ try {
       $jankFailures += "$($profile.Name): $jankyPercent% > $MaxJankyPercent%"
     }
   }
-  [pscustomobject]@{
+  if ((Get-FileHash -LiteralPath $ApkPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $apkSha256) {
+    throw 'APK modificato durante la verifica: ripetere la matrice.'
+  }
+  $manifest = [pscustomobject]@{
     Device = $device
+    ApkSha256 = $apkSha256
     App = $App
     Package = $package
     CapturedAt = (Get-Date).ToString('o')
     Profiles = @($profiles.Name)
     FrameMetrics = $frameMetrics
     MaxJankyPercent = $MaxJankyPercent
-  } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'manifest.json') -Encoding utf8
+  }
   if ($jankFailures.Count) { throw "Budget frame Android non rispettato: $($jankFailures -join '; ')" }
   if ($App -eq 'Control') {
     # La release privata usa FLAG_SECURE: screenshot neri sono il comportamento
@@ -141,6 +146,7 @@ try {
   } else {
     Write-Output "Android visual matrix: PASS ($($profiles.Count) profili in $OutputDirectory)."
   }
+  $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'manifest.json') -Encoding utf8
 }
 finally {
   Restore-Display

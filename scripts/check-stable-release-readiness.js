@@ -4,6 +4,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const root = path.resolve(__dirname, '..');
 const policy = JSON.parse(fs.readFileSync(path.join(root, 'config', 'stable-release-policy.json'), 'utf8'));
@@ -53,8 +54,14 @@ function artifactCheck(id, relativePath, maximumAgeHours, predicate, detail) {
       maximumAgeHours, fresh: Boolean(fresh) } };
 }
 
-function androidMatrixCheck(id, relativePath) {
+function androidMatrixCheck(id, relativePath, apkPath) {
   return artifactCheck(id, relativePath, policy.artifactMaximumAgeHours.androidDeviceMatrix, (artifact) => {
+    if (apkPath) {
+      try {
+        const expected = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, apkPath))).digest('hex');
+        if (String(artifact.ApkSha256 || artifact.apkSha256 || '').toLowerCase() !== expected) return false;
+      } catch { return false; }
+    }
     const profiles = Array.isArray(artifact.profiles) ? artifact.profiles : Array.isArray(artifact.Profiles) ? artifact.Profiles : [];
     const metrics = Array.isArray(artifact.frameMetrics) ? artifact.frameMetrics : Array.isArray(artifact.FrameMetrics) ? artifact.FrameMetrics : [];
     return profiles.length >= policy.android.requiredProfiles
@@ -77,8 +84,8 @@ function buildStableReadinessReport() {
     ...signingChecks(),
     artifactCheck('product-slo', 'qa-artifacts/product-slo-report.json', policy.artifactMaximumAgeHours.productSlo, (artifact) => artifact.releaseReady === true && artifact.onlineReadinessVerified === true, 'SLO automatici recenti e readiness pubblica verificata online'),
     artifactCheck('backup-recovery', 'qa-artifacts/backup-recovery-drill.json', policy.artifactMaximumAgeHours.backupRecoveryDrill, (artifact) => artifact.passed === true && artifact.snapshotIntegrity === true && artifact.encryptedArchiveRoundTrip === true, 'Ripristino e cifratura provati con dati sintetici'),
-    androidMatrixCheck('android-control-device', 'qa-artifacts/android-control-matrix/manifest.json'),
-    androidMatrixCheck('android-public-device', 'qa-artifacts/android-public-matrix/manifest.json'),
+    androidMatrixCheck('android-control-device', 'qa-artifacts/android-control-matrix/manifest.json', 'release-android/NexusNXS-Control.apk'),
+    androidMatrixCheck('android-public-device', 'qa-artifacts/android-public-matrix/manifest.json', 'release-android/NexusNXS-Android.apk'),
     ...policy.externalControls.map((control) => check(control.id, String(process.env[control.environment] || '').trim().toLowerCase() === 'true', control.description))
   ];
   const reportPath = String(process.env[policy.penetrationTestReportEnvironment] || '').trim();

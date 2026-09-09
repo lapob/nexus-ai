@@ -7,11 +7,32 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { runBackupRecoveryDrill } = require('../scripts/run-backup-recovery-drill');
 const { artifactCheck, androidMatrixCheck } = require('../scripts/check-stable-release-readiness');
 
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
+
+test('la matrice Android deve provare esattamente APK della release', () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-apk-evidence-'));
+  const file = path.join(temporary, 'matrix.json');
+  const apk = path.join(temporary, 'release.apk');
+  const profiles = ['small', 'compact', 'font', 'landscape', 'tablet'];
+  const data = { CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
+    FrameMetrics: profiles.map(Profile => ({ Profile, TotalFrames: 100, JankyPercent: 2 })) };
+  const check = () => { fs.writeFileSync(file, JSON.stringify(data)); return androidMatrixCheck('device', file, apk).status; };
+  try {
+    fs.writeFileSync(apk, 'synthetic release one');
+    assert.equal(check(), 'blocked');
+    data.ApkSha256 = crypto.createHash('sha256').update(fs.readFileSync(apk)).digest('hex');
+    assert.equal(check(), 'pass');
+    fs.writeFileSync(apk, 'synthetic release two');
+    assert.equal(check(), 'blocked');
+    fs.unlinkSync(apk);
+    assert.equal(check(), 'blocked');
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+});
 
 test('la matrice rifiuta metriche mancanti negative o profili duplicati', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-matrix-'));
