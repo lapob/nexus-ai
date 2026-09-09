@@ -29,11 +29,14 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   assert.equal(brand.x<state.x+state.width&&brand.x+brand.width>state.x&&brand.y<state.y+state.height&&brand.y+brand.height>state.y,false,'Brand and service state must not overlap');
   assert.equal(report.some(item=>item.overflow),false,'No horizontal overflow');
   if(width<=560){const box=await page.locator('.composer-box').boundingBox(),composer=await page.locator('.composer').boundingBox();assert.ok(box.width>=composer.width-2,'Full width mobile text');}
+  await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await capture('answer-start');
   await page.locator('#prompt').fill('Bozza mantenuta durante il cambio rete');
   await page.context().setOffline(true);await page.evaluate(()=>dispatchEvent(new Event('offline')));
   await page.waitForFunction(()=>document.body.dataset.serviceReadiness==='offline');
   assert.equal(await page.locator('#send').isDisabled(),true,'Offline requests stay disabled');
   await capture('offline');
+  const offlineState=await page.locator('.identity .state').boundingBox(),header=await page.locator('.identity').boundingBox();
+  assert.ok(offlineState.y>=header.y&&offlineState.y+offlineState.height<=header.y+header.height,'Offline status stays inside the header');
   await page.context().setOffline(false);await page.evaluate(()=>dispatchEvent(new Event('online')));
   await page.waitForFunction(()=>document.body.dataset.serviceReadiness==='ready');
   assert.equal(await page.locator('#prompt').inputValue(),'Bozza mantenuta durante il cambio rete');

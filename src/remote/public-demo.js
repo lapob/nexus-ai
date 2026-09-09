@@ -22,7 +22,6 @@ const EXPERIENCE_STYLE = `<style>
 body:not(.request-active):not(.conversation-active) .privacy,body:not(.request-active):not(.conversation-active) .identity .state{visibility:hidden;pointer-events:none}
 body[data-service-readiness="warming"] .identity .state,body[data-service-readiness="offline"] .identity .state{visibility:visible!important;color:#d8e8eb}
 body[data-service-readiness="offline"] .state:before{background:#a6b4b8;box-shadow:none;animation:none}
-@media(max-width:560px){body[data-service-readiness="offline"] .identity .state,body[data-service-readiness="warming"] .identity .state{position:absolute;right:18px;top:70px;font-size:.73rem}}
 body:not(.request-active):not(.conversation-active) .core-caption,body:not(.request-active):not(.conversation-active) .cognition{visibility:hidden}
 body:not(.request-active):not(.conversation-active):not(.memory-cleared) .phase:not([data-microphone=true]){visibility:hidden}
 @media(max-width:560px){.identity .brand-mark{width:38px;height:38px}.identity .wordmark{font-size:.79rem;letter-spacing:.12em}.identity .download-trigger{width:44px}.identity .state{font-size:.73rem}.shell .identity{gap:8px;padding-inline:18px}}
