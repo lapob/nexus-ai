@@ -2922,7 +2922,7 @@ private fun JSONArray?.toTurns() = buildList {
                             ) { label -> Text(label, color = if (state.connection == NexusConnection.OFFLINE) Color(0xFFFF9A91) else Mist, fontSize = 13.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                             if (state.connection != NexusConnection.OFFLINE) Text(
                                 if (voiceMode) inlineVoiceDetail else nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
-                                color = Mist, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                color = Mist, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(top = 8.dp).fillMaxWidth(.82f)
                             )
