@@ -94,7 +94,7 @@
     "qa:web:layout": "node scripts/verify-web-bottom-bar.js",
     "qa:web:probe": "node scripts/probe-public-ai.js",
     "qa:ai:performance": "node scripts/measure-cosmic-performance.js --strict",
-    "qa:ai:layout": "node scripts/verify-cosmic-layout.js",
+    "qa:ai:layout": "node scripts/verify-cosmic-layout.js && node scripts/verify-public-state-layout.js",
     "qa:demo:performance": "npm run qa:ai:performance",
     "qa:web:visual:update": "node scripts/web-visual-regression.js --update",
     "qa:presence": "node scripts/presence-qa.js",

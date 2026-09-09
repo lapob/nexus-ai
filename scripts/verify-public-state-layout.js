@@ -1,0 +1,35 @@
+/** @module scripts/verify-public-state-layout
+ * Verifies narrow, landscape and enlarged-text layouts with synthetic conversations.
+ */
+const {chromium}=require('../../.SITE/node_modules/@playwright/test');
+const {PUBLIC_AI_HTML}=require('../src/remote/remote-session-gateway');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const output=path.resolve(__dirname,'../qa-artifacts');
+process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.resolve(__dirname,'../../.toolchains/playwright');
+(async()=>{
+ const browser=await chromium.launch({headless:true}); const report=[];
+ try { for(const [width,height,font] of [[320,568,100],[390,844,200],[844,390,100],[1440,900,100]]){
+  const page=await browser.newPage({viewport:{width,height},serviceWorkers:'block'});
+  await page.route('https://ai.nexusnxs.com/**',async route=>{
+   const url=new URL(route.request().url());
+   if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:PUBLIC_AI_HTML});
+   if(url.pathname==='/api/guest/bootstrap')return route.fulfill({json:{token:'synthetic-qa',capabilities:{capabilities:[]}}});
+   if(url.pathname==='/api/guest/messages/stream'){const answer='Risposta di prova.\n\n'+('Un paragrafo lungo per controllare leggibilità, scorrimento e separazione dai comandi.\n\n').repeat(12);return route.fulfill({contentType:'application/x-ndjson',body:JSON.stringify({type:'token',token:answer})+'\n'+JSON.stringify({type:'complete',message:answer})+'\n'});}
+   if(url.pathname!=='/readyz')return route.continue();
+   return route.fulfill({json:{ready:true,status:'ready'}});
+  });
+  await page.goto('https://ai.nexusnxs.com/');
+  if(font!==100)await page.addStyleTag({content:`html{font-size:${font}%!important}`});
+  const capture=async state=>{await page.waitForTimeout(600);report.push({width,height,font,state,...await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,controls:[...document.querySelectorAll('button')].filter(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'&&Number(s.opacity)>.1}).map(el=>({id:el.id,rect:el.getBoundingClientRect().toJSON()}))}))});await page.screenshot({path:path.join(output,`web-state-${width}-${font}-${state}.png`)});};
+  await capture('idle');await page.locator('#download').click();await capture('download');await page.locator('#sheetClose').click();
+  await page.locator('#keyboard').click();await page.locator('#prompt').fill('Prova sintetica della disposizione');await capture('compose');await page.locator('#send').click();await page.locator('#answer').filter({hasText:'Risposta di prova.'}).waitFor();await capture('answer');
+  const brand=await page.locator('.brand-lockup').boundingBox(),state=await page.locator('.identity .state').boundingBox();
+  assert.equal(brand.x<state.x+state.width&&brand.x+brand.width>state.x&&brand.y<state.y+state.height&&brand.y+brand.height>state.y,false,'Brand and service state must not overlap');
+  assert.equal(report.some(item=>item.overflow),false,'No horizontal overflow');
+  if(width<=560){const box=await page.locator('.composer-box').boundingBox(),composer=await page.locator('.composer').boundingBox();assert.ok(box.width>=composer.width-2,'Full width mobile text');}
+  await page.close();
+ }}finally{fs.writeFileSync(path.join(output,'web-states-report.json'),JSON.stringify(report,null,2));await browser.close();}
+ console.log('Captured '+report.length+' web states');
+})().catch(e=>{console.error(e);process.exitCode=1});

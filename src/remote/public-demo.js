@@ -170,15 +170,24 @@ syncKeyboardViewport();
 `;
 
 const KEYBOARD_VIEWPORT_STYLE = `<style>
+@media(max-width:560px){
+  .shell .identity{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center}
+  .identity .brand-lockup{grid-column:1;grid-row:1;justify-self:start;max-width:100%}
+  .identity .wordmark{overflow-wrap:anywhere;text-align:left}
+  .identity .identity-actions{display:contents}
+  .identity .download-trigger{grid-column:2;grid-row:1}
+  .shell .identity .state{grid-column:1/-1;grid-row:2;position:static;justify-self:end}
+  body:not(.request-active):not(.conversation-active):not([data-service-readiness="offline"]):not([data-service-readiness="warming"]) .identity .state{display:none}
+}
 @media(max-width:560px),(pointer:coarse){
   body.keyboard-open:not(.conversation-active):not(.request-active) .copy{opacity:0;visibility:hidden;filter:none}
-  body.ime-visible .composer{grid-template-columns:44px 44px minmax(0,1fr);gap:8px;align-items:center}
-  body.ime-visible .composer-box{grid-column:1/-1;grid-row:1;min-height:48px}
+  body:is(.ime-visible,.keyboard-open) .composer{grid-template-columns:44px 44px minmax(0,1fr);gap:8px;align-items:center}
+  body:is(.ime-visible,.keyboard-open) .composer-box{grid-column:1/-1;grid-row:1;min-height:48px}
   body.ime-visible .composer textarea{font-size:16px;min-height:24px;max-height:min(100px,24dvh)}
-  body.ime-visible .attachment-toggle{grid-column:1;grid-row:2}
-  body.ime-visible .keyboard-toggle{grid-column:2;grid-row:2}
-  body.ime-visible .send{grid-column:3;grid-row:2;justify-self:end}
-  body.ime-visible .attachment-toggle,body.ime-visible .keyboard-toggle,body.ime-visible .send{width:44px;height:44px;margin:0}
+  body:is(.ime-visible,.keyboard-open) .attachment-toggle{grid-column:1;grid-row:2}
+  body:is(.ime-visible,.keyboard-open) .keyboard-toggle{grid-column:2;grid-row:2}
+  body:is(.ime-visible,.keyboard-open) .send{grid-column:3;grid-row:2;justify-self:end}
+  body:is(.ime-visible,.keyboard-open) .attachment-toggle,body:is(.ime-visible,.keyboard-open) .keyboard-toggle,body:is(.ime-visible,.keyboard-open) .send{width:44px;height:44px;margin:0}
   body.ime-visible.keyboard-open:not(.request-active):not(.conversation-active) .dock,body.ime-visible.keyboard-open:is(.request-active,.conversation-active) .dock{top:calc(var(--nxs-vv-top) + var(--nxs-vvh) - var(--nxs-dock-height,120px) - 10px);bottom:auto;transform:none;transition:none;padding:8px 0;width:calc(100% - 24px)}
   body.ime-visible .privacy{visibility:hidden;pointer-events:none}
   body.ime-visible:not(.conversation-active) .core,body.ime-visible:not(.conversation-active) .copy{visibility:hidden}

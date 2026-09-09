@@ -54,6 +54,14 @@ const assert = require('node:assert/strict');
       const composer = await page.locator('.composer').boundingBox();
       assert.ok(composer.x >= 0 && composer.x + composer.width <= width, 'Composer fits horizontally');
       assert.ok(composer.y >= 0 && composer.y + composer.height <= height, 'Composer fits vertically');
+      if (width <= 560) {
+        const box = await page.locator('.composer-box').boundingBox();
+        assert.ok(box.width >= composer.width - 2, 'Mobile text field uses the whole composer width');
+        for (const id of ['attachment', 'keyboard', 'send']) {
+          const control = await page.locator('#' + id).boundingBox();
+          assert.ok(control.y >= box.y + box.height, 'Mobile controls stay below the text field');
+        }
+      }
       await page.locator('#keyboard').click();
       await page.waitForFunction(() => nexusCosmicMetrics.renderer().arrival === 1);
       await page.emulateMedia({ reducedMotion: 'reduce' });
