@@ -118,6 +118,7 @@ html { scroll-padding-top: 96px; }
 .astral-hero .hero-actions a { font-size: 14px; }
 .astral-hero__replay { position: absolute; right: max(20px, env(safe-area-inset-right)); bottom: 20px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #71b6bb38; border-radius: 50%; color: #b8d8db; background: #0410158c; cursor: pointer; transition: background .3s, color .3s; }
 .astral-hero__replay:hover { background: #10292cb3; color: #e1ffff; }
+.astral-hero__replay { z-index: 3; }
 .astral-hero__replay:focus-visible { outline: 2px solid #91e9ec; outline-offset: 4px; }
 .home-continuum .astral-hero > .astral-hero__replay { width: 44px; margin: 0; }
 .home-continuum .astral-hero > .astral-hero__replay { top: calc(100svh - 64px); bottom: auto; }
@@ -163,7 +164,7 @@ html { scroll-padding-top: 96px; }
   .home-continuum .astral-hero { padding: 76px var(--page-pad) 84px; min-height: 100svh; }
   .astral-hero__scene { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0,1fr) auto minmax(0,1fr); height: calc(100svh - 152px); min-height: 360px; flex: none; }
   .astral-hero__scene:has(.hero-entry) { height: auto; min-height: calc(100svh - 100px); grid-template-rows: auto auto auto auto; }
-  .astral-hero__scene .hero-entry { grid-row: 4; padding: 16px 32px 24px; }
+  .astral-hero__scene .hero-entry { grid-row: 4; padding: 16px 64px 24px; }
   .home-continuum .astral-hero__scene .home-neural-core { max-width: min(100%, 48svh); }
   .astral-hero .home-neural-core { grid-column: 1; grid-row: 2; width: min(100%, 70svh); max-height: 100%; order: initial; }
   .astral-hero .hero-product-name { display: grid; grid-column: 1; grid-row: 1 / -1; grid-template-columns: 1fr; grid-template-rows: subgrid; height: 100%; font-size: clamp(32px, 8vw, 56px); }

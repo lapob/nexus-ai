@@ -565,6 +565,9 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
     const replay=page.getByRole('button', {name:'Ripeti animazione'});
     await expect(replay).toBeVisible();
     const bounds=await replay.boundingBox();
+    expect(await replay.evaluate(el => { const r=el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)); })).toBe(true);
+    const cta = await page.locator('.hero-entry .primary-button').boundingBox();
+    expect(bounds.x < cta.x + cta.width && bounds.x + bounds.width > cta.x && bounds.y < cta.y + cta.height && bounds.y + bounds.height > cta.y).toBe(false);
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x+bounds.width).toBeLessThanOrEqual(viewport.width);
     await replay.click();
