@@ -1,6 +1,19 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+test('hero entry stays separate from the introduction throughout scrolling', async ({ page }) => {
+  for (const width of [360, 390, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/');
+    for (const y of [0, 200, 400, 600, 800, 1000, 600, 200]) {
+      await page.evaluate(y => scrollTo(0, y), y);
+      await page.waitForTimeout(100);
+      expect(await page.evaluate(() => document.querySelector('.hero-entry').getBoundingClientRect().bottom <= document.querySelector('.hero-intro').getBoundingClientRect().top)).toBe(true);
+    }
+    await expect(page.getByRole('link', { name: 'Prova NexusNXS AI' })).toHaveCount(1);
+  }
+});
+
 const publicRoutes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
 const responsiveRoutes = [...publicRoutes, "/maintenance", "/percorso-che-non-esiste"];
 
