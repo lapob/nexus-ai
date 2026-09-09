@@ -15,6 +15,10 @@ const assert = require('node:assert/strict');
     for (const [width, height] of [[320,568],[390,568],[844,390],[1440,900],[1920,1080]]) for (const seed of [.1,.5,.99]) {
       const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
+      await page.addInitScript(() => {
+        window.microphoneRequests = 0;
+        Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => { window.microphoneRequests++; throw new Error('QA microphone stub'); } });
+      });
       await page.route('https://ai.nexusnxs.com/', r => r.fulfill({ contentType: 'text/html', body: PUBLIC_AI_HTML.replace('{ host: button, efficient,', `{ host: button, efficient, random:()=>${seed},`) }));
       await page.goto('https://ai.nexusnxs.com/');
       await page.waitForFunction(() => nexusCosmicMetrics.renderer().arrival === 1);
@@ -33,6 +37,13 @@ const assert = require('node:assert/strict');
         assert.ok(control.bottom <= height && control.top >= 0, 'Controls fit the viewport');
       }
       assert.deepEqual(errors, []);
+      await page.mouse.move(framing.core.x + framing.core.width / 2, framing.core.y + framing.core.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(framing.core.x + framing.core.width * .7, framing.core.y + framing.core.height * .6, { steps: 12 });
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+      assert.equal(await page.evaluate(() => window.microphoneRequests), 0, 'Dragging must not activate voice');
+      assert.equal(await page.evaluate(() => document.body.classList.contains('keyboard-open')), false, 'Dragging must preserve input mode');
       await page.screenshot({ path: `qa-artifacts/core-framing-${width}-${framing.preset}.png` });
       await page.locator('#keyboard').click();
       await page.waitForFunction(() => nexusCosmicMetrics.renderer().arrival === 0);

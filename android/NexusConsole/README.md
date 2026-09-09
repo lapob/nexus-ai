@@ -1,4 +1,4 @@
-# NexusNXS Console
+# NexusNXS Control
 
 Client operativo separato da NexusNXS Remote AI. Usa la stessa associazione privata
 Tailscale, mostra ogni proposta prima dell'esecuzione e richiede sempre

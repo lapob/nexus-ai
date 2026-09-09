@@ -1123,7 +1123,7 @@ test('pairing monouso, autenticazione e continuazione conversazione funzionano e
     const consoleResponse = await fetch(`${baseUrl}/console`);
     const consoleClient = await consoleResponse.text();
     assert.equal(consoleResponse.status, 200);
-    assert.match(consoleClient, /NexusNXS Console/);
+    assert.match(consoleClient, /NexusNXS Control/);
     assert.match(consoleClient, /Nessuna shell viene esposta direttamente alla rete/);
     assert.match(consoleClient, /console-output/);
     for (const script of [...consoleClient.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)]) {

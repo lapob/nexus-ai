@@ -30,7 +30,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "Dipendenza non presente nella cache: sincronizzazione sicura dai repository configurati..."
     & $gradle.FullName -p $androidProject --console=plain "assemble$variant" "lint$variant"
 }
-if ($LASTEXITCODE -ne 0) { throw "Compilazione NexusNXS Console non riuscita." }
+if ($LASTEXITCODE -ne 0) { throw "Compilazione NexusNXS Control non riuscita." }
 
 $variantFolder = $variant.ToLowerInvariant()
 $sourceApk = Join-Path $androidProject "app\build\outputs\apk\$variantFolder\app-$variantFolder.apk"
@@ -51,7 +51,7 @@ $apksigner = [IO.Directory]::EnumerateFiles(
 ) | Sort-Object -Descending | Select-Object -First 1
 if (-not $apksigner) { throw "apksigner non trovato nell'Android SDK." }
 & $apksigner verify --verbose --print-certs $outputApk
-if ($LASTEXITCODE -ne 0) { throw "Firma APK NexusNXS Console non valida." }
+if ($LASTEXITCODE -ne 0) { throw "Firma APK NexusNXS Control non valida." }
 
 $stream = [System.IO.File]::OpenRead($outputApk)
 try {
