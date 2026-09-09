@@ -2,6 +2,7 @@
  * Browser checks using the workspace site's Playwright toolchain.
  */
 // #region Browser dependencies
+process.env.PLAYWRIGHT_BROWSERS_PATH ||= require('node:path').resolve(__dirname,'../../.toolchains/playwright');
 const { chromium } = require('../../.SITE/node_modules/@playwright/test');
 const { PUBLIC_AI_HTML } = require('../src/remote/remote-session-gateway');
 const { createCosmicVisualizers } = require('../src/shared/cosmic-visualizers');

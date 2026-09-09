@@ -1,13 +1,13 @@
 /** @module scripts/verify-public-state-layout
  * Verifies narrow, landscape and enlarged-text layouts with synthetic conversations.
  */
+const path=require('node:path');
+process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.resolve(__dirname,'../../.toolchains/playwright');
 const {chromium}=require('../../.SITE/node_modules/@playwright/test');
 const {PUBLIC_AI_HTML}=require('../src/remote/remote-session-gateway');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const path=require('node:path');
 const output=path.resolve(__dirname,'../qa-artifacts');
-process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.resolve(__dirname,'../../.toolchains/playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true}); const report=[];
  try { for(const [width,height,font] of [[320,568,100],[390,844,200],[844,390,100],[1440,900,100]]){
@@ -29,6 +29,16 @@ process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.resolve(__dirname,'../../.toolchai
   assert.equal(brand.x<state.x+state.width&&brand.x+brand.width>state.x&&brand.y<state.y+state.height&&brand.y+brand.height>state.y,false,'Brand and service state must not overlap');
   assert.equal(report.some(item=>item.overflow),false,'No horizontal overflow');
   if(width<=560){const box=await page.locator('.composer-box').boundingBox(),composer=await page.locator('.composer').boundingBox();assert.ok(box.width>=composer.width-2,'Full width mobile text');}
+  await page.locator('#prompt').fill('Bozza mantenuta durante il cambio rete');
+  await page.context().setOffline(true);await page.evaluate(()=>dispatchEvent(new Event('offline')));
+  await page.waitForFunction(()=>document.body.dataset.serviceReadiness==='offline');
+  assert.equal(await page.locator('#send').isDisabled(),true,'Offline requests stay disabled');
+  await capture('offline');
+  await page.context().setOffline(false);await page.evaluate(()=>dispatchEvent(new Event('online')));
+  await page.waitForFunction(()=>document.body.dataset.serviceReadiness==='ready');
+  assert.equal(await page.locator('#prompt').inputValue(),'Bozza mantenuta durante il cambio rete');
+  assert.equal(await page.locator('#send').isDisabled(),false,'Reconnect restores sending');
+  await capture('reconnected');
   await page.close();
  }}finally{fs.writeFileSync(path.join(output,'web-states-report.json'),JSON.stringify(report,null,2));await browser.close();}
  console.log('Captured '+report.length+' web states');
