@@ -157,11 +157,11 @@ html { scroll-padding-top: 96px; }
 }
 @media (max-width: 800px) {
   .home-continuum .astral-hero { padding: 76px var(--page-pad) 84px; min-height: 100svh; }
-  .astral-hero__scene { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0,1fr) auto; height: calc(100svh - 152px); min-height: 360px; flex: none; }
+  .astral-hero__scene { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0,1fr) auto minmax(0,1fr); height: calc(100svh - 152px); min-height: 360px; flex: none; }
   .astral-hero .home-neural-core { grid-column: 1; grid-row: 2; width: min(100%, 70svh); max-height: 100%; order: initial; }
   .astral-hero .hero-product-name { display: grid; grid-column: 1; grid-row: 1 / -1; grid-template-columns: 1fr; grid-template-rows: subgrid; height: 100%; font-size: clamp(32px, 8vw, 56px); }
-  .astral-hero .hero-word { grid-column: 1; grid-row: 1; justify-content: center; font-size: clamp(32px, 8vw, 56px); line-height: 1.15; }
-  .astral-hero .hero-word:last-child { grid-column: 1; grid-row: 3; justify-content: center; }
+  .astral-hero .hero-word { grid-column: 1; grid-row: 1; justify-content: center; align-self: end; padding-bottom: 16px; font-size: clamp(32px, 8vw, 56px); line-height: 1.15; }
+  .astral-hero .hero-word:last-child { grid-column: 1; grid-row: 3; justify-content: center; align-self: start; padding-top: 16px; padding-bottom: 0; }
   .astral-hero .hero-intro { padding-top: 20px; }
   .home-continuum .astral-hero .hero-actions { margin-top: 22px !important; gap: 12px 24px; }
   .narrative-copy, .narrative-copy--right { max-width: 620px; margin-inline: auto; padding: 96px var(--page-pad); }
