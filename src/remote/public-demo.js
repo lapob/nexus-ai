@@ -339,10 +339,12 @@ function publicReadinessRuntime() {
 function publicAiCosmicCoreScript({ palette, presentation }) {
   return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}
 .core{user-select:none;-webkit-tap-highlight-color:transparent}.core:focus:not(:focus-visible){outline:none;box-shadow:none}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active):not(.status-active) .core{width:min(84vw,46dvh,680px)}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{width:min(78vw,36dvh,520px)}
 body.keyboard-open:not(.request-active):not(.conversation-active) .copy{opacity:0;visibility:hidden;filter:none}
 @media(max-height:540px) and (min-width:600px){
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:30px;min-height:0;padding-top:0}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(34dvh,180px)!important;flex:0 0 min(34dvh,180px);margin:0!important}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(48dvh,260px)!important;flex:0 0 min(48dvh,260px);margin:0!important}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy{max-width:420px;flex:0 1 420px;margin:0;text-align:left}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .exchange{display:none}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy h1{font-size:clamp(24px,4vw,36px)!important;line-height:1.1;white-space:normal}

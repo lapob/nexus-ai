@@ -144,7 +144,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     if(ambientPaint){
       if(ambient.width!==canvas.width||ambient.height!==canvas.height){ambient.width=canvas.width;ambient.height=canvas.height;}
       ambientPaint.setTransform(dpr,0,0,dpr,0,0);ambientPaint.clearRect(0,0,width,height);
-      for(let i=0;i<(efficient?140:360);i++){if(coreVisible&&gl&&i%4===0)continue;const clock=isReduced?0:elapsed,starPhase=i*2.399963,x=((i+901)*.61803398875%1)*width+Math.sin(clock*.07+starPhase)*5,y=((i+901)*.41421356237%1)*height+Math.cos(clock*.06+starPhase)*4;const edge=Math.min(1,Math.abs(x-width/2)/Math.min(460,width*.48));ambientPaint.fillStyle=`rgba(166,224,234,${.04+edge*edge*.5})`;ambientPaint.beginPath();ambientPaint.arc(x,y,.55+(i%7)*.13,0,Math.PI*2);ambientPaint.fill();}
+      for(let i=0;i<(efficient?140:360);i++){if(coreVisible&&gl&&(options.gatherBackground||i%4===0))continue;const clock=isReduced?0:elapsed,starPhase=i*2.399963,x=((i+901)*.61803398875%1)*width+Math.sin(clock*.07+starPhase)*5,y=((i+901)*.41421356237%1)*height+Math.cos(clock*.06+starPhase)*4;const edge=Math.min(1,Math.abs(x-width/2)/Math.min(460,width*.48));ambientPaint.fillStyle=`rgba(166,224,234,${.04+edge*edge*.5})`;ambientPaint.beginPath();ambientPaint.arc(x,y,.55+(i%7)*.13,0,Math.PI*2);ambientPaint.fill();}
     }
     if(gl){
       gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);const p=programs[preset];gl.useProgram(p.p);

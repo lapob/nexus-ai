@@ -2658,7 +2658,7 @@ private fun JSONArray?.toTurns() = buildList {
     val focusRequester = remember { FocusRequester() }
     val instantImeVisible = WindowInsets.isImeVisible
     val coreConfiguration = LocalConfiguration.current
-    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .90f, coreConfiguration.screenHeightDp * .44f, 380f).dp
+    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .90f, coreConfiguration.screenHeightDp * .46f, 600f).dp
     val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
@@ -2735,6 +2735,8 @@ private fun JSONArray?.toTurns() = buildList {
     }
 
     Surface(color = Ink, contentColor = Ice, modifier = Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize()) {
+        CosmicScene(Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -2746,7 +2748,6 @@ private fun JSONArray?.toTurns() = buildList {
             }.statusBarsPadding().navigationBarsPadding().imePadding()
                 .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = 10.dp)
         ) {
-            CosmicScene(Modifier.fillMaxSize())
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
             AnimatedVisibility(controlsAwake, modifier = Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
                 IconButton(onClick = { keyboard?.hide(); settingsOpen = true }, modifier = Modifier.size(48.dp).clip(CircleShape).background(Surface.copy(alpha = .8f))) { PremiumMenuGlyph() }
@@ -2881,14 +2882,16 @@ private fun JSONArray?.toTurns() = buildList {
                             }
                         }
                     } else Box(Modifier.fillMaxSize()) {
-                        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                        BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = 62.dp)) {
+                            val wideCoreLayout = maxWidth > maxHeight * 1.5f
+                            val renderCore: @Composable (Dp) -> Unit = { availableDiameter ->
                             NexusInstantCore(
                                 fullScene = true,
                                 active = voiceMode || state.busy,
                                 offline = state.connection == NexusConnection.OFFLINE,
                                 reduceMotion = reduceMotion,
                                 energy = if (voiceMode) inlineVoiceEnergy else 0f,
-                                diameter = homeCoreDiameter,
+                                diameter = minOf(homeCoreDiameter, availableDiameter),
                                 phaseState = when { !interactionAvailable -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" },
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2903,7 +2906,9 @@ private fun JSONArray?.toTurns() = buildList {
                                     voiceMode = !voiceMode
                                 }
                             )
-                            Spacer(Modifier.height(22.dp))
+                            }
+                            val renderLabels: @Composable () -> Unit = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             AnimatedContent(
                                 targetState = when {
                                     state.connection == NexusConnection.OFFLINE -> nexusCopy("Server offline · tocca per riprovare", "Server offline · tap to retry")
@@ -2914,14 +2919,27 @@ private fun JSONArray?.toTurns() = buildList {
                                 },
                                 transitionSpec = { nexusTransform(reduceMotion) },
                                 label = "instantStatus"
-                            ) { label -> Text(label, color = if (state.connection == NexusConnection.OFFLINE) Color(0xFFFF9A91) else Mist, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+                            ) { label -> Text(label, color = if (state.connection == NexusConnection.OFFLINE) Color(0xFFFF9A91) else Mist, fontSize = 13.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                             if (state.connection != NexusConnection.OFFLINE) Text(
                                 if (voiceMode) inlineVoiceDetail else nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
-                                color = Mist, fontSize = 12.sp,
+                                color = Mist, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(top = 8.dp).fillMaxWidth(.82f)
                             )
-                            state.error?.let { error -> Text(error, color = Color(0xFFFF9A91), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 14.dp)) }
+                            state.error?.let { error -> Text(error, color = Color(0xFFFF9A91), style = MaterialTheme.typography.bodySmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 14.dp)) }
+                            }
+                            }
+                            if (wideCoreLayout) Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                    renderCore(minOf(maxWidth, maxHeight))
+                                }
+                                Box(Modifier.weight(1f).verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) { renderLabels() }
+                            } else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    renderCore(minOf(maxWidth, maxHeight))
+                                }
+                                renderLabels()
+                            }
                         }
                         IconButton(
                             onClick = { typedSession = true; textMode = true },
@@ -2933,6 +2951,7 @@ private fun JSONArray?.toTurns() = buildList {
             }
         }
     }
+        }
     if (settingsOpen) AlertDialog(
         onDismissRequest = { settingsOpen = false; lastInteraction = System.nanoTime() },
         title = { Text(nexusCopy("Impostazioni", "Settings")) },

@@ -40,6 +40,8 @@ $activity = if ($App -eq 'Public') { "$package/.NexusMainActivity" } else { "$pa
 $sizeState = (Invoke-CheckedAdb -s $device shell wm size) -join "`n"
 $densityState = (Invoke-CheckedAdb -s $device shell wm density) -join "`n"
 $fontScale = ((Invoke-CheckedAdb -s $device shell settings get system font_scale) -join '').Trim()
+$rotationMode = ((Invoke-CheckedAdb -s $device shell settings get system accelerometer_rotation) -join '').Trim()
+$userRotation = ((Invoke-CheckedAdb -s $device shell settings get system user_rotation) -join '').Trim()
 $profiles = @(
   @{ Name = 'phone-small'; Size = '720x1280'; Density = '320'; Font = '1.0' },
   @{ Name = 'phone-compact'; Size = '1080x2400'; Density = '480'; Font = '1.0' },
@@ -54,12 +56,16 @@ function Restore-Display {
   if ($overrideSize) { Invoke-CheckedAdb -s $device shell wm size $overrideSize | Out-Null } else { Invoke-CheckedAdb -s $device shell wm size reset | Out-Null }
   if ($overrideDensity) { Invoke-CheckedAdb -s $device shell wm density $overrideDensity | Out-Null } else { Invoke-CheckedAdb -s $device shell wm density reset | Out-Null }
   if ($fontScale) { Invoke-CheckedAdb -s $device shell settings put system font_scale $fontScale | Out-Null }
+  if ($userRotation) { Invoke-CheckedAdb -s $device shell settings put system user_rotation $userRotation | Out-Null }
+  if ($rotationMode) { Invoke-CheckedAdb -s $device shell settings put system accelerometer_rotation $rotationMode | Out-Null }
 }
 
 #endregion
 #region 02 — Installazione, cattura e ripristino
 
 try {
+  Invoke-CheckedAdb -s $device shell settings put system accelerometer_rotation 0 | Out-Null
+  Invoke-CheckedAdb -s $device shell settings put system user_rotation 0 | Out-Null
   Invoke-CheckedAdb -s $device install -r $ApkPath | Out-Null
   $frameMetrics = @()
   $jankFailures = @()
@@ -75,7 +81,12 @@ try {
     $remotePng = "/sdcard/$($profile.Name).png"
     $remoteXml = "/sdcard/$($profile.Name).xml"
     Invoke-CheckedAdb -s $device shell screencap -p $remotePng | Out-Null
-    Invoke-CheckedAdb -s $device shell uiautomator dump $remoteXml | Out-Null
+    # UI automation can be killed during an Android display reconfiguration.
+    # Retry only this read-only capture, retaining a hard failure after three attempts.
+    for ($captureAttempt = 0; $captureAttempt -lt 3; $captureAttempt++) {
+      try { Invoke-CheckedAdb -s $device shell uiautomator dump $remoteXml | Out-Null; break }
+      catch { if ($captureAttempt -eq 2) { throw }; Start-Sleep -Milliseconds 900 }
+    }
     Invoke-CheckedAdb -s $device pull $remotePng (Join-Path $OutputDirectory "$($profile.Name).png") | Out-Null
     Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
     Invoke-CheckedAdb -s $device shell rm $remotePng $remoteXml | Out-Null
