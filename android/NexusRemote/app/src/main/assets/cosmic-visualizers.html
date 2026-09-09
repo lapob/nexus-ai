@@ -752,7 +752,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     // Ease its framing with the same ring clock, keeping active rings inside the stage.
     const ringTarget={listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
     ringVisibility=isReduced?ringTarget:ringVisibility+(ringTarget-ringVisibility)*(1-Math.exp(-dt*1.65));
-    const saturnFraming=2.65-smooth(ringVisibility/.56)*1.65;
+    const saturnFraming=2.85-smooth(ringVisibility/.56)*1.65;
     const fieldScale=kind=>preset==='saturn-experimental'?saturnFraming*(kind===0?.94:1):preset==='jarvis-reactor'?1.48:1;
     // Adaptive detail does not change point positions or restart the shared clock.
     strain=dt>.028||drawMs>8?strain+dt:Math.max(0,strain-dt);healthy=dt<.021&&drawMs<5?healthy+dt:0;

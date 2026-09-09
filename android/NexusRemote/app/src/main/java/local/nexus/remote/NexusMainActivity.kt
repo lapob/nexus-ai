@@ -2658,7 +2658,7 @@ private fun JSONArray?.toTurns() = buildList {
     val focusRequester = remember { FocusRequester() }
     val instantImeVisible = WindowInsets.isImeVisible
     val coreConfiguration = LocalConfiguration.current
-    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .90f, coreConfiguration.screenHeightDp * .46f, 600f).dp
+    val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .98f, coreConfiguration.screenHeightDp * .78f, 1200f).dp
     val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
