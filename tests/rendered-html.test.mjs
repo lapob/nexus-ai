@@ -25,7 +25,7 @@ test("server-renders the NexusNXS public homepage", async () => {
   assert.match(html, /<html lang="it">/i);
   assert.match(html, /NEXUSNXS/);
   assert.match(html, /hero-product-name/);
-  assert.match(html, /Scrivi, parla e lavora con i tuoi documenti\./);
+  assert.match(html, /Il tuo assistente AI su PC, Android e web\./);
   assert.match(html, /UN DIALOGO CONTINUO/);
   assert.match(html, /IL CONTROLLO RESTA TUO/);
   assert.match(html, /NexusNXS per PC/);
