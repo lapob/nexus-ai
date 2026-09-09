@@ -59,7 +59,6 @@ const AMBIENT_SELECTOR = [
   ".presence-system",
   ".trust-seal",
   "[data-nexus-presence]",
-  ".interactive-visualizer",
 ].join(",");
 
 const IMMEDIATE_REVEAL_SELECTOR = [

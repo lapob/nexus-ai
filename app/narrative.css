@@ -41,7 +41,7 @@ html { scroll-padding-top: 96px; }
 .service-list span, .service-list small, .service-list b, .service-list .neutral { font-size: 12px; line-height: 1.5; }
 .narrative-page, .product-narrative { position: relative; isolation: auto; }
 .narrative-page > section, .product-narrative > section,
-.download-visualizers, .premium-footer {
+.premium-footer {
   background: transparent;
   border: 0;
   box-shadow: none;

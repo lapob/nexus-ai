@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert, Smartphone } from "lucide-react";
 import Image from "next/image";
 import { SiteFooter } from "../components/SiteChrome";
-import { VisualizerCollection } from "../components/InteractiveVisualizer";
 
 export const metadata: Metadata = {
   title: "Download NexusNXS — Release e verifiche",
@@ -31,16 +30,16 @@ const releases = [
   {
     Icon: Smartphone,
     name: "NexusNXS per Android",
-    version: "6.4.10",
+    version: "6.5.1",
     platform: "Android 10+",
-    size: "1,77 MiB · 1.851.895 byte",
-    date: "6 settembre 2026",
+    size: "1,81 MiB · 1.899.727 byte",
+    date: "8 settembre 2026",
     state: "PREVIEW · FIRMA DEBUG",
     text: "Esperienza mobile nativa per conversazioni e continuità.",
     requirements: "Android 10 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
-    sha256: "DE70D7866845C72C6DB46C3F065B120701F520976C0AE6E1285E9004ADF1AF19",
+    sha256: "25E62E1AF3E5E6D925E0E4C5B33EF1C60231356B0D3D9453545858AB5B2DD432",
     url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-Android.apk",
   },
 ];
@@ -54,7 +53,6 @@ export default function Downloads() {
       <p>Ogni file pubblico espone versione, dimensione, stato della firma e impronta crittografica. Queste build sono anteprime autorizzate e non vengono presentate come release firmate.</p>
       <div className="release-policy"><ShieldAlert size={18} /><span><strong>Preview non firmate</strong> — verifica sempre l’impronta SHA-256 prima dell’installazione. Le firme di produzione arriveranno in una release successiva.</span></div>
     </section>
-    <section className="download-visualizers"><div><p className="section-label">/ UN SOLO CONTINUUM</p><h2>Ogni Core.<br /><em>La stessa presenza.</em></h2></div><VisualizerCollection mode="all" compact /></section>
     <section className="release-list" aria-label="Release NexusNXS">
       {releases.map(({ Icon, ...release }) => <article key={release.name}>
         <div className="release-icon"><Icon aria-hidden="true" /></div>
