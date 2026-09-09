@@ -19,6 +19,10 @@ export function AstralHero() {
         </span>)}
       </h1>
       <div className="home-neural-core" aria-hidden="true" />
+      <div className="hero-entry">
+        <p>Il tuo assistente AI su PC, Android e web.</p>
+        <HardNavigationLink className="primary-button" href="https://ai.nexusnxs.com">Prova NexusNXS AI <ArrowUpRight size={16} /></HardNavigationLink>
+      </div>
     </div>
     <div className="hero-intro">
       <p>Scrivi, parla e lavora con i tuoi documenti.<br />Il tuo assistente AI su PC, Android e web.</p>
