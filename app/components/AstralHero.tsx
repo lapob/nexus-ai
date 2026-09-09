@@ -11,7 +11,7 @@ export function AstralHero() {
     setComposition(value => value + 1);
     window.dispatchEvent(new Event("nxs:replay-composition"));
   };
-  return <section className="hero astral-hero" id="top" aria-label="NexusNXS AI" data-cosmic-scene="center" data-cosmic-form="neural">
+  return <section className="hero astral-hero" id="top" aria-label="NexusNXS AI" data-cosmic-scene="center" data-cosmic-form="sigil">
     <div className="astral-hero__scene" key={composition}>
       <h1 className="hero-product-name" aria-label="NexusNXS AI">
         {["NEXUS", "NXS"].map((word) => <span className="hero-word" aria-hidden="true" key={word}>

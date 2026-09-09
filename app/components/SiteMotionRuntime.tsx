@@ -250,6 +250,13 @@ export function SiteMotionRuntime() {
           const latitude = Math.acos(2 * (particle.depth-.25)/.75 - 1), r = .23;
           return project(Math.cos(a)*Math.sin(latitude)*r,Math.cos(latitude)*r,Math.sin(a)*Math.sin(latitude)*r);
         }
+        if (form === 'sigil') {
+          const reach = (Math.floor(index / 10) * .61803398875) % 1;
+          const turn = index % 10 * Math.PI / 5 + reach * 2.3 + time * .015;
+          const width = .003 + Math.sin(reach * Math.PI) * .009;
+          const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
+          return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2);
+        }
         if (form === 'neural') {
           const along = ((index + 1) * .61803398875) % 1;
           const x = (along - .5) * .92;
