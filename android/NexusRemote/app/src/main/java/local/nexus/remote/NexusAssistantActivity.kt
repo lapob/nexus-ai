@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.view.WindowManager
+import local.nexus.motion.NexusSystemBars
 
 /**
  * Entry point traslucido posseduto da Android per il richiamo dell'assistente.
@@ -25,7 +26,26 @@ class NexusAssistantActivity : NexusMainActivity() {
         configureAdaptiveSystemBackdrop()
     }
 
+    override fun onAssistantPresentationChanged() {
+        configureAdaptiveSystemBackdrop()
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        @Suppress("DEPRECATION")
+        val currentTask = manager.appTasks.firstOrNull { it.taskInfo.id == taskId }
+        currentTask
+            ?.setExcludeFromRecents(assistantOverlayActive)
+    }
+
     private fun configureAdaptiveSystemBackdrop() {
+        if (!assistantOverlayActive) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND or WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                window.setBackgroundBlurRadius(0)
+                window.attributes = window.attributes.apply { blurBehindRadius = 0 }
+            }
+            window.setBackgroundDrawable(ColorDrawable(Color.rgb(2, 4, 5)))
+            NexusSystemBars.apply(window)
+            return
+        }
         // L'attivita Assist e un vero overlay: il sistema e le altre app
         // restano visibili dietro al Core senza superfici nere o dim layer.
         window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))

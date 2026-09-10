@@ -159,6 +159,12 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.doesNotMatch(activity.match(/setContent[^\n]+/)?.[0] || '', /NexusApp\(/);
   assert.match(activity, /private fun NexusInstantApp/);
   assert.match(activity, /private fun NexusInstantCore/);
+  const assistantSurface = activity.split('@Composable private fun NexusAssistantOverlay')[1]?.split('@Composable private fun InstantWrittenExchange')[0] || '';
+  assert.doesNotMatch(assistantSurface, /BasicTextField|NexusAttachmentFlow|background\(Ink\)/, 'Assist reuses the full app composer and keeps the underlying Android screen visible');
+  assert.equal((assistantSurface.match(/IconButton\(/g) || []).length, 2, 'Assist exposes just attachment and keyboard shortcuts');
+  const expandAction = activity.split('"assistantExpand" ->')[1]?.split('"assistantEntryConsumed"')[0] || '';
+  assert.doesNotMatch(expandAction, /(?:startActivity|finish|disconnect|cancel\w*)\s*\(/i, 'Expanding the same conversation must not cancel its pending reply');
+  assert.match(expandAction, /assistantOverlay = false/);
   assert.match(activity, /"voiceSend"/);
   assert.match(activity, /if \(speakReply\) speakOrStop\(answer\)/);
   assert.match(activity, /\/api\/guest\/voice\/synthesize/);

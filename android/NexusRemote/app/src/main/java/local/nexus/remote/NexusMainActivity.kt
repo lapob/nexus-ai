@@ -466,6 +466,7 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val wakeAwaiting: Boolean = false,
     val assistantInvocation: Long = 0L,
     val assistantOverlay: Boolean = false,
+    val assistantEntry: String = "",
     val slashCommands: List<SlashCommandRow> = emptyList()
 )
 
@@ -595,6 +596,8 @@ open class NexusMainActivity : ComponentActivity() {
     private lateinit var store: LocalChatStore
     private lateinit var secureTokens: SecureTokenStore
     private var state by mutableStateOf(NexusUiState())
+    protected val assistantOverlayActive: Boolean get() = state.assistantOverlay
+    protected open fun onAssistantPresentationChanged() = Unit
     private var temporaryReturnConversationId = ""
     private var temporaryReturnDraft = ""
     private var temporaryReturnWork = false
@@ -878,7 +881,8 @@ open class NexusMainActivity : ComponentActivity() {
         if (restoredWork == null) secureTokens.clear("workProposal")
         // Work resta chiuso finché il server autenticato non pubblica una
         // capability esplicita. Una preferenza salvata non può riattivarlo da sola.
-        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = intent?.action == Intent.ACTION_ASSIST, slashCommands = loadCustomSlashCommands())
+        val startAsAssistant = savedInstanceState?.getBoolean("nexusAssistantOverlay") ?: (intent?.action == Intent.ACTION_ASSIST)
+        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = startAsAssistant, slashCommands = loadCustomSlashCommands())
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
                 NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
@@ -905,6 +909,11 @@ open class NexusMainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingIntent(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("nexusAssistantOverlay", state.assistantOverlay)
     }
 
     override fun onStop() {
@@ -962,6 +971,14 @@ open class NexusMainActivity : ComponentActivity() {
             // Keep the translucent composition alive until Android removes its
             // task. Switching to the full UI here flashes an opaque app frame.
             "assistantClose" -> { finishAndRemoveTask() }
+            "assistantExpand" -> {
+                // Expand the same controller: drafts, attachments and an in-flight
+                // response must not be copied to a second activity or cancelled.
+                stopAllSpeech()
+                state = state.copy(screen = NexusScreen.CHAT, drawer = false, assistantOverlay = false, assistantInvocation = 0L, assistantEntry = value)
+                onAssistantPresentationChanged()
+            }
+            "assistantEntryConsumed" -> state = state.copy(assistantEntry = "")
             "back" -> state = state.copy(screen = NexusScreen.CHAT)
             "modelSheet" -> state = state.copy(modelSheet = true)
             "closeModel" -> state = state.copy(modelSheet = false)
@@ -2538,6 +2555,7 @@ open class NexusMainActivity : ComponentActivity() {
                 assistantOverlay = true,
                 assistantInvocation = System.currentTimeMillis()
             )
+            onAssistantPresentationChanged()
             incoming.replaceExtras(Bundle())
             incoming.data = null
             incoming.action = null
@@ -2647,8 +2665,8 @@ private fun JSONArray?.toTurns() = buildList {
     val focusRequester = remember { FocusRequester() }
     val coreConfiguration = LocalConfiguration.current
     val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .98f, coreConfiguration.screenHeightDp * .78f, 1200f).dp
-    var textMode by rememberSaveable { mutableStateOf(false) }
-    var typedSession by rememberSaveable { mutableStateOf(false) }
+    var textMode by rememberSaveable { mutableStateOf(state.assistantEntry == "text") }
+    var typedSession by rememberSaveable { mutableStateOf(state.assistantEntry.isNotBlank()) }
     // Una sessione microfono non deve mai essere ripristinata dal saved state
     // dopo un nuovo avvio o un ritorno dal task switcher.
     var voiceMode by remember { mutableStateOf(false) }
@@ -2656,8 +2674,15 @@ private fun JSONArray?.toTurns() = buildList {
     var inlineVoiceEnergy by remember { mutableFloatStateOf(0f) }
     var inlineVoiceStatus by remember { mutableStateOf("") }
     var inlineVoiceDetail by remember { mutableStateOf("") }
-    var attachmentSheet by rememberSaveable { mutableStateOf(false) }
+    var attachmentSheet by rememberSaveable { mutableStateOf(state.assistantEntry == "attachment") }
     val interactionAvailable = state.connection == NexusConnection.ONLINE
+    LaunchedEffect(state.assistantEntry) {
+        if (state.assistantEntry.isBlank()) return@LaunchedEffect
+        typedSession = true
+        textMode = state.assistantEntry == "text"
+        attachmentSheet = state.assistantEntry == "attachment"
+        dispatch("assistantEntryConsumed", "")
+    }
     val instantSlashSuggestions = remember(state.draft, state.slashCommands) {
         val match = Regex("^/([^\\s]*)$").find(state.draft.trim())
         if (match == null) emptyList() else {
@@ -2762,7 +2787,7 @@ private fun JSONArray?.toTurns() = buildList {
                         LazyColumn(
                             state = historyState,
                             modifier = Modifier.weight(1f).fillMaxWidth().conversationGlass(true, metrics.adaptiveReducedMotion),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 40.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 48.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
                             itemsIndexed(state.turns, key = { index, turn -> "instant-" + index + "-" + turn.role }) { _, turn ->
@@ -3079,96 +3104,64 @@ private fun JSONArray?.toTurns() = buildList {
 
 /** Superficie traslucida invocata dal tasto laterale: nessuna apertura della UI completa. */
 @Composable private fun NexusAssistantOverlay(state: NexusUiState, dispatch: (String, String) -> Unit) {
-    val keyboard = LocalSoftwareKeyboardController.current
-    val focusRequester = remember { FocusRequester() }
-    var textMode by rememberSaveable { mutableStateOf(false) }
     var voiceMode by remember { mutableStateOf(true) }
     var inlineVoiceListening by remember { mutableStateOf(false) }
     var inlineVoiceEnergy by remember { mutableFloatStateOf(0f) }
     var inlineVoiceStatus by remember { mutableStateOf("") }
     var inlineVoiceDetail by remember { mutableStateOf("") }
-    var attachmentSheet by rememberSaveable { mutableStateOf(false) }
     val online = state.connection == NexusConnection.ONLINE
-    val latestAnswer = state.streaming.ifBlank { state.turns.lastOrNull { it.role == "assistant" }?.content.orEmpty() }
+    val metrics = LocalNexusMetrics.current
+    val reduceMotion = state.reduceMotion || metrics.adaptiveReducedMotion || !ValueAnimator.areAnimatorsEnabled()
+    val openApp: (String) -> Unit = { entry -> voiceMode = false; dispatch("assistantExpand", entry) }
     BackHandler { dispatch("assistantClose", "") }
-    LaunchedEffect(textMode) {
-        if (textMode) {
-            kotlinx.coroutines.delay(80)
-            focusRequester.requestFocus()
-            keyboard?.show()
+    LaunchedEffect(state.connection) {
+        while (!online) {
+            dispatch("probe", "")
+            kotlinx.coroutines.delay(4_000)
         }
     }
     Box(
-        Modifier.fillMaxSize().background(Ink)
+        Modifier.fillMaxSize()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { dispatch("assistantClose", "") }
-            .navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         CosmicScene(Modifier.fillMaxSize())
-        Surface(
-            color = Color.Transparent,
-            modifier = Modifier.align(Alignment.Center).fillMaxWidth()
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+        Column(
+            modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 6.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (textMode && latestAnswer.isNotBlank()) Text(
-                    latestAnswer,
-                    color = Ice,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
-                )
-                AnimatedContent(textMode, transitionSpec = { nexusComposerTransform(state.reduceMotion) }, label = "assistantComposer") { typing ->
-                    if (typing) Surface(
-                        color = Surface2.copy(alpha = .96f),
-                        shape = RoundedCornerShape(24.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Hairline),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(Modifier.padding(5.dp), verticalAlignment = Alignment.Bottom) {
-                            IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(44.dp)) {
-                                Icon(Icons.Rounded.Add, nexusCopy("Allega", "Attach"), tint = Ice)
-                            }
-                            BasicTextField(
-                                value = state.draft,
-                                onValueChange = { dispatch("draft", it.take(12_000)) },
-                                enabled = true,
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Ice),
-                                cursorBrush = SolidColor(Cyan),
-                                modifier = Modifier.weight(1f).heightIn(min = 44.dp, max = 112.dp).focusRequester(focusRequester).padding(11.dp),
-                                decorationBox = { inner -> Box { if (state.draft.isBlank()) Text(nexusCopy("Chiedi a NexusNXS", "Ask NexusNXS"), color = Mist); inner() } }
-                            )
-                            FilledIconButton(
-                                onClick = { if (state.busy) dispatch("stop", "") else { keyboard?.hide(); dispatch("send", "") } },
-                                enabled = state.busy || online && state.draft.isNotBlank(),
-                                modifier = Modifier.size(44.dp),
-                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Cyan, contentColor = Color(0xFF002223), disabledContainerColor = Surface)
-                            ) { Icon(if (state.busy) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward, nexusCopy("Invia", "Send")) }
-                        }
-                    } else Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, energy = if (voiceMode) inlineVoiceEnergy else 0f, diameter = minOf(LocalConfiguration.current.screenWidthDp * .9f, LocalConfiguration.current.screenHeightDp * .58f).dp, fullScene = true,
-                            phaseState = when { !online -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" }) {
-                            if (online) voiceMode = !voiceMode else dispatch("probe", "")
-                        }
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
-                            IconButton({ attachmentSheet = true }, enabled = online, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                                Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
-                            }
-                            IconButton({ voiceMode = false; textMode = true }, enabled = true, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                                Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
-                            }
-                        }
-                    }
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                NexusInstantCore(
+                    active = voiceMode || state.busy, offline = !online, reduceMotion = reduceMotion,
+                    energy = if (voiceMode) inlineVoiceEnergy else 0f,
+                    diameter = minOf(maxWidth, maxHeight, 1200.dp), fullScene = true,
+                    phaseState = when { !online -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" }
+                ) {
+                    if (online) {
+                        if (state.busy) dispatch("stop", "")
+                        dispatch("stopSpeech", "")
+                        voiceMode = !voiceMode
+                    } else dispatch("probe", "")
                 }
-                Text(
-                    when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); voiceMode -> inlineVoiceDetail.ifBlank { inlineVoiceStatus }; state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Apri la tastiera per leggere i dettagli", "Open the keyboard to read the details") },
-                    color = Mist, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)
-                )
+            }
+            Text(
+                when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); voiceMode -> inlineVoiceDetail.ifBlank { inlineVoiceStatus }; state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Apri la tastiera per leggere i dettagli", "Open the keyboard to read the details") },
+                color = Ice, style = MaterialTheme.typography.bodySmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 3, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)
+            )
+            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
+                IconButton({ openApp("attachment") }, modifier = Modifier.size(52.dp).clip(CircleShape).background(Surface2.copy(alpha = .9f))) {
+                    Icon(Icons.Rounded.AttachFile, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                }
+                IconButton({ openApp("text") }, modifier = Modifier.size(52.dp).clip(CircleShape).background(Surface2.copy(alpha = .9f))) {
+                    Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                }
             }
         }
     }
     if (voiceMode && online) ContinuousVoicePanel(
-        reduceMotion = state.reduceMotion,
+        reduceMotion = reduceMotion,
         connection = state.connection,
         currentDraft = state.draft,
         bargeIn = { dispatch("stopSpeech", "") },
@@ -3176,16 +3169,9 @@ private fun JSONArray?.toTurns() = buildList {
         transcript = { dispatch("draft", it) },
         instantSubmit = { phrase -> voiceMode = false; dispatch("voiceSend", phrase) },
         compactOverlay = true,
-        openKeyboard = { voiceMode = false; textMode = true },
-        openAttachment = { voiceMode = false; attachmentSheet = true },
+        openKeyboard = { openApp("text") },
+        openAttachment = { openApp("attachment") },
         inlineState = { listening, energy, status, detail -> inlineVoiceListening = listening; inlineVoiceEnergy = energy; inlineVoiceStatus = status; inlineVoiceDetail = detail }
-    )
-    NexusAttachmentFlow(
-        visible = attachmentSheet && online,
-        close = { attachmentSheet = false },
-        dispatch = dispatch,
-        remoteWorkAvailable = false,
-        planMode = {}
     )
 }
 

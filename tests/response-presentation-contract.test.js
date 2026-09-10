@@ -107,7 +107,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /new ResizeObserver\(\(\)=>syncPrivacyHeight\(\)\)/);
   assert.match(html, /--nxs-dock-height/);
   assert.match(html, /privacyNote.offsetHeight/);
-  assert.match(html, /\.privacy::before\{[^}]*background:#000/);
+  assert.match(html, /\.privacy::before\{[^}]*background:var\(--nxs-surface\)/);
   assert.match(html, /classList\.toggle\('status-active',Boolean\(value\)\)/);
   assert.match(html, /\.status-active \.dock/);
   assert.match(html, /finally\{busy=false;setSendMode\(false\);leaveRequestLayout\(\)\}/);

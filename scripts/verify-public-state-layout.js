@@ -23,13 +23,22 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   await page.goto('https://ai.nexusnxs.com/');
   if(font!==100)await page.addStyleTag({content:`html{font-size:${font}%!important}`});
   const capture=async state=>{await page.waitForTimeout(600);report.push({width,height,font,state,...await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,controls:[...document.querySelectorAll('button')].filter(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'&&Number(s.opacity)>.1}).map(el=>({id:el.id,rect:el.getBoundingClientRect().toJSON()}))}))});await page.screenshot({path:path.join(output,`web-state-${width}-${font}-${state}.png`)});};
-  await capture('idle');await page.locator('#download').click();await capture('download');await page.locator('#sheetClose').click();
+  await capture('idle');
+  assert.equal(await page.locator('.identity').evaluate(el=>getComputedStyle(el,'::before').opacity),'0','Idle chrome must not tint the shared background');
+  await page.locator('#download').click();await capture('download');await page.locator('#sheetClose').click();
   await page.locator('#keyboard').click();await page.locator('#prompt').fill('Prova sintetica della disposizione');await capture('compose');await page.locator('#send').click();await page.locator('#answer').filter({hasText:'Risposta di prova.'}).waitFor();await capture('answer');
   const brand=await page.locator('.brand-lockup').boundingBox(),state=await page.locator('.identity .state').boundingBox();
   assert.equal(brand.x<state.x+state.width&&brand.x+brand.width>state.x&&brand.y<state.y+state.height&&brand.y+brand.height>state.y,false,'Brand and service state must not overlap');
   assert.equal(report.some(item=>item.overflow),false,'No horizontal overflow');
   if(width<=560){const box=await page.locator('.composer-box').boundingBox(),composer=await page.locator('.composer').boundingBox();assert.ok(box.width>=composer.width-2,'Full width mobile text');}
   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await capture('answer-start');
+  const glass=await page.evaluate(()=>{
+   const top=getComputedStyle(document.querySelector('.identity'),'::before'),bottom=getComputedStyle(document.querySelector('.dock'),'::before');
+   return {top:top.backgroundColor,bottom:bottom.backgroundColor,surface:getComputedStyle(document.body).backgroundColor,topWidth:parseFloat(top.width),bottomWidth:parseFloat(bottom.width),visible:top.opacity,topMask:top.maskImage,bottomMask:bottom.maskImage};
+  });
+  assert.equal(glass.top,glass.surface);assert.equal(glass.bottom,glass.surface);
+  assert.equal(glass.visible,'1');assert.ok(glass.topWidth>=width&&glass.bottomWidth>=width);
+  assert.ok(glass.topMask.includes('gradient')&&glass.bottomMask.includes('gradient'),'Both reading edges fade continuously');
   await page.locator('#prompt').fill('Bozza mantenuta durante il cambio rete');
   await page.context().setOffline(true);await page.evaluate(()=>dispatchEvent(new Event('offline')));
   await page.waitForFunction(()=>document.body.dataset.serviceReadiness==='offline');

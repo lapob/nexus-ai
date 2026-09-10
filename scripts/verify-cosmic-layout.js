@@ -16,7 +16,7 @@ const assert = require('node:assert/strict');
   const browser = await chromium.launch({ headless: true });
   const report = [];
   try {
-    for (const [width, height] of [[320,568],[390,568],[844,390],[1440,900],[1920,1080]]) for (const seed of [.1,.5,.99]) {
+    for (const [width, height] of [[320,568],[390,568],[844,390],[1440,480],[1440,900],[1920,1080],[2560,1440]]) for (const seed of [.1,.5,.99]) {
       const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       await page.addInitScript(() => {
@@ -34,9 +34,12 @@ const assert = require('node:assert/strict');
       });
       assert.equal(framing.overflow, false);
       assert.equal(framing.backend, 'webgl');
+      assert.equal(framing.planetOnly, width < 960, 'Compact screens use only the ringless planet');
+      assert.equal(framing.preset, width < 960 ? 'saturn-experimental' : seed < .3 ? 'neural' : seed < .8 ? 'jarvis-reactor' : 'saturn-experimental');
       const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
       assert.equal(overlaps(framing.core, framing.title), false, 'Idle Core must not overlap its title');
       for (const control of framing.controls) {
+        assert.equal(overlaps(framing.core, control), false, 'Core and controls must not overlap');
         assert.equal(overlaps(control, framing.title), false, 'Controls must not overlap the title');
         assert.ok(control.bottom <= height && control.top >= 0, 'Controls fit the viewport');
       }
@@ -73,6 +76,32 @@ const assert = require('node:assert/strict');
       assert.deepEqual(errors, []);
       report.push({ width, height, framing }); await page.close();
     }
+    const responsive = await browser.newPage({ viewport: { width:1440, height:900 }, serviceWorkers:'block' });
+    await responsive.route('https://ai.nexusnxs.com/', r => r.fulfill({contentType:'text/html',body:PUBLIC_AI_HTML}));
+    await responsive.goto('https://ai.nexusnxs.com/');
+    await responsive.waitForFunction(()=>nexusCosmicMetrics.renderer().arrival===1);
+    await responsive.locator('#keyboard').click();
+    await responsive.locator('#prompt').fill('Bozza conservata mentre cambia lo schermo');
+    for(const width of [959,960,390,1440]) {
+      await responsive.setViewportSize({width,height:900});
+      await responsive.waitForFunction(expected=>nexusCosmicMetrics.renderer().planetOnly===expected,width<960);
+      assert.equal(await responsive.locator('#prompt').inputValue(),'Bozza conservata mentre cambia lo schermo');
+      assert.equal(await responsive.locator('#coreCanvas').count(),1,'Responsive changes retain one drawing surface');
+      assert.equal(await responsive.locator('#coreCanvas').evaluate(el=>el.parentElement===document.body),true,'The scene is never confined to the Core button');
+    }
+    await responsive.close();
+    const tablet = await browser.newPage({ viewport:{width:1024,height:1366},hasTouch:true,serviceWorkers:'block' });
+    await tablet.route('https://ai.nexusnxs.com/',r=>r.fulfill({contentType:'text/html',body:PUBLIC_AI_HTML}));
+    await tablet.goto('https://ai.nexusnxs.com/');
+    await tablet.waitForFunction(()=>nexusCosmicMetrics.renderer().arrival===1);
+    assert.equal(await tablet.evaluate(()=>nexusCosmicMetrics.renderer().planetOnly),true,'Touch tablets retain the ringless planet');
+    await tablet.close();
+    const cold = await browser.newPage({viewport:{width:1440,height:900},javaScriptEnabled:false});
+    await cold.setContent(PUBLIC_AI_HTML);
+    assert.equal(await cold.locator('.identity').evaluate(el=>getComputedStyle(el,'::before').opacity),'0','The top scrim is absent even before JavaScript starts');
+    await cold.screenshot({path:'qa-artifacts/core-cold-start.png'});
+    await cold.close();
+    report.push({responsiveDraftRetained:true,tabletPlanetOnly:true,coldHeaderTransparent:true});
     const page = await browser.newPage({ viewport: { width:390, height:568 } });
     await page.setContent(`<style>body{margin:0}canvas{width:390px;height:568px}#host{position:absolute;left:45px;top:100px;width:300px;height:300px}</style><canvas></canvas><div id="host"></div>`);
     await page.evaluate(({runtime, recipes}) => {
@@ -89,7 +118,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.evaluate(() => document.querySelector('canvas').getContext('2d').getImageData(0,0,390,568).data.some((value,index)=>index%4===3&&value>0)),false);
     report.push({ fallbackHiddenClearsCanvas:true });
     fs.writeFileSync('qa-artifacts/core-framing-report.json',JSON.stringify(report,null,2));
-    console.log('PASS 15 layouts, Core/title/control separation, composer bounds, gather/release and reduced motion; software fallback clears hidden Core.');
+    console.log('PASS 21 layouts, Core/title/control separation, composer bounds, responsive switch, touch tablet, cold start and reduced motion; software fallback clears hidden Core.');
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
 // #endregion

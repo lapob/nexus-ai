@@ -28,13 +28,17 @@ internal fun Modifier.conversationGlass(enabled: Boolean, efficient: Boolean): M
     val output = rememberGraphicsLayer()
     return drawWithContent {
         if (!enabled) { drawContent(); return@drawWithContent }
-        val band = 40.dp.toPx().coerceAtMost(size.height / 4f)
+        val band = 48.dp.toPx().coerceAtMost(size.height / 4f)
         val top = size.height - band
+        val fraction = if (size.height > 0) band / size.height else 0f
         output.compositingStrategy = CompositingStrategy.Offscreen
         output.record {
         if (Build.VERSION.SDK_INT >= 31 && !efficient) {
             content.record { this@drawWithContent.drawContent() }
             drawLayer(content)
+            // Cross-fade sharp and blurred text instead of drawing a second
+            // blurred copy over intact glyphs, which creates bright ghost edges.
+            drawRect(Brush.verticalGradient(0f to Color.Transparent, fraction to Color.White, (1f - fraction) to Color.White, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
             for (upper in listOf(true, false)) {
             val glass = if (upper) upperGlass else lowerGlass
             val mask = if (upper) upperMask else lowerMask
@@ -44,6 +48,7 @@ internal fun Modifier.conversationGlass(enabled: Boolean, efficient: Boolean): M
                 translate(top = -edge) { drawLayer(content) }
             }
             mask.compositingStrategy = CompositingStrategy.Offscreen
+            mask.blendMode = BlendMode.Plus
             mask.record(size = IntSize(size.width.roundToInt(), band.roundToInt())) {
                 drawLayer(glass)
                 drawRect(Brush.verticalGradient(if (upper) listOf(Color.White, Color.Transparent) else listOf(Color.Transparent, Color.White)), blendMode = BlendMode.DstIn)
@@ -51,8 +56,18 @@ internal fun Modifier.conversationGlass(enabled: Boolean, efficient: Boolean): M
             translate(top = edge) { drawLayer(mask) }
             }
         } else this@drawWithContent.drawContent()
-        val fraction = if (size.height > 0) band / size.height else 0f
-        drawRect(Brush.verticalGradient(0f to Color.Transparent, fraction to Color.White, (1f - fraction) to Color.White, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+        drawRect(Brush.verticalGradient(
+            0f to Color.Transparent,
+            fraction * .18f to Color.White.copy(alpha = .08f),
+            fraction * .45f to Color.White.copy(alpha = .42f),
+            fraction * .76f to Color.White.copy(alpha = .86f),
+            fraction to Color.White,
+            (1f - fraction) to Color.White,
+            (1f - fraction * .76f) to Color.White.copy(alpha = .86f),
+            (1f - fraction * .45f) to Color.White.copy(alpha = .42f),
+            (1f - fraction * .18f) to Color.White.copy(alpha = .08f),
+            1f to Color.Transparent
+        ), blendMode = BlendMode.DstIn)
         }
         drawLayer(output)
     }

@@ -12,7 +12,8 @@ const EXPERIENCE_STYLE = `<style>
 .core canvas{background:transparent;mask-image:none;-webkit-mask-image:none}
 /* The two chrome surfaces share the same viewport, typography and frosted edge. */
 .shell .identity{position:fixed;z-index:40;top:0;left:0;right:0;width:min(1180px,100%);margin:auto;padding:max(14px,env(safe-area-inset-top)) clamp(18px,5vw,44px) 14px;min-height:76px;isolation:isolate;gap:16px}
-.identity::before{content:"";position:absolute;z-index:-1;inset:0 0 -24px;pointer-events:none;background:rgba(2,6,7,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);mask-image:linear-gradient(#000 0 72%,transparent);-webkit-mask-image:linear-gradient(#000 0 72%,transparent)}
+.identity::before{content:"";position:absolute;z-index:-1;left:50%;width:100vw;top:0;bottom:calc(-1 * var(--nxs-glass-edge));transform:translateX(-50%);pointer-events:none;background:var(--nxs-surface);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);mask-image:linear-gradient(to top,transparent,rgba(0,0,0,.08) calc(var(--nxs-glass-edge) * .18),rgba(0,0,0,.42) calc(var(--nxs-glass-edge) * .45),rgba(0,0,0,.86) calc(var(--nxs-glass-edge) * .76),#000 var(--nxs-glass-edge));-webkit-mask-image:linear-gradient(to top,transparent,rgba(0,0,0,.08) calc(var(--nxs-glass-edge) * .18),rgba(0,0,0,.42) calc(var(--nxs-glass-edge) * .45),rgba(0,0,0,.86) calc(var(--nxs-glass-edge) * .76),#000 var(--nxs-glass-edge));opacity:0;transition:opacity .2s ease}
+body:is(.conversation-active,.request-active) .identity::before{opacity:1}
 .identity .brand-lockup{color:inherit;text-decoration:none;border:0;background:none;padding:0;cursor:pointer;min-height:44px}
 .identity .brand-lockup:focus-visible{outline:2px solid #78deda;outline-offset:6px;border-radius:12px}
 .identity .brand-mark{width:40px;height:40px}.identity .wordmark{font-size:.86rem;letter-spacing:.16em}.identity .state{font-size:.8rem;white-space:nowrap}.identity .download-trigger{min-height:44px;font-size:.8rem}
@@ -59,7 +60,8 @@ const CONVERSATION_LAYOUT_STYLE = `<style>
 /* Decorative transforms must not enlarge the mobile layout viewport: a
    viewport resize during keyboard collapse moves the entire dock vertically. */
 html{overflow-x:clip}body{width:100%;max-width:100vw;overflow-x:clip}
-:root{--nxs-privacy-height:16px;--nxs-idle-dock-shift:0px;--nxs-status-dock-shift:0px;--nxs-keyboard-dock-shift:0px;--nxs-collapse-shift:0px}
+:root{--nxs-surface:#020607;--nxs-glass-edge:48px;--nxs-privacy-height:16px;--nxs-idle-dock-shift:0px;--nxs-status-dock-shift:0px;--nxs-keyboard-dock-shift:0px;--nxs-collapse-shift:0px}
+html,body{background:var(--nxs-surface)}
 .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom))}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom));transform:translate3d(0,var(--nxs-idle-dock-shift),0)}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom));transform:translate3d(0,var(--nxs-status-dock-shift),0)}
@@ -69,7 +71,7 @@ body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-a
 body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{width:min(48vw,25dvh,232px)}
 @media(max-height:540px){body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{margin-top:0}body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .stage{padding-bottom:36px}}
 body:not(.request-active):not(.conversation-active) .privacy{position:fixed;z-index:29;top:auto;right:18px;bottom:max(14px,env(safe-area-inset-bottom));left:18px;margin:0 auto}
-body.conversation-active:not(.request-active) .dock,body.request-active .dock{top:auto;bottom:calc(var(--nxs-privacy-height) + max(10px,env(safe-area-inset-bottom)));transform:none;width:min(720px,calc(100% - 36px));padding:16px 0 8px;background:linear-gradient(transparent,rgba(2,6,7,.96) 30%)}
+body.conversation-active:not(.request-active) .dock,body.request-active .dock{top:auto;bottom:calc(var(--nxs-privacy-height) + max(10px,env(safe-area-inset-bottom)));transform:none;width:min(720px,calc(100% - 36px));padding:16px 0 8px;background:none}
 .conversation-active.composer-collapsed:not(.request-active) .dock{background:none}
 .composer-box,.send{transition:opacity .2s ease,transform .28s cubic-bezier(.22,1,.36,1),border-color .18s ease,background .18s ease,box-shadow .18s ease}
 body:not(.keyboard-open):not(.request-active) .composer{grid-template-columns:58px 58px minmax(0,1fr) 54px;justify-content:normal;gap:12px}
@@ -89,8 +91,8 @@ body:not(.keyboard-open):not(.request-active) .keyboard-toggle,body:not(.keyboar
 .conversation-active .privacy,.request-active .privacy{position:fixed;z-index:31;top:auto;right:12px;bottom:max(4px,env(safe-area-inset-bottom));left:12px;width:min(660px,calc(100% - 24px));margin:0 auto;padding:0 8px;pointer-events:auto}
 /* Opaque full-width backing: scrolling text must never bleed through controls. */
 body:is(.conversation-active,.request-active) .dock{isolation:isolate}
-body:is(.conversation-active,.request-active) .dock::before{content:'';position:absolute;z-index:-1;pointer-events:none;left:50%;width:100vw;top:-44px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);mask-image:linear-gradient(transparent,#000 44px);-webkit-mask-image:linear-gradient(transparent,#000 44px);bottom:calc(-1 * (var(--nxs-privacy-height) + 16px + env(safe-area-inset-bottom)));transform:translateX(-50%);background:linear-gradient(to bottom,transparent,#000 44px)}
-.privacy::before{content:'';position:absolute;z-index:-1;pointer-events:none;left:50%;width:100vw;top:-4px;bottom:calc(-16px - env(safe-area-inset-bottom));transform:translateX(-50%);background:#000}
+body:is(.conversation-active,.request-active) .dock::before{content:'';position:absolute;z-index:-1;pointer-events:none;left:50%;width:100vw;top:calc(-1 * var(--nxs-glass-edge));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);mask-image:linear-gradient(transparent,rgba(0,0,0,.08) calc(var(--nxs-glass-edge) * .18),rgba(0,0,0,.42) calc(var(--nxs-glass-edge) * .45),rgba(0,0,0,.86) calc(var(--nxs-glass-edge) * .76),#000 var(--nxs-glass-edge));-webkit-mask-image:linear-gradient(transparent,rgba(0,0,0,.08) calc(var(--nxs-glass-edge) * .18),rgba(0,0,0,.42) calc(var(--nxs-glass-edge) * .45),rgba(0,0,0,.86) calc(var(--nxs-glass-edge) * .76),#000 var(--nxs-glass-edge));bottom:calc(-1 * (var(--nxs-privacy-height) + 16px + env(safe-area-inset-bottom)));transform:translateX(-50%);background:var(--nxs-surface)}
+.privacy::before{content:'';position:absolute;z-index:-1;pointer-events:none;left:50%;width:100vw;top:-4px;bottom:calc(-16px - env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--nxs-surface)}
 body:is(.conversation-active,.request-active) .shell{padding-bottom:calc(var(--nxs-dock-height,100px) + var(--nxs-privacy-height) + 40px + env(safe-area-inset-bottom))}
 .memory-cleared .phase{position:fixed;z-index:42;right:18px;bottom:max(18px,calc(12px + env(safe-area-inset-bottom)));left:18px;width:max-content;max-width:calc(100% - 36px);min-height:0;margin:auto;padding:8px 12px;border:1px solid rgba(103,211,208,.12);border-radius:999px;color:#83aaaa;background:rgba(4,14,15,.96);box-shadow:0 12px 34px rgba(0,0,0,.3);backdrop-filter:blur(12px);text-align:center}
 .privacy{transition:opacity .16s ease}.memory-cleared .privacy{opacity:0;pointer-events:none}
@@ -233,19 +235,26 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     const copy = document.querySelector('.copy');
     const dock = document.querySelector('.dock');
     const header = document.querySelector('.identity');
-    if (!copy || !dock || !header || (innerHeight <= 540 && innerWidth >= 600)) return;
+    if (!copy || !dock || !header) return;
+    if (innerHeight <= 540 && innerWidth >= 600) {
+      const available = dock.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 32;
+      button.style.setProperty('--nxs-core-fit', `${Math.max(80, available)}px`);
+      return;
+    }
     const style = getComputedStyle(copy);
     const copyHeight = copy.getBoundingClientRect().height + parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0);
     const stage = document.querySelector('.stage');
     const coreStyle = getComputedStyle(button);
     const stageTop = Math.max(header.getBoundingClientRect().bottom + 16, stage.getBoundingClientRect().top + parseFloat(getComputedStyle(stage).paddingTop || 0));
-    const available = dock.getBoundingClientRect().top - stageTop - copyHeight - parseFloat(coreStyle.marginBottom || 0) - parseFloat(coreStyle.marginTop || 0) - 24;
+    const exchangeStyle = getComputedStyle(exchange);
+    const statusHeight = exchangeStyle.display === 'none' ? 0 : exchange.getBoundingClientRect().height + parseFloat(exchangeStyle.marginTop || 0) + parseFloat(exchangeStyle.marginBottom || 0);
+    const available = dock.getBoundingClientRect().top - stageTop - copyHeight - statusHeight - parseFloat(coreStyle.marginBottom || 0) - parseFloat(coreStyle.marginTop || 0) - 24;
     button.style.setProperty('--nxs-core-fit', `${Math.max(80, available)}px`);
   };
   const settleCore = event => { if (event.target.matches?.('.stage,.dock,.copy,.core')) fitCore(); };
   document.addEventListener('transitionend', settleCore);
   const fitObserver = new ResizeObserver(fitCore);
-  for (const element of document.querySelectorAll('.copy,.dock,.identity')) fitObserver.observe(element);
+  for (const element of document.querySelectorAll('.copy,.dock,.identity,.exchange')) fitObserver.observe(element);
   addEventListener('resize', fitCore, { passive: true });
   document.fonts?.ready.then(fitCore);
   setTimeout(fitCore, 800);
@@ -298,7 +307,11 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   let voiceCore = false;
   const retainVoiceCore = () => { voiceCore = true; };
   button.addEventListener('click', retainVoiceCore, true);
-  const renderer = createCosmicVisualizers(canvas, { host: button, efficient, planetOnly: true, gatherBackground: true, disperseOnHide: true, getVisible: () => !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
+  const desktopCore = matchMedia('(min-width: 960px) and (pointer: fine)');
+  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getVisible: () => !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
+  let renderer = createRenderer();
+  const switchCoreLayout = () => { renderer.dispose(); renderer = createRenderer(); fitCore(); resumeField(); };
+  desktopCore.addEventListener('change', switchCoreLayout);
   // The GPU canvas belongs to the page, so host opacity cannot hide it.
   const layoutObserver = new MutationObserver(() => { if (document.body.classList.contains('keyboard-open')) voiceCore = false; renderer.refresh(); fitCore(); });
   layoutObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
@@ -306,7 +319,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
   globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => renderer.getMetrics().particles, renderer: () => renderer.getMetrics() };
-  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); document.removeEventListener('transitionend', settleCore); removeEventListener('resize', fitCore); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
+  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); document.removeEventListener('transitionend', settleCore); removeEventListener('resize', fitCore); desktopCore.removeEventListener('change', switchCoreLayout); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
   readExchange();
 }
 
@@ -374,17 +387,21 @@ function publicAiCosmicCoreScript({ palette, presentation }) {
   return `<style>.core-glyph{display:none!important}.core canvas{filter:none!important}.core[data-state] canvas{filter:none!important}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .composer-box,body:not(.keyboard-open):not(.request-active):not(.conversation-active) .send{display:none}
 .core{user-select:none;-webkit-tap-highlight-color:transparent}.core:focus:not(:focus-visible){outline:none;box-shadow:none}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active) .exchange{display:none}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active):not(.status-active) .core{width:min(94vw,60dvh,1100px,var(--nxs-core-fit,60dvh))}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{width:min(94vw,60dvh,1100px,var(--nxs-core-fit,60dvh))}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active):not(.status-active) .exchange{display:none}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(96vw,1200px,var(--nxs-core-fit,66dvh))}
 body.keyboard-open:not(.request-active):not(.conversation-active) .copy{opacity:0;visibility:hidden;filter:none}
 @media(max-height:540px) and (min-width:600px){
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:30px;min-height:0;padding-top:0}
-body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(64dvh,44vw)!important;flex:0 0 min(64dvh,44vw);margin:0!important}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{width:min(44vw,var(--nxs-core-fit,54dvh))!important;flex:0 0 auto;margin:0!important}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy{max-width:420px;flex:0 1 420px;margin:0;text-align:left}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .exchange{display:none}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy h1{font-size:clamp(24px,4vw,36px)!important;line-height:1.1;white-space:normal}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .phase{display:none}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .stage{display:grid;grid-template-columns:min(44vw,var(--nxs-core-fit,54dvh)) minmax(0,420px);grid-template-rows:auto auto;align-content:center;gap:8px 30px}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core{grid-row:1 / 3}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .copy{grid-column:2}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .exchange{display:block;grid-column:2;margin:0}
+body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{display:block;margin:0;text-align:left;font-size:.78rem}
 }</style><script>(${publicAiCosmicRuntime.toString()})(${JSON.stringify(palette)},${JSON.stringify(presentation)},${createCosmicVisualizers.toString()},${createDesktopRecipes.toString()});</script>`;
 }
 

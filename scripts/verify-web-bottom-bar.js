@@ -83,12 +83,13 @@ async function main() {
           const dock=document.querySelector('.dock'), privacy=document.querySelector('.privacy');
           const backing=getComputedStyle(dock,'::before');
           resolve({ gap:privacy.getBoundingClientRect().top-dock.getBoundingClientRect().bottom,
-            backing:backing.backgroundImage, backingWidth:parseFloat(backing.width), width:innerWidth,
+            backing:backing.backgroundColor, surface:getComputedStyle(document.body).backgroundColor,
+            feather:backing.maskImage, backingWidth:parseFloat(backing.width), width:innerWidth,
             padding:parseFloat(getComputedStyle(document.querySelector('.shell')).paddingBottom),
             occupied:dock.offsetHeight+privacy.offsetHeight });
         },800);
       })`);
-      if (result.gap < 0 || result.backingWidth < width || !result.backing.includes('rgb(0, 0, 0)') || result.padding < result.occupied) throw new Error(JSON.stringify(result));
+      if (result.gap < 0 || result.backingWidth < width || result.backing !== result.surface || !result.feather.includes('gradient') || result.padding < result.occupied) throw new Error(JSON.stringify(result));
       const screenshot = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       fs.writeFileSync(path.join(output, `${width}x${height}.png`), Buffer.from(screenshot.data, 'base64'));
       report.push({ width, height, typing, transient, ...result });
