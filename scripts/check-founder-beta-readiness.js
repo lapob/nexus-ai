@@ -4,6 +4,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { validAndroidMatrix } = require('./android-matrix-evidence');
 
 const root = path.resolve(__dirname, '..');
 
@@ -16,7 +17,7 @@ function readJson(projectRoot, relativePath) {
 
 function ageHours(value, now = Date.now()) {
   const timestamp = Date.parse(String(value || ''));
-  return Number.isFinite(timestamp) ? Math.max(0, now - timestamp) / 3_600_000 : Infinity;
+  return Number.isFinite(timestamp) ? (now - timestamp) / 3_600_000 : Infinity;
 }
 
 function confirmed(value) { return /^(?:1|true|yes|confirmed)$/i.test(String(value || '').trim()); }
@@ -28,7 +29,7 @@ function artifactCheck({ projectRoot, id, relativePath, maximumAgeHours, predica
     || artifact?.capturedAt
     || artifact?.CapturedAt
     || artifact?.evaluatedAt;
-  return check(id, Boolean(artifact && ageHours(timestamp, now) <= maximumAgeHours && predicate(artifact)), detail);
+  return check(id, Boolean(artifact && ageHours(timestamp, now) >= 0 && ageHours(timestamp, now) <= maximumAgeHours && predicate(artifact)), detail);
 }
 
 function androidMatrixCheck({ projectRoot, id, relativePath, policy, now }) {
@@ -38,12 +39,8 @@ function androidMatrixCheck({ projectRoot, id, relativePath, policy, now }) {
     detail: `Matrice fisica recente con ${policy.android.requiredProfiles} profili e jank <= ${policy.android.maximumJankyPercent}%`,
     now,
     predicate: (artifact) => {
-      const profiles = Array.isArray(artifact.profiles) ? artifact.profiles : Array.isArray(artifact.Profiles) ? artifact.Profiles : [];
-      const metrics = Array.isArray(artifact.frameMetrics) ? artifact.frameMetrics : Array.isArray(artifact.FrameMetrics) ? artifact.FrameMetrics : [];
-      return profiles.length >= policy.android.requiredProfiles
-        && metrics.length >= policy.android.requiredProfiles
-        && metrics.every((entry) => Number(entry.TotalFrames ?? entry.totalFrames) >= policy.android.minimumFramesPerProfile
-          && Number(entry.JankyPercent ?? entry.jankyPercent) <= policy.android.maximumJankyPercent);
+      const name = id === 'android-control-device' ? 'NexusNXS-Control.apk' : 'NexusNXS-Android.apk';
+      return validAndroidMatrix(artifact, policy.android, path.join(projectRoot, 'release-android', name));
     }
   });
 }

@@ -236,8 +236,11 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     const dock = document.querySelector('.dock');
     const header = document.querySelector('.identity');
     if (!copy || !dock || !header) return;
+    // Use the final idle position, never the dock's interpolated keyboard position.
+    const privacyHeight = document.querySelector('.privacy')?.offsetHeight || 0;
+    const dockTop = innerHeight - privacyHeight - (innerHeight <= 540 ? 12 : 24) - dock.offsetHeight;
     if (innerHeight <= 540 && innerWidth >= 600) {
-      const available = dock.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 32;
+      const available = dockTop - header.getBoundingClientRect().bottom - 32;
       button.style.setProperty('--nxs-core-fit', `${Math.max(80, available)}px`);
       return;
     }
@@ -248,7 +251,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     const stageTop = Math.max(header.getBoundingClientRect().bottom + 16, stage.getBoundingClientRect().top + parseFloat(getComputedStyle(stage).paddingTop || 0));
     const exchangeStyle = getComputedStyle(exchange);
     const statusHeight = exchangeStyle.display === 'none' ? 0 : exchange.getBoundingClientRect().height + parseFloat(exchangeStyle.marginTop || 0) + parseFloat(exchangeStyle.marginBottom || 0);
-    const available = dock.getBoundingClientRect().top - stageTop - copyHeight - statusHeight - parseFloat(coreStyle.marginBottom || 0) - parseFloat(coreStyle.marginTop || 0) - 24;
+    const available = dockTop - stageTop - copyHeight - statusHeight - parseFloat(coreStyle.marginBottom || 0) - parseFloat(coreStyle.marginTop || 0) - 24;
     button.style.setProperty('--nxs-core-fit', `${Math.max(80, available)}px`);
   };
   const settleCore = event => { if (event.target.matches?.('.stage,.dock,.copy,.core')) fitCore(); };

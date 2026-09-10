@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { buildFounderBetaReport } = require('../scripts/check-founder-beta-readiness');
 
 function fixture() {
@@ -16,6 +17,8 @@ function fixture() {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, `${JSON.stringify(value)}\n`, 'utf8');
   };
+  fs.mkdirSync(path.join(projectRoot, 'release-android'));
+  for (const name of ['NexusNXS-Control.apk', 'NexusNXS-Android.apk']) fs.writeFileSync(path.join(projectRoot, 'release-android', name), 'synthetic APK');
   const now = Date.now();
   write('config/founder-beta-policy.json', {
     schemaVersion: 1, maximumInvitedTesters: 20,
@@ -44,7 +47,7 @@ test('la Preview tecnica non finge che firma e dispositivi reali siano gia pront
 test('la Founder Beta richiede insieme prove automatiche firma dispositivi e responsabilita', () => {
   const item = fixture();
   try {
-    const matrix = { capturedAt: new Date(item.now).toISOString(), profiles: [1, 2, 3, 4, 5], frameMetrics: Array.from({ length: 5 }, () => ({ totalFrames: 120, jankyPercent: 2 })) };
+    const matrix = { apkSha256: crypto.createHash('sha256').update('synthetic APK').digest('hex'), capturedAt: new Date(item.now).toISOString(), profiles: [1, 2, 3, 4, 5], frameMetrics: Array.from({ length: 5 }, (_, i) => ({ profile: i + 1, totalFrames: 120, jankyPercent: 2 })) };
     item.write('qa-artifacts/android-control-matrix/manifest.json', matrix);
     item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
     const environment = {
@@ -57,6 +60,10 @@ test('la Founder Beta richiede insieme prove automatiche firma dispositivi e res
     assert.equal(report.technicalPreviewReady, true);
     assert.equal(report.founderBetaReady, true);
     assert.equal(report.summary.blocked, 0);
+    fs.writeFileSync(path.join(item.projectRoot, 'release-android', 'NexusNXS-Android.apk'), 'new untested APK');
+    const updated = buildFounderBetaReport({ projectRoot: item.projectRoot, environment, now: item.now });
+    assert.equal(updated.founderBetaReady, false);
+    assert.equal(updated.checks.find(entry => entry.id === 'android-public-device').status, 'blocked');
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });
 
@@ -64,9 +71,10 @@ test('accetta il timestamp PowerShell dei report Android fisici', () => {
   const item = fixture();
   try {
     const matrix = {
+      ApkSha256: crypto.createHash('sha256').update('synthetic APK').digest('hex'),
       CapturedAt: new Date(item.now).toISOString(),
       Profiles: [1, 2, 3, 4, 5],
-      FrameMetrics: Array.from({ length: 5 }, () => ({ TotalFrames: 120, JankyPercent: 2 }))
+      FrameMetrics: Array.from({ length: 5 }, (_, i) => ({ Profile: i + 1, TotalFrames: 120, JankyPercent: 2 }))
     };
     item.write('qa-artifacts/android-control-matrix/manifest.json', matrix);
     item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);

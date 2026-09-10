@@ -2720,9 +2720,6 @@ private fun JSONArray?.toTurns() = buildList {
         if (textMode) {
             voiceMode = false
             dispatch("stopSpeech", "")
-            kotlinx.coroutines.delay(70)
-            focusRequester.requestFocus()
-            keyboard?.show()
         }
     }
     BackHandler(enabled = voiceMode || textMode || typedSession) {
@@ -2813,6 +2810,13 @@ private fun JSONArray?.toTurns() = buildList {
                         // two composer trees briefly duplicated/clipped its shell.
                         Box(Modifier.fillMaxWidth()) {
                             if (textMode) Column(Modifier.fillMaxWidth()) {
+                        // Request focus only while the actual composer is mounted.
+                        // AnimatedContent may not have installed it when textMode changes.
+                        LaunchedEffect(Unit) {
+                            androidx.compose.runtime.withFrameNanos { }
+                            focusRequester.requestFocus()
+                            keyboard?.show()
+                        }
                         AnimatedVisibility(instantSlashSuggestions.isNotEmpty(), enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
                             Surface(
                                 color = Surface.copy(alpha = .985f),

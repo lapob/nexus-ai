@@ -16,6 +16,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   let resolutionScale = 1, releaseAge = 0, releaseArrival = 0, releaseStage = null;
   let width = 1, height = 1, dpr = 1, rect = {left:0,top:0,width:1,height:1};
   let pointer = [0,0], pointerStrength = 0, touching = false, dragging = false, dragStart = [0,0], rotation = [0,0], targetRotation = [0,0];
+  let pointerClient = null;
   let suppressClick = 0, paintedReduced = false, ringVisibility = 0, wasCoreVisible = true;
   const efficient = options.efficient || navigator.connection?.saveData || Number(navigator.deviceMemory || 4) <= 3;
   const budget = efficient ? 16000 : 42000;
@@ -129,6 +130,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     pointerStrength+=((touching&&!isReduced?.55:0)-pointerStrength)*(1-Math.exp(-dt*(touching?7:.8)));
     for(let a=0;a<2;a++)rotation[a]+=((dragging&&!isReduced?targetRotation[a]:0)-rotation[a])*(1-Math.exp(-dt*(dragging?8:1.1)));
     rect=host.getBoundingClientRect();const side=Math.min(rect.width,rect.height)*1.25;
+    if(pointerClient)pointer=[(pointerClient[0]-rect.left-rect.width/2)*13.2/Math.max(1,side),-(pointerClient[1]-rect.top-rect.height/2)*13.2/Math.max(1,side)];
     const stage=[side/width,side/height,(rect.left+rect.width/2)/width*2-1,1-(rect.top+rect.height/2)/height*2];
     const requestedVisible=options.getVisible?.()!==false;
     const coreVisible=requestedVisible||options.disperseOnHide===true;
@@ -159,7 +161,12 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
       for(const field of coreVisible?fields[preset]:[]){
         const saturn=preset==='saturn-experimental',reactor=preset==='jarvis-reactor';
         const rx=(saturn?(field.kind>0?1.38:-.03):reactor?-.12:-.2)+rotation[0];
-        uniform(p,'modelViewMatrix',matrix(rx,rotation[1]+(saturn?.04:0),saturn&&field.kind>0?-.16:reactor?.16:0,fieldScale(field.kind)));uniform(p,'uKind',field.kind);
+        const model=matrix(rx,rotation[1]+(saturn?.04:0),saturn&&field.kind>0?-.16:reactor?.16:0,fieldScale(field.kind));
+        // Invert the projected local XY plane, including framing and inspection.
+        const determinant=model[0]*model[5]-model[4]*model[1];
+        const localPointer=Math.abs(determinant)>.0001?[(pointer[0]*model[5]-pointer[1]*model[4])/determinant,(pointer[1]*model[0]-pointer[0]*model[1])/determinant]:[0,0];
+        uniform(p,'uPointer',localPointer);
+        uniform(p,'modelViewMatrix',model);uniform(p,'uKind',field.kind);
         for(const [name,attribute]of Object.entries(field.gpu)){if(!p.attributes.has(name))p.attributes.set(name,gl.getAttribLocation(p.p,name));const loc=p.attributes.get(name);if(loc<0)continue;gl.bindBuffer(gl.ARRAY_BUFFER,attribute.buffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,attribute.size,gl.FLOAT,false,0,0);}
         gl.drawArrays(gl.POINTS,0,Math.floor(field.positions.length/3*quality));
       }
@@ -188,7 +195,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   }
   function refresh(){paintedReduced=false;if(!raf&&!disposed&&!lost&&visible&&!document.hidden){last=0;raf=requestAnimationFrame(draw);}}
   function visibility(){cancelAnimationFrame(raf);raf=0;last=0;refresh();}
-  function move(e){pointer=[(e.clientX-rect.left-rect.width/2)/Math.max(1,rect.width)*13.2,-(e.clientY-rect.top-rect.height/2)/Math.max(1,rect.height)*13.2];touching=true;if(dragging){targetRotation=[Math.max(-1,Math.min(1,(e.clientY-dragStart[1])/200)),Math.max(-1,Math.min(1,(e.clientX-dragStart[0])/200))];if(Math.hypot(e.clientX-dragStart[0],e.clientY-dragStart[1])>8)suppressClick=performance.now()+400;}}
+  function move(e){pointerClient=[e.clientX,e.clientY];touching=true;if(dragging){targetRotation=[Math.max(-1,Math.min(1,(e.clientY-dragStart[1])/200)),Math.max(-1,Math.min(1,(e.clientX-dragStart[0])/200))];if(Math.hypot(e.clientX-dragStart[0],e.clientY-dragStart[1])>8)suppressClick=performance.now()+400;}}
   function down(e){if(e.button!==0||reduced())return;dragging=true;dragStart=[e.clientX,e.clientY];host.setPointerCapture?.(e.pointerId);}
   function leave(){touching=false;dragging=false;}
   function click(e){if(host.contains(e.target)&&performance.now()<suppressClick){e.preventDefault();e.stopImmediatePropagation();}}

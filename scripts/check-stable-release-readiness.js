@@ -4,7 +4,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
+const { validAndroidMatrix } = require('./android-matrix-evidence');
 
 const root = path.resolve(__dirname, '..');
 const policy = JSON.parse(fs.readFileSync(path.join(root, 'config', 'stable-release-policy.json'), 'utf8'));
@@ -56,26 +56,7 @@ function artifactCheck(id, relativePath, maximumAgeHours, predicate, detail) {
 
 function androidMatrixCheck(id, relativePath, apkPath) {
   return artifactCheck(id, relativePath, policy.artifactMaximumAgeHours.androidDeviceMatrix, (artifact) => {
-    if (apkPath) {
-      try {
-        const expected = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, apkPath))).digest('hex');
-        if (String(artifact.ApkSha256 || artifact.apkSha256 || '').toLowerCase() !== expected) return false;
-      } catch { return false; }
-    }
-    const profiles = Array.isArray(artifact.profiles) ? artifact.profiles : Array.isArray(artifact.Profiles) ? artifact.Profiles : [];
-    const metrics = Array.isArray(artifact.frameMetrics) ? artifact.frameMetrics : Array.isArray(artifact.FrameMetrics) ? artifact.FrameMetrics : [];
-    return profiles.length >= policy.android.requiredProfiles
-      && metrics.length >= policy.android.requiredProfiles
-      && new Set(profiles).size === profiles.length
-      && metrics.length === profiles.length
-      && new Set(metrics.map((entry) => entry.Profile ?? entry.profile)).size === profiles.length
-      && metrics.every((entry) => {
-        const frames = entry.TotalFrames ?? entry.totalFrames;
-        const jank = entry.JankyPercent ?? entry.jankyPercent;
-        return profiles.includes(entry.Profile ?? entry.profile)
-          && typeof frames === 'number' && Number.isFinite(frames) && frames >= policy.android.minimumFramesPerProfile
-          && typeof jank === 'number' && Number.isFinite(jank) && jank >= 0 && jank <= policy.android.maximumJankyPercent;
-      });
+    return validAndroidMatrix(artifact, policy.android, apkPath ? path.resolve(root, apkPath) : null);
   }, `Matrice reale recente con ${policy.android.requiredProfiles} profili e jank <= ${policy.android.maximumJankyPercent}%`);
 }
 
