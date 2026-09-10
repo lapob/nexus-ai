@@ -587,6 +587,14 @@ private fun String.isTransportFailure(): Boolean =
 
 open class NexusMainActivity : ComponentActivity() {
     companion object {
+        private var visibleActivity = java.lang.ref.WeakReference<NexusMainActivity>(null)
+        fun listenInVisibleApp(): Boolean {
+            val activity = visibleActivity.get() ?: return false
+            if (!activity.appVisible || activity.isFinishing || activity.isDestroyed || activity.state.assistantOverlay) return false
+            activity.dispatch("stopSpeech", "")
+            activity.state = activity.state.copy(assistantInvocation = System.currentTimeMillis())
+            return true
+        }
         private const val SESSION_RESUME_WINDOW_MS = 30L * 60L * 1000L
         private const val MAX_ATTACHMENT_BYTES = 1_500_000
         private const val MAX_BACKUP_BYTES = 16 * 1024 * 1024
@@ -898,6 +906,7 @@ open class NexusMainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         appVisible = true
+        visibleActivity = java.lang.ref.WeakReference(this)
         if (::frameHealth.isInitialized) frameHealth.start()
         if (::store.isInitialized) {
             probeConnection()
@@ -918,6 +927,7 @@ open class NexusMainActivity : ComponentActivity() {
 
     override fun onStop() {
         appVisible = false
+        if (visibleActivity.get() === this) visibleActivity.clear()
         flushDraftPersistence()
         if (::frameHealth.isInitialized) frameHealth.stop()
         if (!isChangingConfigurations) {
@@ -2552,7 +2562,7 @@ open class NexusMainActivity : ComponentActivity() {
             state = state.copy(
                 screen = NexusScreen.CHAT,
                 work = false,
-                assistantOverlay = true,
+                assistantOverlay = state.assistantOverlay,
                 assistantInvocation = System.currentTimeMillis()
             )
             onAssistantPresentationChanged()
@@ -2696,6 +2706,8 @@ private fun JSONArray?.toTurns() = buildList {
 
     LaunchedEffect(state.assistantInvocation, interactionAvailable) {
         if (state.assistantInvocation <= 0L) return@LaunchedEffect
+        settingsOpen = false
+        remoteSettingsOpen = false
         keyboard?.hide()
         focusManager.clearFocus(force = true)
         textMode = false
@@ -2986,12 +2998,9 @@ private fun JSONArray?.toTurns() = buildList {
                     TextButton(onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy) {
                         Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"))
                     }
-                    Text(nexusCopy("Conversazioni recenti", "Recent conversations"), color = Mist, style = MaterialTheme.typography.labelLarge)
-                    if (state.chats.isEmpty()) Text(nexusCopy("Le tue conversazioni appariranno qui", "Your conversations will appear here"), color = Mist, style = MaterialTheme.typography.bodySmall)
-                    state.chats.take(12).forEach { chat ->
-                        TextButton(onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id); settingsOpen = false; typedSession = true; textMode = false }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-                            Text(chat.title, maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (chat.id == state.conversationId) Cyan else Ice, modifier = Modifier.fillMaxWidth())
-                        }
+                    InstantHistory(state, dispatch) { chat ->
+                        voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
+                        settingsOpen = false; typedSession = true; textMode = false
                     }
                     HorizontalDivider(color = Hairline)
                     Text(nexusCopy("Aspetto e interazione", "Appearance and interaction"), color = Mist, style = MaterialTheme.typography.labelLarge)
@@ -3016,8 +3025,11 @@ private fun JSONArray?.toTurns() = buildList {
 
                     HorizontalDivider(color = Hairline)
                     CompactSetting(Icons.Rounded.Lock, nexusCopy("Schermata privata", "Private screen"), nexusCopy("Protegge le anteprime e le catture", "Protects previews and screenshots"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }
+                    CompactSetting(Icons.Rounded.VisibilityOff, nexusCopy("Chat temporanea", "Temporary chat"), nexusCopy("Non viene salvata nella cronologia", "Not saved in history"), { Switch(state.temporary, { if (!state.busy) dispatch("temporary", "") }, enabled = !state.busy) }) { if (!state.busy) dispatch("temporary", "") }
+                    Text(nexusCopy("Dati e conversazioni", "Data and conversations"), color = Mist, style = MaterialTheme.typography.labelLarge)
                     TextButton({ dispatch("exportBackup", "") }) { Text(nexusCopy("Esporta backup cifrato", "Export encrypted backup")) }
                     TextButton({ dispatch("importBackup", "") }) { Text(nexusCopy("Importa backup", "Import backup")) }
+                    Text(nexusCopy("La cronologia è conservata sul dispositivo. Lingua e dimensioni del testo seguono Android.", "History is stored on this device. Language and text size follow Android."), color = Mist, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -3877,6 +3889,63 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }
 }
 
+@Composable private fun InstantHistory(state: NexusUiState, dispatch: (String, String) -> Unit, open: (ChatRow) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var selected by remember { mutableStateOf<ChatRow?>(null) }
+    var renaming by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var title by remember { mutableStateOf("") }
+    Text(nexusCopy("Cronologia", "History"), color = Ice, style = MaterialTheme.typography.titleMedium)
+    OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
+        label = { Text(nexusCopy("Cerca conversazioni", "Search conversations")) }, modifier = Modifier.fillMaxWidth())
+    val chats = state.chats.filter { query.isBlank() || it.title.contains(query, true) || it.preview.contains(query, true) }
+        .sortedWith(compareByDescending<ChatRow> { it.pinned }.thenByDescending { it.updatedAt })
+    if (chats.isEmpty()) Text(nexusCopy("Nessuna conversazione trovata", "No conversations found"), color = Mist)
+    val pinnedLabel = nexusCopy("Fissate", "Pinned")
+    val italian = nexusCopy("it", "en") == "it"
+    val groups = chats.groupBy { if (it.pinned) pinnedLabel else historyGroupLabel(it.updatedAt, italian) }
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+    groups.forEach { (group, rows) ->
+        item(key = "group-" + group) { Text(group, color = Mist, style = MaterialTheme.typography.labelMedium) }
+        items(rows.size, key = { rows[it].id }) { index ->
+            val chat = rows[index]
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(enabled = !state.busy) { open(chat) }.padding(10.dp)) {
+                    Text(chat.title, maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (chat.id == state.conversationId) Cyan else Ice)
+                    if (chat.preview.isNotBlank()) Text(chat.preview, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Mist, style = MaterialTheme.typography.bodySmall)
+                }
+                IconButton(onClick = { selected = chat; title = chat.title }, enabled = !state.busy) {
+                    Icon(Icons.Rounded.MoreVert, nexusCopy("Gestisci conversazione", "Manage conversation"), tint = Mist)
+                }
+            }
+        }
+    }
+    }
+    selected?.let { chat ->
+        AlertDialog(onDismissRequest = { selected = null; renaming = false; deleting = false },
+            title = { Text(if (deleting) nexusCopy("Eliminare la conversazione?", "Delete conversation?") else chat.title) },
+            text = {
+                Column {
+                    if (renaming) OutlinedTextField(value = title, onValueChange = { title = it.take(120) }, singleLine = true,
+                        label = { Text(nexusCopy("Titolo", "Title")) })
+                    else if (deleting) Text(nexusCopy("Verrà rimossa dalla cronologia locale. Questa azione non si può annullare.", "It will be removed from local history. This cannot be undone."))
+                    else {
+                        TextButton({ dispatch("pinChat", chat.id); selected = null }) { Text(if (chat.pinned) nexusCopy("Non fissare più", "Unpin") else nexusCopy("Fissa", "Pin")) }
+                        TextButton({ renaming = true }) { Text(nexusCopy("Rinomina", "Rename")) }
+                        TextButton({ deleting = true }) { Text(nexusCopy("Elimina", "Delete")) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                if (renaming && title.isNotBlank()) dispatch("renameChat", chat.id + "\n" + title.trim())
+                if (deleting) dispatch("deleteChat", chat.id)
+                selected = null; renaming = false; deleting = false
+            }, enabled = !renaming || title.isNotBlank()) { Text(if (deleting) nexusCopy("Elimina", "Delete") else nexusCopy("Fatto", "Done")) } },
+            dismissButton = { TextButton({ selected = null; renaming = false; deleting = false }) { Text(nexusCopy("Annulla", "Cancel")) } },
+            containerColor = Surface)
+    }
+}
+
 @Composable private fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, click: () -> Unit) = Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).clickable(onClick = click).padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Color(0xFFC4CECE), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(label, style = MaterialTheme.typography.bodyMedium) }
 
 @Composable private fun RemoteDrawerItem(label: String, click: () -> Unit) = Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).clickable(onClick = click).padding(horizontal = 11.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) { RemoteGlyph(); Spacer(Modifier.width(13.dp)); Text(label, fontSize = 15.sp) }
@@ -3895,11 +3964,16 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
 }
 
 private fun historyGroupLabel(updatedAt: Long, italian: Boolean = true): String {
-    val age = (System.currentTimeMillis() - updatedAt).coerceAtLeast(0L)
+    val today = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+    }
+    val yesterday = (today.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, -1) }
+    val week = (today.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, -6) }
     return when {
-        age < 24 * 60 * 60 * 1000L -> if (italian) "Oggi" else "Today"
-        age < 48 * 60 * 60 * 1000L -> if (italian) "Ieri" else "Yesterday"
-        age < 7 * 24 * 60 * 60 * 1000L -> if (italian) "Ultimi 7 giorni" else "Last 7 days"
+        updatedAt >= today.timeInMillis -> if (italian) "Oggi" else "Today"
+        updatedAt >= yesterday.timeInMillis -> if (italian) "Ieri" else "Yesterday"
+        updatedAt >= week.timeInMillis -> if (italian) "Ultimi 7 giorni" else "Last 7 days"
         else -> if (italian) "Precedenti" else "Earlier"
     }
 }

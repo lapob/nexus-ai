@@ -100,8 +100,17 @@ async function closePage(target) {
   // window.close() attraversa il normale lifecycle BrowserWindow come la X
   // nativa. Page.close può limitarsi a chiudere il target DevTools e lasciare
   // viva la finestra host in alcune versioni Chromium/Electron.
-  socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'window.close()' } }));
-  await delay(120);
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Il renderer non ha confermato il comando di chiusura.')), 5000);
+    socket.addEventListener('message', (event) => {
+      const reply = JSON.parse(event.data);
+      if (reply.id !== 1) return;
+      clearTimeout(timeout);
+      if (reply.error || reply.result?.exceptionDetails) reject(new Error(JSON.stringify(reply)));
+      else resolve();
+    });
+    socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'window.close()' } }));
+  });
   try { socket.close(); } catch {}
 }
 
@@ -145,7 +154,7 @@ async function removeProfile() {
   let stderr = '';
   const child = spawn(electronBinary, ['.', `--remote-debugging-port=${debugPort}`], {
     cwd: root,
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
       NEXUS_USER_DATA_ROOT: profile,
@@ -157,6 +166,7 @@ async function removeProfile() {
     }
   });
   child.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
+  child.stdout.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
   try {
     const target = await rendererTarget();
     const before = processSnapshot();
@@ -178,6 +188,9 @@ async function removeProfile() {
     await waitForProcessLock(presenceLockPath, false);
     console.log('Chiusura finestra verificata: UI terminata, Presence leggera mantenuta e arrestabile dal tray/controllo.');
   } catch (error) {
+    const diagnostics = path.join(root, 'qa-artifacts', 'shutdown-failure.log');
+    fs.mkdirSync(path.dirname(diagnostics), { recursive: true });
+    fs.writeFileSync(diagnostics, stderr);
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     terminateTestTree(child);
     throw error;

@@ -114,7 +114,8 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
                 web?.evaluateJavascript("window.updateNexusVisual && window.updateNexusVisual($data)", null)
                 previous = data
             }
-            kotlinx.coroutines.delay(66)
+            // Follow the display clock; unchanged state never crosses into WebView.
+            withFrameNanos { }
         }
     }
 }

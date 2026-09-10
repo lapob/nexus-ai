@@ -15,7 +15,7 @@ function fixture(extra={}){
   const sandbox={...events,module:{exports:{}},navigator:{deviceMemory:2},document,devicePixelRatio:1,matchMedia:()=>media,performance:{now:()=>time},requestAnimationFrame(fn){frames.set(++id,fn);return id;},cancelAnimationFrame(i){frames.delete(i);},IntersectionObserver:class{observe(){}disconnect(){}},ResizeObserver:class{observe(){}disconnect(){}}};
   vm.runInNewContext(fs.readFileSync(path.join(root,'src/shared/cosmic-visualizers.js'),'utf8'),sandbox);
   const renderer=sandbox.module.exports.createCosmicVisualizers(canvas,{random:()=>.1,...extra},createDesktopRecipes);
-  return {renderer,canvas,media,document,frames,listeners,tick(n=1){for(let i=0;i<n;i++){time+=1000/60;const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(time));}}};
+  return {renderer,canvas,media,document,frames,listeners,tick(n=1,interval=1000/60){for(let i=0;i<n;i++){time+=interval;const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(time));}}};
 }
 test('generated GPU recipes and Android asset exactly match current desktop source',()=>{
   execFileSync(process.execPath,['scripts/generate-cosmic-visualizers.js','--check'],{cwd:root,stdio:'pipe'});
@@ -67,4 +67,15 @@ test('Android visual scene has no network, file, content or JavaScript bridge ac
   for(const token of ['allowFileAccess = false','allowContentAccess = false','blockNetworkLoads = true','domStorageEnabled = false','MIXED_CONTENT_NEVER_ALLOW'])assert.ok(native.includes(token));
   assert.doesNotMatch(native,/addJavascriptInterface|loadUrl\s*\(/);
   assert.match(native,/JSONObject\(\)/);assert.match(native,/web\?\.destroy\(\)/);
+});
+
+
+test('slow devices retain the complete particle field while adapting raster resolution',()=>{
+  const f=fixture({planetOnly:true});
+  const count=f.renderer.getMetrics().particles;
+  f.tick(240,50);
+  assert.equal(f.renderer.getMetrics().particles,count);
+  assert.ok(f.renderer.getMetrics().resolutionScale>=.75);
+  assert.ok(f.renderer.getMetrics().resolutionScale<1);
+  f.renderer.dispose();
 });

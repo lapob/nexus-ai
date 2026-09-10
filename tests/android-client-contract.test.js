@@ -924,3 +924,15 @@ test('NexusNXS puo essere selezionato come assistente Android e apre subito la v
   assert.match(activity, /LaunchedEffect\(state\.assistantInvocation, interactionAvailable\)/);
   assert.match(activity, /if \(interactionAvailable\) voiceMode = true else dispatch\("probe", ""\)/);
 });
+
+test('system invocation reuses the visible conversation before launching an overlay', () => {
+  const base = ['android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote'];
+  const service = read(...base, 'NexusVoiceInteractionService.kt');
+  const activity = read(...base, 'NexusMainActivity.kt');
+  assert.ok(service.indexOf('listenInVisibleApp()') < service.indexOf('startAssistantActivity('));
+  const handoff = activity.split('fun listenInVisibleApp(): Boolean')[1].split('private const val')[0];
+  assert.match(handoff, /activity.appVisible/);
+  assert.match(handoff, /activity.isFinishing/);
+  assert.match(handoff, /assistantInvocation/);
+  assert.doesNotMatch(handoff, /startActivity|createConversation|assistantOverlay = true/);
+});

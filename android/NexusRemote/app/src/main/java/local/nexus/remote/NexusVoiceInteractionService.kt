@@ -14,6 +14,10 @@ class NexusVoiceSessionService : VoiceInteractionSessionService() {
         override fun onShow(args: Bundle?, showFlags: Int) {
             super.onShow(args, showFlags)
             setUiEnabled(false)
+            if (NexusMainActivity.listenInVisibleApp()) {
+                hide()
+                return
+            }
             // Reuse the real Core and its microphone/connection lifecycle, not a second client.
             startAssistantActivity(Intent(this@NexusVoiceSessionService, NexusAssistantActivity::class.java).apply {
                 action = Intent.ACTION_ASSIST
