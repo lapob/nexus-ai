@@ -143,6 +143,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -2708,14 +2709,29 @@ private fun JSONArray?.toTurns() = buildList {
         } else typedSession = false
     }
 
+    Box(Modifier.fillMaxSize()) {
     Surface(color = Ink, contentColor = Ice, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
         CosmicScene(Modifier.fillMaxSize())
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 awaitPointerEventScope {
+                    var origin = androidx.compose.ui.geometry.Offset.Zero
+                    var rejected = false
+                    var opened = false
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull()
+                        if (change != null && change.pressed && !change.previousPressed) { origin = change.position; rejected = false; opened = false }
+                        if (event.changes.count { it.pressed } > 1) rejected = true
+                        if (change != null && change.pressed) {
+                            val delta = change.position - origin
+                            if (kotlin.math.abs(delta.y) > 32.dp.toPx() || delta.x < -24.dp.toPx()) rejected = true
+                            if (!rejected && !opened && delta.x > 80.dp.toPx() && delta.x > kotlin.math.abs(delta.y) * 2f) {
+                                keyboard?.hide(); settingsOpen = true; opened = true
+                            }
+                        }
+                        if (opened) event.changes.forEach { it.consume() }
                         if (event.changes.any { it.pressed }) lastInteraction = System.nanoTime()
                     }
                 }
@@ -2919,10 +2935,37 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
         }
-    if (settingsOpen) AlertDialog(
-        onDismissRequest = { settingsOpen = false; lastInteraction = System.nanoTime() },
-        title = { Text(nexusCopy("Impostazioni", "Settings")) },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        BackHandler(enabled = settingsOpen) { settingsOpen = false }
+        AnimatedVisibility(settingsOpen, enter = fadeIn(tween(if (reduceMotion) 0 else 180)), exit = fadeOut(tween(if (reduceMotion) 0 else 140))) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
+        }
+        AnimatedVisibility(settingsOpen, enter = slideInHorizontally(tween(if (reduceMotion) 0 else 260, easing = NexusFlow.standard)) { -it }, exit = slideOutHorizontally(tween(if (reduceMotion) 0 else 220, easing = NexusFlow.standard)) { -it }) {
+            Surface(color = Surface, shape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp), modifier = Modifier.fillMaxHeight().width(minOf(coreConfiguration.screenWidthDp * .84f, 380f).dp)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .pointerInput(Unit) {
+                    var travel = 0f
+                    detectHorizontalDragGestures(onDragStart = { travel = 0f }, onHorizontalDrag = { change, delta ->
+                        travel += delta
+                        if (travel < -60.dp.toPx()) { change.consume(); settingsOpen = false }
+                    })
+                }) {
+                Column(Modifier.statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("NexusNXS", style = MaterialTheme.typography.titleLarge, color = Ice, modifier = Modifier.weight(1f))
+                        IconButton({ settingsOpen = false }) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi menu", "Close menu"), tint = Mist) }
+                    }
+                    TextButton(onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy) {
+                        Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"))
+                    }
+                    Text(nexusCopy("Conversazioni recenti", "Recent conversations"), color = Mist, style = MaterialTheme.typography.labelLarge)
+                    if (state.chats.isEmpty()) Text(nexusCopy("Le tue conversazioni appariranno qui", "Your conversations will appear here"), color = Mist, style = MaterialTheme.typography.bodySmall)
+                    state.chats.take(12).forEach { chat ->
+                        TextButton(onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id); settingsOpen = false; typedSession = true; textMode = false }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(chat.title, maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (chat.id == state.conversationId) Cyan else Ice, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                    HorizontalDivider(color = Hairline)
+                    Text(nexusCopy("Aspetto e interazione", "Appearance and interaction"), color = Mist, style = MaterialTheme.typography.labelLarge)
             CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
             CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
             CompactSetting(
@@ -2934,17 +2977,22 @@ private fun JSONArray?.toTurns() = buildList {
                     else -> nexusCopy("Non disponibile su questo server", "Unavailable on this server")
                 },
                 { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }
-            ) { remoteSettingsOpen = true }
+            ) { settingsOpen = false; remoteSettingsOpen = true }
             TextButton(onClick = {
                 val role = if (android.os.Build.VERSION.SDK_INT >= 29) context.getSystemService(android.app.role.RoleManager::class.java) else null
                 val request = if (Build.VERSION.SDK_INT >= 29 && role?.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT) == true && !role.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT)) role.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT) else Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
                 runCatching { context.startActivity(request) }.onFailure { runCatching { context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) } }
             }) { Text(nexusCopy("Usa Nexus come assistente", "Use Nexus as assistant")) }
             Text(nexusCopy("Il richiamo con il tasto laterale dipende dalle impostazioni del telefono. Il microfono resta sotto il tuo controllo.", "Side-button activation depends on your phone settings. The microphone remains under your control."), style = MaterialTheme.typography.bodySmall, color = Mist)
-        } },
-        confirmButton = { TextButton({ settingsOpen = false; lastInteraction = System.nanoTime() }) { Text(nexusCopy("Chiudi", "Close")) } },
-        containerColor = Surface, shape = RoundedCornerShape(26.dp)
-    )
+
+                    HorizontalDivider(color = Hairline)
+                    CompactSetting(Icons.Rounded.Lock, nexusCopy("Schermata privata", "Private screen"), nexusCopy("Protegge le anteprime e le catture", "Protects previews and screenshots"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }
+                    TextButton({ dispatch("exportBackup", "") }) { Text(nexusCopy("Esporta backup cifrato", "Export encrypted backup")) }
+                    TextButton({ dispatch("importBackup", "") }) { Text(nexusCopy("Importa backup", "Import backup")) }
+                }
+            }
+        }
+    }
     if (remoteSettingsOpen) AlertDialog(
         onDismissRequest = { remoteSettingsOpen = false },
         icon = { Icon(Icons.Outlined.Computer, null, tint = Cyan) },
