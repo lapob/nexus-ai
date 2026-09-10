@@ -12,6 +12,7 @@ export function AstralHero() {
     window.dispatchEvent(new Event("nxs:replay-composition"));
   };
   return <section className="hero astral-hero" id="top" aria-label="NexusNXS AI" data-cosmic-scene="center" data-cosmic-form="sigil">
+    <div className="astral-hero__track">
     <div className="astral-hero__scene" key={composition}>
       <h1 className="hero-product-name" aria-label="NexusNXS AI">
         {["NEXUS", "NXS"].map((word) => <span className="hero-word" aria-hidden="true" key={word}>
@@ -23,6 +24,7 @@ export function AstralHero() {
         <p>Il tuo assistente AI su PC, Android e web.</p>
         <HardNavigationLink className="primary-button" href="https://ai.nexusnxs.com">Prova NexusNXS AI <ArrowUpRight size={16} /></HardNavigationLink>
       </div>
+    </div>
     </div>
     <div className="hero-intro">
       <div className="hero-actions">

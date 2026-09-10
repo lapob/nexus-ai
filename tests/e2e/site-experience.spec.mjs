@@ -1,6 +1,22 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+test('opening artwork remains pinned during reversible 3D scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const scene = page.locator('.astral-hero__scene');
+  await expect(scene).toHaveCSS('position', 'sticky');
+  const initial = await scene.boundingBox();
+  for (const y of [180, 300, 180, 0]) {
+    await page.evaluate(y => scrollTo(0, y), y);
+    await page.waitForTimeout(150);
+    const current = await scene.boundingBox();
+    expect(Math.abs(current.y - initial.y)).toBeLessThan(2);
+    if (y === 300) await page.screenshot({ path: 'qa-artifacts/hero-sticky-desktop.png' });
+  }
+});
+
 test('hero entry stays separate from the introduction throughout scrolling', async ({ page }) => {
   for (const width of [360, 390, 1440]) {
     await page.setViewportSize({ width, height: 844 });

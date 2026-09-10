@@ -87,8 +87,9 @@ html { scroll-padding-top: 96px; }
   text-align: center;
   overflow: clip;
 }
-.astral-hero__scene { position: relative; top: auto; min-height: calc(100svh - 100px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 66vw) minmax(0, 1fr); align-items: center; flex: 0; width: 100%; }
-.home-continuum .astral-hero > .astral-hero__scene { width: 100%; margin-inline: 0; }
+.astral-hero__track { min-height: 155svh; width: 100%; }
+.astral-hero__scene { position: sticky; top: 76px; min-height: calc(100svh - 100px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 66vw) minmax(0, 1fr); align-items: center; flex: 0; width: 100%; }
+.home-continuum .astral-hero > .astral-hero__track { width: 100%; margin-inline: 0; }
 .astral-hero__scene .hero-entry { grid-column: 1 / -1; grid-row: 2; position: relative; z-index: 2; padding: 16px 48px 24px; text-align: center; }
 .hero-entry p { margin: 0 0 14px; font-size: 16px; color: #b8cacc; }
 .home-continuum .astral-hero__scene .home-neural-core { max-width: min(1100px, 60svh); }
@@ -112,7 +113,7 @@ html { scroll-padding-top: 96px; }
 .hero-word:last-child .hero-letter:nth-child(3) { animation-delay: .65s; }
 @keyframes nxs-letter-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .astral-hero .home-neural-core { position: relative; grid-column: 2; grid-row: 1; width: 100%; max-width: min(1100px, 82svh); aspect-ratio: 1; margin: auto; filter: none; cursor: grab; touch-action: pan-y; }
-.astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; margin-top: 55svh; }
+.astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; margin-top: 0; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
 .astral-hero .hero-actions a { font-size: 14px; }
@@ -182,7 +183,13 @@ html { scroll-padding-top: 96px; }
   .narrative-apps .app-card-visual.android .app-card-visual__screen { width: 210px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .astral-hero__track { min-height: 0; }
+  .astral-hero__scene { position: relative; top: auto; }
   .hero-letter { animation: none; opacity: 1; transform: none; }
+}
+@media (max-height: 600px) {
+  .astral-hero__track { min-height: 0; }
+  .astral-hero__scene { position: relative; top: auto; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
