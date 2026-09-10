@@ -26,19 +26,22 @@ const qaSecret = ['127.0.0.1', 'localhost', '::1'].includes(parsedUrl.hostname) 
 
 // #region 02 — Scenari browser pubblici
 async function viewport(client, width, height, mobile) {
+  const previousDocument = await evaluateWhenReady(client, 'performance.timeOrigin', 5_000);
   await client.command('Emulation.setDeviceMetricsOverride', {
     width, height, deviceScaleFactor: 1, mobile, screenWidth: width, screenHeight: height
   });
   await client.command('Page.reload', { ignoreCache: true });
   await evaluateWhenReady(client, `new Promise((resolve) => {
-    const ready = () => document.querySelector('#send') && document.querySelector('#answer');
+    const ready = () => performance.timeOrigin !== ${previousDocument} && document.querySelector('#send') && document.querySelector('#answer');
     if (ready()) return resolve(true);
     const timer = setInterval(() => { if (ready()) { clearInterval(timer); resolve(true); } }, 30);
   })`, 10_000);
 }
 
 async function verifyInitialControlReveal(client, label) {
-  const result = await evaluateWhenReady(client, `new Promise((resolve) => setTimeout(() => {
+  const result = await evaluateWhenReady(client, `new Promise((resolve) => {
+    const finish = () => {
+    if (!globalThis.__nxsInitialControlComplete) return setTimeout(finish, 30);
     const samples = Array.isArray(globalThis.__nxsInitialControlFrames) ? globalThis.__nxsInitialControlFrames : [];
     const horizontal = samples.map((sample) => sample.groupCenterX).filter(Number.isFinite);
     const intervals = samples.slice(1).map((sample) => sample.interval).filter(Number.isFinite).sort((a, b) => a - b);
@@ -54,7 +57,9 @@ async function verifyInitialControlReveal(client, label) {
       endOpacity: samples.at(-1)?.opacity ?? 0,
       p95: intervals[Math.floor(intervals.length * .95)] || 0
     });
-  }, 560))`, 5_000);
+    };
+    finish();
+  })`, 12_000);
   if (result.frames < 10 || result.horizontalSpan > 2 || result.maxStep > 2 || result.endCenterDelta > 2) {
     throw new Error(`${label}: i controlli attraversano lo schermo al caricamento (${JSON.stringify(result)}).`);
   }
@@ -487,12 +492,14 @@ async function main() {
       globalThis.__nxsInitialControlFrames = [];
       (() => {
         let started = null;
+        let revealed = null;
         let previous = 0;
         const sample = (now) => {
           const keyboard = document.querySelector('#keyboard');
           const attachment = document.querySelector('#attachment');
           if (!keyboard || !attachment) return requestAnimationFrame(sample);
           if (started === null) { started = now; previous = now; }
+          if (revealed === null && document.body.classList.contains('motion-ready')) revealed = now;
           const keyboardRect = keyboard.getBoundingClientRect();
           const attachmentRect = attachment.getBoundingClientRect();
           globalThis.__nxsInitialControlFrames.push({
@@ -501,7 +508,8 @@ async function main() {
             interval: now - previous
           });
           previous = now;
-          if (now - started < 500) requestAnimationFrame(sample);
+          if (now - started < 10000 && (revealed === null || now - revealed < 500)) requestAnimationFrame(sample);
+          else globalThis.__nxsInitialControlComplete = true;
         };
         requestAnimationFrame(sample);
       })();
