@@ -100,18 +100,35 @@ async function closePage(target) {
   // window.close() attraversa il normale lifecycle BrowserWindow come la X
   // nativa. Page.close può limitarsi a chiudere il target DevTools e lasciare
   // viva la finestra host in alcune versioni Chromium/Electron.
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Il renderer non ha confermato il comando di chiusura.')), 5000);
-    socket.addEventListener('message', (event) => {
+  let sequence = 0;
+  const evaluate = (expression) => new Promise((resolve, reject) => {
+    const id = ++sequence;
+    const timeout = setTimeout(() => {
+      socket.removeEventListener('message', receive);
+      reject(new Error('Il renderer non ha confermato il comando CDP.'));
+    }, 10_000);
+    const receive = (event) => {
       const reply = JSON.parse(event.data);
-      if (reply.id !== 1) return;
+      if (reply.id !== id) return;
       clearTimeout(timeout);
+      socket.removeEventListener('message', receive);
       if (reply.error || reply.result?.exceptionDetails) reject(new Error(JSON.stringify(reply)));
-      else resolve();
-    });
-    socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'window.close()' } }));
+      else resolve(reply.result?.result?.value);
+    };
+    socket.addEventListener('message', receive);
+    socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } }));
   });
-  try { socket.close(); } catch {}
+  try {
+    const deadline = Date.now() + 20_000;
+    while (await evaluate('document.readyState') !== 'complete') {
+      if (Date.now() >= deadline) throw new Error('Il renderer non ha completato il caricamento prima della prova di chiusura.');
+      await delay(50);
+    }
+    // Acknowledge scheduling before the window destroys its execution context.
+    await evaluate('setTimeout(() => window.close(), 0); true');
+  } finally {
+    try { socket.close(); } catch {}
+  }
 }
 
 function waitForExit(child, timeoutMs = 15_000) {
@@ -169,11 +186,14 @@ async function removeProfile() {
   child.stdout.on('data', (chunk) => { stderr += chunk.toString('utf8'); });
   try {
     const target = await rendererTarget();
+    const presenceLockPath = path.join(profile, 'system-presence.lock');
+    // This scenario verifies an initialized UI preserving its Presence. The
+    // window is exposed before background startup has finished.
+    await waitForProcessLock(presenceLockPath, true, 20_000);
     const before = processSnapshot();
     const owned = new Set([child.pid, ...descendantsOf(before, child.pid)]);
     await closePage(target);
     const code = await waitForExit(child);
-    const presenceLockPath = path.join(profile, 'system-presence.lock');
     const presenceDescriptor = await waitForProcessLock(presenceLockPath, true);
     await delay(350);
     const normalizedProfile = path.resolve(profile).toLowerCase();
