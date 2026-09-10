@@ -65,6 +65,8 @@ const assert = require('node:assert/strict');
       }
       await page.locator('#keyboard').click();
       await page.waitForFunction(() => nexusCosmicMetrics.renderer().arrival === 1);
+      const restored = await page.locator('#core').boundingBox();
+      assert.ok(Math.abs(restored.width - framing.core.width) < 2, `Closing a long draft restores the original Core diameter: ${width}x${height}, ${framing.core.width} -> ${restored.width}; ${JSON.stringify(await page.evaluate(()=>({fit:document.getElementById('core').style.cssText,stage:document.querySelector('.stage').getBoundingClientRect().toJSON(),dock:document.querySelector('.dock').getBoundingClientRect().toJSON()})))}`);
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.waitForTimeout(150);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

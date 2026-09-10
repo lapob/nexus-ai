@@ -170,9 +170,9 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(instantSurface, /navigationBarsPadding\(\)\.imePadding\(\)/, 'il composer deve restare sopra la tastiera edge-to-edge');
   assert.doesNotMatch(instantSurface.split('/** Superficie traslucida')[0], /composerBringIntoView|AnimatedContent\(textMode/, 'il composer non deve duplicarsi o riposizionarsi durante il movimento IME');
   assert.match(instantSurface, /bottom = 10\.dp/, 'il composer mantiene un margine stabile sopra la tastiera');
-  assert.match(instantSurface, /centeredExchange/);
-  assert.match(instantSurface, /BiasAlignment\(0f, alignmentBias\)/);
-  assert.match(instantSurface, /targetValue = if \(centeredExchange\) 0f else -1f/);
+  assert.match(instantSurface, /val historyState = rememberLazyListState/);
+  assert.match(instantSurface, /itemsIndexed\(state\.turns/);
+  assert.match(instantSurface, /followLatest && !historyState\.isScrollInProgress/);
   assert.doesNotMatch(instantSurface, /targetState = centeredExchange/, 'la fine streaming non deve ricreare il Markdown');
   assert.match(instantSurface, /InstantWrittenExchange/);
   assert.match(instantSurface, /shape = RoundedCornerShape\(18\.dp\)/, 'prompt e stato devono condividere superfici arrotondate coerenti');
@@ -201,7 +201,7 @@ test('l APK pubblico blocca ogni input finché il server non è realmente online
   assert.equal(protocol.states.offline.inputPolicy, 'blocked-until-online');
   assert.deepEqual(protocol.states.offline.allowedActions, ['retry-connection', 'read-status']);
   assert.match(instantSurface, /val interactionAvailable = state\.connection == NexusConnection\.ONLINE/);
-  assert.match(instantSurface, /if \(!interactionAvailable\)[\s\S]{0,240}keyboard\?\.hide\(\)[\s\S]{0,240}typedSession = false/);
+  assert.match(instantSurface, /if \(!interactionAvailable\)[\s\S]{0,240}keyboard\?\.hide\(\)[\s\S]{0,240}voiceMode = false/);
   assert.match(instantSurface, /enabled = interactionAvailable/);
   assert.match(instantSurface, /visible = attachmentSheet && interactionAvailable/);
   assert.match(dispatch, /"draft" -> \{[\s\S]{0,100}state\.connection != NexusConnection\.ONLINE\) return/);
@@ -554,7 +554,7 @@ test('NexusNXS per Android Compose conserva la coda offline e autorizza Cuore pr
   assert.match(activity, /branchConversation/);
   assert.match(store, /archiveConversation/);
   assert.match(activity, /Modalità Cuore/);
-  assert.match(activity, /WindowInsets\.isImeVisible/);
+  assert.match(activity, /conversationGlass\(true, metrics\.adaptiveReducedMotion\)/);
   assert.match(activity, /enum class NexusWidthClass/);
   assert.match(activity, /rememberNexusMetrics/);
   assert.match(activity, /val landscape = windowSize\.width > windowSize\.height/);
@@ -602,7 +602,7 @@ test('invio mobile libera la tastiera e segue lo streaming finché l utente non 
   const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
   assert.match(activity, /state = state\.copy\(conversationId = id,[\s\S]*turns = store\.get\(id\)\.optJSONArray\("turns"\)\.toTurns\(\)/);
   assert.match(activity, /keyboard\?\.hide\(\)[\s\S]{0,160}textMode = false[\s\S]{0,160}dispatch\("send"/);
-  assert.match(activity, /state\.busy && latestAnswer\.isNotBlank\(\) && !scrollState\.isScrollInProgress\) scrollState\.scrollTo\(scrollState\.maxValue\)/);
+  assert.match(activity, /followLatest && !historyState\.isScrollInProgress/);
 });
 
 test('NexusNXS per Android carica i modelli anche dal percorso di continuità raggiungibile', () => {
@@ -724,8 +724,8 @@ test('la home Android riserva lo stato, sostituisce il turno e mostra soltanto a
   const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
   assert.match(manifest, /android:enableOnBackInvokedCallback="true"/);
   assert.match(activity, /padding\(top = 48\.dp\)/, 'il contenuto deve riservare lo spazio dello stato connessione');
-  assert.match(activity, /targetState = exchangeGeneration/);
-  assert.match(activity, /nexusExchangeTransform\(reduceMotion\)/);
+  assert.match(activity, /itemsIndexed\(state\.turns/);
+  assert.match(activity, /item\(key = "instant-stream"\)/);
   assert.match(activity, /if \(state\.busy\) state\.streaming/);
   assert.match(activity, /InstantReasoningPhase\(/);
   assert.match(activity, /label = activity\.ifBlank/);
@@ -751,7 +751,7 @@ test('transizioni e streaming mobile mantengono budget frame e isolamento del tu
   assert.match(activity, /val ENTER = NexusMotion\.ENTER/);
   assert.match(activity, /val FADE_DELAY = NexusMotion\.FADE_DELAY/);
   assert.match(activity, /private fun nexusTransform[\s\S]*ContentTransform\(nexusEnter\(reduced\), nexusExit\(reduced\)/, 'le superfici di navigazione restano ancorate durante la dissolvenza');
-  assert.match(activity, /private fun nexusExchangeTransform[\s\S]*slideInVertically[\s\S]*slideOutVertically/, 'solo il nuovo turno deve salire dal composer');
+  assert.doesNotMatch(activity, /private fun nexusExchangeTransform/, "La cronologia non dissolve i messaggi precedenti");
   assert.doesNotMatch(activity, /scaleIn|scaleOut/);
   assert.match(activity, /CompletableFuture\.supplyAsync/);
   assert.match(activity, /rememberReachable\(winner\)/);

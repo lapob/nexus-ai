@@ -69,7 +69,7 @@ test('web microphone level drives the core and resets when capture stops', () =>
   sample(); assert.equal(runtime.voiceEnergy,0);
   value=150; now=600; sample(); assert.ok(runtime.voiceEnergy>.5);
   vm.runInNewContext('stopVoiceMonitor()',sandbox); assert.equal(runtime.voiceEnergy,0);
-  assert.match(web,/getEnergy: \(\) => Number\(globalThis\.nexusDemoState\?\.voiceEnergy \|\| 0\)/);
+  assert.match(web,/getEnergy: \(\) => Number\(globalThis\.nexusAiState\?\.voiceEnergy \|\| 0\)/);
 });
 
 test('all real interaction states preserve phase and use bounded finite geometry', () => {

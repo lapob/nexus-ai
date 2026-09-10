@@ -8,7 +8,8 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   const host = options.host || canvas;
   const media = matchMedia('(prefers-reduced-motion: reduce)');
   const random = options.random || Math.random;
-  const names = ['neural', 'jarvis-reactor', 'saturn-experimental'];
+  const planetOnly = options.planetOnly === true;
+  const names = planetOnly ? ['saturn-experimental'] : ['neural', 'jarvis-reactor', 'saturn-experimental'];
   let deck = [], preset = '', previousPreset = '', age = 0, elapsed = 0, phase = 'assembling';
   let arrival = 0, hold = 24, last = 0, raf = 0, disposed = false, lost = false, visible = true;
   let draws = 0, drawMs = 0, quality = 1, strain = 0, healthy = 0, state = 'idle', audio = 0;
@@ -35,7 +36,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   const fields = {
     neural:[{...recipes.neural.build(budget),kind:0}],
     'jarvis-reactor':['rings','core','scanner','aura'].map((layer,i)=>({...recipes.reactor(Math.floor(budget*[.55,.22,.08,.15][i]),layer),kind:i})),
-    'saturn-experimental':[['planet',.36],['orbit',.48],['halo',.16]].map(([layer,share],i)=>({...recipes.saturn[layer](Math.floor(budget*share)),kind:i}))
+    'saturn-experimental':(planetOnly ? [['planet',1]] : [['planet',.36],['orbit',.48],['halo',.16]]).map(([layer,share],i)=>({...recipes.saturn[layer](Math.floor(budget*share)),kind:i}))
   };
   const basicVertex = `precision highp float;uniform float uTime;uniform float uEnergy;uniform float uKind;uniform vec3 uAccent;varying float vAlpha;void main(){vec3 p=position;float angle=uTime*(uKind<.5?.07:uKind<1.5?-.12:-.09);float c=cos(angle),s=sin(angle);p.xy=mat2(c,-s,s,c)*p.xy;p*=1.+sin(uTime*1.1)*.025+uEnergy*.025;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);gl_PointSize=1.25;vAlpha=uKind>2.5?.12:uKind>.5&&uKind<1.5?.6:.42;}`;
   const basicFragment = `precision highp float;uniform vec3 uAccent;varying float vAlpha;void main(){float a=smoothstep(.5,.13,length(gl_PointCoord-.5));gl_FragColor=vec4(uAccent,a*vAlpha);}`;
@@ -101,7 +102,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   // A GPU compilation failure can only obtain 2D on a fresh canvas.
   if(lost){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);const replacement=canvas.cloneNode(false);canvas.replaceWith(replacement);canvas=replacement;gl=null;lost=false;context2d=canvas.getContext('2d');}
   const profile={...recipes.profiles.idle};
-  function resize(){const bounds=canvas.getBoundingClientRect();width=Math.max(1,bounds.width);height=Math.max(1,bounds.height);dpr=Math.min(devicePixelRatio||1,efficient?1.5:2.5,Math.sqrt(8294400/(width*height)))*resolutionScale;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);if(gl)gl.viewport(0,0,canvas.width,canvas.height);paintedReduced=false;}
+  function resize(){const bounds=canvas.getBoundingClientRect();width=Math.max(1,bounds.width);height=Math.max(1,bounds.height);dpr=Math.min(devicePixelRatio||1,planetOnly?3:efficient?1.5:2.5,Math.sqrt(8294400/(width*height)))*resolutionScale;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);if(gl)gl.viewport(0,0,canvas.width,canvas.height);paintedReduced=false;}
   function uniform(p,name,value){if(!p.uniforms.has(name))p.uniforms.set(name,gl.getUniformLocation(p.p,name));const loc=p.uniforms.get(name);if(loc===null)return;if(Array.isArray(value)||value instanceof Float32Array){if(value.length===16)gl.uniformMatrix4fv(loc,false,value);else gl['uniform'+value.length+'fv'](loc,value);}else gl.uniform1f(loc,value);}
   function matrix(rx,ry,rz,scale=1){const x=Math.cos(rx),a=Math.sin(rx),y=Math.cos(ry),b=Math.sin(ry),z=Math.cos(rz),c=Math.sin(rz);return new Float32Array([y*z*scale,(a*b*z+x*c)*scale,(-x*b*z+a*c)*scale,0,-y*c*scale,(-a*b*c+x*z)*scale,(x*b*c+a*z)*scale,0,b*scale,-a*y*scale,x*y*scale,0,0,0,-8,1]);}
   const projection=new Float32Array([1/6.6,0,0,0,0,1/6.6,0,0,0,0,-.01,0,0,0,0,1]);
@@ -119,7 +120,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     else {arrival=1;phase='holding';age=0;}
     if(!isReduced){
       if(phase==='assembling'){arrival=smooth(age/3.8);if(age>=3.8){phase='holding';age=0;arrival=1;}}
-      else if(phase==='holding'&&age>=hold&&!touching&&['idle','offline','booting'].includes(state)){phase='dispersing';age=0;}
+      else if(phase==='holding'&&!planetOnly&&age>=hold&&!touching&&['idle','offline','booting'].includes(state)){phase='dispersing';age=0;}
       else if(phase==='dispersing'){arrival=1-smooth(age/3.2);if(age>=3.2){pick();phase='assembling';age=0;arrival=0;}}
     }
     const target=recipes.profiles[state]||recipes.profiles.idle;
@@ -138,14 +139,14 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     const accent=colors[state]||colors.idle,t=isReduced?0:elapsed*.55;
     // The dormant planet has a much smaller footprint than its deployed rings.
     // Ease its framing with the same ring clock, keeping active rings inside the stage.
-    const ringTarget={listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
+    const ringTarget=planetOnly ? 0 : {listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
     ringVisibility=isReduced?ringTarget:ringVisibility+(ringTarget-ringVisibility)*(1-Math.exp(-dt*1.65));
     const saturnFraming=2.85-smooth(ringVisibility/.56)*1.65;
     const expansiveScale=preset==='neural'?Math.max(1.18,Math.min(1.8,width*.94/Math.max(1,side))):1.18;
     const fieldScale=kind=>expansiveScale*(preset==='saturn-experimental'?saturnFraming*(kind===0?.94:1):preset==='jarvis-reactor'?1.48:1);
     // Adaptive detail does not change point positions or restart the shared clock.
     strain=dt>.028||drawMs>8?strain+dt:Math.max(0,strain-dt);healthy=dt<.021&&drawMs<5?healthy+dt:0;
-    if(strain>1.5){quality=Math.max(.35,quality-.15);if(resolutionScale>.5){resolutionScale=Math.max(.5,resolutionScale-.15);resize();}strain=0;}if(healthy>10){quality=Math.min(1,quality+.05);if(quality===1&&resolutionScale<1){resolutionScale=Math.min(1,resolutionScale+.05);resize();}healthy=0;}
+    if(strain>1.5){quality=Math.max(.35,quality-.15);if(quality<=.35&&resolutionScale>(planetOnly?.75:.5)){resolutionScale=Math.max(planetOnly?.75:.5,resolutionScale-.1);resize();}strain=0;}if(healthy>10){quality=Math.min(1,quality+.05);if(quality===1&&resolutionScale<1){resolutionScale=Math.min(1,resolutionScale+.05);resize();}healthy=0;}
     if(ambientPaint){
       if(ambient.width!==canvas.width||ambient.height!==canvas.height){ambient.width=canvas.width;ambient.height=canvas.height;}
       ambientPaint.setTransform(dpr,0,0,dpr,0,0);ambientPaint.clearRect(0,0,width,height);
@@ -153,7 +154,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     }
     if(gl){
       gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);const p=programs[preset];gl.useProgram(p.p);
-      for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uViewport:[width,height],uElapsed:isReduced?0:elapsed,uTaper:preset==='neural'?1:0,uArrival:arrival,uDpr:dpr,uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:1.08,uPointScale:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
+      for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uViewport:[width,height],uElapsed:isReduced?0:elapsed,uTaper:preset==='neural'?1:0,uArrival:arrival,uDpr:dpr,uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:planetOnly?1.2:1.08,uPointScale:planetOnly?.62:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
       for(const [key,value] of Object.entries(profile))uniform(p,'u'+key[0].toUpperCase()+key.slice(1),value);
       for(const field of coreVisible?fields[preset]:[]){
         const saturn=preset==='saturn-experimental',reactor=preset==='jarvis-reactor';
@@ -199,6 +200,6 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   canvas.addEventListener('webglcontextlost',contextLost);canvas.addEventListener('webglcontextrestored',contextRestored);
   document.addEventListener('visibilitychange',visibility);media.addEventListener('change',refresh);globalThis.addEventListener('resize',refresh);globalThis.addEventListener('scroll',refresh,{passive:true});globalThis.addEventListener('blur',leave);
   resize();refresh();
-  return {refresh,setState(value){state=value;refresh();},getMetrics:()=>({state,phase,preset,previousPreset,arrival,energy:profile.energy,audio,quality,particles:Math.floor(budget*quality),draws,drawMs,elapsed,resolutionScale,backend:gl?'webgl':'canvas',fallbackReason}),dispose(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();io.disconnect();ambient?.remove();document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',refresh);globalThis.removeEventListener('resize',refresh);globalThis.removeEventListener('scroll',refresh);globalThis.removeEventListener('blur',leave);host.removeEventListener('pointermove',move);host.removeEventListener('pointerdown',down);host.removeEventListener('pointerup',leave);host.removeEventListener('pointerleave',leave);host.removeEventListener('pointercancel',leave);document.removeEventListener('click',click,true);canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('webglcontextrestored',contextRestored);if(gl){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);}}};
+  return {refresh,setState(value){state=value;refresh();},getMetrics:()=>({state,phase,preset,previousPreset,arrival,energy:profile.energy,audio,quality,particles:Math.floor(budget*quality),draws,drawMs,elapsed,resolutionScale,pixelRatio:dpr,renderWidth:canvas.width,renderHeight:canvas.height,planetOnly,ringVisibility,backend:gl?'webgl':'canvas',fallbackReason}),dispose(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();io.disconnect();ambient?.remove();document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',refresh);globalThis.removeEventListener('resize',refresh);globalThis.removeEventListener('scroll',refresh);globalThis.removeEventListener('blur',leave);host.removeEventListener('pointermove',move);host.removeEventListener('pointerdown',down);host.removeEventListener('pointerup',leave);host.removeEventListener('pointerleave',leave);host.removeEventListener('pointercancel',leave);document.removeEventListener('click',click,true);canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('webglcontextrestored',contextRestored);if(gl){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);}}};
 }
 module.exports = {createCosmicVisualizers};

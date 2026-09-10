@@ -21,26 +21,39 @@ import kotlin.math.roundToInt
 @Composable
 internal fun Modifier.conversationGlass(enabled: Boolean, efficient: Boolean): Modifier {
     val content = rememberGraphicsLayer()
-    val glass = rememberGraphicsLayer()
-    val mask = rememberGraphicsLayer()
+    val upperGlass = rememberGraphicsLayer()
+    val lowerGlass = rememberGraphicsLayer()
+    val upperMask = rememberGraphicsLayer()
+    val lowerMask = rememberGraphicsLayer()
+    val output = rememberGraphicsLayer()
     return drawWithContent {
         if (!enabled) { drawContent(); return@drawWithContent }
-        val band = 40.dp.toPx().coerceAtMost(size.height)
+        val band = 40.dp.toPx().coerceAtMost(size.height / 4f)
         val top = size.height - band
+        output.compositingStrategy = CompositingStrategy.Offscreen
+        output.record {
         if (Build.VERSION.SDK_INT >= 31 && !efficient) {
             content.record { this@drawWithContent.drawContent() }
             drawLayer(content)
+            for (upper in listOf(true, false)) {
+            val glass = if (upper) upperGlass else lowerGlass
+            val mask = if (upper) upperMask else lowerMask
+            val edge = if (upper) 0f else top
             glass.renderEffect = BlurEffect(6.dp.toPx(), 6.dp.toPx(), TileMode.Clamp)
             glass.record(size = IntSize(size.width.roundToInt(), band.roundToInt())) {
-                translate(top = -top) { drawLayer(content) }
+                translate(top = -edge) { drawLayer(content) }
             }
             mask.compositingStrategy = CompositingStrategy.Offscreen
             mask.record(size = IntSize(size.width.roundToInt(), band.roundToInt())) {
                 drawLayer(glass)
-                drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.White)), blendMode = BlendMode.DstIn)
+                drawRect(Brush.verticalGradient(if (upper) listOf(Color.White, Color.Transparent) else listOf(Color.Transparent, Color.White)), blendMode = BlendMode.DstIn)
             }
-            translate(top = top) { drawLayer(mask) }
-        } else drawContent()
-        drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color(0xB3020607)), startY = top, endY = size.height))
+            translate(top = edge) { drawLayer(mask) }
+            }
+        } else this@drawWithContent.drawContent()
+        val fraction = if (size.height > 0) band / size.height else 0f
+        drawRect(Brush.verticalGradient(0f to Color.Transparent, fraction to Color.White, (1f - fraction) to Color.White, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+        }
+        drawLayer(output)
     }
 }

@@ -313,18 +313,6 @@ private fun nexusTransform(reduced: Boolean = false) =
 private fun nexusComposerTransform(reduced: Boolean = false) =
     ContentTransform(nexusEnter(reduced), nexusExit(reduced), sizeTransform = null)
 
-/** Un nuovo turno sale dal composer mentre il precedente si dissolve verso l'alto. */
-private fun nexusExchangeTransform(reduced: Boolean = false): ContentTransform {
-    if (reduced) return nexusTransform(true)
-    return ContentTransform(
-        fadeIn(tween(NexusFlow.ENTER, easing = NexusFlow.standard)) +
-            slideInVertically(tween(NexusFlow.ENTER, easing = NexusFlow.emphasized)) { height -> height / 7 },
-        fadeOut(tween(NexusFlow.EXIT, easing = NexusFlow.standard)) +
-            slideOutVertically(tween(NexusFlow.EXIT, easing = NexusFlow.standard)) { height -> -height / 10 },
-        sizeTransform = SizeTransform(clip = false)
-    )
-}
-
 /**
  * Navigazione Android completa: avanzamento da destra e ritorno speculare.
  * La distanza rimane breve per sostenere 60 Hz, mentre Android conserva il
@@ -2656,10 +2644,8 @@ private fun JSONArray?.toTurns() = buildList {
     val focusManager = LocalFocusManager.current
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
-    val instantImeVisible = WindowInsets.isImeVisible
     val coreConfiguration = LocalConfiguration.current
     val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .98f, coreConfiguration.screenHeightDp * .78f, 1200f).dp
-    val scrollState = rememberScrollState()
     var textMode by rememberSaveable { mutableStateOf(false) }
     var typedSession by rememberSaveable { mutableStateOf(false) }
     // Una sessione microfono non deve mai essere ripristinata dal saved state
@@ -2671,13 +2657,6 @@ private fun JSONArray?.toTurns() = buildList {
     var inlineVoiceDetail by remember { mutableStateOf("") }
     var attachmentSheet by rememberSaveable { mutableStateOf(false) }
     val interactionAvailable = state.connection == NexusConnection.ONLINE
-    val latestAnswer = if (state.busy) state.streaming else state.streaming.ifBlank { state.turns.lastOrNull { it.role == "assistant" }?.content.orEmpty() }
-    val latestPrompt = state.turns.lastOrNull { it.role == "user" }?.content.orEmpty()
-    val exchangeGeneration = state.turns.count { it.role == "user" }
-    val centeredExchange = !state.busy && state.error == null && (
-        (latestPrompt.isBlank() && latestAnswer.isBlank()) ||
-            (latestPrompt.length <= 180 && latestAnswer.isNotBlank() && latestAnswer.length <= 560)
-        )
     val instantSlashSuggestions = remember(state.draft, state.slashCommands) {
         val match = Regex("^/([^\\s]*)$").find(state.draft.trim())
         if (match == null) emptyList() else {
@@ -2703,8 +2682,6 @@ private fun JSONArray?.toTurns() = buildList {
         if (!interactionAvailable) {
             keyboard?.hide()
             focusManager.clearFocus(force = true)
-            textMode = false
-            typedSession = false
             voiceMode = false
             attachmentSheet = false
         }
@@ -2721,9 +2698,6 @@ private fun JSONArray?.toTurns() = buildList {
             focusRequester.requestFocus()
             keyboard?.show()
         }
-    }
-    LaunchedEffect(latestAnswer, state.streaming, state.busy) {
-        if (state.busy && latestAnswer.isNotBlank() && !scrollState.isScrollInProgress) scrollState.scrollTo(scrollState.maxValue)
     }
     BackHandler(enabled = voiceMode || textMode || typedSession) {
         if (voiceMode) voiceMode = false
@@ -2763,39 +2737,32 @@ private fun JSONArray?.toTurns() = buildList {
                     label = "instantInteractionMode"
                 ) { written ->
                     if (written) Column(Modifier.fillMaxSize()) {
-                        AnimatedContent(
-                            targetState = exchangeGeneration,
-                            transitionSpec = { nexusExchangeTransform(reduceMotion) },
-                            modifier = Modifier.weight(1f).fillMaxWidth().conversationGlass(instantImeVisible, metrics.adaptiveReducedMotion),
-                            label = "instantExchange"
-                        ) { generation ->
-                            key(generation) {
-                                val alignmentBias by animateFloatAsState(
-                                    targetValue = if (centeredExchange) 0f else -1f,
-                                    animationSpec = tween(if (reduceMotion) 0 else NexusFlow.ENTER, easing = NexusFlow.standard),
-                                    label = "instantExchangePosition"
+                        val historyState = rememberLazyListState()
+                        LaunchedEffect(Unit) { historyState.scrollToItem(state.turns.size) }
+                        val followLatest = !historyState.canScrollForward
+                        LaunchedEffect(state.turns.size, state.streaming, state.busy) {
+                            if (followLatest && !historyState.isScrollInProgress) historyState.scrollToItem(state.turns.size)
+                        }
+                        LazyColumn(
+                            state = historyState,
+                            modifier = Modifier.weight(1f).fillMaxWidth().conversationGlass(true, metrics.adaptiveReducedMotion),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 40.dp),
+                            verticalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            itemsIndexed(state.turns, key = { index, turn -> "instant-" + index + "-" + turn.role }) { _, turn ->
+                                InstantWrittenExchange(
+                                    latestPrompt = if (turn.role == "user") turn.content else "",
+                                    latestAnswer = if (turn.role == "assistant") turn.content else "",
+                                    error = null, centered = false, busy = false, activity = "",
+                                    reduceMotion = reduceMotion, modifier = Modifier.fillMaxWidth()
                                 )
-                                // Keep the same Markdown tree and width when streaming ends.
-                                // Only its placement changes; long answers remain scrollable.
-                                BoxWithConstraints(Modifier.fillMaxSize()) {
-                                    val viewportHeight = maxHeight
-                                    Box(
-                                        Modifier.fillMaxWidth().verticalScroll(scrollState).heightIn(min = viewportHeight)
-                                            .padding(horizontal = 8.dp, vertical = 24.dp),
-                                        contentAlignment = androidx.compose.ui.BiasAlignment(0f, alignmentBias)
-                                    ) {
-                                        InstantWrittenExchange(
-                                            latestPrompt = latestPrompt,
-                                            latestAnswer = latestAnswer,
-                                            error = state.error,
-                                            centered = centeredExchange,
-                                            busy = state.busy,
-                                            activity = state.activity,
-                                            reduceMotion = reduceMotion,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
+                            }
+                            item(key = "instant-stream") {
+                                if (state.busy || state.error != null || state.turns.isEmpty()) InstantWrittenExchange(
+                                    latestPrompt = "", latestAnswer = if (state.busy) state.streaming else "",
+                                    error = state.error, centered = false, busy = state.busy, activity = state.activity,
+                                    reduceMotion = reduceMotion, modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                         AnimatedVisibility(state.attachment != null, enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
@@ -2921,7 +2888,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 label = "instantStatus"
                             ) { label -> Text(label, color = if (state.connection == NexusConnection.OFFLINE) Color(0xFFFF9A91) else Mist, fontSize = 13.sp, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                             if (state.connection != NexusConnection.OFFLINE) Text(
-                                if (voiceMode) inlineVoiceDetail else nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
+                                if (voiceMode) inlineVoiceDetail else if (state.turns.isNotEmpty()) nexusCopy("Apri la tastiera per leggere la conversazione", "Open the keyboard to read the conversation") else nexusCopy("Voce privata · rispondo quando hai concluso", "Private voice · I respond when you finish"),
                                 color = Mist, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(top = 8.dp).fillMaxWidth(.82f)
@@ -3084,20 +3051,18 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
     Box(
-        Modifier.fillMaxSize()
+        Modifier.fillMaxSize().background(Ink)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { dispatch("assistantClose", "") }
             .navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
+        CosmicScene(Modifier.fillMaxSize())
         Surface(
-            color = Color(0xD6030A0B),
-            shape = RoundedCornerShape(32.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Cyan.copy(alpha = .22f)),
-            shadowElevation = 18.dp,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().widthIn(max = 680.dp)
+            color = Color.Transparent,
+            modifier = Modifier.align(Alignment.Center).fillMaxWidth()
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (latestAnswer.isNotBlank()) Text(
+                if (textMode && latestAnswer.isNotBlank()) Text(
                     latestAnswer,
                     color = Ice,
                     style = MaterialTheme.typography.bodyMedium,
@@ -3133,7 +3098,7 @@ private fun JSONArray?.toTurns() = buildList {
                             ) { Icon(if (state.busy) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward, nexusCopy("Invia", "Send")) }
                         }
                     } else Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, energy = if (voiceMode) inlineVoiceEnergy else 0f, diameter = minOf(176f, LocalConfiguration.current.screenWidthDp - 160f).coerceAtLeast(96f).dp,
+                        NexusInstantCore(active = voiceMode || state.busy, offline = !online, reduceMotion = state.reduceMotion, energy = if (voiceMode) inlineVoiceEnergy else 0f, diameter = minOf(LocalConfiguration.current.screenWidthDp * .9f, LocalConfiguration.current.screenHeightDp * .58f).dp, fullScene = true,
                             phaseState = when { !online -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" }) {
                             if (online) voiceMode = !voiceMode else dispatch("probe", "")
                         }
@@ -3148,7 +3113,7 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }
                 Text(
-                    when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); voiceMode -> inlineVoiceDetail.ifBlank { inlineVoiceStatus }; state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Assistente NexusNXS", "NexusNXS assistant") },
+                    when { !online -> nexusCopy("Riconnessione automatica", "Reconnecting automatically"); voiceMode -> inlineVoiceDetail.ifBlank { inlineVoiceStatus }; state.busy -> state.activity.ifBlank { nexusCopy("NexusNXS sta lavorando", "NexusNXS is working") }; else -> nexusCopy("Apri la tastiera per leggere i dettagli", "Open the keyboard to read the details") },
                     color = Mist, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)
                 )
             }
@@ -3196,9 +3161,7 @@ private fun JSONArray?.toTurns() = buildList {
                 latestPrompt,
                 color = Mist,
                 style = MaterialTheme.typography.bodySmall,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Start,
                 modifier = Modifier.widthIn(max = 520.dp).padding(horizontal = 14.dp, vertical = 8.dp)
             )
         }
