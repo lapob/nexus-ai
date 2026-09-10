@@ -5,8 +5,8 @@
 
 const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../shared/desktop-recipes');
-const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-0.3.14-Setup.exe';
-const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-Android.apk';
+const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.15-preview.1/NexusNXS-0.3.15-Setup.exe';
+const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.15-preview.1/NexusNXS-Android.apk';
 
 const EXPERIENCE_STYLE = `<style>
 .core canvas{background:transparent;mask-image:none;-webkit-mask-image:none}

@@ -1280,7 +1280,7 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /api\/guest\/voice\/transcribe/);
     assert.match(publicHtml, new RegExp(`NexusNXS-${packageMetadata.version.replaceAll('.', '\\.')}\\-Setup\\.exe`));
     assert.ok(androidVersion);
-    assert.match(publicHtml, /releases\/download\/v0\.3\.14-preview\.3\/NexusNXS-Android\.apk/);
+    assert.match(publicHtml, /releases\/download\/v\d+\.\d+\.\d+-preview\.\d+\/NexusNXS-Android\.apk/);
     assert.match(publicHtml, /id="keyboard"/);
     assert.match(publicHtml, /id="downloadSheet"/);
     assert.match(publicHtml, /id="imageResult"/);

@@ -191,7 +191,7 @@ function normalizePresenceSync(value) {
     throw bridgeError('Stato Presence non valido.', 'PRESENCE_SYNC_INVALID', 400);
   }
   const allowedKeys = new Set([
-    'state', 'appearance', 'motion', 'quality',
+    'state', 'activityOnly', 'appearance', 'motion', 'quality',
     'wakeWordEnabled', 'wakeWordConfidence', 'wakeWordCooldownMs', 'wakeWordSuspended'
   ]);
   if (Object.keys(value).some((key) => !allowedKeys.has(key))) {
@@ -207,6 +207,7 @@ function normalizePresenceSync(value) {
   }
   return Object.freeze({
     state,
+    ...(value.activityOnly === true ? { activityOnly: true } : {}),
     appearance,
     motion,
     quality,

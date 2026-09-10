@@ -390,7 +390,7 @@ test('la sessione remota resta disattivabile, associabile e revocabile dalle imp
 });
 
 test('l avvio con Windows resta una scelta semplice nella sezione remota', () => {
-  assert.match(settingsOverlay, /Core e Presence all’accensione/);
+  assert.match(settingsOverlay, /NexusNXS e il pet all’accensione/);
   assert.match(settingsOverlay, /senza aprire l’interfaccia completa/);
   assert.match(settingsOverlay, /window\.nexus\.startupStatus\(\)/);
   assert.match(settingsOverlay, /window\.nexus\.configureStartup\(event\.target\.checked\)/);
@@ -449,13 +449,13 @@ test('la presenza nasconde i controlli inattivi e le superfici restano progressi
   assert.match(unifiedCss, /command-thread-context/);
 });
 
-test('Core e Presence si materializzano con particelle adattive senza nuove texture', () => {
+test('i Core restano invariati e il pet riusa le immagini esistenti', () => {
   assert.match(nexusCore, /layer: 'rings' \| 'core' \| 'scanner' \| 'aura'/);
   assert.match(nexusCore, /emergence\.current/);
   assert.match(nexusCore, /geometries\.aura/);
-  assert.match(companionWindow, /createAstralCore/);
-  assert.match(companionWindow, /astral-canvas/);
-  assert.match(companionWindow, /efficient:root.dataset.quality==='efficient'/);
+  assert.match(companionWindow, /nexus-pets\.webp/);
+  assert.match(companionWindow, /pet-breathe/);
+  assert.match(companionWindow, /prefers-reduced-motion/);
   assert.doesNotMatch(companionWindow, /presenceParticles|presence-materialize/);
 });
 

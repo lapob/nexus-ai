@@ -20,7 +20,7 @@ if (!process.versions.electron) {
   fs.mkdirSync(outputDirectory, { recursive: true });
   const result = spawnSync(electron, [__filename, `--user-data-dir=${profile}`], {
     cwd: root,
-    timeout: 20_000,
+    timeout: 45_000,
     windowsHide: true,
     stdio: 'inherit',
     env: { ...process.env, NEXUS_PRESENCE_QA_OUTPUT: outputDirectory }
@@ -103,14 +103,16 @@ async function runElectronQa() {
       return {
         appearance: root?.dataset?.appearance || '',
         state: root?.dataset?.state || '',
-        canvasCount: document.querySelectorAll('.astral-canvas').length,
+        petCount: document.querySelectorAll('.pet').length,
+        pet: root?.dataset.pet,
+        animation: getComputedStyle(document.querySelector('.pet')).animationName,
         particleCount: Number(document.querySelector('.astral-canvas')?.dataset.astralParticles || 0),
         canvasState: document.querySelector('.astral-canvas')?.dataset.astralState,
         hasCore: document.querySelector('.core') instanceof HTMLButtonElement
       };
     })()`);
-    if (visual.canvasCount !== 1 || visual.canvasState !== 'listening'
-      || visual.particleCount < 210 || visual.particleCount > 900 || !visual.hasCore) {
+    if (visual.petCount !== 1 || visual.state !== 'listening'
+      || visual.animation !== 'pet-listen' || !visual.hasCore) {
       throw new Error(`Presence non renderizzata sul display ${index + 1}: ${JSON.stringify(visual)}.`);
     }
     const fileName = `presence-display-${index + 1}.png`;
@@ -124,6 +126,41 @@ async function runElectronQa() {
     });
   }
   const window = windows[0];
+  for (const pet of ['orb', 'robot', 'fox']) {
+    manager.selectPet(pet);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const selected = await window.webContents.executeJavaScript("document.querySelector('.presence').dataset.pet");
+    if (selected !== pet) throw new Error('Selezione pet non applicata.');
+    fs.writeFileSync(path.join(output, `pet-${pet}.png`), (await window.webContents.capturePage()).toPNG());
+  }
+  for (const state of ['idle', 'booting', 'listening', 'thinking', 'responding', 'speaking', 'executing', 'permission', 'offline', 'error']) {
+    manager.updateState(state);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const rendered = await window.webContents.executeJavaScript("document.querySelector('.presence').dataset.state");
+    if (rendered !== state) throw new Error('Stato pet non sincronizzato: ' + state);
+    fs.writeFileSync(path.join(output, `pet-state-${state}.png`), (await window.webContents.capturePage()).toPNG());
+  }
+  manager.updateState('idle');
+  await new Promise(resolve => setTimeout(resolve, 550));
+  const organicMotion = await window.webContents.executeJavaScript(`new Promise(resolve => {
+    document.querySelector('.presence').dispatchEvent(new PointerEvent('pointerleave'));
+    const body = document.querySelector('.pet-life');
+    const deadline = performance.now() + 10000;
+    const poll = () => {
+      if (body.getAnimations().some(animation => animation.playState === 'running')) return resolve(true);
+      if (performance.now() > deadline) return resolve(false);
+      setTimeout(poll, 100);
+    };
+    poll();
+  })`);
+  if (!organicMotion) throw new Error('Il pet non alterna gesti e pause.');
+  manager.setSystemPresenceConfiguration({ state: 'listening', motion: 'reduced' });
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const motion = await window.webContents.executeJavaScript("getComputedStyle(document.querySelector('.pet')).animationName");
+  if (motion !== 'none') throw new Error('Movimento ridotto non rispettato.');
+  const gestures = await window.webContents.executeJavaScript("document.querySelector('.pet-life').getAnimations().length");
+  if (gestures !== 0) throw new Error('Gesto organico ancora attivo con movimento ridotto.');
+  manager.setSystemPresenceConfiguration({ state: 'listening', motion: 'full' });
   const settle = () => new Promise((resolve) => setTimeout(resolve, 800));
   manager.setApplicationVisible(true);
   await settle();

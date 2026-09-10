@@ -83,3 +83,26 @@ test('non riusa un requestId finché il trasporto annullato non è terminato', a
   await assert.rejects(first, (error) => error.code === AI_ERROR_CODES.REQUEST_CANCELLED);
   assert.equal(runtime.requests.size, 0);
 });
+
+
+test('il pet riceve solo stati reali e resta attivo fino alla fine delle richieste concorrenti', async () => {
+  const pending = new Map();
+  const provider = new MockProvider();
+  provider.streamChat = (request, handlers) => new Promise((resolve) => {
+    pending.set(request.requestId, { token: () => handlers.onToken('private content'), resolve });
+  });
+  const runtime = new AIRuntime({ registry: new AIProviderRegistry().register('mock', () => provider) });
+  await runtime.initialize({ provider: 'mock' });
+  const states = [], tokens = [];
+  runtime.subscribeActivity(() => { throw new Error('Broken visual observer'); });
+  const unsubscribe = runtime.subscribeActivity(state => states.push(state));
+  const request = id => runtime.streamChat({ requestId: id, mode: 'quick', messages: [{ role: 'user', content: 'private prompt' }] }, { onToken: token => tokens.push(token) });
+  const first = request('first'), second = request('second');
+  pending.get('first').token();
+  pending.get('first').resolve({}); await first;
+  assert.deepEqual(states, ['thinking', 'responding', 'thinking']);
+  pending.get('second').resolve({}); await second;
+  assert.deepEqual(states, ['thinking', 'responding', 'thinking', 'idle']);
+  assert.deepEqual(tokens, ['private content']);
+  unsubscribe(); await runtime.shutdown();
+});

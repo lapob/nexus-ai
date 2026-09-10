@@ -274,6 +274,23 @@ function bootstrapElectron({ env = process.env } = {}) {
     .register('nexus-service', (config) => new NexusServiceProvider(config));
   const aiRuntime = new AIRuntime({ registry, logger });
   aiRuntime.initialize(runtimeConfig.ai);
+  // Only state names cross the authenticated local bridge: never prompts,
+  // responses or model details. The UI publishes richer voice/action states.
+  let activitySync = Promise.resolve(), pendingActivity = null, publishingActivity = false;
+  const publishActivity = (state) => {
+    pendingActivity = state;
+    if (publishingActivity) return;
+    publishingActivity = true;
+    activitySync = (async () => {
+      try {
+        while (pendingActivity !== null) {
+          const next = pendingActivity; pendingActivity = null;
+          await presenceBridgeClient.sync({ state: next, activityOnly: true }).catch(() => {});
+        }
+      } finally { publishingActivity = false; }
+    })();
+  };
+  const stopActivitySync = headlessMode ? aiRuntime.subscribeActivity(publishActivity) : () => {};
   // La ricerca resta nel motore della workstation: i client pubblici non
   // ricevono chiavi, non invocano provider terzi e rimangono renderer leggeri.
   const webResearchService = new WebResearchService({
@@ -284,6 +301,7 @@ function bootstrapElectron({ env = process.env } = {}) {
   let shutdownPromise = null;
   const shutdownApplication = () => {
     if (shutdownPromise) return shutdownPromise;
+    stopActivitySync();
     if (ambientVoiceShutdownTimer) clearTimeout(ambientVoiceShutdownTimer);
     ambientVoiceShutdownTimer = null;
     aiWarmup?.cancel();
@@ -300,7 +318,11 @@ function bootstrapElectron({ env = process.env } = {}) {
         { label: 'voce neurale', run: () => neuralSpeechService.shutdown() },
         { label: 'voce espressiva', run: () => expressiveSpeechService.shutdown() },
         { label: 'sessione remota', run: () => remoteGatewayInstance?.stop() },
-        { label: 'bridge presenza', run: () => presenceBridgeClient.close() },
+        { label: 'bridge presenza', run: async () => {
+          if (headlessMode) publishActivity('idle');
+          await activitySync;
+          presenceBridgeClient.close();
+        } },
         { label: 'indice knowledge', run: () => index?.shutdown?.() },
         { label: 'runtime AI gestito', run: () => managedRuntime.shutdown() },
         { label: 'sensori proattivi', run: () => proactiveSensorHub?.stop() },

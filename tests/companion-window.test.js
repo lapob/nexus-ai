@@ -37,7 +37,7 @@ test('gli stati vocali possono materializzare la Presence al centro senza perder
   });
 });
 
-test('la Presence usa il core astrale condiviso, trasparente e con hotspot esplicito', () => {
+test('il pet trasparente comunica gli stati e conserva hotspot e accessibilita', () => {
   const document = systemPresenceDocument({ interactive: true, locale: 'it-IT', configuration: { appearance: 'jarvis-reactor', state: 'listening', motion: 'full' } });
   assert.match(document, /data-appearance="jarvis-reactor"/);
   assert.match(document, /data-state="listening"/);
@@ -47,16 +47,19 @@ test('la Presence usa il core astrale condiviso, trasparente e con hotspot espli
   assert.match(document, /data-action="minimize-main"/);
   assert.match(document, /data-action="hide-presence"/);
   assert.match(document, /data-action="quit-desktop"/);
-  assert.match(document, /function createAstralCore\(/);
-  assert.match(document, /astral-canvas/);
-  assert.match(document, /getReduced:\(\)=>root.dataset.motion/);
+  assert.match(document, /class="pet"/);
+  assert.match(document, /data-pet="fox"/);
+  assert.match(document, /pet-listen/);
+  assert.match(document, /pet-think/);
+  assert.match(document, /pet-work/);
+  assert.match(document, /img-src data:/);
   assert.match(document, /prefers-reduced-motion/);
   assert.doesNotMatch(document, /class="visual|presence-particles|webgl|nexus-pet/i);
 });
 
-test('la configurazione elimina i campi pet legacy e applica fallback sicuri', () => {
+test('la configurazione valida i pet e applica fallback sicuri', () => {
   assert.deepEqual(normalizePresenceConfiguration({ state: 'thinking', appearance: 'neural', motion: 'reduced', quality: 'efficient', pet: 'nova' }), {
-    state: 'thinking', appearance: 'neural', motion: 'reduced', quality: 'efficient',
+    state: 'thinking', pet: 'fox', appearance: 'neural', motion: 'reduced', quality: 'efficient',
     wakeWordEnabled: false, wakeWordConfidence: 0.84, wakeWordCooldownMs: 5000,
     wakeWordSuspended: false, wakeWordListening: false
   });

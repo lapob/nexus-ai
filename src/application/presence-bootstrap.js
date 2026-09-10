@@ -152,6 +152,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
   let chatGptOpen = false;
   let chatGptCheckedAt = 0;
   let applications = [];
+  let backgroundActivity = 'idle';
   const uiLockPath = path.join(sharedDataRoot, UI_LOCK);
   const openFullUi = async ({ activationTicket = '' } = {}) => {
     // Una seconda istanza e intenzionale: Electron la inoltra alla UI gia
@@ -268,6 +269,11 @@ async function bootstrapPresence({ env = process.env } = {}) {
       return { ...manager.getSystemPresenceStatus(), chatGptOpen, applications, foregroundApplicationId: foregroundApplication?.id || '' };
     },
     stateSynchronizer: async (snapshot) => {
+      if (snapshot.activityOnly === true) {
+        backgroundActivity = snapshot.state;
+        if (!processLockState(uiLockPath).running) manager.updateState(backgroundActivity);
+        return;
+      }
       manager.setSystemPresenceConfiguration(snapshot);
       await wakeWordListener.configure(wakeWordConfiguration());
     },
@@ -371,11 +377,15 @@ async function bootstrapPresence({ env = process.env } = {}) {
       { label: italian ? 'Riduci al tray' : 'Minimize to tray', click: closeFullUi },
       { type: 'separator' },
       {
-        label: italian ? 'Mostra Presence' : 'Show Presence',
+        label: italian ? 'Mostra pet' : 'Show pet',
         type: 'checkbox',
         checked: manager.getSystemPresenceStatus().nucleusVisible,
         click: (item) => { manager.setSystemPresenceEnabled?.(item.checked); refreshTrayMenu(); }
       },
+      { label: italian ? 'Scegli pet' : 'Choose pet', submenu: ['orb', 'robot', 'fox'].map((pet, index) => ({
+        label: (italian ? ['Orbita', 'Robot', 'Volpe'] : ['Orb', 'Robot', 'Fox'])[index],
+        type: 'radio', checked: manager.getPet() === pet, click: () => { manager.selectPet(pet); refreshTrayMenu(); }
+      })) },
       { type: 'separator' },
       { label: italian ? 'Esci da NexusNXS' : 'Quit NexusNXS', click: quitDesktop }
     ]));
@@ -393,7 +403,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
   let uiWasRunning = false;
   const syncVisibility = () => {
     const state = processLockState(uiLockPath);
-    if (uiWasRunning && !state.running) manager.updateState?.('idle');
+    if (uiWasRunning && !state.running) manager.updateState?.(backgroundActivity);
     uiWasRunning = state.running;
     manager.setApplicationVisible?.(state.running);
   };

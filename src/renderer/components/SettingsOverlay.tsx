@@ -758,7 +758,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     />
                     <span>
                       <strong>Richiamo “Nexus”</strong>
-                      <small>Opzionale e disattivato all’installazione. Windows riconosce solo “Nexus” e “Hey Nexus”, offline; la Presence si materializza al centro per ascolto, ragionamento e risposta senza aprire l’interfaccia completa.</small>
+                      <small>Opzionale e disattivato all’installazione. Windows riconosce solo “Nexus” e “Hey Nexus”, offline; il pet si attiva per ascolto, ragionamento e risposta senza aprire l’interfaccia completa.</small>
                     </span>
                   </label>
                   {uiDraft.wakeWordEnabled && (
@@ -1050,14 +1050,14 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                         try {
                           const next = await window.nexus.configureStartup(event.target.checked);
                           setStartupStatus(next);
-                          setMessage(next.enabled ? 'Core e Presence saranno pronti con Windows, senza aprire l’app.' : 'Avvio automatico disattivato.');
+                          setMessage(next.enabled ? 'NexusNXS e il pet saranno pronti con Windows, senza aprire l’app.' : 'Avvio automatico disattivato.');
                         } catch (error) {
                           setMessage(publicUiError(error, 'Impossibile modificare l’avvio automatico.'));
                         } finally { setBusy(false); }
                       }}
                     />
                     <span>
-                      <strong>Core e Presence all’accensione</strong>
+                      <strong>NexusNXS e il pet all’accensione</strong>
                       <small>{startupStatus.available
                         ? 'Avvia il motore in background e un visualizer discreto. L’interfaccia completa resta chiusa finché non la richiami.'
                         : 'Disponibile nella versione installata di NexusNXS.'}</small>

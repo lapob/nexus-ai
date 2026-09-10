@@ -6,7 +6,9 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { interactionStatePalette } = require('../../core/interaction-state-protocol');
-const { createAstralCore } = require('../../shared/astral-core');
+const PET_SPRITE = fs.readFileSync(path.join(__dirname, '../../shared/nexus-pets.webp')).toString('base64');
+const PETS = ['orb', 'robot', 'fox'];
+const { createPetMotion } = require('../../shared/pet-motion');
 
 const PRESENCE_SIZE = 168;
 const DISPLAY_MARGIN = 18;
@@ -47,6 +49,7 @@ function normalizePresenceConfiguration(value = {}) {
     : 'saturn-experimental';
   return Object.freeze({
     state,
+    pet: PETS.includes(value.pet) ? value.pet : 'fox',
     appearance,
     motion,
     quality,
@@ -128,13 +131,13 @@ function systemPresenceDocument({ interactive = false, locale = 'en', configurat
     speaking: 'Sto parlando', thinking: 'Sto pensando', responding: 'Sto rispondendo',
     executing: 'Sto lavorando', permission: 'Conferma richiesta', offline: 'Non raggiungibile',
     error: 'Attenzione', wake: 'Richiamo vocale locale attivo',
-    menuOpen: 'Apri NexusNXS', menuMinimize: 'Riduci al tray', menuHide: 'Nascondi Presence', menuQuit: 'Esci da NexusNXS'
+    menuOpen: 'Apri NexusNXS', menuMinimize: 'Riduci al tray', menuHide: 'Nascondi pet', menuQuit: 'Esci da NexusNXS'
   } : {
     open: 'Open NexusNXS', talk: 'Talk to NexusNXS', idle: 'NexusNXS', booting: 'Starting', listening: 'Listening',
     speaking: 'Speaking', thinking: 'Thinking', responding: 'Responding',
     executing: 'Working', permission: 'Confirmation required', offline: 'Unavailable',
     error: 'Attention', wake: 'Local wake word active',
-    menuOpen: 'Open NexusNXS', menuMinimize: 'Minimize to tray', menuHide: 'Hide Presence', menuQuit: 'Quit NexusNXS'
+    menuOpen: 'Open NexusNXS', menuMinimize: 'Minimize to tray', menuHide: 'Hide pet', menuQuit: 'Quit NexusNXS'
   };
   const initial = normalizePresenceConfiguration(configuration);
   const interactiveAttribute = interactive ? 'true' : 'false';
@@ -147,9 +150,9 @@ html .presence{width:168px;height:168px;transform:scale(var(--presence-scale,1))
 .presence[data-state=permission] .state,.presence[data-state=offline] .state,.presence[data-state=error] .state{opacity:1;transform:none}`;
   return `<!doctype html>
 <html lang="${language}"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
 <meta name="viewport" content="width=device-width,initial-scale=1"><style>${contextualStateStyles}</style>
-<script>addEventListener('DOMContentLoaded',()=>{const fit=()=>document.documentElement.style.setProperty('--presence-scale',String(innerWidth/168));fit();addEventListener('resize',fit);const root=document.querySelector('.presence');const canvas=document.createElement('canvas');canvas.className='astral-canvas';canvas.setAttribute('aria-hidden','true');document.querySelector('.drag-ring').prepend(canvas);(${createAstralCore.toString()})(canvas,{host:document.querySelector('.drag-ring'),contrastUnderlay:true,efficient:root.dataset.quality==='efficient',getReduced:()=>root.dataset.motion==='reduced',getState:()=>root.dataset.state||'idle'});});</script>
+<script>addEventListener('DOMContentLoaded',()=>{const fit=()=>document.documentElement.style.setProperty('--presence-scale',String(Math.min(innerWidth,innerHeight)/168));fit();addEventListener('resize',fit);const life=(${createPetMotion.toString()})(document.querySelector('.presence'));addEventListener('pagehide',()=>life.dispose(),{once:true});});</script>
 <style>
 :root{color-scheme:dark;--accent:86,222,224}
 *{box-sizing:border-box}
@@ -158,7 +161,28 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent
 .presence:hover,.presence:focus-within,.presence:not([data-state=idle]){opacity:1}
 .drag-ring{position:relative;width:118px;height:118px;border-radius:50%}
 .drag-ring[data-interactive=true]{-webkit-app-region:drag;cursor:default}
-.astral-canvas{position:absolute;inset:-18%;width:136%;height:136%;pointer-events:none}
+.pet-life,.pet-gaze{position:absolute;inset:0;pointer-events:none;transform-origin:50% 85%}
+.pet-gaze{transition:transform .42s cubic-bezier(.2,.7,.2,1)}
+.pet{position:absolute;inset:0;background-image:url(data:image/webp;base64,${PET_SPRITE});background-size:300% 100%;background-position:100% 0;pointer-events:none;transform-origin:50% 85%;animation:pet-breathe 4s ease-in-out infinite;filter:drop-shadow(0 2px 2px #001317aa)}
+.presence[data-pet=orb] .pet{background-position:0 0}
+.presence[data-pet=robot] .pet{background-position:50% 0}
+.presence[data-state=booting] .pet{animation:pet-rise 1.2s ease-in-out infinite}
+.presence[data-state=listening] .pet{animation:pet-listen 1.8s ease-in-out infinite}
+.presence[data-state=thinking] .pet{animation:pet-think 2.8s ease-in-out infinite}
+.presence[data-state=responding] .pet{animation:pet-rise 1.8s ease-in-out infinite}
+.presence[data-state=speaking] .pet{animation:pet-speak .55s ease-in-out infinite}
+.presence[data-state=executing] .pet{animation:pet-work .8s ease-in-out infinite}
+.presence[data-state=permission] .pet{animation:pet-listen 2s ease-in-out infinite}
+.presence[data-state=offline] .pet{animation:none;filter:grayscale(.8) drop-shadow(0 2px 2px #001317aa);opacity:.7}
+.presence[data-state=error] .pet{animation:pet-alert 1.6s ease-in-out infinite}
+.presence:not([data-state=idle]) .state{opacity:1;transform:none}
+@keyframes pet-breathe{50%{transform:translateY(-3px) scale(1.015)}}
+@keyframes pet-rise{50%{transform:translateY(-7px)}}
+@keyframes pet-listen{50%{transform:rotate(-6deg) translateY(-2px)}}
+@keyframes pet-think{25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+@keyframes pet-speak{50%{transform:scale(1.025,.975) translateY(-2px)}}
+@keyframes pet-work{25%{transform:translateX(-3px) rotate(-3deg)}75%{transform:translateX(3px) rotate(3deg)}}
+@keyframes pet-alert{10%,30%{transform:translateX(-3px)}20%,40%{transform:translateX(3px)}50%,100%{transform:none}}
 .core{position:absolute;z-index:5;left:50%;top:50%;width:48px;height:48px;border:0;border-radius:50%;padding:0;background:transparent;outline:0;transform:translate(-50%,-50%);cursor:default;-webkit-app-region:no-drag;-webkit-tap-highlight-color:transparent}
 .core[data-interactive=true]{cursor:pointer}
 .core[data-interactive=true]:focus-visible{outline:2px solid rgba(var(--accent),.62);outline-offset:5px}
@@ -175,7 +199,7 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent
 .presence[data-motion=reduced] *,.presence[data-motion=reduced]~.presence-menu,.presence[data-motion=reduced]~.presence-menu *{animation:none!important;transition:none!important}
 @keyframes menu-in{from{opacity:0;transform:translate(-50%,calc(-50% + 4px))}to{opacity:1;transform:translate(-50%,-50%)}}
 @media(prefers-reduced-motion:reduce){.presence[data-motion=system] *,.presence[data-motion=system]~.presence-menu,.presence[data-motion=system]~.presence-menu *{animation:none!important;transition:none!important}}
-</style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}" data-menu-open="false"><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.talk}" title="${copy.talk}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main><section class="presence-menu" role="menu" aria-label="NexusNXS" hidden><button role="menuitem" data-action="open-main">${copy.menuOpen}</button><button role="menuitem" data-action="minimize-main">${copy.menuMinimize}</button><button role="menuitem" data-action="hide-presence">${copy.menuHide}</button><button role="menuitem" data-action="quit-desktop">${copy.menuQuit}</button></section>
+</style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-pet="${initial.pet}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}" data-menu-open="false"><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><span class="pet-life" aria-hidden="true"><span class="pet-gaze"><span class="pet"></span></span></span><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.talk}" title="${copy.talk}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main><section class="presence-menu" role="menu" aria-label="NexusNXS" hidden><button role="menuitem" data-action="open-main">${copy.menuOpen}</button><button role="menuitem" data-action="minimize-main">${copy.menuMinimize}</button><button role="menuitem" data-action="hide-presence">${copy.menuHide}</button><button role="menuitem" data-action="quit-desktop">${copy.menuQuit}</button></section>
 <script>(()=>{
 const copy=${JSON.stringify(copy)};
 const bridge=window.nexusPresence;
@@ -209,6 +233,7 @@ bridge.onState((value)=>{
 });
 bridge.onConfiguration((value)=>{
   const next=value&&typeof value==='object'?value:{};
+  root.dataset.pet=['orb','robot','fox'].includes(next.pet)?next.pet:'fox';
   root.dataset.appearance=['neural','saturn-experimental','jarvis-reactor'].includes(String(next.appearance))?String(next.appearance):'saturn-experimental';
   root.dataset.motion=['system','reduced','full'].includes(String(next.motion))?String(next.motion):'system';
   root.dataset.quality=['auto','efficient','balanced','ultra','super'].includes(String(next.quality))?String(next.quality):'auto';
@@ -274,6 +299,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     ? presenceState.enabled
     : defaultSystemPresence === true;
   let presenceConfiguration = normalizePresenceConfiguration({
+    pet: presenceState.pet,
     appearance: presenceState.appearance,
     motion: presenceState.motion,
     quality: presenceState.quality,
@@ -313,6 +339,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
       selectedDisplayId: selectedLogicalDisplayId,
       displaySelectionMode,
       positions: { ...(presenceState.positions || {}) },
+      pet: presenceConfiguration.pet,
       appearance: presenceConfiguration.appearance,
       motion: presenceConfiguration.motion,
       quality: presenceConfiguration.quality,
@@ -487,7 +514,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
       frame: false, transparent: true, backgroundColor: '#00000000', resizable: false,
       movable: true, alwaysOnTop: true, skipTaskbar: true, hasShadow: false, show: false,
       focusable: true, fullscreenable: false, minimizable: false, maximizable: false,
-      title: primary ? 'NexusNXS' : 'NexusNXS Presence',
+      title: 'NexusNXS',
       webPreferences: {
         preload: presencePreload, contextIsolation: true, nodeIntegration: false,
         sandbox: true, devTools: false, webSecurity: true, backgroundThrottling: true
@@ -499,7 +526,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     presenceWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     presenceWindow.setIgnoreMouseEvents(true, { forward: true });
     presenceWindow.setBackgroundColor?.('#00000000');
-    presenceWindow.setOpacity?.(applicationVisible ? 0.48 : 0.66);
+    presenceWindow.setOpacity?.(applicationVisible ? 0.78 : 0.9);
     presenceWindow.on('focus', () => applyPresenceOpacity(entry));
     presenceWindow.on('blur', () => applyPresenceOpacity(entry));
     presenceWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -611,7 +638,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
   }
 
   function setSystemPresenceConfiguration(snapshot) {
-    const normalized = normalizePresenceConfiguration(snapshot);
+    const normalized = normalizePresenceConfiguration({ ...snapshot, pet: presenceConfiguration.pet });
     const persistentChanged = normalized.appearance !== presenceConfiguration.appearance
       || normalized.motion !== presenceConfiguration.motion
       || normalized.quality !== presenceConfiguration.quality
@@ -621,6 +648,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     const configurationChanged = persistentChanged
       || normalized.wakeWordSuspended !== presenceConfiguration.wakeWordSuspended;
     presenceConfiguration = Object.freeze({
+      pet: presenceConfiguration.pet,
       appearance: normalized.appearance,
       motion: normalized.motion,
       quality: normalized.quality,
@@ -757,6 +785,16 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     getSystemPresenceStatus,
     getSystemPresenceConfiguration,
     setWakeWordListening,
+    getPet: () => presenceConfiguration.pet,
+    selectPet: (pet) => {
+      if (!PETS.includes(pet)) return false;
+      presenceConfiguration = Object.freeze({ ...presenceConfiguration, pet });
+      persistPresenceState('Preferenza pet non salvata.');
+      for (const entry of presenceWindows.values()) {
+        if (!entry.window.isDestroyed()) entry.window.webContents.send(PRESENCE_CONFIG_CHANNEL, presenceConfiguration);
+      }
+      return true;
+    },
     setSystemPresenceConfiguration,
     selectSystemPresenceDisplay,
     setApplicationVisible,
