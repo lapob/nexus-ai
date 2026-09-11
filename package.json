@@ -21,6 +21,7 @@
     "cloudflare:dry-run": "wrangler deploy --config dist/server/wrangler.json --dry-run --outdir .wrangler/dry-run",
     "cloudflare:credential:store": "node scripts/cloudflare-credential.mjs store",
     "cloudflare:credential:status": "node scripts/cloudflare-credential.mjs status",
+    "release:sync": "node scripts/sync-public-release.mjs",
     "release:bootstrap": "node scripts/cloudflare-release.mjs bootstrap",
     "release:prepare": "node scripts/cloudflare-release.mjs prepare",
     "release:activate-initial": "node scripts/cloudflare-release.mjs activate-initial",

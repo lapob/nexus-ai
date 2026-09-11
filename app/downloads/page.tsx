@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import release from "../data/public-release.json";
 import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert, Smartphone } from "lucide-react";
 import Image from "next/image";
 import { SiteFooter } from "../components/SiteChrome";
@@ -11,36 +12,38 @@ export const metadata: Metadata = {
   twitter: { title: "Download NexusNXS", description: "Release NexusNXS e controlli di integrità.", images: [] },
 };
 
+const releaseDate = new Date(release.date + "T12:00:00Z").toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const sizeLabel = (bytes: number) => `${(bytes / 1048576).toLocaleString("it-IT", { maximumFractionDigits: 2 })} MiB · ${bytes.toLocaleString("it-IT")} byte`;
 const releases = [
   {
     Icon: Laptop,
     name: "NexusNXS per PC",
-    version: "0.3.14",
+    version: release.windows.version,
     platform: "Windows 11 · x64",
-    size: "102,52 MiB · 107.499.014 byte",
-    date: "6 settembre 2026",
+    size: sizeLabel(release.windows.bytes),
+    date: releaseDate,
     state: "PREVIEW · NON FIRMATA",
     text: "Assistente AI connesso per Windows con voce e strumenti locali.",
     requirements: "Windows 11 x64, connessione Internet e 4 GB di spazio libero consigliati.",
     warning: "Authenticode non presente. Microsoft Defender SmartScreen può mostrare ‘Autore sconosciuto’: verifica SHA-256 e non disattivare le protezioni.",
     action: "Scarica per Windows",
-    sha256: "996F5085B0BC31F74D1E29F2895640658293ED1FF4894E6A08BDC4B007768B1C",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-0.3.14-Setup.exe",
+    sha256: release.windows.sha256,
+    url: release.windows.url,
   },
   {
     Icon: Smartphone,
     name: "NexusNXS per Android",
-    version: "6.5.1",
-    platform: "Android 10+",
-    size: "1,81 MiB · 1.899.727 byte",
-    date: "8 settembre 2026",
+    version: release.android.version,
+    platform: "Android 8+",
+    size: sizeLabel(release.android.bytes),
+    date: releaseDate,
     state: "PREVIEW · FIRMA DEBUG",
     text: "Esperienza mobile nativa per conversazioni e continuità.",
-    requirements: "Android 10 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
+    requirements: "Android 8 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
     warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
     action: "Scarica per Android",
-    sha256: "25E62E1AF3E5E6D925E0E4C5B33EF1C60231356B0D3D9453545858AB5B2DD432",
-    url: "https://github.com/lapob/nexus-ai/releases/download/v0.3.14-preview.3/NexusNXS-Android.apk",
+    sha256: release.android.sha256,
+    url: release.android.url,
   },
 ];
 
@@ -74,7 +77,7 @@ export default function Downloads() {
     <section className="verify-guide">
       <div><FileCheck2 /><h2>Come verificare una release</h2></div>
       <ol><li><span>01</span>Avvia il download da <strong>nexusnxs.com</strong>; il file è ospitato nella release GitHub ufficiale.</li><li><span>02</span>Leggi lo stato della firma e gli avvisi della piattaforma.</li><li><span>03</span>Confronta l’impronta SHA-256 completa prima di eseguire il file.</li></ol>
-      <div className="hash-preview"><Copy size={16} /><code>Get-FileHash .\NexusNXS-0.3.14-Setup.exe -Algorithm SHA256</code></div>
+      <div className="hash-preview"><Copy size={16} /><code>{`Get-FileHash .\\NexusNXS-${release.windows.version}-Setup.exe -Algorithm SHA256`}</code></div>
       <p><BadgeCheck /> Versioni, avvisi e impronte sono pubblicati insieme ai file.</p>
     </section>
     <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili i client PC e Android con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>

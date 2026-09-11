@@ -383,7 +383,14 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
-      cosmicCanvas.dataset.arrival = Math.min(1, Math.max(0, age - .4) / 5).toFixed(3);
+      const compositionComplete = reduced || age >= 5.4;
+      cosmicCanvas.dataset.arrival = (reduced ? 1 : Math.min(1, Math.max(0, age - .4) / 5)).toFixed(3);
+      const replay = document.querySelector<HTMLButtonElement>(".astral-hero__replay");
+      if (replay && replay.hidden !== compositionComplete) {
+        replay.hidden = compositionComplete;
+        replay.disabled = compositionComplete;
+        replay.tabIndex = compositionComplete ? -1 : 0;
+      }
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
       cosmicCanvas.dataset.particles = String(activeParticles);
       cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
@@ -473,8 +480,8 @@ export function SiteMotionRuntime() {
         const opacity = 1 - progress * progress * (3 - 2 * progress);
         hero.style.setProperty("--hero-label-opacity", String(opacity));
         if (replayButton) {
-          replayButton.disabled = progress >= 1;
-          replayButton.tabIndex = progress >= 1 ? -1 : 0;
+          replayButton.disabled = progress >= 1 || replayButton.hidden;
+          replayButton.tabIndex = replayButton.disabled ? -1 : 0;
         }
       }
     };

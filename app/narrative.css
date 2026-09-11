@@ -199,3 +199,5 @@ html { scroll-padding-top: 96px; }
     transition-delay: .12s;
   }
 }
+
+.astral-hero__replay[hidden] { display: none; }

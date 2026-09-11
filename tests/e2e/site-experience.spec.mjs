@@ -595,7 +595,7 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
   }
 });
 
-test("home wordmark and replay dissolve together and return with scroll", async ({page}) => {
+test("replay disappears after composition and stays hidden when returning to the hero", async ({page}) => {
   for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
@@ -611,7 +611,12 @@ test("home wordmark and replay dissolve together and return with scroll", async 
     await expect(replay).toHaveAttribute('tabindex','-1');
     await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
     await expect(replay).toBeEnabled();
-    await expect(replay).toHaveCSS('opacity','1');
     await expect(title).toHaveCSS('opacity','1');
+    await expect(page.locator('.nxs-cosmic-field')).toHaveAttribute('data-arrival', '1.000', { timeout: 10000 });
+    await expect(replay).toBeHidden();
+    await expect(replay).toBeDisabled();
+    await expect(replay).toHaveAttribute('tabindex', '-1');
+    await page.evaluate(() => { scrollTo({top:innerHeight,behavior:'instant'}); scrollTo({top:0,behavior:'instant'}); });
+    await expect(replay).toBeHidden();
   }
 });
