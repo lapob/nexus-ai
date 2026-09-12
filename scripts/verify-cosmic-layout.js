@@ -23,6 +23,7 @@ const assert = require('node:assert/strict');
         window.microphoneRequests = 0;
         Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => { window.microphoneRequests++; throw new Error('QA microphone stub'); } });
       });
+      await page.route('https://ai.nexusnxs.com/readyz', r => r.fulfill({json:{status:'ready'}}));
       await page.route('https://ai.nexusnxs.com/', r => r.fulfill({ contentType: 'text/html', body: PUBLIC_AI_HTML.replace('{ host: button, efficient,', `{ host: button, efficient, random:()=>${seed},`) }));
       await page.goto('https://ai.nexusnxs.com/');
       await page.waitForFunction(() => nexusCosmicMetrics.renderer().arrival === 1);

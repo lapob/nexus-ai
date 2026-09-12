@@ -42,12 +42,12 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   };
   const basicVertex = `precision highp float;uniform float uTime;uniform float uEnergy;uniform float uKind;uniform vec3 uAccent;varying float vAlpha;void main(){vec3 p=position;float angle=uTime*(uKind<.5?.07:uKind<1.5?-.12:-.09);float c=cos(angle),s=sin(angle);p.xy=mat2(c,-s,s,c)*p.xy;p*=1.+sin(uTime*1.1)*.025+uEnergy*.025;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);gl_PointSize=1.25;vAlpha=uKind>2.5?.12:uKind>.5&&uKind<1.5?.6:.42;}`;
   const basicFragment = `precision highp float;uniform vec3 uAccent;varying float vAlpha;void main(){float a=smoothstep(.5,.13,length(gl_PointCoord-.5));gl_FragColor=vec4(uAccent,a*vAlpha);}`;
-  const prefix = `precision highp float;attribute vec3 position;attribute vec4 aJourney;uniform mat4 modelViewMatrix;uniform mat4 projectionMatrix;uniform vec4 uStage;uniform vec2 uViewport;uniform float uElapsed;uniform float uArrival;uniform float uDpr;uniform float uTaper;varying float vJourney;varying float vEdge;varying float vCarrier;varying float vSourceAlpha;`;
+  const prefix = `precision highp float;attribute vec3 position;attribute vec4 aJourney;uniform mat4 modelViewMatrix;uniform mat4 projectionMatrix;uniform vec4 uStage;uniform vec2 uViewport;uniform float uElapsed;uniform float uArrival;uniform float uDpr;uniform float uTaper;uniform float uWide;varying float vJourney;varying float vEdge;varying float vCarrier;varying float vSourceAlpha;`;
   function vertex(source) {
     const index=source.lastIndexOf('}');
     return prefix + source.slice(0,index) + `
       vec2 target=gl_Position.xy/gl_Position.w*uStage.xy+uStage.zw;
-      float shapeEdge=mix(1.,1.-smoothstep(.82,1.,abs(gl_Position.x/gl_Position.w)),uTaper);
+      float shapeEdge=mix(1.,1.-smoothstep(.85,1.,mix(abs(gl_Position.x/gl_Position.w),abs(target.x),uWide)),uTaper);
       // The field can fill the screen horizontally while matter fades before
       // reaching the title and controls reserved above/below the host.
       float readingEdge=1.-smoothstep(.78,1.,abs(target.y-uStage.w)/max(.001,uStage.y/1.25));
@@ -144,7 +144,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     const ringTarget=planetOnly ? 0 : {listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
     ringVisibility=isReduced?ringTarget:ringVisibility+(ringTarget-ringVisibility)*(1-Math.exp(-dt*1.65));
     const saturnFraming=planetOnly?4:2.85;
-    const expansiveScale=preset==='neural'?Math.max(1.18,Math.min(1.8,width*.94/Math.max(1,side))):1.18;
+    const expansiveScale=preset==='neural'?Math.max(1.18,Math.min(options.expansive&&height>540?3:1.8,width*.94/Math.max(1,side))):options.expansive&&height>540&&!planetOnly?1.38:1.18;
     const fieldScale=kind=>expansiveScale*(preset==='saturn-experimental'?saturnFraming*(kind===0?.94:1):preset==='jarvis-reactor'?1.48:1);
     // Adaptive detail does not change point positions or restart the shared clock.
     strain=dt>.028||drawMs>8?strain+dt:Math.max(0,strain-dt);healthy=dt<.021&&drawMs<5?healthy+dt:0;
@@ -158,7 +158,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     }
     if(gl){
       gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);const p=programs[preset];gl.useProgram(p.p);
-      for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uViewport:[width,height],uElapsed:isReduced?0:elapsed,uTaper:preset==='neural'?1:0,uArrival:arrival,uDpr:dpr,uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:planetOnly?1.2:1.08,uPointScale:planetOnly?.48:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
+      for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uViewport:[width,height],uElapsed:isReduced?0:elapsed,uTaper:preset==='neural'?1:0,uWide:options.expansive&&height>540?1:0,uArrival:arrival,uDpr:dpr,uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:planetOnly?1.2:1.08,uPointScale:planetOnly?.48:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
       for(const [key,value] of Object.entries(profile))uniform(p,'u'+key[0].toUpperCase()+key.slice(1),value);
       for(const field of coreVisible?fields[preset]:[]){
         const saturn=preset==='saturn-experimental',reactor=preset==='jarvis-reactor';
