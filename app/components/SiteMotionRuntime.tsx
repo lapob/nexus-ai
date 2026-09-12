@@ -198,6 +198,7 @@ export function SiteMotionRuntime() {
       const sceneDistance = destination - sceneProgress;
       const catchup = 5 + Math.min(14, Math.abs(sceneDistance) * 7);
       sceneProgress += sceneDistance * (reduced ? 1 : 1 - Math.exp(-catchup * delta));
+      if (window.scrollY < 4 && initialSceneFinished) sceneProgress = 0;
       const sectionPosition = sceneProgress;
       const sectionIndex = Math.floor(sectionPosition);
       const sectionMixRaw = sectionPosition - sectionIndex;

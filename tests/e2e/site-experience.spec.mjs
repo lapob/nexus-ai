@@ -610,7 +610,7 @@ test("real desktop and Android image zoom is centered and keyboard dismissible",
 });
 
 
-test("discover text itself stays centered independently of its arrow", async ({page}) => {
+test("both home actions stay centered independently of their icons", async ({page}) => {
   for (const width of [320,360,390,768,960,1440,1920]) {
     await page.setViewportSize({width,height:844});
     await page.goto('/');
@@ -626,6 +626,29 @@ test("discover text itself stays centered independently of its arrow", async ({p
       expect(result.delta, JSON.stringify({width,top,result})).toBeLessThan(2);
       expect(result.gap).toBeGreaterThan(6);
       expect(result.overflow).toBe(false);
+      const primary = await page.locator('.hero-entry .primary-button').evaluate(el=>{
+        const range=document.createRange();range.selectNodeContents(el.firstChild);
+        const text=range.getBoundingClientRect(),button=el.getBoundingClientRect();
+        return {text:Math.abs(text.x+text.width/2-document.documentElement.clientWidth/2),button:Math.abs(button.x+button.width/2-document.documentElement.clientWidth/2)};
+      });
+      expect(primary.text,JSON.stringify({width,top,primary})).toBeLessThan(2);
+      expect(primary.button).toBeLessThan(2);
     }
+  }
+});
+
+
+test("returning to the hero retains the completed form",async({page})=>{
+  await page.goto('/');
+  const canvas=page.locator('.nxs-cosmic-field');
+  await expect(canvas).toHaveAttribute('data-arrival','1.000',{timeout:18000});
+  for(const top of [2500,5000]){
+    await page.evaluate(top=>scrollTo({top,behavior:'instant'}),top);
+    await page.waitForTimeout(400);
+    await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+    await expect(canvas).toHaveAttribute('data-scene-progress','0.000');
+    await expect(canvas).toHaveAttribute('data-arrival','1.000');
+    await page.waitForTimeout(500);
+    await expect(canvas).toHaveAttribute('data-arrival','1.000');
   }
 });
