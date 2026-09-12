@@ -559,7 +559,7 @@ test("the continuous field moves particles locally without scaling the interface
   await page.mouse.move(45,before.height*.55);
   await expect(page.locator('html')).not.toHaveClass(/nxs-field-dragging/);
   await page.mouse.up();
-  await expect(core).toHaveAttribute('data-arrival','1.000',{timeout:10000});
+  await expect(core).toHaveAttribute('data-arrival','1.000',{timeout:15000});
   await page.mouse.move(before.width*.54,before.height*.5);
   await page.mouse.move(before.width*.54+6,before.height*.5+2,{steps:3});
   await expect.poll(async()=>Number(await core.getAttribute('data-max-drift'))).toBeGreaterThan(.5);

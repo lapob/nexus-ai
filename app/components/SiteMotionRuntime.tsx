@@ -94,6 +94,8 @@ export function SiteMotionRuntime() {
     let sceneProgress = 0;
     let paintMs = 0;
     const fieldStarted = performance.now();
+    const arrivalDelay = 1.8;
+    const arrivalDuration = 8.2;
     let ambientTime = 0;
     const inspection = { id: -1, startX: 0, startY: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
     let strainedSeconds = 0;
@@ -285,8 +287,14 @@ export function SiteMotionRuntime() {
       const age = Math.max(0, now - fieldStarted) / 1000;
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
       // Sticky content has viewport coordinates; a cached document rectangle drifts on scroll.
-      const heroEntry = document.querySelector('.hero-entry')?.getBoundingClientRect();
-      if (heroEntry) visibleHalos.push({left:heroEntry.left,right:heroEntry.right,top:heroEntry.top+window.scrollY,bottom:heroEntry.bottom+window.scrollY});
+      // Protect the actual words, not the full-width grid row: a row-sized
+      // exclusion erased the stars into a dark horizontal band around the CTA.
+      for (const element of document.querySelectorAll('.hero-entry p,.hero-entry a')) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const rect = range.getBoundingClientRect();
+        visibleHalos.push({left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY});
+      }
       const readingOpacity = (x: number, y: number) => {
         let fade = 0;
         for (const rect of visibleHalos) {
@@ -328,7 +336,7 @@ export function SiteMotionRuntime() {
         const transitionScatter = Math.sin(sectionMix * Math.PI) * .025;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
-        const arrivalTime = Math.min(1, Math.max(0, age - .4) / 5);
+        const arrivalTime = Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
         // Zero velocity at both ends: acceleration never snaps into the final form.
         const arrival = reduced ? 1 : arrivalTime ** 3 * (arrivalTime * (arrivalTime * 6 - 15) + 10);
         const compose = (1 - transitionScatter) * arrival;
@@ -369,7 +377,7 @@ export function SiteMotionRuntime() {
         const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (quietPage ? .12 : 1);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
-      interactivePoints = age < 5.4 || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
+      interactivePoints = age < arrivalDelay + arrivalDuration || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
       cosmicContext.lineWidth = .55;
       for (let index = 0; index < points.length; index += 3) {
         const point = points[index];
@@ -406,7 +414,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
-      cosmicCanvas.dataset.arrival = (reduced ? 1 : Math.min(1, Math.max(0, age - .4) / 5)).toFixed(3);
+      cosmicCanvas.dataset.arrival = (reduced ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration)).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
       cosmicCanvas.dataset.particles = String(activeParticles);
       cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
@@ -488,7 +496,7 @@ export function SiteMotionRuntime() {
       scrollFrame = 0;
       const available = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       root.style.setProperty("--nxs-scroll", String(Math.min(1, Math.max(0, window.scrollY / available))));
-      // The wordmark dissolves with scroll; replay stays anchored to its scene.
+      // The wordmark dissolves with scroll.
       // Keep the particles alive; only the opening labels dissolve.
       if (hero) {
         const progress = Math.min(1, Math.max(0, (window.scrollY / Math.max(1, window.innerHeight) - .08) / .42));
