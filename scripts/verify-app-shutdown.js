@@ -33,14 +33,14 @@ function processSnapshot() {
   if (process.platform === 'win32') {
     const result = spawnSync('powershell.exe', [
       '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
-      '@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine) | ConvertTo-Json -Compress'
-    ], { encoding: 'utf8', windowsHide: true });
-    if (result.status !== 0 || !result.stdout.trim()) return [];
+      "@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,@{Name='CommandLineBase64';Expression={[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_.CommandLine))}}) | ConvertTo-Json -Compress"
+    ], { encoding: 'utf8', windowsHide: true, timeout: 10_000, maxBuffer: 16 * 1024 * 1024 });
+    if (result.error || result.status !== 0 || !result.stdout.trim()) throw new Error('Inventario processi Windows non disponibile.');
     const parsed = JSON.parse(result.stdout);
     return (Array.isArray(parsed) ? parsed : [parsed]).map((item) => ({
       pid: Number(item.ProcessId),
       parentPid: Number(item.ParentProcessId),
-      commandLine: String(item.CommandLine || '')
+      commandLine: Buffer.from(String(item.CommandLineBase64 || ''), 'base64').toString('utf8')
     }));
   }
   const result = spawnSync('ps', ['-eo', 'pid=,ppid=,args='], { encoding: 'utf8' });
@@ -241,10 +241,18 @@ async function verifyAppShutdown() {
     const diagnostics = path.join(root, 'qa-artifacts', 'shutdown-failure.log');
     fs.mkdirSync(path.dirname(diagnostics), { recursive: true });
     fs.writeFileSync(diagnostics, stderr);
+    fs.writeFileSync(path.join(root,'qa-artifacts','shutdown-process-failure.json'), JSON.stringify({pid:child.pid,exitCode:child.exitCode,signalCode:child.signalCode,alive:isProcessAlive(child.pid),message:error.message}));
+    try {
+      const targets = await fetch(`http://127.0.0.1:${debugPort}/json`,{signal:AbortSignal.timeout(2000)}).then(response=>response.json());
+      fs.writeFileSync(path.join(root,'qa-artifacts','shutdown-targets-failure.json'),JSON.stringify(targets.map(target=>({type:target.type,url:target.url})),null,2));
+    } catch {}
+
     try {
       // Preserve diagnostics from this disposable QA profile before cleanup.
       const profileLog = path.join(profile, 'logs', 'nexus.log');
       if (fs.existsSync(profileLog)) fs.copyFileSync(profileLog, path.join(root, 'qa-artifacts', 'shutdown-profile-failure.log'));
+      const presenceLog=path.join(profile,'logs','presence.log');
+      if(fs.existsSync(presenceLog)) fs.copyFileSync(presenceLog,path.join(root,'qa-artifacts','shutdown-presence-failure.log'));
     } catch {}
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     terminateTestTree(child);
