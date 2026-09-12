@@ -93,7 +93,7 @@ export function SiteMotionRuntime() {
     let heroCore: { x: number; y: number; size: number } | null = null;
     let sceneProgress = 0;
     let paintMs = 0;
-    let fieldStarted = performance.now();
+    const fieldStarted = performance.now();
     let ambientTime = 0;
     const inspection = { id: -1, startX: 0, startY: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
     let strainedSeconds = 0;
@@ -159,6 +159,7 @@ export function SiteMotionRuntime() {
       });
     };
 
+    let interactivePoints: {x:number;y:number}[] = [];
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const paintStart = performance.now();
@@ -170,7 +171,7 @@ export function SiteMotionRuntime() {
       if (strainedSeconds > 2) { activeParticles = Math.max(300, activeParticles - 60); strainedSeconds = 0; }
       if (healthySeconds > 8) { activeParticles = Math.min(particleCount, activeParticles + 30); healthySeconds = 0; }
       const dragging = inspection.id !== -1 && !reduced;
-      const omega = dragging ? 5 : 1.1;
+      const omega = dragging ? 14 : 1.8;
       const decay = Math.exp(-omega * delta);
       for (const axis of ['x', 'y'] as const) {
         const velocity = axis === 'x' ? 'vx' : 'vy';
@@ -283,6 +284,9 @@ export function SiteMotionRuntime() {
       cosmicContext.globalCompositeOperation = "lighter";
       const age = Math.max(0, now - fieldStarted) / 1000;
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
+      // Sticky content has viewport coordinates; a cached document rectangle drifts on scroll.
+      const heroEntry = document.querySelector('.hero-entry')?.getBoundingClientRect();
+      if (heroEntry) visibleHalos.push({left:heroEntry.left,right:heroEntry.right,top:heroEntry.top+window.scrollY,bottom:heroEntry.bottom+window.scrollY});
       const readingOpacity = (x: number, y: number) => {
         let fade = 0;
         for (const rect of visibleHalos) {
@@ -339,8 +343,8 @@ export function SiteMotionRuntime() {
         const influence = (reduced ? 0 : pointer.active) * proximity * proximity;
         const movement = Math.min(1, speed / 180);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
-        const goalX = (Math.cos(angle) * 24 * movement + pointer.vx * .22) * influence;
-        const goalY = (Math.sin(angle) * 24 * movement + pointer.vy * .22) * influence;
+        const goalX = (Math.cos(angle) * 24 * movement + pointer.vx * .32) * influence;
+        const goalY = (Math.sin(angle) * 24 * movement + pointer.vy * .32) * influence;
         const omega = influence * movement > .01 ? 12 : 2.8, decay = Math.exp(-omega * delta);
         const ex = particle.offsetX - goalX, ey = particle.offsetY - goalY;
         const ax = particle.velocityX + omega * ex, ay = particle.velocityY + omega * ey;
@@ -365,6 +369,7 @@ export function SiteMotionRuntime() {
         const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (quietPage ? .12 : 1);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
+      interactivePoints = age < 5.4 || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
       cosmicContext.lineWidth = .55;
       for (let index = 0; index < points.length; index += 3) {
         const point = points[index];
@@ -499,8 +504,8 @@ export function SiteMotionRuntime() {
       if (event.pointerId === inspection.id) {
         const dx = event.clientX - inspection.startX, dy = event.clientY - inspection.startY;
         if (Math.hypot(dx, dy) > 8) root.classList.add('nxs-field-dragging');
-        inspection.targetX = Math.max(-.8, Math.min(.8, dy / cosmicHeight * 2));
-        inspection.targetY = Math.max(-1.2, Math.min(1.2, dx / cosmicWidth * 2.5));
+        inspection.targetX = Math.max(-.8, Math.min(.8, dy / Math.min(cosmicWidth, cosmicHeight) * 5));
+        inspection.targetY = Math.max(-1.2, Math.min(1.2, dx / Math.min(cosmicWidth, cosmicHeight) * 6));
       }
       if (event.pointerType === "touch" || reducedMotion.matches) return;
       const now = performance.now(), seconds = Math.max(.008, (now - pointer.time) / 1000);
@@ -515,7 +520,7 @@ export function SiteMotionRuntime() {
     const startDrag = (event: PointerEvent) => {
       if (event.button !== 0 || reducedMotion.matches || !(event.target instanceof Element)) return;
       if (event.target.closest('a,button,input,textarea,select,[contenteditable],h1,h2,p,li')) return;
-      if (!event.target.closest('.astral-interlude,.home-neural-core')) return;
+      if (!interactivePoints.some(point => Math.hypot(point.x-event.clientX,point.y-event.clientY)<24)) return;
       if (event.pointerType === 'touch') return;
       root.classList.add('nxs-field-dragging');
       inspection.id = event.pointerId;
@@ -523,10 +528,6 @@ export function SiteMotionRuntime() {
       inspection.targetX = inspection.x; inspection.targetY = inspection.y;
     };
     const onPointerLeave = () => { pointer.active = 0; releaseDrag(); };
-    const replayComposition = () => {
-      fieldStarted = performance.now();
-      if (reducedMotion.matches) drawCosmicField(fieldStarted);
-    };
     updateScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
@@ -537,7 +538,6 @@ export function SiteMotionRuntime() {
     window.addEventListener('pointercancel', releaseDrag);
     window.addEventListener('blur', onPointerLeave);
     document.documentElement.addEventListener("pointerleave", onPointerLeave);
-    window.addEventListener("nxs:replay-composition", replayComposition);
 
     return () => {
       releaseDrag();
@@ -556,7 +556,6 @@ export function SiteMotionRuntime() {
       window.removeEventListener("resize", resizeCosmicField);
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
-      window.removeEventListener("nxs:replay-composition", replayComposition);
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
       document.removeEventListener("visibilitychange", syncVisibility);

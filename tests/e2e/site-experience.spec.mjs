@@ -554,6 +554,11 @@ test("the continuous field moves particles locally without scaling the interface
   await expect(scene).toHaveCSS('cursor', 'grab');
   await expect(core).toHaveAttribute('data-background-particles', /\d+/);
   const backgroundCount = await core.getAttribute('data-background-particles');
+  await page.mouse.move(20,before.height*.5);
+  await page.mouse.down();
+  await page.mouse.move(45,before.height*.55);
+  await expect(page.locator('html')).not.toHaveClass(/nxs-field-dragging/);
+  await page.mouse.up();
   await expect(core).toHaveAttribute('data-arrival','1.000',{timeout:10000});
   await page.mouse.move(before.width*.54,before.height*.5);
   await page.mouse.move(before.width*.54+6,before.height*.5+2,{steps:3});
@@ -585,56 +590,6 @@ test("the continuous field moves particles locally without scaling the interface
   expect(await core.getAttribute('data-background-particles')).toBe(backgroundCount);
 });
 
-test("replay reassembles only the home artwork and remains bounded on mobile", async ({page}) => {
-  for (const viewport of [{width:1440,height:1000}, {width:390,height:844}]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-    const core=page.locator('.nxs-cosmic-field');
-    await expect(core).toHaveAttribute('data-particles', /\d+/);
-    const original=await core.elementHandle();
-    const replay=page.getByRole('button', {name:'Ripeti animazione'});
-    await expect(replay).toBeVisible();
-    const bounds=await replay.boundingBox();
-    expect(await replay.evaluate(el => { const r=el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)); })).toBe(true);
-    const cta = await page.locator('.hero-entry .primary-button').boundingBox();
-    expect(bounds.x < cta.x + cta.width && bounds.x + bounds.width > cta.x && bounds.y < cta.y + cta.height && bounds.y + bounds.height > cta.y).toBe(false);
-    expect(bounds.x).toBeGreaterThanOrEqual(0);
-    expect(bounds.x+bounds.width).toBeLessThanOrEqual(viewport.width);
-    await replay.click();
-    expect(await original.evaluate(node=>node.isConnected)).toBe(true);
-    await expect(core).toHaveAttribute('data-particles', /\d+/);
-    await expect(page.locator('.nxs-cosmic-field')).toHaveCount(1);
-    await expect(page).toHaveURL(/\/$/);
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  }
-});
-
-test("replay remains available throughout the page after composition", async ({page}) => {
-  for (const viewport of [{width:1440,height:1000},{width:960,height:720},{width:844,height:390},{width:390,height:844}]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-    const replay = page.locator('.astral-hero__replay');
-    await expect(page.locator('.nxs-cosmic-field')).toHaveAttribute('data-arrival','1.000',{timeout:10000});
-    await expect(replay).toBeVisible();
-    await page.screenshot({path:'qa-artifacts/home-composed-'+viewport.width+'.png'});
-    const initial=await replay.boundingBox();
-    await page.evaluate(()=>scrollTo({top:innerHeight*.3,behavior:'instant'}));
-    await expect(replay).toBeEnabled();
-    expect(Math.abs((await replay.boundingBox()).y-initial.y)).toBeLessThan(2);
-    await page.evaluate(()=>scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
-    expect(Math.abs((await replay.boundingBox()).y-initial.y)).toBeLessThan(2);
-    expect(await replay.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
-    await replay.click();
-    expect(await page.evaluate(()=>scrollY)).toBe(0);
-    await expect.poll(async()=>Number(await page.locator('.nxs-cosmic-field').getAttribute('data-arrival'))).toBeLessThan(.5);
-    expect(await replay.evaluate(el=>el===document.activeElement)).toBe(true);
-    await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
-    const cta=await page.locator('.hero-entry .primary-button').boundingBox();
-    const discover=await page.locator('.hero-actions a').boundingBox();
-    expect(discover.y-cta.y-cta.height).toBeLessThan(80);
-  }
-});
-
 test("real desktop and Android image zoom is centered and keyboard dismissible", async ({page}) => {
   for (const viewport of [{width:1440,height:1000},{width:960,height:720},{width:844,height:390},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
@@ -650,6 +605,27 @@ test("real desktop and Android image zoom is centered and keyboard dismissible",
       await page.keyboard.press('Escape');
       await expect(dialog).toHaveCount(0);
       await expect(trigger).toBeFocused();
+    }
+  }
+});
+
+
+test("discover text itself stays centered independently of its arrow", async ({page}) => {
+  for (const width of [320,360,390,768,960,1440,1920]) {
+    await page.setViewportSize({width,height:844});
+    await page.goto('/');
+    await expect(page.locator('.nxs-cosmic-field')).toHaveAttribute('data-particles', /\d+/);
+    await page.evaluate(()=>document.fonts.ready);
+    for (const top of [0,200,500]) {
+      await page.evaluate(top=>scrollTo({top,behavior:'instant'}),top);
+      const result=await page.locator('.hero-actions a').evaluate(el=>{
+        const range=document.createRange();range.selectNodeContents(el.firstChild);
+        const text=range.getBoundingClientRect(), arrow=el.querySelector('span').getBoundingClientRect();
+        return {delta:Math.abs(text.x+text.width/2-document.documentElement.clientWidth/2),gap:arrow.left-text.right,overflow:document.documentElement.scrollWidth>innerWidth};
+      });
+      expect(result.delta, JSON.stringify({width,top,result})).toBeLessThan(2);
+      expect(result.gap).toBeGreaterThan(6);
+      expect(result.overflow).toBe(false);
     }
   }
 });
