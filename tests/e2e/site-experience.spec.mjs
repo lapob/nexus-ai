@@ -609,7 +609,7 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
   }
 });
 
-test("replay remains available with the sticky scene after composition", async ({page}) => {
+test("replay remains available throughout the page after composition", async ({page}) => {
   for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
@@ -621,7 +621,11 @@ test("replay remains available with the sticky scene after composition", async (
     await page.evaluate(()=>scrollTo({top:innerHeight*.3,behavior:'instant'}));
     await expect(replay).toBeEnabled();
     expect(Math.abs((await replay.boundingBox()).y-initial.y)).toBeLessThan(2);
+    await page.evaluate(()=>scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
+    expect(Math.abs((await replay.boundingBox()).y-initial.y)).toBeLessThan(2);
+    expect(await replay.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
     await replay.click();
+    expect(await page.evaluate(()=>scrollY)).toBe(0);
     await expect.poll(async()=>Number(await page.locator('.nxs-cosmic-field').getAttribute('data-arrival'))).toBeLessThan(.5);
     expect(await replay.evaluate(el=>el===document.activeElement)).toBe(true);
     await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));

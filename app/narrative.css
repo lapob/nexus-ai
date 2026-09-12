@@ -117,9 +117,9 @@ html { scroll-padding-top: 96px; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { margin: 24px 0 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
 .astral-hero .hero-actions a { font-size: 14px; }
-.astral-hero__replay { position: absolute; right: max(20px, env(safe-area-inset-right)); bottom: 20px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #71b6bb38; border-radius: 50%; color: #b8d8db; background: #0410158c; cursor: pointer; transition: background .3s, color .3s; }
+.astral-hero__replay { position: fixed; right: max(20px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #71b6bb38; border-radius: 50%; color: #b8d8db; background: #0410158c; cursor: pointer; transition: background .3s, color .3s; }
 .astral-hero__replay:hover { background: #10292cb3; color: #e1ffff; }
-.astral-hero__replay { z-index: 3; }
+.astral-hero__replay { z-index: 60; }
 .astral-hero__replay:focus-visible { outline: 2px solid #91e9ec; outline-offset: 4px; }
 .home-continuum .astral-hero > .astral-hero__replay { width: 44px; margin: 0; }
 
@@ -172,7 +172,7 @@ html { scroll-padding-top: 96px; }
   .astral-hero .hero-word { grid-column: 1; grid-row: 1; justify-content: center; align-self: end; padding-bottom: 16px; font-size: clamp(32px, 8vw, 56px); line-height: 1.15; }
   .astral-hero .hero-word:last-child { grid-column: 1; grid-row: 3; justify-content: center; align-self: start; padding-top: 16px; padding-bottom: 0; }
   .astral-hero .hero-intro { padding-top: 20px; }
-  .astral-hero__replay { top: 0; right: 0; bottom: auto; }
+  .astral-hero__replay { left: calc(50% - 22px); right: auto; }
   .home-continuum .astral-hero .hero-actions { margin-top: 22px !important; gap: 12px 24px; }
   .narrative-copy, .narrative-copy--right { max-width: 620px; margin-inline: auto; padding: 96px var(--page-pad); }
   .narrative-page .narrative-copy { padding-bottom: 64svh; }
