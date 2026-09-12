@@ -52,6 +52,8 @@ const assert = require('node:assert/strict');
         const hover=await page.evaluate(()=>nexusCosmicMetrics.renderer());
         const expected=(x-framing.core.left-framing.core.width/2)*13.2/(Math.min(framing.core.width,framing.core.height)*1.25);
         assert.ok(Math.abs(hover.pointer[0]-expected)<.05,'Expanded field tracks the cursor beyond the old button bounds');
+        await page.waitForFunction(()=>!nexusCosmicMetrics.renderer().touching);
+        assert.equal(await page.evaluate(()=>nexusCosmicMetrics.renderer().touching),false,'A stationary pointer does not hold the full-page animation indefinitely');
         await page.locator('#keyboard').hover();
         await page.waitForFunction(()=>!nexusCosmicMetrics.renderer().touching);
         assert.equal(await page.evaluate(()=>window.microphoneRequests),0,'Hovering the expanded field never activates voice');

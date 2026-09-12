@@ -632,7 +632,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   let resolutionScale = 1, releaseAge = 0, releaseArrival = 0, releaseStage = null;
   let width = 1, height = 1, dpr = 1, rect = {left:0,top:0,width:1,height:1};
   let pointer = [0,0], pointerStrength = 0, touching = false, dragging = false, dragStart = [0,0], rotation = [0,0], targetRotation = [0,0];
-  let pointerClient = null;
+  let pointerClient = null, hoverAt = 0;
   let suppressClick = 0, paintedReduced = false, ringVisibility = 0, wasCoreVisible = true;
   const efficient = options.efficient || navigator.connection?.saveData || Number(navigator.deviceMemory || 4) <= 3;
   // Generate a denser planet once, retaining every existing deterministic point.
@@ -732,6 +732,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     const next=options.getState?.()||state;const normalized=next==='ready'?'idle':next==='transcribing'?'thinking':next;
     if(state!==normalized){state=Object.hasOwn(recipes.profiles,normalized)?normalized:'idle';paintedReduced=false;}
     const isReduced=reduced();if(isReduced&&paintedReduced){raf=requestAnimationFrame(draw);return;}
+    if(options.expansive&&!dragging&&now-hoverAt>180)touching=false;
     const input=options.getInspection?.();if(input){touching=input[2]>0;dragging=touching;pointer=[input[0]*6.6,-input[1]*6.6];targetRotation=[input[1]*.5,input[0]*.5];}
     const start=performance.now(),dt=last?Math.min(.06,(now-last)/1000):1/60;last=now;
     if(!isReduced){elapsed+=dt;age+=dt;}
@@ -822,7 +823,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     const bounds=canvas.getBoundingClientRect();
     const control=e.target?.closest?.('button,a,input,textarea,select,[role="dialog"]');
     if(options.getVisible?.()===false||(control&&!host.contains(control))||e.clientX<bounds.left||e.clientX>bounds.right||e.clientY<bounds.top||e.clientY>bounds.bottom){touching=false;return;}
-    move(e);
+    hoverAt=performance.now();move(e);
   }
   function down(e){if(e.button!==0||reduced())return;dragging=true;dragStart=[e.clientX,e.clientY];host.setPointerCapture?.(e.pointerId);}
   function leave(){touching=false;dragging=false;}
