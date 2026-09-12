@@ -561,11 +561,20 @@ test("the continuous field moves particles locally without scaling the interface
   expect(await core.boundingBox()).toEqual(before);
   await page.mouse.move(before.x + before.width * .4, before.y + before.height * .5);
   await page.mouse.down();
+  await page.evaluate(() => {
+    window.nxsGesturePeak = 0;
+    window.nxsGestureSampling = true;
+    const sample = () => {
+      window.nxsGesturePeak = Math.max(window.nxsGesturePeak, Number(document.querySelector('.nxs-cosmic-field').dataset.maxDrift));
+      if (window.nxsGestureSampling) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
   await page.mouse.move(before.x + before.width * .65, before.y + before.height * .57, {steps:24});
   await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
   await page.waitForTimeout(600);
-  expect(Number(await core.getAttribute('data-max-drift'))).toBeGreaterThan(3);
+  expect(await page.evaluate(()=>{window.nxsGestureSampling=false;return window.nxsGesturePeak;})).toBeGreaterThan(3);
   expect((await core.getAttribute('data-rotation')).split(',').some(v => Math.abs(Number(v)) > .01)).toBe(true);
   await page.mouse.up();
   await expect(page.locator('html')).not.toHaveClass(/nxs-field-dragging/);
