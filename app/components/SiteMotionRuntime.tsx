@@ -92,8 +92,9 @@ export function SiteMotionRuntime() {
     let sceneProgress = 0;
     let paintMs = 0;
     const fieldStarted = performance.now();
-    const arrivalDelay = 1.8;
+    const arrivalDelay = 3.2;
     const arrivalDuration = 8.2;
+    let initialSceneFinished = false;
     let ambientTime = 0;
     const inspection = { id: -1, startX: 0, startY: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
     let strainedSeconds = 0;
@@ -281,6 +282,10 @@ export function SiteMotionRuntime() {
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
       const age = Math.max(0, now - fieldStarted) / 1000;
+      // The long entrance belongs only to opening the page. Once the visitor
+      // leaves the hero, scrolling never waits for or restarts that entrance.
+      initialSceneFinished ||= age >= arrivalDelay + arrivalDuration || window.scrollY > cosmicHeight * .65;
+      const entranceTime = initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
       // Sticky content has viewport coordinates; a cached document rectangle drifts on scroll.
       // Protect the actual words, not the full-width grid row: a row-sized
@@ -301,7 +306,7 @@ export function SiteMotionRuntime() {
         }
         return 1-.94*fade;
       };
-      cosmicContext.globalAlpha = reduced ? 1 : Math.min(1, age / .9);
+      cosmicContext.globalAlpha = reduced || initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - 1.5) / 1.7);
       for (const [index, star] of backgroundStars.entries()) {
         // These grains are rendered below and travel into the current form.
         if (!quietPage && index % 4 === 0) continue;
@@ -332,7 +337,7 @@ export function SiteMotionRuntime() {
         const transitionScatter = Math.sin(sectionMix * Math.PI) * .025;
         // Reload starts with dispersed matter, not a blank canvas followed
         // by a finished diagram. The same particles keep moving on scroll.
-        const arrivalTime = Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
+        const arrivalTime = entranceTime;
         // Zero velocity at both ends: acceleration never snaps into the final form.
         const arrival = reduced ? 1 : arrivalTime ** 3 * (arrivalTime * (arrivalTime * 6 - 15) + 10);
         const compose = (1 - transitionScatter) * arrival;
@@ -365,7 +370,7 @@ export function SiteMotionRuntime() {
         const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (quietPage ? .12 : 1);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
-      interactivePoints = age < arrivalDelay + arrivalDuration || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
+      interactivePoints = entranceTime < 1 || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
       cosmicContext.lineWidth = .55;
       for (let index = 0; index < points.length; index += 3) {
         const point = points[index];
@@ -402,7 +407,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
-      cosmicCanvas.dataset.arrival = (reduced ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration)).toFixed(3);
+      cosmicCanvas.dataset.arrival = (reduced ? 1 : entranceTime).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
       cosmicCanvas.dataset.particles = String(activeParticles);
       cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
