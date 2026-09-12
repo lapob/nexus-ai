@@ -116,7 +116,7 @@ html { scroll-padding-top: 96px; }
 .astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; margin-top: 0; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { width:100%; margin: 16px auto 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
-.astral-hero .hero-actions a { position:relative; display:block; width:100%; text-align:center; font-size:14px; }
+.astral-hero .hero-actions a { position:relative; display:block; width:100%; border-bottom:0; text-align:center; font-size:14px; }
 .astral-hero .hero-actions a span { position:absolute; left:calc(50% + 112px); top:50%; transform:translateY(-50%); margin:0; }
 
 .astral-hero .hero-product-name { opacity: var(--hero-label-opacity, 1); }
