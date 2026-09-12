@@ -23,6 +23,7 @@ html { scroll-padding-top: 96px; }
 .trust-seal::before, .trust-seal::after { display: none; }
 .trust-seal > span, .trust-seal small { color: #a6cbcd; }
 @media(max-width:959px) {
+  .astral-hero__replay { left: calc(50% - 22px); right: auto; }
   .nxs-floating-brand::before, .nxs-menu-toggle::before { content:''; position:absolute; inset:-14px; z-index:-1; pointer-events:none; border-radius:50%; background:radial-gradient(#020607e6 38%,#02060700 74%); }
   .nxs-floating-brand, .nxs-menu-toggle { isolation:isolate; }
   .premium-footer .footer-links { gap:28px; }
@@ -172,7 +173,6 @@ html { scroll-padding-top: 96px; }
   .astral-hero .hero-word { grid-column: 1; grid-row: 1; justify-content: center; align-self: end; padding-bottom: 16px; font-size: clamp(32px, 8vw, 56px); line-height: 1.15; }
   .astral-hero .hero-word:last-child { grid-column: 1; grid-row: 3; justify-content: center; align-self: start; padding-top: 16px; padding-bottom: 0; }
   .astral-hero .hero-intro { padding-top: 20px; }
-  .astral-hero__replay { left: calc(50% - 22px); right: auto; }
   .home-continuum .astral-hero .hero-actions { margin-top: 22px !important; gap: 12px 24px; }
   .narrative-copy, .narrative-copy--right { max-width: 620px; margin-inline: auto; padding: 96px var(--page-pad); }
   .narrative-page .narrative-copy { padding-bottom: 64svh; }
