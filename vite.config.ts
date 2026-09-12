@@ -15,9 +15,12 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
-    server: isRestrictedPreviewSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      watch: {
+        ignored: ["**/qa-artifacts/**", "**/outputs/**", "**/.wrangler/**"],
+        ...(isRestrictedPreviewSandbox ? { useFsEvents: false, usePolling: true } : {}),
+      },
+    },
     plugins: [
       vinext(),
       cloudflare({
