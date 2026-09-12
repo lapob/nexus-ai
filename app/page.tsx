@@ -1,5 +1,6 @@
 import { DesktopHomePreview } from "./components/DesktopHomePreview";
 import Image from "next/image";
+import { ProductImageZoom } from "./components/ProductImageZoom";
 import { ArrowUpRight, BrainCircuit, MessageCircle, Mic2, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
@@ -7,7 +8,7 @@ import { HardNavigationLink } from "./components/HardNavigationLink";
 import { AstralHero } from "./components/AstralHero";
 
 const apps = [
-  { name: "Sul tuo computer.", platform: "NexusNXS per Windows", description: "Scrivi, analizza documenti e prepara codice. Con gli strumenti autorizzati, Nexus può aprire applicazioni e lavorare sui tuoi file. La Presence resta a portata di voce anche quando chiudi la finestra.", device: "desktop", image: "/products/desktop-conversation.png", alt: "Conversazione dimostrativa nell’app NexusNXS per PC", href: "/desktop" },
+  { name: "Sul tuo computer.", platform: "NexusNXS per Windows", description: "Scrivi, analizza documenti e prepara codice. Con gli strumenti autorizzati, Nexus può aprire applicazioni e lavorare sui tuoi file. Il pet resta a portata di voce anche quando chiudi la finestra.", device: "desktop", image: "/products/desktop-conversation.png", alt: "Conversazione dimostrativa nell’app NexusNXS per PC", href: "/desktop" },
   { name: "Dove nasce un’idea.", platform: "NexusNXS per Android", description: "Tocca il Core e parla, oppure scrivi e allega una foto o un documento. Imposta Nexus come assistente di sistema sui dispositivi compatibili e richiama la voce senza aprire l’intera app.", device: "android", image: "/products/android-home-astral.png", alt: "Interfaccia reale di NexusNXS per Android", href: "/android" },
 ];
 const presenceStates = [
@@ -21,7 +22,7 @@ export default function Home() {
   return <main id="main-content" className="home-continuum narrative-page">
     <StructuredData data={[{"@context":"https://schema.org","@type":"WebSite",name:"NexusNXS",url:"https://nexusnxs.com",inLanguage:"it-IT"},{"@context":"https://schema.org","@type":"Organization",name:"NexusNXS",url:"https://nexusnxs.com",logo:"https://nexusnxs.com/nexus-icon.png",email:"hello@nexusnxs.com"}]} />
     <AstralHero />
-    <section className="narrative-copy reveal" id="vision" data-cosmic-scene="right" data-cosmic-form="neural">
+    <section className="narrative-copy reveal" id="vision" data-cosmic-scene="right" data-cosmic-form="helix">
       <p className="section-label">DALL’IDEA AL RISULTATO</p>
       <h2>Meno passaggi.<br /><em>Più possibilità.</em></h2>
       <p>Una domanda veloce, un testo da migliorare, un problema da risolvere. Parla con Nexus o scrivi: ricevi una risposta leggibile mentre prende forma.</p>
@@ -32,7 +33,7 @@ export default function Home() {
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
       <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene={app.device === "desktop" ? "right" : "left"} data-cosmic-form="ambient">
         <div className="narrative-app-copy"><p className="platform">{app.platform}</p><h2>{app.name}</h2><p>{app.description}</p><HardNavigationLink className="text-link" href={app.href}>Esplora {app.device === "desktop" ? "NexusNXS per PC" : "NexusNXS per Android"} <ArrowUpRight size={16} /></HardNavigationLink></div>
-        <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen">{app.device === "desktop" ? <DesktopHomePreview /> : <Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 92vw, 640px" : "220px"} unoptimized />}</div></div>
+        <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen">{app.device === "desktop" ? <DesktopHomePreview /> : <ProductImageZoom src={app.image} label={app.alt}><Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 92vw, 640px" : "220px"} unoptimized /></ProductImageZoom>}</div></div>
       </article>)}</div>
     </section>
     <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right" data-cosmic-form="ambient">
@@ -44,7 +45,7 @@ export default function Home() {
       <div className="one-nexus-copy"><p className="section-label">PC · ANDROID · WEB</p><h2>Un solo prodotto.<br /><em>Più modi di esserci.</em></h2><p>Le app condividono il servizio NexusNXS. Collega il telefono al tuo desktop con una sessione remota autorizzata, oppure apri il web per iniziare senza installazioni.</p><HardNavigationLink className="text-link" href="https://ai.nexusnxs.com">Provalo nel browser <ArrowUpRight size={16}/></HardNavigationLink></div>
       <div className="nexus-stage"><ProductMockup type="desktop"/><ProductMockup type="android"/></div>
     </section>
-    <section className="narrative-copy narrative-copy--right reveal" id="security" data-cosmic-scene="left" data-cosmic-form="neural">
+    <section className="narrative-copy narrative-copy--right reveal" id="security" data-cosmic-scene="left" data-cosmic-form="torus">
       <p className="section-label">IL CONTROLLO RESTA TUO</p><h2>Capace di aiutarti.<br /><em>Non di decidere per te.</em></h2>
       <p>Autorizzazioni esplicite, sessioni revocabili e collegamenti cifrati. I controlli amministrativi privati restano separati dal servizio pubblico.</p>
       <p>NexusNXS è in Preview e può commettere errori. Verifica i risultati importanti; l’accesso richiede che i servizi siano disponibili.</p>

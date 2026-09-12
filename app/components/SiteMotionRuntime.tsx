@@ -142,7 +142,7 @@ export function SiteMotionRuntime() {
 
     const resizeCosmicField = () => {
       if (!cosmicContext) return;
-      const ratio = Math.min(window.devicePixelRatio || 1, tier === "ultra" ? 1.75 : 1.35);
+      const ratio = Math.min(window.devicePixelRatio || 1, tier === "lite" ? 1.5 : 2.5, Math.sqrt(6_000_000 / Math.max(1, innerWidth * innerHeight)));
       cosmicWidth = Math.max(1, window.innerWidth);
       cosmicHeight = Math.max(1, window.innerHeight);
       cosmicCanvas.width = Math.round(cosmicWidth * ratio);
@@ -235,9 +235,21 @@ export function SiteMotionRuntime() {
         const project = (x: number, y: number, z: number) => {
           const rx = x * Math.cos(yaw) + z * Math.sin(yaw);
           const rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
-          const perspective = Math.min(1.32, 1 / (1 - (y * Math.sin(pitch) + rz * Math.cos(pitch)) * .45));
+          const perspective = 1;
           return { x:centerX+rx*unit*perspective, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit*perspective };
         };
+        if (form === 'helix') {
+          const along = (index * .61803398875) % 1;
+          const angle = along * Math.PI * 5 + (index % 2) * Math.PI + time * .16;
+          const radius = .16 + Math.sin(particle.phase) * .018;
+          return project(Math.cos(angle) * radius, (along - .5) * .82, Math.sin(angle) * radius);
+        }
+        if (form === 'torus') {
+          const angle = particle.phase + time * .07;
+          const tube = index * 2.399963 + time * .11;
+          const radius = .29 + Math.cos(tube) * .085;
+          return project(Math.cos(angle) * radius, Math.sin(angle) * radius, Math.sin(tube) * .085);
+        }
         if (form === 'reactor') {
           const ring = index % 7;
           const a = particle.phase + time * (ring % 2 ? .055 : -.04);
@@ -253,7 +265,7 @@ export function SiteMotionRuntime() {
         if (form === 'sigil') {
           const reach = (Math.floor(index / 10) * .61803398875) % 1;
           const turn = index % 10 * Math.PI / 5 + reach * 2.3 + time * .015;
-          const width = .003 + Math.sin(reach * Math.PI) * .009;
+          const width = .006 + Math.sin(reach * Math.PI) * .023;
           const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
           return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2);
         }
@@ -318,12 +330,18 @@ export function SiteMotionRuntime() {
         const compose = (1 - transitionScatter) * arrival;
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (1 + particle.depth * 2);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (1 + particle.depth * 2);
+        // A passing hand transfers momentum locally. A resting pointer stops
+        // applying force, allowing the grains to return without inflating the form.
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
-        const influence = (reduced ? 0 : pointer.active) * Math.max(0, 1 - distance / 240) * (index % 9 < 3 ? .3 : 1);
+        const radius = Math.min(150, Math.max(85, cosmicWidth * .085));
+        const proximity = Math.max(0, 1 - distance / radius);
+        const speed = Math.hypot(pointer.vx, pointer.vy);
+        const influence = (reduced ? 0 : pointer.active) * proximity * proximity;
+        const movement = Math.min(1, speed / 180);
         const angle = Math.atan2(y - pointer.y, x - pointer.x);
-        const goalX = (Math.cos(angle) * 85 + pointer.vx * .14) * influence;
-        const goalY = (Math.sin(angle) * 85 + pointer.vy * .14) * influence;
-        const omega = influence > .01 ? 4.5 : 1.1, decay = Math.exp(-omega * delta);
+        const goalX = (Math.cos(angle) * 24 * movement + pointer.vx * .22) * influence;
+        const goalY = (Math.sin(angle) * 24 * movement + pointer.vy * .22) * influence;
+        const omega = influence * movement > .01 ? 12 : 2.8, decay = Math.exp(-omega * delta);
         const ex = particle.offsetX - goalX, ey = particle.offsetY - goalY;
         const ax = particle.velocityX + omega * ex, ay = particle.velocityY + omega * ey;
         particle.offsetX = goalX + (ex + ax * delta) * decay;
@@ -366,7 +384,7 @@ export function SiteMotionRuntime() {
       }
       for (const point of points) {
         if (point.depth > .985) {
-          const glowSize = 5 + point.depth * 4;
+          const glowSize = 8 + point.depth ** 12 * 10;
           cosmicContext.save();
           cosmicContext.globalAlpha *= point.visibility;
           cosmicContext.drawImage(glow,point.x-glowSize/2,point.y-glowSize/2,glowSize,glowSize);
@@ -374,7 +392,7 @@ export function SiteMotionRuntime() {
         }
         cosmicContext.beginPath();
         cosmicContext.fillStyle = `rgba(${point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
-        cosmicContext.arc(point.x, point.y, .4 + point.depth ** 4 * .85, 0, Math.PI * 2);
+        cosmicContext.arc(point.x, point.y, .45 + point.depth ** 8 * 1.65, 0, Math.PI * 2);
         cosmicContext.fill();
       }
       cosmicContext.globalCompositeOperation = "source-over";
@@ -383,14 +401,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
-      const compositionComplete = reduced || age >= 5.4;
       cosmicCanvas.dataset.arrival = (reduced ? 1 : Math.min(1, Math.max(0, age - .4) / 5)).toFixed(3);
-      const replay = document.querySelector<HTMLButtonElement>(".astral-hero__replay");
-      if (replay && replay.hidden !== compositionComplete) {
-        replay.hidden = compositionComplete;
-        replay.disabled = compositionComplete;
-        replay.tabIndex = compositionComplete ? -1 : 0;
-      }
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
       cosmicCanvas.dataset.particles = String(activeParticles);
       cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
@@ -468,21 +479,17 @@ export function SiteMotionRuntime() {
     }
 
     const hero = document.querySelector<HTMLElement>(".astral-hero");
-    const replayButton = hero?.querySelector<HTMLButtonElement>(".astral-hero__replay");
     const updateScroll = () => {
       scrollFrame = 0;
       const available = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       root.style.setProperty("--nxs-scroll", String(Math.min(1, Math.max(0, window.scrollY / available))));
-      // One reversible scroll envelope for the wordmark and replay control.
+      // The wordmark dissolves with scroll; replay stays anchored to its scene.
       // Keep the particles alive; only the opening labels dissolve.
       if (hero) {
         const progress = Math.min(1, Math.max(0, (window.scrollY / Math.max(1, window.innerHeight) - .08) / .42));
         const opacity = 1 - progress * progress * (3 - 2 * progress);
         hero.style.setProperty("--hero-label-opacity", String(opacity));
-        if (replayButton) {
-          replayButton.disabled = progress >= 1 || replayButton.hidden;
-          replayButton.tabIndex = replayButton.disabled ? -1 : 0;
-        }
+
       }
     };
     const onScroll = () => {
@@ -495,7 +502,7 @@ export function SiteMotionRuntime() {
         inspection.targetX = Math.max(-.8, Math.min(.8, dy / cosmicHeight * 2));
         inspection.targetY = Math.max(-1.2, Math.min(1.2, dx / cosmicWidth * 2.5));
       }
-      if (event.pointerType === "touch" || tier === "lite") return;
+      if (event.pointerType === "touch" || reducedMotion.matches) return;
       const now = performance.now(), seconds = Math.max(.008, (now - pointer.time) / 1000);
       pointer.vx = pointer.active ? Math.max(-650, Math.min(650, (event.clientX - pointer.x) / seconds)) : 0;
       pointer.vy = pointer.active ? Math.max(-650, Math.min(650, (event.clientY - pointer.y) / seconds)) : 0;
@@ -528,7 +535,7 @@ export function SiteMotionRuntime() {
     window.addEventListener('pointerdown', startDrag, {passive:true});
     window.addEventListener('pointerup', releaseDrag);
     window.addEventListener('pointercancel', releaseDrag);
-    window.addEventListener('blur', releaseDrag);
+    window.addEventListener('blur', onPointerLeave);
     document.documentElement.addEventListener("pointerleave", onPointerLeave);
     window.addEventListener("nxs:replay-composition", replayComposition);
 
@@ -537,7 +544,7 @@ export function SiteMotionRuntime() {
       window.removeEventListener('pointerdown', startDrag);
       window.removeEventListener('pointerup', releaseDrag);
       window.removeEventListener('pointercancel', releaseDrag);
-      window.removeEventListener('blur', releaseDrag);
+      window.removeEventListener('blur', onPointerLeave);
       revealObserver?.disconnect();
       layoutObserver.disconnect();
       ambientObserver?.disconnect();

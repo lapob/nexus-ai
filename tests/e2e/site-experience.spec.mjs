@@ -24,7 +24,7 @@ test('hero entry stays separate from the introduction throughout scrolling', asy
     for (const y of [0, 200, 400, 600, 800, 1000, 600, 200]) {
       await page.evaluate(y => scrollTo(0, y), y);
       await page.waitForTimeout(100);
-      expect(await page.evaluate(() => document.querySelector('.hero-entry').getBoundingClientRect().bottom <= document.querySelector('.hero-intro').getBoundingClientRect().top)).toBe(true);
+      expect(await page.evaluate(() => document.querySelector('.hero-entry .primary-button').getBoundingClientRect().bottom <= document.querySelector('.hero-intro').getBoundingClientRect().top)).toBe(true);
     }
     await expect(page.getByRole('link', { name: 'Prova NexusNXS AI' })).toHaveCount(1);
   }
@@ -554,6 +554,11 @@ test("the continuous field moves particles locally without scaling the interface
   await expect(scene).toHaveCSS('cursor', 'grab');
   await expect(core).toHaveAttribute('data-background-particles', /\d+/);
   const backgroundCount = await core.getAttribute('data-background-particles');
+  await expect(core).toHaveAttribute('data-arrival','1.000',{timeout:10000});
+  await page.mouse.move(before.width*.54,before.height*.5);
+  await page.mouse.move(before.width*.54+6,before.height*.5+2,{steps:3});
+  await expect.poll(async()=>Number(await core.getAttribute('data-max-drift'))).toBeGreaterThan(.5);
+  expect(await core.boundingBox()).toEqual(before);
   await page.mouse.move(before.x + before.width * .4, before.y + before.height * .5);
   await page.mouse.down();
   await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
@@ -595,28 +600,43 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
   }
 });
 
-test("replay disappears after composition and stays hidden when returning to the hero", async ({page}) => {
+test("replay remains available with the sticky scene after composition", async ({page}) => {
   for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
     const replay = page.locator('.astral-hero__replay');
-    const title = page.locator('.hero-product-name');
+    await expect(page.locator('.nxs-cosmic-field')).toHaveAttribute('data-arrival','1.000',{timeout:10000});
+    await expect(replay).toBeVisible();
+    await page.screenshot({path:'qa-artifacts/home-composed-'+viewport.width+'.png'});
+    const initial=await replay.boundingBox();
+    await page.evaluate(()=>scrollTo({top:innerHeight*.3,behavior:'instant'}));
     await expect(replay).toBeEnabled();
-    await page.evaluate(() => scrollTo({top:innerHeight*.29,behavior:'instant'}));
-    await expect.poll(() => replay.evaluate(el=>Number(getComputedStyle(el).opacity))).toBeCloseTo(.5, 1);
-    expect(await replay.evaluate(el=>getComputedStyle(el).opacity)).toBe(await title.evaluate(el=>getComputedStyle(el).opacity));
-    await page.evaluate(() => scrollTo({top:innerHeight*.6,behavior:'instant'}));
-    await expect(replay).toBeDisabled();
-    await expect(replay).toBeHidden();
-    await expect(replay).toHaveAttribute('tabindex','-1');
-    await page.evaluate(() => scrollTo({top:0,behavior:'instant'}));
-    await expect(replay).toBeEnabled();
-    await expect(title).toHaveCSS('opacity','1');
-    await expect(page.locator('.nxs-cosmic-field')).toHaveAttribute('data-arrival', '1.000', { timeout: 10000 });
-    await expect(replay).toBeHidden();
-    await expect(replay).toBeDisabled();
-    await expect(replay).toHaveAttribute('tabindex', '-1');
-    await page.evaluate(() => { scrollTo({top:innerHeight,behavior:'instant'}); scrollTo({top:0,behavior:'instant'}); });
-    await expect(replay).toBeHidden();
+    expect(Math.abs((await replay.boundingBox()).y-initial.y)).toBeLessThan(2);
+    await replay.click();
+    await expect.poll(async()=>Number(await page.locator('.nxs-cosmic-field').getAttribute('data-arrival'))).toBeLessThan(.5);
+    expect(await replay.evaluate(el=>el===document.activeElement)).toBe(true);
+    await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+    const cta=await page.locator('.hero-entry .primary-button').boundingBox();
+    const discover=await page.locator('.hero-actions a').boundingBox();
+    expect(discover.y-cta.y-cta.height).toBeLessThan(80);
+  }
+});
+
+test("real desktop and Android image zoom is centered and keyboard dismissible", async ({page}) => {
+  for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    for (const device of ['desktop','android']) {
+      const trigger=page.locator('.app-card-visual.'+device+' .product-image-open');
+      await trigger.click();
+      const dialog=page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      const box=await dialog.boundingBox();
+      expect(Math.abs(box.x+box.width/2-viewport.width/2)).toBeLessThan(2);
+      expect(Math.abs(box.y+box.height/2-viewport.height/2)).toBeLessThan(2);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    }
   }
 });
