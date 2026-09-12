@@ -11,7 +11,7 @@ const { isProcessAlive, readLock, requestProcessShutdown } = require('../src/inf
 
 const root = path.resolve(__dirname, '..');
 const electronBinary = require('electron');
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-shutdown-'));
+let profile;
 let debugPort = 0;
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -79,6 +79,32 @@ function terminateTestTree(child) {
 
 // #region 02 — Controllo della finestra Electron
 
+async function waitForRendererReady(evaluate, { timeoutMs = 20_000, pollMs = 50 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastContextError;
+  while (Date.now() < deadline) {
+    try {
+      const documentState = await evaluate('({ readyState: document.readyState, url: location.href })');
+      // Target metadata can already contain the destination URL while its
+      // initial about:blank context still reports a complete document.
+      if (documentState?.readyState === 'complete' && documentState.url === 'nexus://app/index.html') return;
+    } catch (error) {
+      // Chromium exposes the page target before creating its main JavaScript
+      // context. Only these navigation/startup errors may be retried: a script
+      // exception, closed connection or another protocol failure must fail QA.
+      if (error.cdpError?.code !== -32000 || ![
+        'Cannot find default execution context',
+        'Execution context was destroyed.'
+      ].includes(error.cdpError.message)) throw error;
+      lastContextError = error;
+    }
+    await delay(Math.min(pollMs, Math.max(0, deadline - Date.now())));
+  }
+  throw new Error('Il renderer non ha completato il caricamento prima della prova di chiusura.', {
+    cause: lastContextError
+  });
+}
+
 async function rendererTarget() {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     try {
@@ -91,8 +117,8 @@ async function rendererTarget() {
   throw new Error('La finestra NexusNXS non è diventata raggiungibile durante il test di chiusura.');
 }
 
-async function closePage(target) {
-  const socket = new WebSocket(target.webSocketDebuggerUrl);
+async function closePage(target, waitForUiExit, { WebSocketClass = WebSocket } = {}) {
+  const socket = new WebSocketClass(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener('open', resolve, { once: true });
     socket.addEventListener('error', reject, { once: true });
@@ -112,20 +138,24 @@ async function closePage(target) {
       if (reply.id !== id) return;
       clearTimeout(timeout);
       socket.removeEventListener('message', receive);
-      if (reply.error || reply.result?.exceptionDetails) reject(new Error(JSON.stringify(reply)));
+      if (reply.error || reply.result?.exceptionDetails) {
+        const error = new Error(JSON.stringify(reply));
+        error.cdpError = reply.error;
+        reject(error);
+      }
       else resolve(reply.result?.result?.value);
     };
     socket.addEventListener('message', receive);
     socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true } }));
   });
   try {
-    const deadline = Date.now() + 20_000;
-    while (await evaluate('document.readyState') !== 'complete') {
-      if (Date.now() >= deadline) throw new Error('Il renderer non ha completato il caricamento prima della prova di chiusura.');
-      await delay(50);
-    }
+    await waitForRendererReady(evaluate);
     // Acknowledge scheduling before the window destroys its execution context.
     await evaluate('setTimeout(() => window.close(), 0); true');
+    // The scheduling acknowledgement does not confirm that the timer has run.
+    // Keep the debugging session attached until the real UI process exits;
+    // detaching here can race the renderer's pending close request at startup.
+    return await waitForUiExit();
   } finally {
     try { socket.close(); } catch {}
   }
@@ -166,7 +196,8 @@ async function removeProfile() {
 
 // #region 03 — Scenario end-to-end di chiusura
 
-(async () => {
+async function verifyAppShutdown() {
+  profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-shutdown-'));
   debugPort = await reserveDebugPort();
   let stderr = '';
   const child = spawn(electronBinary, ['.', `--remote-debugging-port=${debugPort}`], {
@@ -192,8 +223,7 @@ async function removeProfile() {
     await waitForProcessLock(presenceLockPath, true, 20_000);
     const before = processSnapshot();
     const owned = new Set([child.pid, ...descendantsOf(before, child.pid)]);
-    await closePage(target);
-    const code = await waitForExit(child);
+    const code = await closePage(target, () => waitForExit(child));
     const presenceDescriptor = await waitForProcessLock(presenceLockPath, true);
     await delay(350);
     const normalizedProfile = path.resolve(profile).toLowerCase();
@@ -211,6 +241,11 @@ async function removeProfile() {
     const diagnostics = path.join(root, 'qa-artifacts', 'shutdown-failure.log');
     fs.mkdirSync(path.dirname(diagnostics), { recursive: true });
     fs.writeFileSync(diagnostics, stderr);
+    try {
+      // Preserve diagnostics from this disposable QA profile before cleanup.
+      const profileLog = path.join(profile, 'logs', 'nexus.log');
+      if (fs.existsSync(profileLog)) fs.copyFileSync(profileLog, path.join(root, 'qa-artifacts', 'shutdown-profile-failure.log'));
+    } catch {}
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     terminateTestTree(child);
     throw error;
@@ -218,9 +253,15 @@ async function removeProfile() {
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     await removeProfile();
   }
-})().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+}
+
+if (require.main === module) {
+  verifyAppShutdown().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { closePage, waitForRendererReady };
 
 // #endregion

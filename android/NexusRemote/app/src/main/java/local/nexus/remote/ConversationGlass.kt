@@ -27,36 +27,43 @@ internal fun Modifier.conversationGlass(enabled: Boolean, efficient: Boolean): M
     val lowerMask = rememberGraphicsLayer()
     val output = rememberGraphicsLayer()
     return drawWithContent {
-        if (!enabled) { drawContent(); return@drawWithContent }
+        if (!enabled || size.width < 1f || size.height < 1f) { drawContent(); return@drawWithContent }
         val band = 48.dp.toPx().coerceAtMost(size.height / 4f)
         val top = size.height - band
         val fraction = if (size.height > 0) band / size.height else 0f
+        val blurEnabled = Build.VERSION.SDK_INT >= 31 && !efficient
+        val blurRadius = 6.dp.toPx()
+        val stripSize = IntSize(size.width.roundToInt(), band.roundToInt().coerceAtLeast(1))
+        // Record each dependency before its consumer. Nested recordings reuse
+        // Compose's mutable DrawScope and can make density resolve to itself.
+        content.record { this@drawWithContent.drawContent() }
+        if (blurEnabled) {
+            for (upper in listOf(true, false)) {
+                val glass = if (upper) upperGlass else lowerGlass
+                val mask = if (upper) upperMask else lowerMask
+                val edge = if (upper) 0f else top
+                glass.renderEffect = BlurEffect(blurRadius, blurRadius, TileMode.Clamp)
+                glass.record(size = stripSize) {
+                    translate(top = -edge) { drawLayer(content) }
+                }
+                mask.compositingStrategy = CompositingStrategy.Offscreen
+                mask.blendMode = BlendMode.Plus
+                mask.record(size = stripSize) {
+                    drawLayer(glass)
+                    drawRect(Brush.verticalGradient(if (upper) listOf(Color.White, Color.Transparent) else listOf(Color.Transparent, Color.White)), blendMode = BlendMode.DstIn)
+                }
+            }
+        }
         output.compositingStrategy = CompositingStrategy.Offscreen
         output.record {
-        if (Build.VERSION.SDK_INT >= 31 && !efficient) {
-            content.record { this@drawWithContent.drawContent() }
             drawLayer(content)
-            // Cross-fade sharp and blurred text instead of drawing a second
-            // blurred copy over intact glyphs, which creates bright ghost edges.
-            drawRect(Brush.verticalGradient(0f to Color.Transparent, fraction to Color.White, (1f - fraction) to Color.White, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
-            for (upper in listOf(true, false)) {
-            val glass = if (upper) upperGlass else lowerGlass
-            val mask = if (upper) upperMask else lowerMask
-            val edge = if (upper) 0f else top
-            glass.renderEffect = BlurEffect(6.dp.toPx(), 6.dp.toPx(), TileMode.Clamp)
-            glass.record(size = IntSize(size.width.roundToInt(), band.roundToInt())) {
-                translate(top = -edge) { drawLayer(content) }
+            if (blurEnabled) {
+                // Cross-fade sharp and blurred text without doubling glyphs.
+                drawRect(Brush.verticalGradient(0f to Color.Transparent, fraction to Color.White, (1f - fraction) to Color.White, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                drawLayer(upperMask)
+                translate(top = top) { drawLayer(lowerMask) }
             }
-            mask.compositingStrategy = CompositingStrategy.Offscreen
-            mask.blendMode = BlendMode.Plus
-            mask.record(size = IntSize(size.width.roundToInt(), band.roundToInt())) {
-                drawLayer(glass)
-                drawRect(Brush.verticalGradient(if (upper) listOf(Color.White, Color.Transparent) else listOf(Color.Transparent, Color.White)), blendMode = BlendMode.DstIn)
-            }
-            translate(top = edge) { drawLayer(mask) }
-            }
-        } else this@drawWithContent.drawContent()
-        drawRect(Brush.verticalGradient(
+            drawRect(Brush.verticalGradient(
             0f to Color.Transparent,
             fraction * .18f to Color.White.copy(alpha = .08f),
             fraction * .45f to Color.White.copy(alpha = .42f),
@@ -67,7 +74,7 @@ internal fun Modifier.conversationGlass(enabled: Boolean, efficient: Boolean): M
             (1f - fraction * .45f) to Color.White.copy(alpha = .42f),
             (1f - fraction * .18f) to Color.White.copy(alpha = .08f),
             1f to Color.Transparent
-        ), blendMode = BlendMode.DstIn)
+            ), blendMode = BlendMode.DstIn)
         }
         drawLayer(output)
     }

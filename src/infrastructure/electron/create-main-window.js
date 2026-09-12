@@ -209,17 +209,18 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
         if (smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing') {
           await win.webContents.executeJavaScript(`
             (async () => {
-              const tabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
               const requested = ${JSON.stringify(smokeView)};
-              const patterns = {
-                'settings-ai': /intelligenza|modelli/i,
-                'settings-data': /dati|privacy|memoria/i,
-                'settings-connections': /funzioni|git|computer use/i,
-                'settings-shortcuts': /scorciatoie|tastiera/i,
-                'settings-pets': /companion|cosmici/i,
-                'remote-pairing': /remoto|telefono|dispositivi/i
+              const sections = {
+                'settings-ai': 'ai',
+                'settings-data': 'data',
+                'settings-connections': 'connections',
+                'settings-shortcuts': 'shortcuts',
+                'settings-pets': 'appearance',
+                'remote-pairing': 'remote'
               };
-              tabs.find((tab) => patterns[requested]?.test(tab.textContent || ''))?.click();
+              const tab = document.getElementById('settings-tab-' + sections[requested]);
+              if (!tab) throw new Error('Sezione impostazioni QA non trovata: ' + requested);
+              tab.click();
             })()
           `);
           await new Promise((resolve) => setTimeout(resolve, 300));
@@ -331,8 +332,10 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
           }
           await new Promise((resolve) => setTimeout(resolve, 420));
         }
-        const expectedSelector = smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets'
+        const expectedSelector = smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts'
           ? '.settings-overlay'
+          : smokeView === 'settings-pets'
+            ? '#settings-panel-appearance .settings-page-intro'
           : smokeView === 'settings-data'
             ? '.settings-health-check'
           : smokeView === 'remote-pairing'

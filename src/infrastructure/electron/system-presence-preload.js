@@ -15,7 +15,13 @@ contextBridge.exposeInMainWorld('nexusPresence', Object.freeze({
   setInteractive: (enabled) => ipcRenderer.send(POINTER_CHANNEL, enabled === true),
   openMain: () => ipcRenderer.send(OPEN_CHANNEL),
   startVoice: () => ipcRenderer.send(VOICE_CHANNEL),
-  menu: (action) => ipcRenderer.send(MENU_CHANNEL, String(action || '')),
+  showMenu: () => ipcRenderer.send(MENU_CHANNEL),
+  onMenuState: (listener) => {
+    if (typeof listener !== 'function') return () => {};
+    const handler = (_event, value) => listener(value === true);
+    ipcRenderer.on(MENU_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(MENU_CHANNEL, handler);
+  },
   onState: (listener) => {
     if (typeof listener !== 'function') return () => {};
     const handler = (_event, value) => listener(String(value || 'idle'));

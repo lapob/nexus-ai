@@ -2,7 +2,7 @@
  * @module infrastructure/electron/companion-window
  * @description Presenza desktop leggera, trascinabile e coerente su tutti i display.
  */
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { interactionStatePalette } = require('../../core/interaction-state-protocol');
@@ -18,7 +18,6 @@ const PRESENCE_VOICE_CHANNEL = 'nexus:system-presence-voice';
 const PRESENCE_STATE_CHANNEL = 'nexus:system-presence-state';
 const PRESENCE_CONFIG_CHANNEL = 'nexus:system-presence-config';
 const PRESENCE_MENU_CHANNEL = 'nexus:system-presence-menu';
-const PRESENCE_MENU_ACTIONS = new Set(['open-main', 'minimize-main', 'hide-presence', 'quit-desktop']);
 const PRESENCE_STATES = new Set([
   'booting', 'idle', 'listening', 'speaking', 'thinking', 'responding',
   'executing', 'permission', 'offline', 'error'
@@ -131,13 +130,11 @@ function systemPresenceDocument({ interactive = false, locale = 'en', configurat
     speaking: 'Sto parlando', thinking: 'Sto pensando', responding: 'Sto rispondendo',
     executing: 'Sto lavorando', permission: 'Conferma richiesta', offline: 'Non raggiungibile',
     error: 'Attenzione', wake: 'Richiamo vocale locale attivo',
-    menuOpen: 'Apri NexusNXS', menuMinimize: 'Riduci al tray', menuHide: 'Nascondi pet', menuQuit: 'Esci da NexusNXS'
   } : {
     open: 'Open NexusNXS', talk: 'Talk to NexusNXS', idle: 'NexusNXS', booting: 'Starting', listening: 'Listening',
     speaking: 'Speaking', thinking: 'Thinking', responding: 'Responding',
     executing: 'Working', permission: 'Confirmation required', offline: 'Unavailable',
     error: 'Attention', wake: 'Local wake word active',
-    menuOpen: 'Open NexusNXS', menuMinimize: 'Minimize to tray', menuHide: 'Hide pet', menuQuit: 'Quit NexusNXS'
   };
   const initial = normalizePresenceConfiguration(configuration);
   const interactiveAttribute = interactive ? 'true' : 'false';
@@ -190,42 +187,29 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent
 .presence:hover .state,.presence:focus-within .state{opacity:1;transform:none}
 .wake-indicator{position:absolute;z-index:7;right:21px;top:21px;width:6px;height:6px;border-radius:50%;background:rgb(var(--accent));box-shadow:0 0 10px rgba(var(--accent),.4);opacity:0;pointer-events:none;transition:opacity .6s ease}
 .presence[data-interactive=true][data-wake-listening=true] .wake-indicator{opacity:.8}
-.presence-menu{position:fixed;z-index:20;left:50%;top:50%;width:min(164px,calc(100vw - 12px));display:flex;flex-direction:column;gap:3px;padding:3px;border:0;border-radius:0;background:transparent;box-shadow:none;transform:translate(-50%,-50%);-webkit-app-region:no-drag;animation:menu-in .38s cubic-bezier(.4,0,.2,1) both}
-.presence-menu[hidden]{display:none}
-.presence-menu button{min-height:26px;border:1px solid rgba(var(--accent),.12);border-radius:8px;padding:5px 7px;color:rgba(235,247,247,.96);background:rgba(4,14,17,.82);font:500 11px/1.2 Inter,system-ui,sans-serif;text-align:left;cursor:pointer;transition:background .2s ease,border-color .2s ease}
-.presence-menu button:hover,.presence-menu button:focus-visible{color:#fff;background:rgba(14,41,45,.96);border-color:rgba(var(--accent),.48);outline:0}
-.presence-menu button[data-action=quit-desktop]{color:rgba(255,152,143,.92)}
-.presence[data-menu-open=true] :is(.drag-ring,.state,.wake-indicator){opacity:0!important;pointer-events:none}
-.presence[data-motion=reduced] *,.presence[data-motion=reduced]~.presence-menu,.presence[data-motion=reduced]~.presence-menu *{animation:none!important;transition:none!important}
-@keyframes menu-in{from{opacity:0;transform:translate(-50%,calc(-50% + 4px))}to{opacity:1;transform:translate(-50%,-50%)}}
-@media(prefers-reduced-motion:reduce){.presence[data-motion=system] *,.presence[data-motion=system]~.presence-menu,.presence[data-motion=system]~.presence-menu *{animation:none!important;transition:none!important}}
-</style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-pet="${initial.pet}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}" data-menu-open="false"><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><span class="pet-life" aria-hidden="true"><span class="pet-gaze"><span class="pet"></span></span></span><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.talk}" title="${copy.talk}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main><section class="presence-menu" role="menu" aria-label="NexusNXS" hidden><button role="menuitem" data-action="open-main">${copy.menuOpen}</button><button role="menuitem" data-action="minimize-main">${copy.menuMinimize}</button><button role="menuitem" data-action="hide-presence">${copy.menuHide}</button><button role="menuitem" data-action="quit-desktop">${copy.menuQuit}</button></section>
+.presence[data-motion=reduced] *{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){.presence[data-motion=system] *{animation:none!important;transition:none!important}}
+</style></head><body><main class="presence" data-interactive="${interactiveAttribute}" data-state="${initial.state}" data-pet="${initial.pet}" data-appearance="${initial.appearance}" data-motion="${initial.motion}" data-quality="${initial.quality}" data-wake-listening="${initial.wakeWordListening}" data-menu-open="false"><span class="wake-indicator" role="status" aria-label="${copy.wake}" title="${copy.wake}"></span><div class="drag-ring" data-interactive="${interactiveAttribute}" ${interactive ? `title="${copy.open}"` : 'aria-hidden="true"'}><span class="pet-life" aria-hidden="true"><span class="pet-gaze"><span class="pet"></span></span></span><button class="core" data-interactive="${interactiveAttribute}" ${interactive ? `aria-label="${copy.talk}" title="${copy.talk}"` : 'aria-hidden="true" tabindex="-1"'}></button></div><span class="state" role="status">${copy[initial.state] || copy.idle}</span></main>
 <script>(()=>{
 const copy=${JSON.stringify(copy)};
 const bridge=window.nexusPresence;
 const root=document.querySelector('.presence');
 const core=document.querySelector('.core');
 const ring=document.querySelector('.drag-ring');
-const menu=document.querySelector('.presence-menu');
 if(!bridge)return;
 let active=false;
 let clickTimer=null;
 let suppressCoreClickUntil=0;
-const closeMenu=()=>{
-  const restoreFocus=menu.contains(document.activeElement);
-  menu.hidden=true;
-  root.dataset.menuOpen='false';
-  active=false;
-  if(restoreFocus)core.focus({preventScroll:true});
-  bridge.setInteractive(false);
-};
 const openMenu=()=>{
   clearTimeout(clickTimer);
-  menu.hidden=false;
-  root.dataset.menuOpen='true';
-  bridge.setInteractive(true);
-  menu.querySelector('button')?.focus({preventScroll:true});
+  suppressCoreClickUntil=performance.now()+500;
+  bridge.showMenu();
 };
+bridge.onMenuState((opened)=>{
+  root.dataset.menuOpen=String(opened);
+  clearTimeout(clickTimer);
+  if(!opened){active=false;suppressCoreClickUntil=performance.now()+500;}
+});
 bridge.onState((value)=>{
   const state=String(value||'idle');
   root.dataset.state=state;
@@ -253,25 +237,9 @@ if(core.dataset.interactive==='true'){
   });
   addEventListener('contextmenu',(event)=>{event.preventDefault();openMenu()});
   addEventListener('keydown',(event)=>{
-    if(root.dataset.menuOpen!=='true')return;
-    if(event.key==='Escape'){event.preventDefault();closeMenu();return}
-    const items=[...menu.querySelectorAll('button')];
-    const index=items.indexOf(document.activeElement);
-    const next=event.key==='ArrowDown'?(index+1)%items.length
-      :event.key==='ArrowUp'?(index+items.length-1)%items.length
-      :event.key==='Home'?0:event.key==='End'?items.length-1:null;
-    if(next!==null){event.preventDefault();items[next].focus({preventScroll:true})}
-  });
-  addEventListener('pointerdown',(event)=>{
-    if(root.dataset.menuOpen==='true'&&!menu.contains(event.target)){
-      suppressCoreClickUntil=performance.now()+350;
-      event.preventDefault();event.stopPropagation();closeMenu();
+    if(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10')){
+      event.preventDefault();openMenu();
     }
-  },true);
-  menu.addEventListener('click',(event)=>{
-    const action=event.target.closest('button')?.dataset.action;
-    if(!action)return;
-    closeMenu();bridge.menu(action);
   });
   core.addEventListener('click',()=>{
     if(performance.now()<suppressCoreClickUntil)return;
@@ -394,19 +362,31 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
     entry.window.setOpacity(opacity);
   }
 
-  function onPresenceMenu(event, requestedAction) {
+  function onPresenceMenu(event) {
     const entry = presenceSender(event);
-    const action = String(requestedAction || '');
-    if (!entry || !PRESENCE_MENU_ACTIONS.has(action)) return;
-    entry.menuOpen = false;
-    entry.pointerActive = false;
-    entry.window.setIgnoreMouseEvents(true, { forward: true });
+    if (!entry || entry.menuOpen) return;
+    const italian = /^it(?:-|$)/i.test(app.getLocale?.() || 'en');
+    entry.menuOpen = true;
+    entry.window.setIgnoreMouseEvents(false);
+    entry.window.webContents.send(PRESENCE_MENU_CHANNEL, true);
     applyPresenceOpacity(entry);
-    Promise.resolve(action === 'open-main' ? openPrimaryWindow?.()
-      : action === 'minimize-main' ? closePrimaryWindow?.()
-        : action === 'hide-presence' ? setSystemPresenceEnabled(false)
-          : quitApplication?.())
-      .catch((error) => logger?.warn?.('Azione menu Presence non riuscita.', { action, error }));
+    const invoke = (operation) => () => Promise.resolve().then(operation)
+      .catch(error => logger?.warn?.('Azione menu pet non riuscita.', { error }));
+    const menu = Menu.buildFromTemplate([
+      { label: italian ? 'Apri NexusNXS' : 'Open NexusNXS', click: invoke(() => openPrimaryWindow?.()) },
+      { label: italian ? 'Riduci al tray' : 'Minimize to tray', click: invoke(() => closePrimaryWindow?.()) },
+      { type: 'separator' },
+      { label: italian ? 'Nascondi pet' : 'Hide pet', click: invoke(() => setSystemPresenceEnabled(false)) },
+      { type: 'separator' },
+      { label: italian ? 'Esci da NexusNXS' : 'Quit NexusNXS', click: invoke(() => quitApplication?.()) }
+    ]);
+    menu.popup({ window: entry.window, callback: () => {
+      entry.menuOpen = false; entry.pointerActive = false;
+      if (entry.window.isDestroyed()) return;
+      entry.window.webContents.send(PRESENCE_MENU_CHANNEL, false);
+      entry.window.setIgnoreMouseEvents(true, { forward: true });
+      applyPresenceOpacity(entry);
+    } });
   }
 
   function onPresenceOpen(event) {

@@ -44,9 +44,9 @@ test('il pet trasparente comunica gli stati e conserva hotspot e accessibilita',
   assert.match(document, /aria-label="Parla con NexusNXS"/);
   assert.match(document, /bridge\.startVoice\(\)/);
   assert.match(document, /dblclick[\s\S]*bridge\.openMain\(\)/);
-  assert.match(document, /data-action="minimize-main"/);
-  assert.match(document, /data-action="hide-presence"/);
-  assert.match(document, /data-action="quit-desktop"/);
+
+
+
   assert.match(document, /class="pet"/);
   assert.match(document, /data-pet="fox"/);
   assert.match(document, /pet-listen/);
@@ -66,17 +66,13 @@ test('la configurazione valida i pet e applica fallback sicuri', () => {
   assert.equal(normalizePresenceConfiguration({ appearance: 'unknown' }).appearance, 'saturn-experimental');
 });
 
-test('il menu Presence resta compatto fuori dal layer scalato senza pannello di sfondo', () => {
+test('il menu del pet delega aspetto e tastiera al sistema operativo', () => {
   const document = systemPresenceDocument({ interactive: true, locale: 'it-IT' });
-  assert.match(document, /<\/main><section class="presence-menu" role="menu"/);
-  assert.match(document, /width:min\(164px,calc\(100vw - 12px\)\)/);
-  assert.match(document, /\.presence-menu\{[^}]*background:transparent;box-shadow:none/);
-  assert.match(document, /\.presence\[data-motion=reduced\]~\.presence-menu/);
-  assert.equal((document.match(/role="menuitem"/g) || []).length, 4);
-  assert.match(document, /event\.key==='Escape'[\s\S]*closeMenu\(\)/);
-  assert.match(document, /event\.key==='ArrowDown'/);
-  assert.match(document, /event\.key==='ArrowUp'/);
-  assert.match(document, /suppressCoreClickUntil=performance\.now\(\)\+350/);
+  assert.doesNotMatch(document, /presence-menu|role="menu"/);
+  assert.match(document, /bridge\.showMenu\(\)/);
+  assert.match(document, /bridge\.onMenuState/);
+  assert.match(document, /ContextMenu/);
+  assert.match(document, /suppressCoreClickUntil=performance\.now\(\)\+500/);
 });
 
 test('le transizioni Presence preservano gli stati critici e assestano idle', () => {
@@ -96,7 +92,7 @@ test('il manager usa una sola Presence trascinabile e ancorata senza fondo opaco
   assert.match(source, /setVisibleOnAllWorkspaces\(true, \{ visibleOnFullScreen: true \}\)/);
   assert.match(source, /applicationVisible \? \(entry.detached \? 280 : 168\) : 360/);
   assert.match(source, /setBackgroundColor\?\.\('#00000000'\)/);
-  assert.match(source, /PRESENCE_MENU_ACTIONS/);
+  assert.match(source, /Menu\.buildFromTemplate/);
   assert.match(source, /animatePresenceBounds/);
   assert.match(source, /--presence-scale/);
   assert.match(source, /setApplicationVisible/);
