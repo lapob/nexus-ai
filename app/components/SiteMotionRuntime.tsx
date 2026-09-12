@@ -17,8 +17,6 @@ type CosmicParticle = {
   speed: number;
   offsetX: number;
   offsetY: number;
-  velocityX: number;
-  velocityY: number;
 };
 
 const MOTION_TIER_CLASSES = ["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
@@ -130,8 +128,6 @@ export function SiteMotionRuntime() {
       speed: .22 + random() * .42,
       offsetX: 0,
       offsetY: 0,
-      velocityX: 0,
-      velocityY: 0,
     }));
     // Independent persistent stars: composing a shape never empties the sky.
     const backgroundStars = Array.from({ length: tier === "lite" ? 180 : 520 }, () => ({
@@ -342,24 +338,16 @@ export function SiteMotionRuntime() {
         const compose = (1 - transitionScatter) * arrival;
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (1 + particle.depth * 2);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (1 + particle.depth * 2);
-        // A passing hand transfers momentum locally. A resting pointer stops
-        // applying force, allowing the grains to return without inflating the form.
+        // Advect grains along the passing hand. First-order settling has no
+        // spring velocity, overshoot or radial inflation around the cursor.
         const distance = Math.hypot(x - pointer.x, y - pointer.y);
         const radius = Math.min(150, Math.max(85, cosmicWidth * .085));
         const proximity = Math.max(0, 1 - distance / radius);
         const speed = Math.hypot(pointer.vx, pointer.vy);
         const influence = (reduced ? 0 : pointer.active) * proximity * proximity;
-        const movement = Math.min(1, speed / 180);
-        const angle = Math.atan2(y - pointer.y, x - pointer.x);
-        const goalX = (Math.cos(angle) * 24 * movement + pointer.vx * .32) * influence;
-        const goalY = (Math.sin(angle) * 24 * movement + pointer.vy * .32) * influence;
-        const omega = influence * movement > .01 ? 12 : 2.8, decay = Math.exp(-omega * delta);
-        const ex = particle.offsetX - goalX, ey = particle.offsetY - goalY;
-        const ax = particle.velocityX + omega * ex, ay = particle.velocityY + omega * ey;
-        particle.offsetX = goalX + (ex + ax * delta) * decay;
-        particle.offsetY = goalY + (ey + ay * delta) * decay;
-        particle.velocityX = (particle.velocityX - omega * ax * delta) * decay;
-        particle.velocityY = (particle.velocityY - omega * ay * delta) * decay;
+        const blend = 1 - Math.exp(-delta * (influence > .01 && speed > 2 ? 24 : 3.6));
+        particle.offsetX += (pointer.vx * .14 * influence - particle.offsetX) * blend;
+        particle.offsetY += (pointer.vy * .14 * influence - particle.offsetY) * blend;
         maxDrift = Math.max(maxDrift, Math.hypot(particle.offsetX, particle.offsetY));
         const px = x + particle.offsetX, py = y + particle.offsetY;
         // One uninterrupted field: text must not punch rectangular holes in it.
