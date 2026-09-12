@@ -402,9 +402,9 @@ test("ambient motion only runs while its surface is near the viewport", async ({
   const core = page.locator(".nxs-cosmic-field");
   await expect(core).toHaveAttribute("data-particles", /\d+/);
   const initialHeroTransform = await core.evaluate((canvas) => canvas.toDataURL());
-  await page.waitForTimeout(260);
-  const movingHeroTransform = await core.evaluate((canvas) => canvas.toDataURL());
-  expect(movingHeroTransform).not.toBe(initialHeroTransform);
+  // Lettering now precedes the field. Observe its actual entrance instead of
+  // requiring moving pixels during the intentional initial text-only phase.
+  await expect.poll(async () => (await core.evaluate((canvas) => canvas.toDataURL())) !== initialHeroTransform).toBe(true);
 
   const surface = page.locator(".presence-system");
 
