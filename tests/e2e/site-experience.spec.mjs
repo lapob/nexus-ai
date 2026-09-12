@@ -610,7 +610,7 @@ test("replay reassembles only the home artwork and remains bounded on mobile", a
 });
 
 test("replay remains available throughout the page after composition", async ({page}) => {
-  for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+  for (const viewport of [{width:1440,height:1000},{width:960,height:720},{width:844,height:390},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
     const replay = page.locator('.astral-hero__replay');
@@ -636,7 +636,7 @@ test("replay remains available throughout the page after composition", async ({p
 });
 
 test("real desktop and Android image zoom is centered and keyboard dismissible", async ({page}) => {
-  for (const viewport of [{width:1440,height:1000},{width:390,height:844}]) {
+  for (const viewport of [{width:1440,height:1000},{width:960,height:720},{width:844,height:390},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
     for (const device of ['desktop','android']) {

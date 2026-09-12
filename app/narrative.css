@@ -121,6 +121,7 @@ html { scroll-padding-top: 96px; }
 .astral-hero__replay { position: fixed; right: max(20px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #71b6bb38; border-radius: 50%; color: #b8d8db; background: #0410158c; cursor: pointer; transition: background .3s, color .3s; }
 .astral-hero__replay:hover { background: #10292cb3; color: #e1ffff; }
 .astral-hero__replay { z-index: 60; }
+@media(min-width:960px) { .astral-hero__replay { z-index:151; } }
 .astral-hero__replay:focus-visible { outline: 2px solid #91e9ec; outline-offset: 4px; }
 .home-continuum .astral-hero > .astral-hero__replay { width: 44px; margin: 0; }
 
