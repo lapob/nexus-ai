@@ -45,6 +45,17 @@ const assert = require('node:assert/strict');
         assert.ok(control.bottom <= height && control.top >= 0, 'Controls fit the viewport');
       }
       assert.deepEqual(errors, []);
+      if(width>=960){
+        const x=Math.max(4,framing.core.left-40),y=framing.core.top+framing.core.height/2;
+        await page.mouse.move(x,y);
+        await page.waitForFunction(()=>nexusCosmicMetrics.renderer().pointerStrength>.2);
+        const hover=await page.evaluate(()=>nexusCosmicMetrics.renderer());
+        const expected=(x-framing.core.left-framing.core.width/2)*13.2/(Math.min(framing.core.width,framing.core.height)*1.25);
+        assert.ok(Math.abs(hover.pointer[0]-expected)<.05,'Expanded field tracks the cursor beyond the old button bounds');
+        await page.locator('#keyboard').hover();
+        await page.waitForFunction(()=>!nexusCosmicMetrics.renderer().touching);
+        assert.equal(await page.evaluate(()=>window.microphoneRequests),0,'Hovering the expanded field never activates voice');
+      }
       await page.mouse.move(framing.core.x + framing.core.width / 2, framing.core.y + framing.core.height / 2);
       await page.mouse.down();
       await page.mouse.move(framing.core.x + framing.core.width * .7, framing.core.y + framing.core.height * .6, { steps: 12 });

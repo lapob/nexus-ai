@@ -814,6 +814,16 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   function refresh(){paintedReduced=false;if(!raf&&!disposed&&!lost&&visible&&!document.hidden){last=0;raf=requestAnimationFrame(draw);}}
   function visibility(){cancelAnimationFrame(raf);raf=0;last=0;refresh();}
   function move(e){pointerClient=[e.clientX,e.clientY];touching=true;if(dragging){targetRotation=[Math.max(-1,Math.min(1,(e.clientY-dragStart[1])/200)),Math.max(-1,Math.min(1,(e.clientX-dragStart[0])/200))];if(Math.hypot(e.clientX-dragStart[0],e.clientY-dragStart[1])>8)suppressClick=performance.now()+400;}}
+  // Expanded web fields extend beyond the voice button. Observe hover across
+  // their canvas without expanding the button's click or drag hit target.
+  const hoverSurface=options.expansive?document:host;
+  function hover(e){
+    if(!options.expansive||dragging){move(e);return;}
+    const bounds=canvas.getBoundingClientRect();
+    const control=e.target?.closest?.('button,a,input,textarea,select,[role="dialog"]');
+    if(options.getVisible?.()===false||(control&&!host.contains(control))||e.clientX<bounds.left||e.clientX>bounds.right||e.clientY<bounds.top||e.clientY>bounds.bottom){touching=false;return;}
+    move(e);
+  }
   function down(e){if(e.button!==0||reduced())return;dragging=true;dragStart=[e.clientX,e.clientY];host.setPointerCapture?.(e.pointerId);}
   function leave(){touching=false;dragging=false;}
   function click(e){if(host.contains(e.target)&&performance.now()<suppressClick){e.preventDefault();e.stopImmediatePropagation();}}
@@ -821,11 +831,11 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   function contextRestored(){try{buffers=[];upload();lost=false;resize();refresh();}catch(e){fallbackReason=String(e.message);}}
   const ro=new ResizeObserver(()=>{resize();refresh();});ro.observe(canvas);ro.observe(host);
   const io=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;visibility();});io.observe(canvas);
-  host.addEventListener('pointermove',move,{passive:true});host.addEventListener('pointerdown',down);host.addEventListener('pointerup',leave);host.addEventListener('pointerleave',leave);host.addEventListener('pointercancel',leave);document.addEventListener('click',click,true);
+  hoverSurface.addEventListener('pointermove',hover,{passive:true});host.addEventListener('pointerdown',down);host.addEventListener('pointerup',leave);hoverSurface.addEventListener('pointerleave',leave);host.addEventListener('pointercancel',leave);document.addEventListener('click',click,true);
   canvas.addEventListener('webglcontextlost',contextLost);canvas.addEventListener('webglcontextrestored',contextRestored);
   document.addEventListener('visibilitychange',visibility);media.addEventListener('change',refresh);globalThis.addEventListener('resize',refresh);globalThis.addEventListener('scroll',refresh,{passive:true});globalThis.addEventListener('blur',leave);
   resize();refresh();
-  return {refresh,setState(value){state=value;refresh();},getMetrics:()=>({state,phase,preset,previousPreset,arrival,energy:profile.energy,audio,quality,particles:Math.floor(budget*quality),draws,drawMs,elapsed,resolutionScale,pixelRatio:dpr,renderWidth:canvas.width,renderHeight:canvas.height,planetOnly,ringVisibility,backend:gl?'webgl':'canvas',fallbackReason}),dispose(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();io.disconnect();ambient?.remove();document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',refresh);globalThis.removeEventListener('resize',refresh);globalThis.removeEventListener('scroll',refresh);globalThis.removeEventListener('blur',leave);host.removeEventListener('pointermove',move);host.removeEventListener('pointerdown',down);host.removeEventListener('pointerup',leave);host.removeEventListener('pointerleave',leave);host.removeEventListener('pointercancel',leave);document.removeEventListener('click',click,true);canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('webglcontextrestored',contextRestored);if(gl){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);}}};
+  return {refresh,setState(value){state=value;refresh();},getMetrics:()=>({state,phase,preset,previousPreset,arrival,energy:profile.energy,audio,pointer:[...pointer],pointerStrength,touching,quality,particles:Math.floor(budget*quality),draws,drawMs,elapsed,resolutionScale,pixelRatio:dpr,renderWidth:canvas.width,renderHeight:canvas.height,planetOnly,ringVisibility,backend:gl?'webgl':'canvas',fallbackReason}),dispose(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();io.disconnect();ambient?.remove();document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',refresh);globalThis.removeEventListener('resize',refresh);globalThis.removeEventListener('scroll',refresh);globalThis.removeEventListener('blur',leave);hoverSurface.removeEventListener('pointermove',hover);host.removeEventListener('pointerdown',down);host.removeEventListener('pointerup',leave);hoverSurface.removeEventListener('pointerleave',leave);host.removeEventListener('pointercancel',leave);document.removeEventListener('click',click,true);canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('webglcontextrestored',contextRestored);if(gl){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);}}};
 }
 
 
