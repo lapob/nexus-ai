@@ -197,6 +197,7 @@
     "qa:android:visual": "pwsh -NoProfile -File scripts/capture-android-visual-matrix.ps1 -App Control",
     "qa:android:visual:public": "pwsh -NoProfile -File scripts/capture-android-visual-matrix.ps1 -App Public",
     "qa:android:device:strict": "pwsh -NoProfile -File scripts/run-android-device-gate.ps1",
+    "qa:android:history": "pwsh -NoProfile -File scripts/verify-android-history.ps1",
     "qa:android:benchmark": "pwsh -NoProfile -File scripts/benchmark-android-ui.ps1",
     "qa:visual:matrix": "npm run build:renderer && node scripts/visual-qa.js --views=conversation,history,neural --scales=100,200 && npm run qa:android:visual && npm run qa:android:visual:public"
   },

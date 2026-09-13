@@ -17,7 +17,12 @@ import java.util.Locale;
 /** Archivio privato delle conversazioni anonime, confinato nel sandbox Android. */
 public final class LocalChatStore extends SQLiteOpenHelper {
     private final SecureChatCodec codec = new SecureChatCodec();
-    public LocalChatStore(Context context) { super(context, "nexusnxs-chats.db", null, 6); }
+    public LocalChatStore(Context context) { super(context, "nexusnxs-chats.db", null, 7); }
+
+    @Override public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.setForeignKeyConstraintsEnabled(true);
+    }
 
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE conversations(id TEXT PRIMARY KEY,title TEXT NOT NULL,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,pinned INTEGER NOT NULL DEFAULT 0,archived INTEGER NOT NULL DEFAULT 0)");
@@ -35,6 +40,12 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         if (oldVersion < 4) db.execSQL("ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
         if (oldVersion < 5) encryptExistingHistory(db);
         if (oldVersion < 6) db.execSQL("ALTER TABLE turns ADD COLUMN metadata TEXT NOT NULL DEFAULT ''");
+        if (oldVersion < 7) {
+            // Earlier connections did not enforce CASCADE. Remove only children
+            // whose conversation has already been deleted by the user.
+            db.execSQL("DELETE FROM turns WHERE NOT EXISTS (SELECT 1 FROM conversations WHERE conversations.id=turns.conversation_id)");
+            db.execSQL("DELETE FROM pending_requests WHERE NOT EXISTS (SELECT 1 FROM conversations WHERE conversations.id=pending_requests.conversation_id)");
+        }
     }
 
     private void encryptExistingHistory(SQLiteDatabase db) {
@@ -62,6 +73,11 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
+            // A user may delete a chat while an asynchronous reply is arriving.
+            // Keep deletion final; do not recreate the chat or crash the worker.
+            try (Cursor parent = db.rawQuery("SELECT id FROM conversations WHERE id=?", new String[]{conversationId})) {
+                if (!parent.moveToFirst()) { db.setTransactionSuccessful(); return; }
+            }
             db.execSQL("INSERT INTO turns(conversation_id,role,content,metadata,created_at) VALUES(?,?,?,?,?)", new Object[]{conversationId, role, codec.encrypt(content), codec.encrypt(metadata == null ? "" : metadata), now});
             if ("user".equals(role)) {
                 String title = ""; try (Cursor row = db.rawQuery("SELECT title FROM conversations WHERE id=?", new String[]{conversationId})) { if (row.moveToFirst()) title = codec.decrypt(row.getString(0)); }
@@ -170,21 +186,26 @@ public final class LocalChatStore extends SQLiteOpenHelper {
 
     /** Crea una diramazione copiando i turni precedenti al messaggio che verrà modificato. */
     public String branchConversation(String sourceId, int beforeTurnIndex) {
-        String targetId = createConversation();
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
-        try (Cursor cursor = db.rawQuery("SELECT role,content FROM turns WHERE conversation_id=? ORDER BY id LIMIT ?", new String[]{sourceId, String.valueOf(Math.max(0, beforeTurnIndex))})) {
+        try {
+          try (Cursor source = db.rawQuery("SELECT id FROM conversations WHERE id=?", new String[]{sourceId})) {
+            if (!source.moveToFirst()) throw new IllegalArgumentException("Conversazione non disponibile");
+          }
+          String targetId = createConversation();
+          try (Cursor cursor = db.rawQuery("SELECT role,content,metadata FROM turns WHERE conversation_id=? ORDER BY id LIMIT ?", new String[]{sourceId, String.valueOf(Math.max(0, beforeTurnIndex))})) {
             long now = System.currentTimeMillis();
             String firstUser = "";
             while (cursor.moveToNext()) {
                 String role = cursor.getString(0), content = codec.decrypt(cursor.getString(1));
-                db.execSQL("INSERT INTO turns(conversation_id,role,content,created_at) VALUES(?,?,?,?)", new Object[]{targetId, role, codec.encrypt(content), now});
+                db.execSQL("INSERT INTO turns(conversation_id,role,content,metadata,created_at) VALUES(?,?,?,?,?)", new Object[]{targetId, role, codec.encrypt(content), cursor.getString(2), now});
                 if (firstUser.isEmpty() && "user".equals(role)) firstUser = content;
             }
             if (!firstUser.isEmpty()) db.execSQL("UPDATE conversations SET title=?,updated_at=? WHERE id=?", new Object[]{codec.encrypt(firstUser.substring(0, Math.min(72, firstUser.length()))), now, targetId});
             db.setTransactionSuccessful();
+            return targetId;
+          }
         } finally { db.endTransaction(); }
-        return targetId;
     }
 
     public void deleteEmptyConversationsExcept(String keepId) {
@@ -277,8 +298,14 @@ public final class LocalChatStore extends SQLiteOpenHelper {
 
     public String exportEncryptedArchive() throws Exception {
         JSONObject archive = new JSONObject(); JSONArray conversations = new JSONArray();
-        JSONArray rows = list();
-        for (int i = 0; i < rows.length(); i++) { JSONObject row = rows.optJSONObject(i); JSONObject conversation = row == null ? null : get(row.optString("id")); if (conversation != null) conversations.put(conversation); }
+        try (Cursor rows = getReadableDatabase().rawQuery("SELECT id,pinned,archived FROM conversations ORDER BY created_at,id", null)) {
+            while (rows.moveToNext()) {
+                JSONObject conversation = get(rows.getString(0));
+                if (conversation == null) throw new IllegalStateException("Conversazione non esportabile");
+                conversation.put("pinned", rows.getInt(1) == 1).put("archived", rows.getInt(2) == 1);
+                conversations.put(conversation);
+            }
+        }
         archive.put("schema", 1).put("createdAt", System.currentTimeMillis()).put("conversations", conversations);
         return codec.encrypt(archive.toString());
     }
@@ -288,13 +315,19 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         if (archive.optInt("schema") != 1) throw new IllegalArgumentException("Archivio NexusNXS non supportato");
         JSONArray conversations = archive.optJSONArray("conversations"); int imported = 0;
         if (conversations == null) return 0;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
         for (int i = 0; i < conversations.length(); i++) {
             JSONObject source = conversations.optJSONObject(i); if (source == null) continue;
             String id = createConversation(); renameConversation(id, source.optString("title", "Conversazione importata"));
             JSONArray turns = source.optJSONArray("turns");
-            if (turns != null) for (int turn = 0; turn < turns.length(); turn++) { JSONObject value = turns.optJSONObject(turn); if (value != null) addTurn(id, value.optString("role"), value.optString("content")); }
+            if (turns != null) for (int turn = 0; turn < turns.length(); turn++) { JSONObject value = turns.optJSONObject(turn); if (value != null) addTurn(id, value.optString("role"), value.optString("content"), value.optJSONArray("artifacts") == null ? "" : value.getJSONArray("artifacts").toString()); }
+            db.execSQL("UPDATE conversations SET pinned=?,archived=?,created_at=?,updated_at=? WHERE id=?", new Object[]{source.optBoolean("pinned") ? 1 : 0, source.optBoolean("archived") ? 1 : 0, source.optLong("createdAt", System.currentTimeMillis()), source.optLong("updatedAt", System.currentTimeMillis()), id});
             imported++;
         }
+        db.setTransactionSuccessful();
         return imported;
+        } finally { db.endTransaction(); }
     }
 }

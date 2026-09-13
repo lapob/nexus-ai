@@ -39,6 +39,8 @@ dependencies {
     implementation("androidx.compose.animation:animation")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
 
 android {
@@ -50,8 +52,9 @@ android {
         applicationId = "local.nexus.remote"
         minSdk = 26
         targetSdk = 36
-        versionCode = 99
-        versionName = "6.5.9"
+        versionCode = 100
+        versionName = "6.5.10"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "NEXUS_URL", quotedBuildValue(publicNexusUrl)
         buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)
         buildConfigField "String", "NEXUS_FALLBACK_URL", quotedBuildValue(fallbackNexusUrl)
@@ -81,6 +84,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Tests have a separate sandbox and cannot replace personal history.
+            applicationIdSuffix ".qa"
+        }
         release {
             minifyEnabled = true
             shrinkResources = true

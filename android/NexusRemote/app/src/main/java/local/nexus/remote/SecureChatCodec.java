@@ -17,7 +17,8 @@ final class SecureChatCodec {
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
 
     String encrypt(String value) {
-        if (value == null || value.isEmpty() || value.startsWith(PREFIX)) return value == null ? "" : value;
+        // Callers supply plaintext. An envelope-looking message is still text.
+        if (value == null || value.isEmpty()) return value == null ? "" : value;
         try {
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, key());

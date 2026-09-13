@@ -116,6 +116,41 @@ Ogni nuova funzione deve aggiungere casi di valutazione e una soglia di release.
 
 ## Priorità verso un assistente di riferimento
 
+### Piano di completamento verificabile — 13 settembre 2026
+
+Locale rimane il percorso predefinito. Il cloud resta opzionale e spento;
+una macchina completamente spenta non può eseguire attività: serve un nodo
+locale sempre acceso oppure un servizio esterno scelto esplicitamente.
+L'identità cosmica è una scelta grafica, non una promessa di coscienza,
+onniscienza o capacità che il sistema non possiede.
+
+| Area | Intervento proposto | Criterio di accettazione |
+| --- | --- | --- |
+| Conversazioni | Un solo modello di messaggio per testo, voce, file e immagini; ID stabili e diramazioni esplicite | Modifica, retry e cambio rete non duplicano turni; nessuna perdita di allegati o bozza |
+| Voce | STT residente, misurazione separata di acquisizione/rete/trascrizione; cancellazione TTS e barge-in con gestione dell'eco | Corpus di persone reali e microfoni diversi; interruzione non provocata dalla voce sintetica; nessun audio dopo uscita |
+| Ragionamento | Auto sceglie il budget in base al compito; rapido e approfondito restano override comprensibili | Qualità misurata su richieste brevi, codice, documenti, ambiguità; risposta verificata prima di dichiarare esecuzioni |
+| Memoria | Ricordi con origine, ambito personale/progetto, scadenza e modifica; sincronizzazione solo autenticata | Isolamento tra utenti, revoca e cancellazione verificati su tutti i client |
+| Azioni | Piano breve, anteprima, autorizzazione limitata, checkpoint, ricevuta e annullamento | Revoca durante esecuzione, riavvio e ripresa non aggirano il consenso; risultati confrontati con stato reale |
+| Proattività | Routine disattivate inizialmente, trigger espliciti, fasce silenziose e limite di frequenza | Nessuna azione esterna o ascolto implicito; arresto e disattivazione immediati |
+| Dashboard | Amministrazione autenticata con sessioni attive, dispositivi, capacità, code, latenza ed errori aggregati | Nessun contenuto delle chat nelle metriche; contatori di sessioni non presentati come persone uniche |
+| Dati | Mappa di conservazione, esportazione completa, cancellazione a scadenza effettiva e drill di ripristino | Backup comprende chat archiviate e metadati; cancellare una chat elimina figli e richieste pendenti |
+| Immagini | Job persistente con stato reale, anteprima/download e modifiche collegate al risultato originale | Retry senza doppia generazione; cancellazione libera risorse; URL e file isolati per utente |
+| Affidabilità | Coordinare warm-up e valutazioni evitando contendere lo stesso runtime con la produzione | Cold start, timeout e recupero misurati; nessuna falsa readiness; rollback firmato verificato |
+
+Per la grafica: un solo catalogo di font, spaziature, luminosità e raggi;
+composer di larghezza limitata con comandi progressivi, senza toolbar affollate;
+Core con geometria invariata e stati guidati da eventi reali. Lo stato di errore
+deve offrire una sola azione utile senza sostituire la scena con pannelli tecnici.
+Animazioni iniziali una sola volta, reduced-motion rispettato e illuminazione
+locale per hover/focus; mantenere il focus visibile per chi usa la tastiera.
+Su mobile lo spazio segue tastiera, safe area e orientamento; desktop sfrutta
+lo spazio per chat e contenuti di lavoro senza gonfiare il campo di scrittura.
+
+Prima di nuove funzionalità: chiudere verifica fisica Android, scan Security
+integrale e latenza vocale. Dopo: continuità autenticata e dashboard; infine
+routine e integrazioni. Queste righe sono proposte e criteri, non funzionalità
+già consegnate. Non aggiungere controlli grafici senza backend funzionante.
+
 ### P0 — Qualità percepita ogni giorno
 
 - coordinatore di warm-up per ridurre il primo token di AI e la prima frase TTS
