@@ -2659,6 +2659,8 @@ private fun JSONArray?.toTurns() = buildList {
 @Composable private fun NexusInstantApp(state: NexusUiState, dispatch: (String, String) -> Unit) {
     val context = LocalContext.current
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var menuPreferences by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(settingsOpen) { if (!settingsOpen) menuPreferences = false }
     var remoteSettingsOpen by rememberSaveable { mutableStateOf(false) }
     var remotePairCode by rememberSaveable { mutableStateOf("") }
     var controlsAwake by remember { mutableStateOf(true) }
@@ -2994,7 +2996,7 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
         }
-        BackHandler(enabled = settingsOpen) { settingsOpen = false }
+        BackHandler(enabled = settingsOpen) { if (menuPreferences) menuPreferences = false else settingsOpen = false }
         AnimatedVisibility(settingsOpen, enter = fadeIn(tween(if (reduceMotion) 0 else 180)), exit = fadeOut(tween(if (reduceMotion) 0 else 140))) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
         }
@@ -3008,19 +3010,23 @@ private fun JSONArray?.toTurns() = buildList {
                         if (travel < -60.dp.toPx()) { change.consume(); settingsOpen = false }
                     })
                 }) {
-                Column(Modifier.statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("NexusNXS", style = MaterialTheme.typography.titleLarge, color = Ice, modifier = Modifier.weight(1f))
+                        if (menuPreferences) IconButton({ menuPreferences = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
+                        Text(if (menuPreferences) nexusCopy("Impostazioni", "Settings") else "NexusNXS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ice, modifier = Modifier.weight(1f))
                         IconButton({ settingsOpen = false }) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi menu", "Close menu"), tint = Mist) }
                     }
-                    TextButton(onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy) {
+                    if (!menuPreferences) {
+                    TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).background(Cyan.copy(alpha = .08f), RoundedCornerShape(14.dp)), onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy) {
                         Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"))
                     }
-                    InstantHistory(state, dispatch) { chat ->
+                    InstantHistory(state, dispatch, Modifier.weight(1f)) { chat ->
                         voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
                         settingsOpen = false; typedSession = true; textMode = false
                     }
                     HorizontalDivider(color = Hairline)
+                    DrawerItem(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings")) { menuPreferences = true }
+                    } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(nexusCopy("Aspetto e interazione", "Appearance and interaction"), color = Mist, style = MaterialTheme.typography.labelLarge)
             CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
             CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
@@ -3048,6 +3054,7 @@ private fun JSONArray?.toTurns() = buildList {
                     TextButton({ dispatch("exportBackup", "") }) { Text(nexusCopy("Esporta backup cifrato", "Export encrypted backup")) }
                     TextButton({ dispatch("importBackup", "") }) { Text(nexusCopy("Importa backup", "Import backup")) }
                     Text(nexusCopy("La cronologia è conservata sul dispositivo. Lingua e dimensioni del testo seguono Android.", "History is stored on this device. Language and text size follow Android."), color = Mist, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -3907,22 +3914,23 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }
 }
 
-@Composable private fun InstantHistory(state: NexusUiState, dispatch: (String, String) -> Unit, open: (ChatRow) -> Unit) {
+@Composable private fun InstantHistory(state: NexusUiState, dispatch: (String, String) -> Unit, modifier: Modifier = Modifier, open: (ChatRow) -> Unit) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     var query by rememberSaveable { mutableStateOf("") }
     var selected by remember { mutableStateOf<ChatRow?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
-    Text(nexusCopy("Cronologia", "History"), color = Ice, style = MaterialTheme.typography.titleMedium)
+    Text(nexusCopy("Cronologia", "History"), color = Mist, style = MaterialTheme.typography.labelMedium)
     OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
-        label = { Text(nexusCopy("Cerca conversazioni", "Search conversations")) }, modifier = Modifier.fillMaxWidth())
+        placeholder = { Text(nexusCopy("Cerca conversazioni", "Search conversations")) }, leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist) }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
     val chats = state.chats.filter { query.isBlank() || it.title.contains(query, true) || it.preview.contains(query, true) }
         .sortedWith(compareByDescending<ChatRow> { it.pinned }.thenByDescending { it.updatedAt })
     if (chats.isEmpty()) Text(nexusCopy("Nessuna conversazione trovata", "No conversations found"), color = Mist)
     val pinnedLabel = nexusCopy("Fissate", "Pinned")
     val italian = nexusCopy("it", "en") == "it"
     val groups = chats.groupBy { if (it.pinned) pinnedLabel else historyGroupLabel(it.updatedAt, italian) }
-    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+    LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
     groups.forEach { (group, rows) ->
         item(key = "group-" + group) { Text(group, color = Mist, style = MaterialTheme.typography.labelMedium) }
         items(rows.size, key = { rows[it].id }) { index ->
@@ -3964,7 +3972,9 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }
 }
 
-@Composable private fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, click: () -> Unit) = Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).clickable(onClick = click).padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Color(0xFFC4CECE), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(label, style = MaterialTheme.typography.bodyMedium) }
+}
+
+@Composable private fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, click: () -> Unit) = Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).clickable(onClick = click).heightIn(min = 48.dp).padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Color(0xFFC4CECE), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(label, style = MaterialTheme.typography.bodyMedium) }
 
 @Composable private fun RemoteDrawerItem(label: String, click: () -> Unit) = Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).clickable(onClick = click).padding(horizontal = 11.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) { RemoteGlyph(); Spacer(Modifier.width(13.dp)); Text(label, fontSize = 15.sp) }
 
