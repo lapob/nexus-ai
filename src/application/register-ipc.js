@@ -1182,6 +1182,13 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     return { examples, memories, cache, removed: examples + memories + cache };
   });
   ipcMain.handle(CHANNELS.memoryList, (event) => { assertTrustedSender(event); return memoryStore?.list({ limit: 100 }) || []; });
+  ipcMain.handle(CHANNELS.memoryUpdate, (event, payload = {}) => {
+    assertTrustedSender(event);
+    if (!Number.isSafeInteger(payload?.id) || payload.id < 1 || typeof payload.content !== 'string'
+      || payload.content.trim().length < 3 || payload.content.length > 2000) throw new Error('Ricordo non valido.');
+    if (!memoryStore) throw new Error('Memoria non disponibile.');
+    return { updated: memoryStore.updateById(payload.id, payload.content) };
+  });
   ipcMain.handle(CHANNELS.memoryForget, (event, value) => {
     assertTrustedSender(event);
     const id = Number(value);

@@ -234,14 +234,16 @@ class WorkflowRuntime {
       });
       delete step.ticket;
       delete step.proposal;
-      step.status = approved && result?.status === 'completed' ? 'complete' : 'denied';
+      step.status = !approved || result?.status === 'denied' ? 'denied'
+        : result?.status === 'completed' ? 'complete'
+          : result?.status === 'cancelled' ? 'cancelled' : 'failed';
       step.result = {
         status: String(result?.status || 'failed'),
         code: result?.code ?? null,
         ...(result?.receipt ? { receipt: result.receipt } : {}),
         ...(typeof result?.receiptPersisted === 'boolean' ? { receiptPersisted: result.receiptPersisted } : {})
       };
-      if (!approved || result?.status !== 'completed') workflow.status = approved ? 'failed' : 'denied';
+      if (step.status !== 'complete') workflow.status = step.status;
       else {
         workflow.cursor += 1;
         workflow.status = workflow.cursor >= workflow.steps.length ? 'complete' : 'pending';

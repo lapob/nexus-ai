@@ -2,6 +2,21 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { ProactiveEventBus } = require('../src/application/proactive-event-bus');
 
+test('sessioni proattive lunghe limitano deduplica e recuperano salti orologio', () => {
+  let now = 10000;
+  const bus = new ProactiveEventBus({ now: () => now, historyLimit: 8 });
+  for (let index = 0; index < 1000; index++) bus.publish('device.health', { code: String(index) });
+  assert.ok(bus.lastSeen.size <= 32);
+  assert.equal(bus.history().length, 8);
+  assert.equal(bus.publish('device.health', { code: '999' }), null);
+  now = 1;
+  assert.ok(bus.publish('device.health', { code: '999' }));
+  now += 16000;
+  bus.publish('system.resume');
+  assert.equal(bus.lastSeen.size, 1);
+  bus.close();
+});
+
 test('il bus proattivo accetta soltanto eventi allowlist e dati metadata-only', () => {
   let now = 1000;
   const bus = new ProactiveEventBus({ now: () => now });

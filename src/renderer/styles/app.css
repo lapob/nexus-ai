@@ -3207,6 +3207,11 @@ button.shortcut-item:focus-visible kbd {
 .memory-list-heading span, .memory-list article > span, .cache-maintenance > span { display: grid; gap: 0.25rem; min-width: 0; }
 .memory-list article { padding: 0.72rem 0.45rem; border-radius: 0.75rem; transition: background 160ms ease; }
 .memory-list article:hover { background: rgba(94, 205, 208, 0.045); }
+.memory-list article > span { flex: 1 1 12rem; }
+.memory-list article textarea { width:100%;min-width:0;max-height:12rem;resize:vertical;padding:.65rem;border:1px solid rgba(118,211,212,.2);border-radius:.7rem;background:rgba(5,16,18,.8);color:inherit;font:inherit;line-height:1.5; }
+.memory-edit-actions { display:flex;flex-wrap:wrap;gap:.4rem; }
+.memory-list article > button,.memory-edit-actions button { flex-shrink:0;min-height:44px;min-width:44px; }
+@media(max-width:600px){.memory-list article{flex-wrap:wrap;gap:.5rem}.memory-list article > span{flex-basis:100%}}
 .memory-list article strong { overflow: hidden; color: rgba(216, 238, 239, 0.78); font-size: 0.78rem; font-weight: 420; text-overflow: ellipsis; white-space: nowrap; }
 .memory-list small, .cache-maintenance small { color: rgba(151, 188, 190, 0.44); }
 .cache-maintenance { grid-template-columns: 1fr auto; padding: 1rem; }

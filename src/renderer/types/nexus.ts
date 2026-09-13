@@ -312,6 +312,7 @@ export interface NexusBridge {
   clearTrainingExamples(): Promise<{ removed: number }>;
   listMemories(): Promise<Array<{ id: number; type: string; content: string; updatedAt: number; expiresAt?: number | null }>>;
   forgetMemory(id: number): Promise<{ removed: number }>;
+  updateMemory(id: number, content: string): Promise<{ updated: number }>;
   responseCacheStats(): Promise<{ entries: number; hits: number }>;
   clearResponseCache(): Promise<{ removed: number }>;
   exportPersonalData(clientData: unknown, passphrase: string): Promise<{ status: 'saved' | 'cancelled'; path?: string }>;

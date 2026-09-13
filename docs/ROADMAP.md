@@ -1,5 +1,51 @@
 # Roadmap tecnica
 
+## Priorita prodotto concordate il 13 settembre 2026
+
+Impostazione scelta: inferenza locale predefinita; cloud opzionale, disattivato.
+Nessun passaggio automatico a un servizio esterno in caso di errore locale.
+Il sito pubblico continua a usare il server NexusNXS esistente: questo non
+equivale a eseguire il modello sul telefono o nel browser dell'utente.
+Il funzionamento a PC spento richiede un altro nodo sempre acceso, locale
+oppure cloud attivato esplicitamente. n8n coordina workflow e integrazioni;
+non sostituisce il modello di ragionamento e non garantisce ricavi.
+
+| Priorita | Intervento | Prova necessaria prima della promozione |
+| --- | --- | --- |
+| 1 | STT locale residente, confronto CPU/GPU e modelli sul dispositivo | Corpus umano separato per lingua/rumore; accuratezza e latenza a freddo/caldo; nessuna regressione rispetto al backend corrente |
+| 2 | Interruzione vocale durante TTS, riconoscimento delle correzioni e ripresa | Test con speaker e cuffie; nessuna auto-interruzione dovuta alla propria voce; stop media e richieste tardive |
+| 3 | Memoria correggibile e con provenienza, scadenza e revoca | Edit/cancel/persistenza via IPC reale; nessuna commistione con training o altre identita |
+| 4 | Ragionamento adattivo e retrieval | Confronto cieco su domande reali, fonti corrette, rispetto dei limiti di tempo e scelta manuale del livello |
+| 5 | Azioni con esito osservabile, checkpoint e rollback | Distinguere successo, errore, annullamento e consenso negato; nessuna ripetizione di effetti dopo riconnessione |
+| 6 | Iniziativa selettiva e lavoro persistente | Orari silenziosi, deduplica limitata, revoca, budget e scadenza; niente messaggi esterni senza autorizzazione |
+| 7 | Training mirato | Dati approvati, separazione train/validation/test, confronto con baseline; nessuna promozione automatica |
+
+La sessione vocale web continua e l'editor desktop dei ricordi riusano i
+componenti esistenti. I test sintetici della voce verificano il lifecycle;
+non dimostrano naturalezza o precisione su un microfono reale. Non pubblicare
+come acquisita una parita con assistenti commerciali.
+
+### Perfezionamenti profondi successivi
+
+- Una conversazione unica tra testo, voce e immagini, con artefatti persistenti
+  soltanto negli account o dispositivi autorizzati. La demo anonima resta temporanea.
+- Un registro delle attivita accessibile su richiesta: cosa e stato fatto,
+  quale risultato e stato verificato, cosa resta da decidere. Mostrare progressi
+  reali, senza percentuali simulate o catene di ragionamento interne.
+- Ricordi con origine visibile e differenza prima/dopo; aggiornamenti contestuali
+  espliciti, senza inferire emozioni, salute o caratteristiche sensibili.
+- Controlli contestuali invece di nuove barre: Core per la voce, composer per
+  scrivere, dettaglio delle attivita soltanto quando serve.
+- Un solo vocabolario di icone, spaziature e movimento; transizioni basate sullo
+  stato, illuminazione leggibile, riduzione movimento e target tattili accessibili.
+- Calibrare la personalita: cordiale, coerente e capace di dissentire; dichiarare
+  incertezze e limiti senza fingere coscienza, emozioni umane o azioni mai eseguite.
+- Servizio personale sempre acceso come opzione distinta, con identita dei
+  dispositivi, code a scadenza e isolamento tra utenti prima delle integrazioni n8n.
+
+Queste sono priorita e criteri di accettazione, non un elenco di funzioni tutte
+gia implementate. Lo stato verificato e mantenuto in CONTINUITA.md alla radice.
+
 ## Foundation
 
 - Git, ignore e baseline riproducibile;

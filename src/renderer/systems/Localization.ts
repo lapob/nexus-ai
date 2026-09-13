@@ -20,12 +20,16 @@ export function documentUiLocale(): string {
 
 const copy = {
   it: {
+    memoryHelp: 'Modifica o rimuovi i ricordi. Solo le informazioni approvate vengono conservate.',
+    memoryEdit: 'Modifica ricordo', memorySave: 'Salva', memoryCancel: 'Annulla', memorySaved: 'Ricordo aggiornato.', memoryFailed: 'Impossibile aggiornare il ricordo. Riprova.',
     settings: 'Impostazioni', voice: 'Voce', voiceDetail: 'Ascolto e risposta', appearance: 'Aspetto',
     appearanceDetail: 'Grafica e fluidità', intelligence: 'Intelligenza', intelligenceDetail: 'Identità e risposte',
     permissions: 'Permessi', permissionsDetail: 'Azioni e controllo', data: 'Dati', dataDetail: 'Memoria e archivio',
     remote: 'Remoto', remoteDetail: 'Telefono e dispositivi', select: 'Seleziona', reasoningFast: 'Ragionamento rapido', reasoningDeep: 'Ragionamento approfondito'
   },
   en: {
+    memoryHelp: 'Edit or remove memories. Only approved information is retained.',
+    memoryEdit: 'Edit memory', memorySave: 'Save', memoryCancel: 'Cancel', memorySaved: 'Memory updated.', memoryFailed: 'Could not update this memory. Try again.',
     settings: 'Settings', voice: 'Voice', voiceDetail: 'Listening and replies', appearance: 'Appearance',
     appearanceDetail: 'Visuals and motion', intelligence: 'Intelligence', intelligenceDetail: 'Identity and replies',
     permissions: 'Permissions', permissionsDetail: 'Actions and control', data: 'Data', dataDetail: 'Memory and archive',

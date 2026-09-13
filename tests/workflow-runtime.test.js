@@ -6,6 +6,25 @@ const path = require('node:path');
 const { WorkflowRuntime, validateSteps } = require('../src/agents/workflow-runtime');
 const { ActionRuntime } = require('../src/agents/action-runtime');
 
+test('workflow conserva esiti falliti e annullati senza attribuirli a un rifiuto utente', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-outcomes-'));
+  try {
+    for (const outcome of ['failed', 'cancelled', 'denied']) {
+      const runtime = new WorkflowRuntime({ checkpointDirectory: root, actionRuntime: {
+        propose: () => ({ id: 'ticket-outcome' }), execute: async () => ({ status: outcome }), undoTransaction: () => ({ status: 'empty' })
+      } });
+      const workflow = runtime.create({ summary: 'Controllo', steps: [{ tool: 'read_file' }] });
+      runtime.proposeNext(workflow);
+      await runtime.decide(workflow, true);
+      const persisted = runtime.load(workflow.id);
+      assert.equal(persisted.status, outcome);
+      assert.equal(persisted.steps[0].status, outcome);
+      assert.equal(persisted.cursor, 0);
+      assert.equal(runtime.proposeNext(persisted), null);
+    }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('workflow richiede approvazione a ogni passo e riprende dal checkpoint', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-'));
   let sequence = 0;

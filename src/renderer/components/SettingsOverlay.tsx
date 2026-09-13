@@ -133,6 +133,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
   const [trainingStats, setTrainingStats] = useState<{ examples: number; approved: number; quarantined: number; corrected: number; preferencePairs: number; domains: Record<string, number>; evaluationExamples: number; evaluationReady: boolean; nextMilestone: number; memories?: number } | null>(null);
   const [trainingEvaluation, setTrainingEvaluation] = useState<{ examples: number; readiness: number; diversity: number; correctionCoverage: number; averagePromptTokens: number; status: 'ready' | 'growing' | 'early' } | null>(null);
   const [memories, setMemories] = useState<Array<{ id: number; type: string; content: string; updatedAt: number; expiresAt?: number | null }>>([]);
+  const [memoryEdit, setMemoryEdit] = useState<{ id: number; content: string } | null>(null);
   const [responseCache, setResponseCache] = useState<{ entries: number; hits: number }>({ entries: 0, hits: 0 });
   const [confirmTrainingClear, setConfirmTrainingClear] = useState(false);
   const [actionHistory, setActionHistory] = useState<Array<{ timestamp: string; event: string; tool: string; preview?: string }>>([]);
@@ -1126,10 +1127,21 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     </div>
                   </section>}
                   {memories.length > 0 && <div className="memory-list settings-wide">
-                    <div className="memory-list-heading"><span><strong>Ciò che NexusNXS ricorda</strong><small>Puoi rimuovere un elemento o scrivere in chat: Correggi il ricordo #numero: nuovo contenuto.</small></span></div>
+                    <div className="memory-list-heading"><span><strong>Ciò che NexusNXS ricorda</strong><small>{labels.memoryHelp}</small></span></div>
                     {memories.map((memory) => <article key={memory.id}>
-                      <span><small>#{memory.id} · {memory.type === 'preference' ? 'Preferenza' : memory.type === 'project' ? 'Progetto' : memory.type === 'procedural' ? 'Procedura' : memory.type === 'episodic' ? 'Evento' : 'Informazione'}</small><strong>{memory.content}</strong></span>
-                      <button type="button" className="settings-quiet-action" disabled={busy} onClick={async () => {
+                      <span><small>#{memory.id} · {memory.type === 'preference' ? 'Preferenza' : memory.type === 'project' ? 'Progetto' : memory.type === 'procedural' ? 'Procedura' : memory.type === 'episodic' ? 'Evento' : 'Informazione'}</small>
+                        {memoryEdit?.id === memory.id ? <textarea aria-label={labels.memoryEdit} maxLength={2000} rows={3} autoFocus value={memoryEdit.content} disabled={busy} onChange={event => setMemoryEdit({ id: memory.id, content: event.target.value })} /> : <strong>{memory.content}</strong>}
+                      </span>
+                      {memoryEdit?.id === memory.id ? <div className="memory-edit-actions">
+                        <button type="button" className="settings-quiet-action" disabled={busy || memoryEdit.content.trim().length < 3} onClick={async () => {
+                          setBusy(true);
+                          try { await window.nexus.updateMemory(memory.id, memoryEdit.content); setMemories(await window.nexus.listMemories()); setMemoryEdit(null); setMessage(labels.memorySaved); }
+                          catch { setMessage(labels.memoryFailed); }
+                          finally { setBusy(false); }
+                        }}>{labels.memorySave}</button>
+                        <button type="button" className="settings-quiet-action" disabled={busy} onClick={() => setMemoryEdit(null)}>{labels.memoryCancel}</button>
+                      </div> : <button type="button" className="settings-quiet-action" aria-label={labels.memoryEdit} title={labels.memoryEdit} disabled={busy} onClick={() => setMemoryEdit({ id: memory.id, content: memory.content })}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
+                      {memoryEdit?.id !== memory.id && <button type="button" className="settings-quiet-action" disabled={busy} onClick={async () => {
                         setBusy(true);
                         try {
                           await window.nexus.forgetMemory(memory.id);
@@ -1137,7 +1149,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                           setTrainingStats(await window.nexus.trainingStats());
                           setMessage('Ricordo rimosso.');
                         } finally { setBusy(false); }
-                      }}>Dimentica</button>
+                      }}>Dimentica</button>}
                     </article>)}
                   </div>}
                   {responseCache.entries > 0 && <div className="cache-maintenance settings-wide">

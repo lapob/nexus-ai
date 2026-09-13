@@ -50,6 +50,7 @@ const CHANNELS = Object.freeze({
   trainingClear: 'nexus:training-clear',
   memoryList: 'nexus:memory-list',
   memoryForget: 'nexus:memory-forget',
+  memoryUpdate: 'nexus:memory-update',
   responseCacheStats: 'nexus:response-cache-stats',
   responseCacheClear: 'nexus:response-cache-clear',
   backupExport: 'nexus:backup-export',

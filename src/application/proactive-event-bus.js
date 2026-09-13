@@ -79,9 +79,16 @@ class ProactiveEventBus {
     const normalized = normalizeMetadata(metadata);
     const fingerprint = crypto.createHash('sha256').update(`${type}\u0000${JSON.stringify(normalized)}`).digest('hex');
     const time = this.now();
+    // Keep long-running sensor sessions bounded, including after a clock reset.
+    for (const [key, seenAt] of this.lastSeen) {
+      if (time < seenAt || time - seenAt >= this.dedupeMs) this.lastSeen.delete(key);
+    }
     const previous = this.lastSeen.get(fingerprint);
     if (previous !== undefined && time - previous < this.dedupeMs) return null;
     this.lastSeen.set(fingerprint, time);
+    while (this.lastSeen.size > this.historyLimit * 4) {
+      this.lastSeen.delete(this.lastSeen.keys().next().value);
+    }
     const policy = EVENT_POLICY[type];
     // Le quiet hours silenziano solo segnali informativi. Avvisi di sicurezza,
     // salute e ogni evento che richiede consenso restano sempre visibili.

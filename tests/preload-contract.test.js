@@ -23,7 +23,7 @@ function loadPreloadBridge() {
 test('il preload espone il bridge NexusNXS completo nel namespace ufficiale', () => {
   const { name, value } = loadPreloadBridge();
   assert.equal(name, 'nexus');
-  const required = ['benchmarkModels', 'clearResponseCache', 'forgetMemory', 'listMemories', 'responseCacheStats', 'openExternal', 'onWakeWordActivation', 'createWorkflow', 'nextWorkflowStep', 'decideWorkflowStep', 'cancelWorkflow', 'workflowStatus'];
+  const required = ['benchmarkModels', 'clearResponseCache', 'forgetMemory', 'updateMemory', 'listMemories', 'responseCacheStats', 'openExternal', 'onWakeWordActivation', 'createWorkflow', 'nextWorkflowStep', 'decideWorkflowStep', 'cancelWorkflow', 'workflowStatus'];
   for (const method of required) assert.equal(typeof value[method], 'function', `${method} deve essere esposto dal bridge.`);
   assert.ok(Object.keys(value).length >= 60, 'Il bridge NexusNXS non deve perdere funzioni esistenti.');
   for (const method of Object.values(value)) assert.equal(typeof method, 'function');
