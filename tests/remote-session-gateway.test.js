@@ -1272,12 +1272,12 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.doesNotMatch(publicHtml, /positions\.push\(/);
     assert.match(publicHtml, /indexedDB\.open\('nexusnxs-demo'/);
     assert.match(publicHtml, /MediaRecorder/);
-    assert.match(publicHtml, /monitorVoice/);
-    assert.match(publicHtml, /setPhase\('Ti ascolto'\)/);
-    assert.match(publicHtml, /noiseFloor\*2\.35/);
+    assert.match(publicHtml, /createPublicVoiceSession/);
+    assert.match(publicHtml, /state\('listening', copy\('Ti ascolto'/);
+    assert.match(publicHtml, /floor \* 2\.35/);
     assert.doesNotMatch(publicHtml, /Tocca e parla|mi fermo da solo|rispondo quando hai concluso/);
-    assert.match(publicHtml, /audio\.onpause=finish/);
-    assert.match(publicHtml, /setTimeout\(\(\)=>toggleVoice\(\),0\)/);
+    assert.match(publicHtml, /current\.pause\(\); resolve\(\)/);
+    assert.match(publicHtml, /while \(valid\(id\)\)/);
     assert.match(publicHtml, /rel="icon" href="\/nexus-icon\.png"/);
     assert.match(publicHtml, /class="brand-mark" src="\/nexus-icon\.png"/);
     assert.match(publicHtml, /api\/guest\/voice\/transcribe/);

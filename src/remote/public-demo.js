@@ -5,6 +5,7 @@
 
 const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../shared/desktop-recipes');
+const { createPublicVoiceSession } = require('./public-voice-session');
 const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.16-preview.1/NexusNXS-0.3.16-Setup.exe';
 const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.16-preview.1/NexusNXS-Android.apk';
 
@@ -233,6 +234,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const exchange = document.querySelector('.exchange');
   const userPrompt = document.getElementById('userPrompt');
   const fitCore = () => {
+    if (document.body.classList.contains('voice-session')) return;
     if (document.body.matches('.keyboard-open,.request-active,.conversation-active')) return;
     const copy = document.querySelector('.copy');
     const dock = document.querySelector('.dock');
@@ -312,7 +314,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const retainVoiceCore = () => { voiceCore = true; };
   button.addEventListener('click', retainVoiceCore, true);
   const desktopCore = matchMedia('(min-width: 960px) and (pointer: fine)');
-  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, expansive: true, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getVisible: () => document.body.classList.contains('image-generating') || !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
+  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, expansive: true, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getVisible: () => document.body.classList.contains('voice-session') || document.body.classList.contains('image-generating') || !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
   let renderer = createRenderer();
   const switchCoreLayout = () => { renderer.dispose(); renderer = createRenderer(); fitCore(); resumeField(); };
   desktopCore.addEventListener('change', switchCoreLayout);
@@ -392,17 +394,22 @@ function publicAiCosmicCoreScript({ palette, presentation }) {
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .composer-box,body:not(.keyboard-open):not(.request-active):not(.conversation-active) .send{display:none}
 
 .reasoning-toggle{display:none}
+.voice-session-controls[hidden]{display:none}.voice-session-controls{position:fixed;z-index:60;bottom:max(20px,env(safe-area-inset-bottom));left:16px;right:16px;display:grid;justify-items:center;gap:16px;color:#b5cece;text-align:center}.voice-session-controls p{max-width:480px;margin:0;font-size:.85rem;line-height:1.5;overflow-wrap:anywhere}.voice-session-controls button{width:48px;height:48px;border:1px solid #8cd9d933;border-radius:50%;background:#0a1b1df2;color:#cbe6e6;cursor:pointer}.voice-session-controls svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6}.voice-session-controls button:focus-visible{outline:2px solid #78deda;outline-offset:4px}
+body.voice-session{overflow:hidden}body.voice-session .exchange,body.voice-session .copy,body.voice-session .dock,body.voice-session .privacy{visibility:hidden!important;pointer-events:none!important}
+body.voice-session .core{position:fixed!important;left:50%!important;top:45dvh!important;width:min(92vw,calc(100dvh - 220px),1100px)!important;height:min(92vw,calc(100dvh - 220px),1100px)!important;min-width:64px;min-height:64px;max-height:none!important;margin:0!important;opacity:1!important;visibility:visible!important;overflow:visible!important;transform:translate(-50%,-50%)!important;pointer-events:auto!important;transition:none!important}
+body.voice-session #coreCanvas{opacity:1!important}body.voice-session .core-caption{display:none!important}body.voice-session .identity{pointer-events:none}
+#voiceStart{display:none}body:is(.keyboard-open,.request-active) #voiceStart{display:grid;place-items:center;grid-column:4;grid-row:2;width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:#83b8b8;cursor:pointer}#voiceStart svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.6;fill:none}
 body.keyboard-open .dock,body.request-active .dock{max-width:680px}
 .phase:not(:empty){max-width:100%;padding:10px 14px;border:1px solid rgba(118,211,212,.12);border-radius:16px;background:rgba(5,16,18,.94);color:#b5cece;line-height:1.5;overflow-wrap:anywhere;box-shadow:0 12px 32px rgba(0,0,0,.24)}
 .phase.error:not(:empty){border-color:rgba(231,143,130,.22);color:#eed2cd}
-body:is(.keyboard-open,.request-active) .composer{grid-template-columns:44px 44px minmax(0,1fr) 44px;gap:4px;padding:8px;border:1px solid rgba(111,202,202,.18);border-radius:26px;background:rgba(8,22,23,.92)}
+body:is(.keyboard-open,.request-active) .composer{grid-template-columns:44px 44px minmax(76px,1fr) 44px 44px;gap:4px;padding:8px;border:1px solid rgba(111,202,202,.18);border-radius:26px;background:rgba(8,22,23,.92)}
 body:is(.keyboard-open,.request-active) .composer-box{grid-column:1/-1;grid-row:1;min-height:44px;padding:0;border:0;background:transparent;box-shadow:none}
 body:is(.keyboard-open,.request-active) .composer textarea{display:block;width:100%;min-height:44px;margin:0;padding:10px 12px;border:0;background:transparent;box-shadow:none;font-size:16px}
 body:is(.keyboard-open,.request-active) .attachment-toggle,body:is(.keyboard-open,.request-active) .keyboard-toggle,body:is(.keyboard-open,.request-active) .send,body:is(.keyboard-open,.request-active) .reasoning-toggle{grid-row:2;width:44px;height:44px;margin:0;transform:none}
 body:is(.keyboard-open,.request-active) .attachment-toggle{grid-column:1;border:0;background:transparent;box-shadow:none}
 body:is(.keyboard-open,.request-active) .keyboard-toggle{grid-column:2;border:0;background:transparent;box-shadow:none}
 body:is(.keyboard-open,.request-active) .reasoning-toggle{display:flex;align-items:center;justify-content:center;gap:7px;width:76px;border-radius:22px;grid-column:3;justify-self:start}.reasoning-toggle:hover{background:rgba(91,224,220,.07)}.reasoning-toggle:focus-visible,.image-download:focus-visible{outline:2px solid #78deda;outline-offset:2px}
-body:is(.keyboard-open,.request-active) .send{grid-column:4}
+body:is(.keyboard-open,.request-active) .send{grid-column:5}
 body:is(.keyboard-open,.request-active) .attachment-tray{margin-inline:12px}
 .composer button{user-select:none;-webkit-user-select:none}
 body.image-generating .core{position:fixed;left:50%;top:calc(var(--nxs-vvh) * .45);width:min(90vw,var(--nxs-core-fit,56dvh),900px);height:auto;max-height:none;margin:0;opacity:1;visibility:visible;overflow:visible;transform:translate(-50%,-50%);pointer-events:none}
@@ -669,7 +676,7 @@ function resolveSlashInput(value){const raw=String(value||'').trim();let custom=
 prompt.addEventListener('keydown',event=>{const values=slashMatches();if(!values.length)return;if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();event.stopImmediatePropagation();slashSelected=(slashSelected+(event.key==='ArrowDown'?1:-1)+values.length)%values.length;updateSlashMenu()}else if(event.key==='Tab'||event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();chooseSlash(values[slashSelected]?.name||values[0].name)}else if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();slashMenu.hidden=true}},{capture:true});
 prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
   const answerFormattingRuntime = `const {formatAnswer,hideAnswerContext}=(${publicAnswerPresentationRuntime.toString()})(answer);`;
-  return script
+  const enhancedScript = script
     .replace('globalThis.nexusDemoState=runtime', 'globalThis.nexusAiState=runtime')
     .replace("const setVoiceState=value=>", "const coreHintSeen=()=>{try{return localStorage.getItem('nexusnxs.core-hint.v1')==='1'}catch{return false}},markCoreHintSeen=()=>{try{localStorage.setItem('nexusnxs.core-hint.v1','1')}catch{}};const setVoiceState=value=>")
     .replace("idle:'Core pronto'", "idle:coreHintSeen()?'Core pronto':'Parla con Nexus'")
@@ -732,6 +739,12 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("if(busy)return;if(!navigator.mediaDevices", "if(busy||runtime.voiceState==='requesting')return;setVoiceState('requesting');try{await session()}catch{setPhase('Connessione non disponibile: riprova tra poco',true);return}if(capability('voice-input')==='unavailable'){setPhase('La voce non è disponibile: puoi scrivere',true);return}if(!navigator.mediaDevices")
     .replace("recorder.onstop=()=>{clearTimeout(recordingTimer);stream.getTracks()", "recorder.onstop=()=>{clearTimeout(recordingTimer);stopVoiceMonitor();stream.getTracks()")
     .replace("recorder.start(250);setVoiceState('listening');setPhase('Ti ascolto · tocca ancora per inviare');recordingTimer=setTimeout(()=>recorder.state==='recording'&&recorder.stop(),10000)", "recorder.start(250);monitorVoice(stream,recorder);setVoiceState('listening');setPhase('Ti ascolto');recordingTimer=setTimeout(()=>recorder.state==='recording'&&recorder.stop(),15000)");
+  return enhancedScript
+    .replace(/async function speak\(text\)\{[\s\S]*?currentAudio=null;setVoiceState\('ready'\)\}\}/, 'async function speak(text){await voiceSession.speak(text)}')
+    .replace(/async function transcribe\(blob\)\{[\s\S]*?(?=function toggleKeyboard\()/, 'function toggleVoice(){return voiceSession.interact()}')
+    .replace('function toggleKeyboard(){', 'function toggleKeyboard(){if(voiceSession.active){voiceSession.leave();return;}')
+    .replace("core.addEventListener('click',event=>", `const voiceSession=(${createPublicVoiceSession.toString()})({core,prompt,runtime,session,fetchAudio:authenticatedFetch,ask:text=>ask(text,{voice:true}),encodeWav,spokenLanguage,setState:setVoiceState,setPhase,isBusy:()=>busy,showText:focus=>{voicePresentation=false;document.body.classList.remove('composer-collapsed');document.body.classList.add('conversation-active','keyboard-open');setViewportMetrics();if(focus)prompt.focus({preventScroll:true})}});const voiceStart=document.createElement('button');voiceStart.id='voiceStart';voiceStart.type='button';voiceStart.setAttribute('aria-label',composerCopy('Avvia conversazione vocale','Start voice conversation'));voiceStart.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3"/></svg>';send.before(voiceStart);voiceStart.onclick=()=>voiceSession.start();core.addEventListener('click',event=>`)
+    .replace("core.animate([{transform:'scale(1)'},{transform:'scale(.965)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.2,0,0,1)'});", '');
 }
 
 function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, androidDownload }) {

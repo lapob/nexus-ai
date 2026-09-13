@@ -75,8 +75,9 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /async function authenticatedFetch\(url,options=\{\}\)/);
   assert.match(html, /if\(response\.status===401\)\{token='';credential=await session\(\);response=await invoke\(\)\}/);
   assert.match(html, /await authenticatedFetch\('\/api\/guest\/messages\/stream'/);
-  assert.match(html, /await authenticatedFetch\('\/api\/guest\/voice\/synthesize'/);
-  assert.match(html, /await authenticatedFetch\('\/api\/guest\/voice\/transcribe'/);
+  assert.match(html, /fetchAudio:authenticatedFetch/);
+  assert.match(html, /await fetchAudio\('\/api\/guest\/voice\/synthesize'/);
+  assert.match(html, /await fetchAudio\('\/api\/guest\/voice\/transcribe'/);
   assert.match(html, /verified!==rawAnswer/);
   assert.doesNotMatch(html, /async function memoryRead\(/);
   assert.match(html, /id="sessionHistory"/);
@@ -112,7 +113,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /\.status-active \.dock/);
   assert.match(html, /finally\{busy=false;setSendMode\(false\);leaveRequestLayout\(\)\}/);
   assert.match(html, /visualViewport/);
-  assert.match(html, /language:spokenLanguage\(text\)/);
+  assert.match(html, /language:\s*spokenLanguage\(text\)/);
   assert.match(html, /NexusNXS può commettere errori/);
   assert.match(html, /Parla con Nexus/);
   assert.match(html, /nexusnxs\.core-hint\.v1/);
