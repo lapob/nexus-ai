@@ -610,7 +610,7 @@ test("real desktop and Android image zoom is centered and keyboard dismissible",
 });
 
 
-test("both home actions stay centered independently of their icons", async ({page}) => {
+test("both home actions center the complete text and icon group", async ({page}) => {
   for (const width of [320,360,390,768,960,1440,1920]) {
     await page.setViewportSize({width,height:844});
     await page.goto('/');
@@ -619,17 +619,15 @@ test("both home actions stay centered independently of their icons", async ({pag
     for (const top of [0,200,500]) {
       await page.evaluate(top=>scrollTo({top,behavior:'instant'}),top);
       const result=await page.locator('.hero-actions a').evaluate(el=>{
-        const range=document.createRange();range.selectNodeContents(el.firstChild);
-        const text=range.getBoundingClientRect(), arrow=el.querySelector('span').getBoundingClientRect();
-        return {delta:Math.abs(text.x+text.width/2-document.documentElement.clientWidth/2),gap:arrow.left-text.right,overflow:document.documentElement.scrollWidth>innerWidth};
+        const text=el.querySelector('.hero-action-label').getBoundingClientRect(), arrow=el.querySelector('.hero-action-arrow').getBoundingClientRect();
+        return {delta:Math.abs((text.left+arrow.right)/2-document.documentElement.clientWidth/2),gap:arrow.left-text.right,overflow:document.documentElement.scrollWidth>innerWidth};
       });
       expect(result.delta, JSON.stringify({width,top,result})).toBeLessThan(2);
       expect(result.gap).toBeGreaterThan(6);
       expect(result.overflow).toBe(false);
       const primary = await page.locator('.hero-entry .primary-button').evaluate(el=>{
-        const range=document.createRange();range.selectNodeContents(el.firstChild);
-        const text=range.getBoundingClientRect(),button=el.getBoundingClientRect();
-        return {text:Math.abs(text.x+text.width/2-document.documentElement.clientWidth/2),button:Math.abs(button.x+button.width/2-document.documentElement.clientWidth/2)};
+        const text=el.querySelector('span').getBoundingClientRect(),icon=el.querySelector('svg').getBoundingClientRect(),button=el.getBoundingClientRect();
+        return {text:Math.abs((text.left+icon.right)/2-document.documentElement.clientWidth/2),button:Math.abs(button.x+button.width/2-document.documentElement.clientWidth/2)};
       });
       expect(primary.text,JSON.stringify({width,top,primary})).toBeLessThan(2);
       expect(primary.button).toBeLessThan(2);
