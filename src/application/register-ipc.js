@@ -247,13 +247,12 @@ function agentPlanSchema(capabilities) {
 }
 
 function remoteActionCapabilities(capabilities) {
-  const blocked = new Set(['run_script', 'run_command', 'open_path', 'open_user_path']);
   return {
     ...capabilities,
     // A paired phone can use structured tools, but it never becomes a remote
     // shell. Generic OS file opening is excluded too because executable file
     // associations can turn an apparently harmless open into code execution.
-    tools: capabilities.tools.filter((tool) => !blocked.has(tool.name))
+    tools: capabilities.tools.filter((tool) => require('../security/remote-tool-policy').remoteToolAllowed(tool.name))
   };
 }
 

@@ -12,6 +12,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const { sanitizeLogValue } = require('../services/logger');
 const { createActionReceipt } = require('../security/action-receipt');
 const { assertVerifiedDeviceIdentity } = require('../security/device-identity');
+const { assertRemoteToolAllowed } = require('../security/remote-tool-policy');
 
 const MAX_OUTPUT = 64 * 1024;
 const TICKET_TTL_MS = 5 * 60 * 1000;
@@ -646,6 +647,7 @@ class ActionRuntime {
   }
 
   propose(plan, { subjectId = '', deviceIdentity = null } = {}) {
+    assertRemoteToolAllowed(plan.tool, Boolean(subjectId || deviceIdentity));
     if (!this.acceptingActions) throw new Error('NexusNXS è in fase di chiusura: nessuna nuova azione può essere pianificata.');
     for (const [id, ticket] of this.tickets) if (ticket.expiresAt < this.now()) this.tickets.delete(id);
     if (this.tickets.size >= MAX_PENDING_TICKETS) throw new Error('Troppe proposte operative in attesa. Completa o lascia scadere quelle esistenti.');
@@ -1012,6 +1014,9 @@ class ActionRuntime {
       const recorded = this.recordReceipt(ticket, { outcome: 'denied', verification: 'human-denied' });
       return { status: 'denied', message: 'Azione annullata dalla persona.', receipt: recorded.receipt, receiptPersisted: recorded.persisted };
     }
+    // Denial/revocation above remains possible for legacy tickets, but no
+    // approval mode can turn a paired device into a local executor.
+    assertRemoteToolAllowed(ticket.tool, Boolean(ticket.subjectId || subjectId || deviceIdentity || requireSubject));
     this.audit({ event: requiresApproval ? 'approved' : 'auto-approved', tool: ticket.tool, preview: ticket.preview, approvalMode: policy });
     const rollbackPolicy = ticket.capability?.rollback || TOOL_EFFECTS[ticket.tool]?.rollback || 'not-guaranteed';
     const rollbackTransactionId = String(transactionId || ticket.id).slice(0, 128);

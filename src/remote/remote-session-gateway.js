@@ -10,7 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
-const parsePdf = require('pdf-parse');
+const { extractPdfText } = require('./pdf-extraction');
 const { SecurityEventStore } = require('../security/security-event-store');
 const { PersistentQuotaStore, extractionRisk } = require('../security/abuse-guard');
 const { profileSafetyLimit, resolveAccessProfile } = require('../security/access-profile-policy');
@@ -176,7 +176,7 @@ function operationIdentifier(value) {
   return candidate;
 }
 
-async function guestAttachments(value) {
+async function guestAttachments(value, { signal } = {}) {
   if (!Array.isArray(value)) return { context: '', images: [] };
   const contexts = []; const images = [];
   for (const item of value.slice(0, 2)) {
@@ -196,7 +196,7 @@ async function guestAttachments(value) {
       contexts.push(`FILE: ${name}\n${text}`); continue;
     }
     if (mime === 'application/pdf') {
-      const extracted = await parsePdf(bytes, { max: 80 }).catch(() => null);
+      const extracted = await extractPdfText(bytes, { signal });
       const text = String(extracted?.text || '').replace(/\u0000/g, '').trim().slice(0, 120_000);
       contexts.push(text ? `PDF: ${name}\n${text}` : `PDF: ${name}\nTesto non estraibile; il documento potrebbe contenere soltanto immagini.`);
     }
@@ -1001,7 +1001,7 @@ class RemoteSessionGateway {
           execution.emit({ type: 'phase', activity: guest.activity });
         };
         report('Comprendo la richiesta…');
-        const attachments = await guestAttachments(body.attachments);
+        const attachments = await guestAttachments(body.attachments, { signal: controller.signal });
         this.assertServing();
         if (controller.signal.aborted) throw Object.assign(new Error('Richiesta annullata.'), { name: 'AbortError', code: 'ABORT_ERR' });
         const now = Date.now();

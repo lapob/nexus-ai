@@ -8,7 +8,7 @@ const assert=require('node:assert/strict');
  const browser=await chromium.launch();
  try {
   for(const width of [320,390,768,1440]){
-   const page=await browser.newPage({viewport:{width,height:844},serviceWorkers:'block',locale:'it-IT'});
+   const page=await browser.newPage({viewport:{width,height:844},hasTouch:width<960,isMobile:width<960,serviceWorkers:'block',locale:'it-IT'});
    const errors=[],requests=[];
    page.on('pageerror',e=>errors.push(e.message));
    await page.route('https://ai.nexusnxs.com/**',r=>{
@@ -23,7 +23,15 @@ const assert=require('node:assert/strict');
     return r.fulfill({json:{}});
    });
    await page.goto('https://ai.nexusnxs.com/');
-   await page.locator('#attachmentInput').setInputFiles({name:'prova.md',mimeType:'',buffer:Buffer.from('# Verifica\nDocumento sintetico.')});
+   await page.locator('#keyboard').click();
+   await page.locator('#prompt').fill('Bozza da mantenere');
+   const chooserPromise=page.waitForEvent('filechooser');
+   if(width<960)await page.locator('#attachment').tap();else await page.locator('#attachment').click();
+   const chooser=await chooserPromise;
+   assert.equal(await page.locator('#prompt').evaluate(el=>document.activeElement===el),true,'Attachment activation must preserve composer focus');
+   await chooser.setFiles({name:'prova.md',mimeType:'text/markdown',buffer:Buffer.from('# Verifica\nDocumento sintetico.')});
+   assert.equal(await page.locator('#prompt').inputValue(),'Bozza da mantenere');
+   assert.equal(await page.locator('#attachment').getAttribute('title'),null);
    await page.waitForFunction(()=>document.querySelector('#attachment').dataset.count==='1');
    await page.locator('#attachmentInput').setInputFiles({name:'non-supportato.exe',mimeType:'application/x-msdownload',buffer:Buffer.from('invalid')});
    await page.waitForFunction(()=>document.querySelector('#phase').textContent.includes('Formato'));

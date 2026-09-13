@@ -142,7 +142,7 @@ test('la proposta è un dry-run con capability monouso legata a workspace e disp
   const item = fixture();
   t.after(item.cleanup);
   const proposal = item.runtime.propose(
-    { summary: 'Apri file', tool: 'open_path', arguments: { path: 'task.js' } },
+    { summary: 'Leggi file', tool: 'read_file', arguments: { path: 'task.js' } },
     { subjectId: 'device-owner' }
   );
   assert.equal(proposal.phase, 'dry-run');
@@ -154,7 +154,7 @@ test('la proposta è un dry-run con capability monouso legata a workspace e disp
     subjectBound: proposal.capability.subjectBound,
     singleUse: proposal.capability.singleUse
   }, {
-    scope: 'active-workspace', tool: 'open_path', effect: 'read', rollback: 'not-required',
+    scope: 'active-workspace', tool: 'read_file', effect: 'read', rollback: 'not-required',
     subjectBound: true, singleUse: true
   });
   await assert.rejects(

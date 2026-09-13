@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
+const { assertRemoteToolAllowed } = require('../security/remote-tool-policy');
 
 // #region 01 — Validazione e persistenza
 
@@ -111,8 +112,10 @@ class WorkflowRuntime {
     return Array.isArray(tools) ? new Set(tools.map((tool) => tool.name)) : null;
   }
 
-  create({ summary, steps }, { subjectId = '' } = {}) {
+  create({ summary, steps }, { subjectId = '', deviceIdentity = null, requireSubject = false } = {}) {
     if (!this.accepting) throw workflowFailure('NexusNXS è in fase di chiusura.', 'WORKFLOW_SHUTTING_DOWN', 503);
+    const validatedSteps = validateSteps(steps, this.allowedTools());
+    for (const step of validatedSteps) assertRemoteToolAllowed(step.tool, Boolean(subjectId || deviceIdentity || requireSubject));
     const workflow = {
       id: randomUUID(),
       summary: String(summary || '').trim().slice(0, 1000),
@@ -121,7 +124,7 @@ class WorkflowRuntime {
       status: 'pending',
       cursor: 0,
       ownerSubjectId: String(subjectId || '').trim().slice(0, 128),
-      steps: validateSteps(steps, this.allowedTools())
+      steps: validatedSteps
     };
     this.save(workflow);
     return workflow;
@@ -174,6 +177,7 @@ class WorkflowRuntime {
     if (TERMINAL_STATUSES.has(workflow.status)) return null;
     const step = workflow.steps[workflow.cursor];
     if (!step) return null;
+    assertRemoteToolAllowed(step.tool, Boolean(workflow.ownerSubjectId || context.subjectId || context.deviceIdentity || context.requireSubject));
     if (step.status === 'awaiting-approval' && step.proposal) {
       return { workflow: publicWorkflow(workflow), step: { id: step.id, tool: step.tool }, proposal: { ...step.proposal } };
     }
@@ -212,6 +216,7 @@ class WorkflowRuntime {
       throw workflowFailure('Nessun passaggio attende approvazione.', 'WORKFLOW_NOT_AWAITING_APPROVAL', 409);
     }
     const approved = typeof decision === 'boolean' ? decision : decision?.approved === true;
+    if (approved) assertRemoteToolAllowed(step.tool, Boolean(workflow.ownerSubjectId || context.subjectId || context.deviceIdentity || context.requireSubject));
     const suppliedTicket = typeof decision === 'object' ? String(decision?.ticketId || '').trim() : step.ticket;
     if (!suppliedTicket || suppliedTicket !== step.ticket) {
       throw workflowFailure('Il ticket non appartiene al passaggio corrente.', 'WORKFLOW_TICKET_MISMATCH', 409);
