@@ -392,6 +392,9 @@ function publicAiCosmicCoreScript({ palette, presentation }) {
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .composer-box,body:not(.keyboard-open):not(.request-active):not(.conversation-active) .send{display:none}
 
 .reasoning-toggle{display:none}
+body.keyboard-open .dock,body.request-active .dock{max-width:680px}
+.phase:not(:empty){max-width:100%;padding:10px 14px;border:1px solid rgba(118,211,212,.12);border-radius:16px;background:rgba(5,16,18,.94);color:#b5cece;line-height:1.5;overflow-wrap:anywhere;box-shadow:0 12px 32px rgba(0,0,0,.24)}
+.phase.error:not(:empty){border-color:rgba(231,143,130,.22);color:#eed2cd}
 body:is(.keyboard-open,.request-active) .composer{grid-template-columns:44px 44px minmax(0,1fr) 44px;gap:4px;padding:8px;border:1px solid rgba(111,202,202,.18);border-radius:26px;background:rgba(8,22,23,.92)}
 body:is(.keyboard-open,.request-active) .composer-box{grid-column:1/-1;grid-row:1;min-height:44px;padding:0;border:0;background:transparent;box-shadow:none}
 body:is(.keyboard-open,.request-active) .composer textarea{display:block;width:100%;min-height:44px;margin:0;padding:10px 12px;border:0;background:transparent;box-shadow:none;font-size:16px}

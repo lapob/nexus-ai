@@ -3530,22 +3530,25 @@ button.shortcut-item:focus-visible kbd {
 .voice-notice {
   position: absolute;
   z-index: 24;
-  left: clamp(22rem, 58vw, 70%);
+  left: 50%;
   bottom: clamp(5.2rem, 9vh, 7rem);
   display: flex;
   max-width: min(28rem, calc(100vw - 2rem));
   align-items: center;
   gap: 0.65rem;
-  transform: translateX(-50%);
+  translate: -50% 0;
   border: 1px solid rgba(157, 220, 222, 0.1);
-  border-radius: 999px;
+  border-radius: 1rem;
   padding: 0.68rem 0.9rem;
-  background: rgba(5, 12, 14, 0.72);
+  background: rgba(5, 16, 18, 0.94);
   color: rgba(213, 235, 236, 0.68);
   font-size: var(--text-caption);
   letter-spacing: 0.005em;
   pointer-events: none;
   backdrop-filter: blur(10px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
 }
 
 .voice-notice i {
@@ -3661,7 +3664,7 @@ body[data-smoke-barge-in="true"] .entity-shell .answer-surface[data-size="expand
     left: 1rem;
     justify-content: center;
     max-width: none;
-    transform: none;
+    translate: none;
     text-align: center;
   }
 }

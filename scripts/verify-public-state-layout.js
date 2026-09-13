@@ -30,7 +30,7 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   const brand=await page.locator('.brand-lockup').boundingBox(),state=await page.locator('.identity .state').boundingBox();
   assert.equal(brand.x<state.x+state.width&&brand.x+brand.width>state.x&&brand.y<state.y+state.height&&brand.y+brand.height>state.y,false,'Brand and service state must not overlap');
   assert.equal(report.some(item=>item.overflow),false,'No horizontal overflow');
-  if(width<=560){const box=await page.locator('.composer-box').boundingBox(),composer=await page.locator('.composer').boundingBox();assert.ok(box.width>=composer.width-2,'Full width mobile text');}
+  if(width<=560){const box=await page.locator('.composer-box').boundingBox(),composer=await page.locator('.composer').boundingBox();const inset=await page.locator('.composer').evaluate(el=>{const s=getComputedStyle(el);return parseFloat(s.paddingLeft)+parseFloat(s.paddingRight)+parseFloat(s.borderLeftWidth)+parseFloat(s.borderRightWidth)});assert.ok(Math.abs(box.width-(composer.width-inset))<=2,'Mobile text spans the composer content area');}
   await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await capture('answer-start');
   const glass=await page.evaluate(()=>{
    const top=getComputedStyle(document.querySelector('.identity'),'::before'),bottom=getComputedStyle(document.querySelector('.dock'),'::before');
@@ -51,6 +51,12 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   assert.equal(await page.locator('#prompt').inputValue(),'Bozza mantenuta durante il cambio rete');
   assert.equal(await page.locator('#send').isDisabled(),false,'Reconnect restores sending');
   await capture('reconnected');
+  await page.evaluate(()=>{const phase=document.getElementById('phase');phase.textContent='Connessione interrotta. Il messaggio resta disponibile: riprova quando la rete torna attiva.';phase.className='phase error';document.body.classList.add('status-active');});
+  await capture('notice');
+  const notice=await page.locator('#phase').boundingBox();
+  assert.ok(notice&&notice.width<=width&&notice.x>=0&&notice.x+notice.width<=width,'Long notices remain within the viewport');
+  const dockWidth=await page.locator('.dock').evaluate(el=>el.getBoundingClientRect().width);
+  assert.ok(dockWidth<=680,'Composer stays compact on large screens');
   await page.close();
  }}finally{fs.writeFileSync(path.join(output,'web-states-report.json'),JSON.stringify(report,null,2));await browser.close();}
  console.log('Captured '+report.length+' web states');
