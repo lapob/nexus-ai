@@ -93,8 +93,7 @@ html { scroll-padding-top: 96px; }
 .astral-hero__scene .hero-entry { grid-column: 1 / -1; grid-row: 2; position: relative; z-index: 2; padding: 16px 24px 24px; text-align: center; }
 .hero-entry p { margin: 0 0 14px; font-size: 16px; color: #b8cacc; }
 .home-continuum .astral-hero__scene .home-neural-core { max-width: min(1100px, 60svh); }
-.hero-entry .primary-button { font-size:14px; gap:16px; justify-content:center; }
-.hero-entry .primary-button::before { content:''; width:16px; flex:0 0 16px; }
+.hero-entry .primary-button { font-size:14px; gap:16px; display:inline-grid; grid-template-columns:minmax(0,1fr) 16px; justify-content:center; }
 .astral-hero .hero-product-name {
   display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; grid-row: 1;
   width: 100%; max-width: none; margin: 0; z-index: 2;
@@ -117,8 +116,9 @@ html { scroll-padding-top: 96px; }
 .astral-hero .hero-intro { position: relative; z-index: 2; text-align: center; padding-top: 16px; margin-top: 0; }
 .astral-hero .hero-intro > p { margin: 0; color: #b8cacc; font-size: clamp(16px, 1.4vw, 20px); line-height: 1.6; }
 .home-continuum .astral-hero .hero-actions { width:100%; margin: 16px auto 0 !important; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px 32px; }
-.astral-hero .hero-actions a { position:relative; display:block; width:fit-content; padding-inline:30px; margin-inline:auto; border-bottom:0; text-align:center; font-size:14px; }
-.astral-hero .hero-actions a span { position:absolute; left:calc(50% + 112px); top:50%; transform:translateY(-50%); margin:0; }
+.astral-hero .hero-actions a { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 16px; align-items:center; gap:12px; width:fit-content; max-width:100%; padding-inline:0; margin-inline:auto; border-bottom:0; text-align:center; font-size:14px; }
+.astral-hero .hero-actions a span { position:static; transform:none; margin:0; }
+.astral-hero .hero-action-label { font-weight:600; }
 
 .astral-hero .hero-product-name { opacity: var(--hero-label-opacity, 1); }
 
