@@ -2048,8 +2048,12 @@ class RemoteSessionGateway {
         const prompt = String(body.prompt || '').trim();
         const size = String(body.size || '1024x1024');
         if (!prompt || prompt.length > 2_000) return this.json(response, 400, { error: 'Descrizione immagine non valida.', code: 'IMAGE_PROMPT_INVALID' });
+        const imageController = new AbortController();
+        const disconnect = () => { if (!response.writableFinished) imageController.abort(); };
+        response.once('close', disconnect);
         try {
-          const result = await this.imageGenerationService.generate({ prompt, size });
+          const result = await this.imageGenerationService.generate({ prompt, size, signal: imageController.signal });
+          if (imageController.signal.aborted || response.destroyed) return;
           this.assertServing();
           response.writeHead(200, {
             'Content-Type': result.mimeType,
@@ -2065,11 +2069,14 @@ class RemoteSessionGateway {
           this.securityEvents.append('guest.image.generated', { address, detail: `Formato ${size}` });
           return;
         } catch (error) {
+          if (imageController.signal.aborted || response.destroyed) return;
           this.logger.warn?.('Generazione immagine non completata.', { code: error?.code });
           return this.json(response, error?.code === 'IMAGE_PROMPT_INVALID' || error?.code === 'IMAGE_SIZE_INVALID' ? 400 : 503, {
             error: error?.code === 'IMAGE_SIZE_INVALID' ? 'Formato immagine non supportato.' : 'La generazione immagini NexusNXS non è pronta.',
             code: error?.code || 'IMAGE_PROVIDER_ERROR'
           });
+        } finally {
+          response.off('close', disconnect);
         }
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/messages/cancel') {

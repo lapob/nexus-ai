@@ -78,7 +78,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /await authenticatedFetch\('\/api\/guest\/voice\/synthesize'/);
   assert.match(html, /await authenticatedFetch\('\/api\/guest\/voice\/transcribe'/);
   assert.match(html, /verified!==rawAnswer/);
-  assert.match(html, /async function memoryRead\(\)\{return\[\]/);
+  assert.doesNotMatch(html, /async function memoryRead\(/);
   assert.match(html, /id="sessionHistory"/);
   assert.match(html, /function renderSessionHistory\(\)/);
   assert.match(html, /className='session-turn-content'/);

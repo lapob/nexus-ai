@@ -548,7 +548,10 @@ test('la generazione immagini pubblica resta server-side, autenticata e fail-clo
     assert.equal(response.headers.get('content-type'), 'image/png');
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), image);
-    assert.deepEqual(calls, [{ prompt: 'Un nucleo cosmico', size: '512x512' }]);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].prompt, 'Un nucleo cosmico');
+    assert.equal(calls[0].size, '512x512');
+    assert.ok(calls[0].signal instanceof AbortSignal);
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 
   const unavailableRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-guest-image-off-'));
@@ -1470,4 +1473,29 @@ test('una disconnessione breve conserva il lavoro e lo stop esplicito lo annulla
     for (let attempt = 0; attempt < 20 && !cancelled; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(cancelled, true);
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('la disconnessione del client annulla la richiesta al servizio immagini', async () => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nexus-image-cancel-'));
+  let entered, cancelled;
+  const started=new Promise(resolve=>{entered=resolve});
+  const stopped=new Promise(resolve=>{cancelled=resolve});
+  const gateway=new RemoteSessionGateway({
+    statePath:path.join(root,'remote-access.json'),
+    conversationStore:{list:()=>[],save:record=>record},
+    imageGenerationService:{available:true,generate:({signal})=>new Promise(resolve=>{
+      signal.addEventListener('abort',()=>{cancelled();resolve({image:Buffer.from('cancelled'),mimeType:'image/png'})},{once:true});entered();
+    })},logger:{info(){},warn(){}}
+  });
+  const controller=new AbortController();
+  try{
+    const port=await freePort();await gateway.configure({enabled:true,allowLan:false,port});
+    const baseUrl=`http://127.0.0.1:${port}`;
+    const guest=await bootstrapGuest(baseUrl,'019fa53a-63c1-79b1-bf97-08fdf3bb5d07');
+    const pending=fetch(`${baseUrl}/api/guest/images/generate`,{method:'POST',signal:controller.signal,headers:{Authorization:`Bearer ${guest.token}`,'Content-Type':'application/json'},body:JSON.stringify({prompt:'Una stella'})});
+    const rejected=assert.rejects(pending,/abort/i);
+    await started;controller.abort();await rejected;
+    await Promise.race([stopped,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Il servizio immagini non ha ricevuto abort')),5000);timer.unref();})]);
+  }finally{controller.abort();await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
 });

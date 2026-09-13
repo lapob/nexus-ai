@@ -114,6 +114,7 @@ class ImageGenerationService {
     timeout.unref?.();
     const abort = () => controller.abort(signal?.reason);
     signal?.addEventListener?.('abort', abort, { once: true });
+    if (signal?.aborted) abort();
     try {
       const result = this.protocol === 'comfyui'
         ? await this.generateWithComfyUi({ prompt: normalizedPrompt, size, signal: controller.signal })
