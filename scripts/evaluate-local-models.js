@@ -6,6 +6,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { selectManagedRuntimePort } = require('../src/ai/managed-ollama-runtime');
 
 function persistedPrivateEndpoint() {
   const dataRoot = String(process.env.NEXUS_USER_DATA_ROOT || path.resolve(__dirname, '..', '..', '.nexus-data')).trim();
@@ -25,7 +26,7 @@ function activeManagedEndpoint() {
     const pid = Number(descriptor?.pid);
     if (!Number.isInteger(pid) || pid <= 0) return '';
     process.kill(pid, 0);
-    return `http://127.0.0.1:${12000 + (pid % 1000)}`;
+    return `http://127.0.0.1:${selectManagedRuntimePort(pid)}`;
   } catch {}
   return '';
 }

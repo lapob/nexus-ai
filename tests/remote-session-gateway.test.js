@@ -1285,7 +1285,7 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /id="downloadSheet"/);
     assert.match(publicHtml, /id="imageResult"/);
     assert.match(publicHtml, /id="attachmentInput"/);
-    assert.match(publicHtml, /attachments:pendingAttachments/);
+    assert.match(publicHtml, /attachments:requestAttachments/);
     assert.match(publicHtml, /id="feedbackAction"/);
     assert.match(publicHtml, /id="slashMenu"/);
     assert.match(publicHtml, /Comandi NexusNXS/);
