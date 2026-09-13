@@ -1085,7 +1085,7 @@
 
 .command-meta {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.7rem;
 }
@@ -1313,3 +1313,14 @@
     place-items: center;
   }
 }
+
+/* Shared composer controls: quiet at rest, explicit on focus or activation. */
+.command-meta .reasoning-control{width:76px;height:44px;display:flex;align-items:center;justify-content:center;gap:7px;background:transparent;color:#83b8b8;border-radius:22px}
+.reasoning-control svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5}
+.reasoning-control[aria-pressed=true]{color:#9effee}
+.reasoning-level{display:flex;gap:3px}.reasoning-level i{width:10px;height:3px;border-radius:3px;background:#83b8b840}
+.reasoning-level i:first-child,.reasoning-control[aria-pressed=true] .reasoning-level i{background:currentColor}
+.command-meta .attachment-trigger{width:44px;height:44px;justify-content:center;border-radius:50%;padding:0}
+.command-meta .attachment-trigger svg{width:21px;height:21px}
+.command-meta .reasoning-control:hover{background:#5be0dc12;transform:none}
+.command-meta .reasoning-control:focus-visible{outline:2px solid #78deda;outline-offset:2px}

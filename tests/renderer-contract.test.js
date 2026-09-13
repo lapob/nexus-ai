@@ -436,7 +436,8 @@ test('il renderer non reintroduce header o navbar tradizionali', () => {
     .join('\n');
   assert.doesNotMatch(rendererComponents, /<(?:header|nav)\b/i);
   assert.doesNotMatch(rendererComponents, /navbar/i);
-  assert.match(commandInput, /'Automatico'/);
+  assert.match(commandInput, /aria-pressed=\{reasoning === 'deep'\}/);
+  assert.match(commandInput, /onSubmit\(resolution.text, attachments, reasoning\)/);
 });
 
 test('la presenza nasconde i controlli inattivi e le superfici restano progressive', () => {

@@ -26,5 +26,5 @@ test('composer e shell espongono chiaramente il turno successivo', () => {
   assert.match(app, /data-next-turn=.*queuedVoicePrompt/);
   assert.match(app, /queueing=\{nexus\.generating\}/);
   assert.match(composer, /Scrivi il prossimo messaggio/);
-  assert.match(composer, /Invio · metti in coda/);
+  assert.match(composer, /Metti il messaggio in coda/);
 });

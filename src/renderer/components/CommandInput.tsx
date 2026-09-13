@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { LocalAttachment, NexusSettings, WorkspaceContext } from '../types/nexus';
 import { loadSlashCommands, resolveSlashSubmission, saveSlashCommands, slashSuggestions } from '../systems/SlashCommands';
+import { uiCopy } from '../systems/Localization';
 import { NexusSelect } from './NexusSelect';
 
 // #region 01 — Contratto e stato locale
@@ -14,7 +15,7 @@ interface CommandInputProps {
   open: boolean;
   queueing: boolean;
   onClose: () => void;
-  onSubmit: (value: string, attachments: LocalAttachment[]) => void;
+  onSubmit: (value: string, attachments: LocalAttachment[], mode: 'fast' | 'deep') => void;
   workspace: WorkspaceContext;
   approvalMode: NonNullable<NexusSettings['actionApprovalMode']>;
   onSelectWorkspace: () => void;
@@ -25,6 +26,8 @@ interface CommandInputProps {
 
 export function CommandInput({ open, queueing, onClose, onSubmit, workspace, approvalMode, onSelectWorkspace, onClearWorkspace, onApprovalModeChange, conversation }: CommandInputProps) {
   const [value, setValue] = useState('');
+  const [reasoning, setReasoning] = useState<'fast' | 'deep'>('fast');
+  const labels = uiCopy();
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const [attachmentMessage, setAttachmentMessage] = useState('');
   const [customCommands, setCustomCommands] = useState(() => loadSlashCommands());
@@ -81,7 +84,7 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
       setSlashDismissed(false);
       return;
     }
-    if (resolution.text) onSubmit(resolution.text, attachments);
+    if (resolution.text) onSubmit(resolution.text, attachments, reasoning);
   };
 
   // #endregion
@@ -236,12 +239,15 @@ export function CommandInput({ open, queueing, onClose, onSubmit, workspace, app
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M9 12.5l5.2-5.2a3 3 0 1 1 4.2 4.2l-7.1 7.1a5 5 0 0 1-7.1-7.1l7.4-7.4" />
                 </svg>
-                <span>Allega</span>
+
               </button>
               <span id="attachment-trigger-hint" className="attachment-trigger-hint" role="tooltip">Foto, documenti e codice</span>
             </div>
-            <span>{attachmentMessage || (attachments.length ? `${attachments.length} allegati` : 'Automatico')}</span>
-            <small>{queueing ? 'Invio · metti in coda' : 'Invio per continuare'}</small>
+            <button type="button" className="reasoning-control" aria-pressed={reasoning === 'deep'} aria-label={reasoning === 'deep' ? labels.reasoningDeep : labels.reasoningFast} title={reasoning === 'deep' ? labels.reasoningDeep : labels.reasoningFast} onClick={() => setReasoning(reasoning === 'deep' ? 'fast' : 'deep')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="5" transform="rotate(-35 12 12)"/></svg><span className="reasoning-level" aria-hidden="true"><i/><i/></span>
+            </button>
+            <span role="status">{attachmentMessage}</span>
+
             <button type="submit" disabled={!value.trim()} aria-label={queueing ? 'Metti il messaggio in coda' : 'Invia comando'}>↑</button>
           </div>
           <button className="sr-only" type="button" onClick={onClose}>Chiudi</button>

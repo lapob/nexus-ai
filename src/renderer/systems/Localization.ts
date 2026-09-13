@@ -23,13 +23,13 @@ const copy = {
     settings: 'Impostazioni', voice: 'Voce', voiceDetail: 'Ascolto e risposta', appearance: 'Aspetto',
     appearanceDetail: 'Grafica e fluidità', intelligence: 'Intelligenza', intelligenceDetail: 'Identità e risposte',
     permissions: 'Permessi', permissionsDetail: 'Azioni e controllo', data: 'Dati', dataDetail: 'Memoria e archivio',
-    remote: 'Remoto', remoteDetail: 'Telefono e dispositivi', select: 'Seleziona'
+    remote: 'Remoto', remoteDetail: 'Telefono e dispositivi', select: 'Seleziona', reasoningFast: 'Ragionamento rapido', reasoningDeep: 'Ragionamento approfondito'
   },
   en: {
     settings: 'Settings', voice: 'Voice', voiceDetail: 'Listening and replies', appearance: 'Appearance',
     appearanceDetail: 'Visuals and motion', intelligence: 'Intelligence', intelligenceDetail: 'Identity and replies',
     permissions: 'Permissions', permissionsDetail: 'Actions and control', data: 'Data', dataDetail: 'Memory and archive',
-    remote: 'Remote', remoteDetail: 'Phone and devices', select: 'Select'
+    remote: 'Remote', remoteDetail: 'Phone and devices', select: 'Select', reasoningFast: 'Fast reasoning', reasoningDeep: 'Deep reasoning'
   }
 } as const;
 

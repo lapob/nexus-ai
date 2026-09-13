@@ -87,6 +87,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.systemGestureExclusion
@@ -419,6 +420,7 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val drawer: Boolean = false,
     val modelSheet: Boolean = false,
     val model: String = "NexusNXS Rapido",
+    val deepReasoning: Boolean = false,
     val models: List<ModelRow> = listOf(ModelRow("nexus-fast", "NexusNXS Rapido"), ModelRow("nexus-deep", "NexusNXS Pro")),
     val conversationId: String = "",
     val chats: List<ChatRow> = emptyList(),
@@ -992,6 +994,7 @@ open class NexusMainActivity : ComponentActivity() {
             "back" -> state = state.copy(screen = NexusScreen.CHAT)
             "modelSheet" -> state = state.copy(modelSheet = true)
             "closeModel" -> state = state.copy(modelSheet = false)
+            "reasoning" -> { if (!state.busy) state = state.copy(deepReasoning = !state.deepReasoning) }
             "model" -> { prefs.edit { putString("model", value) }; state = state.copy(model = value, modelSheet = false) }
             "draft" -> {
                 if (state.connection != NexusConnection.ONLINE) return
@@ -2053,6 +2056,7 @@ open class NexusMainActivity : ComponentActivity() {
     }
 
     private fun routedMode(text: String, model: String): String {
+        if (state.deepReasoning) return "deep"
         val sensitive = Regex("(?i)\\b(password|segreto|credenzial|token|api.?key|prompt.?injection|sicurezza|privacy|permess|elimina|cancella|sposta|rinomina|esegui|installa|disinstalla|registro|firewall|rete)\\b")
         val workAction = Regex("(?i)\\b(apri|avvia|crea|modifica|scrivi|salva|chiudi|ferma|controlla|verifica|cerca|scarica|carica|collega|disconnetti|riavvia|spegni|accendi)\\b")
         if (sensitive.containsMatchIn(text) || (state.work && workAction.containsMatchIn(text))) return "deep"
@@ -2883,6 +2887,20 @@ private fun JSONArray?.toTurns() = buildList {
                                         }
                                     }
                                 )
+                                IconButton(
+                                    onClick = { dispatch("reasoning", "") },
+                                    enabled = !state.busy,
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    val reasoningLabel = if (state.deepReasoning) nexusCopy("Ragionamento approfondito", "Deep reasoning") else nexusCopy("Ragionamento rapido", "Fast reasoning")
+                                    Canvas(Modifier.size(24.dp).semantics { contentDescription = reasoningLabel }) {
+                                        val tint = if (state.deepReasoning) Cyan else Mist
+                                        drawCircle(tint, radius = size.minDimension * .17f, center = Offset(size.width * .5f, size.height * .35f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()))
+                                        drawOval(tint, topLeft = Offset(size.width * .1f, size.height * .2f), size = androidx.compose.ui.geometry.Size(size.width * .8f, size.height * .3f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()))
+                                        drawLine(tint, Offset(3.dp.toPx(), size.height * .85f), Offset(10.dp.toPx(), size.height * .85f), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                        drawLine(if (state.deepReasoning) tint else tint.copy(alpha = .25f), Offset(14.dp.toPx(), size.height * .85f), Offset(21.dp.toPx(), size.height * .85f), strokeWidth = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                    }
+                                }
                                 FilledIconButton(
                                     onClick = {
                                         if (state.busy) dispatch("stop", "") else if (state.draft.isNotBlank()) {

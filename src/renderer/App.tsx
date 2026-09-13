@@ -242,7 +242,7 @@ export function App() {
         open={nexus.commandOpen}
         queueing={nexus.generating}
         onClose={() => nexus.setCommandOpen(false)}
-        onSubmit={(value, attachments) => nexus.submit(value, 'fast', attachments)}
+        onSubmit={(value, attachments, mode) => nexus.submit(value, mode, attachments)}
         workspace={nexus.workspace}
         approvalMode={nexus.settings?.actionApprovalMode || 'dangerous-only'}
         onSelectWorkspace={nexus.selectWorkspace}
