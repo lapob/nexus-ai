@@ -2151,6 +2151,16 @@ class RemoteSessionGateway {
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
         return this.json(response, 200, guest.activity || { text: '', phase: 'idle', updatedAt: 0 });
       }
+      if (request.method === 'POST' && url.pathname === '/api/guest/rating') {
+        const guest = this.guestSession(request);
+        if (!guest) return this.json(response, 401, { error: 'Sessione scaduta.' });
+        const body = await this.body(request);
+        if (![1, 0, -1].includes(body.rating) || typeof body.clientMessageId !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(body.clientMessageId)) return this.json(response, 400, { error: 'Valutazione non valida.' });
+        if (!this.persistentQuotas.allow(`rating:${guest.installationHash}`, { limit: 120 })) return this.json(response, 429, { error: 'Riprova più tardi.' });
+        const key = crypto.createHash('sha256').update(`${guest.installationHash}:${body.clientMessageId}`).digest('hex');
+        if (!this.requestLedger.rate(key, body.rating)) return this.json(response, 404, { error: 'Risposta non più disponibile per la valutazione.' });
+        return this.json(response, 200, { status: 'received', rating: body.rating });
+      }
       if (request.method === 'POST' && url.pathname === '/api/guest/feedback') {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });

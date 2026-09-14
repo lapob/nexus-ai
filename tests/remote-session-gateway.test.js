@@ -1295,9 +1295,10 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /nexusnxs\.slash-commands\.v1/);
     assert.match(publicHtml, /resolveSlashInput/);
     assert.match(publicHtml, /Ricerca web/);
-    assert.match(publicHtml, /\/api\/guest\/feedback/);
-    assert.match(publicHtml, /consent:true/);
-    assert.match(publicHtml, /In revisione/);
+    assert.match(publicHtml, /\/api\/guest\/rating/);
+    assert.doesNotMatch(publicHtml, /Migliora NexusNXS|contributeFeedback/);
+    assert.match(publicHtml, /aria-label="Mi piace"/);
+    assert.match(publicHtml, /aria-label="Non mi piace"/);
     assert.match(publicHtml, /api\/guest\/images\/generate/);
     assert.doesNotMatch(publicHtml, /history:\[\]/);
     assert.doesNotMatch(publicHtml, /<nav|impostazioni|cronologia|workstation|codice di collegamento|Le tue conversazioni|questa demo|\/api\/pair/i);
@@ -1498,4 +1499,28 @@ test('la disconnessione del client annulla la richiesta al servizio immagini', a
     await started;controller.abort();await rejected;
     await Promise.race([stopped,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Il servizio immagini non ha ricevuto abort')),5000);timer.unref();})]);
   }finally{controller.abort();await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('guest ratings are scoped to the installation and do not submit training content', async () => {
+  const { root, gateway } = fixture();
+  try {
+    const port = await freePort();
+    await gateway.configure({enabled:true,allowLan:false,port});
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const installationId = crypto.randomUUID();
+    const owner = await bootstrapGuest(baseUrl, installationId);
+    const other = await bootstrapGuest(baseUrl, crypto.randomUUID());
+    const id = crypto.randomUUID();
+    const key = crypto.createHash('sha256').update(`${tokenHash(installationId)}:${id}`).digest('hex');
+    gateway.requestLedger.begin(key, 'fixture');
+    gateway.requestLedger.complete(key,{message:'Synthetic response'});
+    const vote = (token,rating) => fetch(`${baseUrl}/api/guest/rating`,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({clientMessageId:id,rating})});
+    assert.equal((await vote(other.token,1)).status,404);
+    assert.equal((await vote(owner.token,'1')).status,400);
+    assert.equal((await vote(owner.token,1)).status,200);
+    assert.equal(gateway.requestLedger.inspect(key,'fixture').entry.rating,1);
+    assert.equal((await vote(owner.token,-1)).status,200);
+    assert.equal((await vote(owner.token,0)).status,200);
+    assert.equal(gateway.requestLedger.inspect(key,'fixture').entry.rating,0);
+  } finally {await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
 });

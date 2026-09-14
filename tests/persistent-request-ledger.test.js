@@ -57,3 +57,26 @@ test('la scadenza TTL elimina richieste vecchie senza conservare dati indefinita
     assert.equal(ledger.inspect(key, 'ttl').state, 'missing');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('ratings persist and change without extending conversation retention', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-rating-'));
+  let now = 100000;
+  const filePath = path.join(root, 'requests.json'), key = 'd'.repeat(64);
+  try {
+    const ledger = new PersistentRequestLedger({ filePath, ttlMs: 60000, now: () => now });
+    ledger.begin(key, 'f');
+    assert.equal(ledger.rate(key, 1), false);
+    ledger.complete(key, { message: 'Synthetic response' });
+    now += 1000;
+    assert.equal(ledger.rate(key, 1), true);
+    assert.equal(new PersistentRequestLedger({ filePath, now: () => now }).inspect(key, 'f').entry.rating, 1);
+    assert.equal(ledger.rate(key, -1), true);
+    assert.equal(ledger.rate(key, 0), true);
+    assert.equal(ledger.rate(key, '1'), false);
+    assert.equal(ledger.inspect(key, 'f').entry.rating, 0);
+    assert.equal(ledger.inspect(key, 'f').entry.updatedAt, 100000);
+    now += 60000;
+    assert.equal(ledger.rate(key, 1), false);
+    ledger.close();
+  } finally { fs.rmSync(root, {recursive:true,force:true}); }
+});

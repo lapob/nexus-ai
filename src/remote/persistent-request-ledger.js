@@ -19,6 +19,7 @@ function cleanEntry(value) {
   return {
     fingerprint: value.fingerprint.slice(0, 128),
     status,
+    rating: [1, -1].includes(value.rating) ? value.rating : 0,
     createdAt: Number(value.createdAt || 0),
     updatedAt: Number(value.updatedAt || 0),
     content: String(value.content || '').slice(0, MAX_STREAM_CHARS),
@@ -166,6 +167,17 @@ class PersistentRequestLedger {
       state: entry.status,
       result: entry.result ? { ...entry.result } : null
     };
+  }
+
+  rate(key, rating) {
+    this.prune();
+    if (![1, 0, -1].includes(rating)) return false;
+    const entry = this.entries.get(key);
+    if (!entry || entry.status !== 'complete') return false;
+    entry.rating = rating;
+    // A vote does not extend conversation retention.
+    this.persistNow();
+    return true;
   }
 
   schedulePersist() {
