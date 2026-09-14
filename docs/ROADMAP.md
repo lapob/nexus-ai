@@ -185,3 +185,140 @@ già consegnate. Non aggiungere controlli grafici senza backend funzionante.
   conservazione minima a scadenza;
 - comprensione dello schermo e della finestra attiva soltanto su richiesta,
   preferendo struttura accessibile e metadati alle catture complete.
+
+## Piano operativo Jarvis — revisione 14 settembre 2026
+
+Questa sezione integra la roadmap esistente e ne ordina il completamento.
+È un piano, non una dichiarazione di funzioni già consegnate. Baseline sorgente:
+bd77147. Il checkpoint CONTINUITA.md conserva prove e pubblicazioni correnti.
+
+### Prima consegna: esperienza quotidiana affidabile
+
+1. Completare la voce full-duplex: ascolto anche durante generazione e sintesi,
+   interruzione immediata, gestione dell'eco, pause naturali, correzioni e
+   cancellazione delle risposte obsolete. Il prototipo web attuale è opt-in
+   locale e ascolta durante playback con AEC; la prova umana Windows è pendente.
+   Estendere a desktop e Android soltanto dopo corpus reale e prove speaker,
+   cuffie, Bluetooth, rumore, uscita e perdita della rete.
+2. Ridurre la latenza misurando primo token, prima frase udibile, durata STT,
+   interruzione e code p50/p95 su hardware dichiarato. Warm-up controllato,
+   streaming e cancellazione devono riusare il runtime esistente. I target
+   numerici vanno fissati dopo la baseline; nessuna promessa universale.
+3. Chiudere collaudo fisico Android, aggiornamenti con firme e provenienza
+   coerente, ripristino della versione precedente e audit sicurezza integrale.
+   L'ultimo audit registrato ha 2 criteri conformi e 13 bloccati: non è ancora
+   una Stable pronta alla vendita. I 878 test del checkpoint precedente non
+   sostituiscono prove acustiche, sicurezza completa e test su dispositivi reali.
+
+### Seconda consegna: un assistente che ricorda e porta a termine
+
+4. Unificare conversazioni, voce, allegati e progetti: modifica del messaggio,
+   rigenerazione, ricerca nella cronologia, esportazione, cancellazione e
+   ripresa senza duplicare risposte o azioni. La demo anonima resta temporanea.
+5. Completare la memoria personale e di progetto con origine, correzione,
+   scadenza e sincronizzazione autenticata opzionale. Riutilizzare l'editor
+   esistente; verificare isolamento e revoca su tutti i client.
+6. Rendere i lavori lunghi persistenti: obiettivo, avanzamento reale, pausa,
+   ripresa, annullamento e risultato verificato. Preferire API e strumenti
+   strutturati; usare browser e computer in ambienti confinati quando necessario.
+   Per il codice: workspace isolato, diff, test e revisione prima della consegna.
+7. Completare documenti e immagini: lettura con riferimenti alle fonti,
+   artefatti modificabili, generazione e modifica immagini, originali e download,
+   job persistenti e retry senza doppie generazioni. Animazione cosmica legata
+   allo stato effettivo; nessuna percentuale inventata.
+
+### Terza consegna: integrazioni e iniziativa controllabile
+
+8. Collegare un catalogo reale di plugin/MCP con installazione, stato,
+   autenticazione, permessi minimi, revoca, versioni e gestione degli errori.
+   Separare strumenti, applicazioni rilevate e integrazioni connesse. La nuova
+   sezione impostazioni è una base; non dimostra un marketplace funzionante.
+9. Integrare n8n come esecutore di routine autorizzate: calendario, documenti,
+   riepiloghi e monitoraggi. Prevedere chiavi protette, webhook autenticati,
+   timeout, deduplicazione, registro esiti e arresto. Nessun invio esterno
+   senza autorizzazione. Verificare licenze prima di offrire servizi commerciali.
+10. Aggiungere proattività opzionale con orari silenziosi, limiti di frequenza,
+    anteprima e notifiche soltanto utili. Schermo, microfono e domotica richiedono
+    ambiti espliciti e revocabili. Un altro nodo acceso è indispensabile per
+    lavorare quando il PC è spento; il cloud rimane opzionale e disattivato.
+
+### Grafica e impostazioni comuni
+
+- Un solo sistema di font, icone, spaziature e stati; riutilizzare i componenti.
+- Composer compatto, comandi contestuali e livello di ragionamento discreto.
+- Core con geometria preservata, stati reali, hit area coerente e nessun salto
+  dimensionale passando tra ascolto, risposta ed errore.
+- Menu mobile progressivo, safe area e tastiera senza collisioni; verificare
+  zoom del testo, orientamento, contrasto e movimento ridotto. Conservare un
+  focus elegante ma riconoscibile per chi naviga da tastiera.
+- Impostazioni raggruppate in conversazioni/memoria, voce, connessioni,
+  automazioni/attività, privacy/dispositivi e aspetto. Mostrare solo capacità
+  effettive, con azioni chiare di recupero quando un servizio non è disponibile.
+
+### Intelligenza e sostenibilità
+
+Migliorare prima selezione del modello, retrieval, strumenti e valutazioni su
+compiti reali. Il training deve partire da dati autorizzati e revisionati,
+con test separato, confronto cieco e rollback. Like/dislike non equivalgono a
+consenso al training; cambiare nome o versione non prova maggiore intelligenza.
+L'ultimo inventario nel checkpoint riporta solo 2 esempi approvati: ricontrollare
+il dataset prima di pianificare un addestramento. Non promettere equivalenza
+con modelli proprietari mediante solo fine-tuning locale.
+
+Per una seconda entrata, ipotesi da validare: assistenza privata su documenti
+per piccoli studi, preparazione di report o automazioni amministrative con
+revisione umana. Scegliere un caso d'uso iniziale, provare con utenti pilota e
+misurare tempo risparmiato, successo dei compiti, assistenza necessaria e costo
+per attività. Prezzi e ricavi richiedono dati reali; nessuna garanzia di guadagno.
+Prima di clienti paganti: isolamento utenti, mappa dei dati, esportazione e
+cancellazione, backup esterno verificato, aggiornamenti sicuri e supporto.
+
+### Criterio comune di completamento
+
+Ogni voce richiede backend reale, interfaccia, annullamento/error handling,
+verifica pertinente e checkpoint con revisione e limiti. Non chiudere una voce
+perché esiste un pulsante o perché passa una simulazione. Il prossimo passo
+resta la prova vocale Windows e la chiusura della baseline, poi continuità e
+strumenti. Jarvis indica l'esperienza desiderata, non coscienza o infallibilità.
+
+### Riferimenti tecnici consultati
+
+Le piattaforme attuali combinano modelli con strumenti, ricerca, esecuzione e
+integrazioni. Questi riferimenti guidano i requisiti; non provano che Nexus
+possieda le stesse capacità o debba adottare un backend cloud.
+
+- OpenAI, strumenti: https://developers.openai.com/api/docs/guides/tools
+- OpenAI, conversazioni realtime: https://developers.openai.com/api/docs/guides/realtime-conversations
+- MCP, introduzione: https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro
+### Flusso unico e ampliamento delle capacità digitali
+
+Contratto comune da completare riusando runtime, chat e registro delle azioni:
+richiesta -> contesto autorizzato -> strumenti disponibili -> esecuzione ->
+verifica del risultato -> artefatto/ricevuta nella stessa conversazione.
+Testo e voce sono ingressi dello stesso flusso; cambiare modalità non crea
+un nuovo progetto o perde il lavoro. Stato e annullamento devono provenire
+ dall'esecuzione reale, non da timer grafici.
+
+Prima correzione applicata: il Core richiama stopGeneration durante una
+risposta in corso, riutilizzando l'annullamento della chat; la sessione vocale
+può acquisire il turno seguente. Non è interruzione vocale durante inferenza:
+quella resta da realizzare e validare.
+
+Capacità successive, da consegnare una alla volta con percorsi completi:
+
+| Famiglia | Risultato per l'utente | Confine di completamento |
+| --- | --- | --- |
+| Ricerca e studio | Confrontare fonti, interrogare documenti, preparare dossier | Citazioni verificabili, fonti mancanti dichiarate, file finale |
+| Ufficio | Creare e modificare testi, fogli di calcolo e presentazioni | Formule e layout controllati; anteprima ed esportazione |
+| Sviluppo | Analizzare repository, correggere bug, eseguire test | Ambiente isolato, diff, log e risultato riproducibile |
+| Organizzazione | Appuntamenti, attività, preparazione di riunioni | Account collegati, fusi orari, conflitti e duplicati gestiti |
+| Comunicazioni | Preparare risposte e riepiloghi | Destinatario e contenuto verificati, invio autorizzato |
+| Creatività | Immagini, varianti, revisione di contenuti e media | Versioni, originali, download e gestione dei job |
+| Computer personale | Organizzare file e operare sulle app autorizzate | Ambito selezionato, anteprima per modifiche distruttive, recupero |
+| Routine | Report periodici, controlli e notifiche utili | Nodo acceso, scadenze, revoca, deduplicazione e ricevute |
+
+Questa tabella è backlog, non un catalogo di funzioni già operative.
+Ogni famiglia deve dichiarare piattaforme supportate, requisiti hardware,
+modalità locale/cloud, dati trattati e limiti; nascondere comandi non collegati.
+La dashboard amministrativa mostra salute e utilizzo aggregati: non deve
+trasformarsi in un accesso indiscriminato alle conversazioni personali.

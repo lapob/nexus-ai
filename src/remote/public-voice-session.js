@@ -1,6 +1,6 @@
 /** @module remote/public-voice-session Shared chat history and cancellable browser media. */
 // #region Session controls and capture
-function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, duplex = false }) {
+function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, duplex = false }) {
   const copy = (it, en) => /^it\b/i.test(navigator.language) ? it : en;
   let active = false, epoch = 0, stream = null, recorder = null;
   let controller = null, finishCapture = null, finishPlayback = null;
@@ -158,6 +158,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     if (!active) return start();
     if (finishPlayback) return finishPlayback();
     if (recorder?.state === 'recording') return finishCapture?.();
+    if (isBusy()) return cancelResponse();
     if (runtime.voiceState === 'error') { leave({ focus: false }); return start(); }
   }
   return { start, interact, speak, leave, get active() { return active; } };
