@@ -63,11 +63,12 @@ class PersistentRequestLedger {
         if (entry.status === 'running') {
           if (!entry.content) continue;
           entry.status = 'interrupted';
-          entry.updatedAt = this.now();
         }
         this.entries.set(key, entry);
       }
       this.prune({ persist: false });
+      // Persist recovery and expiry immediately, even without another request.
+      this.persistNow();
     } catch { /* Il primo avvio non ha ancora un ledger. */ }
   }
 
@@ -158,6 +159,7 @@ class PersistentRequestLedger {
   }
 
   replay(key, cursor = 0) {
+    this.prune();
     const entry = this.entries.get(key);
     if (!entry) return { cursor: 0, token: '', state: 'missing', result: null };
     const safeCursor = Math.max(0, Math.min(entry.content.length, Number(cursor) || 0));

@@ -80,3 +80,35 @@ test('ratings persist and change without extending conversation retention', () =
     ledger.close();
   } finally { fs.rmSync(root, {recursive:true,force:true}); }
 });
+
+test('restart does not revive expired partial responses or extend their retention', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ledger-expiry-'));
+  const filePath = path.join(root, 'requests.json');
+  let now = 100000;
+  const key = 'e'.repeat(64);
+  try {
+    const first = new PersistentRequestLedger({ filePath, ttlMs:60000, now:()=>now });
+    first.begin(key,'f');first.append(key,'partial');first.close();
+    now += 30000;
+    const recovered = new PersistentRequestLedger({ filePath, ttlMs:60000, now:()=>now });
+    assert.equal(recovered.inspect(key,'f').state,'interrupted');
+    assert.equal(recovered.inspect(key,'f').entry.updatedAt,100000);
+    now += 30001;
+    const expired = new PersistentRequestLedger({ filePath, ttlMs:60000, now:()=>now });
+    assert.equal(expired.replay(key).state,'missing');
+    assert.equal(JSON.parse(fs.readFileSync(filePath,'utf8')).entries[key],undefined);
+    expired.close();
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('replay checks expiry even if no other request inspected the ledger', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ledger-replay-expiry-'));
+  let now=100000;
+  const key='f'.repeat(64);
+  const ledger=new PersistentRequestLedger({filePath:path.join(root,'requests.json'),ttlMs:60000,now:()=>now});
+  try {
+    ledger.begin(key,'f');ledger.complete(key,{message:'expired'});
+    now+=60001;
+    assert.deepEqual(ledger.replay(key),{cursor:0,token:'',state:'missing',result:null});
+  } finally {ledger.close();fs.rmSync(root,{recursive:true,force:true});}
+});
