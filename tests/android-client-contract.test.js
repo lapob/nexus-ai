@@ -184,7 +184,8 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(instantSurface, /shape = RoundedCornerShape\(18\.dp\)/, 'prompt e stato devono condividere superfici arrotondate coerenti');
   assert.match(instantSurface, /var typedSession by rememberSaveable/);
   assert.match(instantSurface, /align\(Alignment\.BottomStart\)[\s\S]{0,260}Icons\.Rounded\.Keyboard/, 'la tastiera deve restare raggiungibile in basso a sinistra');
-  assert.doesNotMatch(instantSurface, /Icons\.Rounded\.Mic/, 'la superficie istantanea deve usare il Core come unico ingresso vocale');
+  const conversationSurface = instantSurface.slice(0, instantSurface.indexOf('BackHandler(enabled = settingsOpen)'));
+  assert.doesNotMatch(conversationSurface, /Icons\.Rounded\.Mic/, 'la conversazione deve usare il Core come unico ingresso vocale; le impostazioni possono identificarne la categoria');
   assert.match(activity, /energy: Float = 0f/);
   assert.match(activity, /energy = voiceEnergy/);
   assert.match(activity, /haltCapture\(false, true\)[\s\S]{0,80}close\(\)/, 'un secondo tocco sul Core deve interrompere e tornare alla superficie principale');

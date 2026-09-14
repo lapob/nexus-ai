@@ -2660,7 +2660,8 @@ private fun JSONArray?.toTurns() = buildList {
     val context = LocalContext.current
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var menuPreferences by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(settingsOpen) { if (!settingsOpen) menuPreferences = false }
+    var menuSection by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(settingsOpen) { if (!settingsOpen) { menuPreferences = false; menuSection = "" } }
     var remoteSettingsOpen by rememberSaveable { mutableStateOf(false) }
     var remotePairCode by rememberSaveable { mutableStateOf("") }
     var controlsAwake by remember { mutableStateOf(true) }
@@ -2771,12 +2772,14 @@ private fun JSONArray?.toTurns() = buildList {
                     var rejected = false
                     var tracking = false
                     while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val event = awaitPointerEvent(PointerEventPass.Main)
                         val change = event.changes.firstOrNull() ?: continue
                         if (change.pressed && !change.previousPressed) {
-                            origin = change.position; rejected = settingsOpen || origin.x > 40.dp.toPx(); tracking = false
+                            origin = change.position; rejected = settingsOpen; tracking = false
                         }
                         val delta = change.position - origin
+                        // Child controls keep their own selection, scrolling and drag gestures.
+                        if (!tracking && change.previousPressed && change.isConsumed) rejected = true
                         if (!tracking && (event.changes.count { it.pressed } > 1 || kotlin.math.abs(delta.y) > viewConfiguration.touchSlop || delta.x < -viewConfiguration.touchSlop)) rejected = true
                         if (!rejected && change.pressed && delta.x > viewConfiguration.touchSlop && !tracking) {
                             keyboard?.hide(); drawerDragging = true; tracking = true
@@ -3012,7 +3015,7 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
         }
-        BackHandler(enabled = settingsOpen) { if (menuPreferences) menuPreferences = false else settingsOpen = false }
+        BackHandler(enabled = settingsOpen) { if (menuSection.isNotEmpty()) menuSection = "" else if (menuPreferences) menuPreferences = false else settingsOpen = false }
         if (drawerFraction > 0f || settingsOpen || drawerDragging) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f * drawerFraction)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
             Surface(color = Ink, shape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp), modifier = Modifier.fillMaxHeight().width(drawerWidth)
@@ -3030,8 +3033,14 @@ private fun JSONArray?.toTurns() = buildList {
                     )
                 }) {                Column(Modifier.statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        if (menuPreferences) IconButton({ menuPreferences = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
-                        Text(if (menuPreferences) nexusCopy("Impostazioni", "Settings") else "NexusNXS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ice, modifier = Modifier.weight(1f))
+                        if (menuPreferences) IconButton({ if (menuSection.isNotEmpty()) menuSection = "" else menuPreferences = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
+                        Text(when (menuSection) {
+                            "appearance" -> nexusCopy("Aspetto", "Appearance")
+                            "devices" -> nexusCopy("Dispositivi", "Devices")
+                            "voice" -> nexusCopy("Voce e assistente", "Voice and assistant")
+                            "privacy" -> nexusCopy("Privacy e dati", "Privacy and data")
+                            else -> if (menuPreferences) nexusCopy("Impostazioni", "Settings") else "NexusNXS"
+                        }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ice, modifier = Modifier.weight(1f))
                         IconButton({ settingsOpen = false }) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi menu", "Close menu"), tint = Mist) }
                     }
                     if (!menuPreferences) {
@@ -3045,10 +3054,21 @@ private fun JSONArray?.toTurns() = buildList {
                     HorizontalDivider(color = Hairline)
                     DrawerItem(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings")) { menuPreferences = true }
                     } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(nexusCopy("Aspetto e interazione", "Appearance and interaction"), color = Mist, style = MaterialTheme.typography.labelLarge)
+                    if (menuSection.isEmpty()) {
+                        SettingsGroup {
+                            CompactSetting(Icons.Rounded.Animation, nexusCopy("Aspetto", "Appearance"), nexusCopy("Movimento e feedback", "Motion and feedback"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "appearance" }
+                            CompactSetting(Icons.Rounded.Mic, nexusCopy("Voce e assistente", "Voice and assistant"), nexusCopy("Richiamo e microfono", "Activation and microphone"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "voice" }
+                        }
+                        SettingsGroup {
+                            CompactSetting(Icons.Outlined.Computer, nexusCopy("Dispositivi", "Devices"), nexusCopy("Connessioni e controllo remoto", "Connections and remote control"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "devices" }
+                            CompactSetting(Icons.Rounded.Lock, nexusCopy("Privacy e dati", "Privacy and data"), nexusCopy("Cronologia e backup", "History and backup"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "privacy" }
+                        }
+                    }
+                    if (menuSection == "appearance") SettingsGroup {
             CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
             CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
-            Text(nexusCopy("Dispositivi", "Devices"), color = Mist, style = MaterialTheme.typography.labelLarge)
+                    }
+                    if (menuSection == "devices") SettingsGroup {
             CompactSetting(
                 Icons.Outlined.Computer,
                 nexusCopy("Controllo remoto", "Remote control"),
@@ -3059,7 +3079,8 @@ private fun JSONArray?.toTurns() = buildList {
                 },
                 { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }
             ) { settingsOpen = false; remoteSettingsOpen = true }
-            Text(nexusCopy("Voce e assistente", "Voice and assistant"), color = Mist, style = MaterialTheme.typography.labelLarge)
+                    }
+                    if (menuSection == "voice") Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = {
                 val role = if (android.os.Build.VERSION.SDK_INT >= 29) context.getSystemService(android.app.role.RoleManager::class.java) else null
                 val request = if (Build.VERSION.SDK_INT >= 29 && role?.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT) == true && !role.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT)) role.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT) else Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
@@ -3067,13 +3088,14 @@ private fun JSONArray?.toTurns() = buildList {
             }) { Text(nexusCopy("Usa Nexus come assistente", "Use Nexus as assistant")) }
             Text(nexusCopy("Il richiamo con il tasto laterale dipende dalle impostazioni del telefono. Il microfono resta sotto il tuo controllo.", "Side-button activation depends on your phone settings. The microphone remains under your control."), style = MaterialTheme.typography.bodySmall, color = Mist)
 
-                    HorizontalDivider(color = Hairline)
-                    Text(nexusCopy("Privacy e dati", "Privacy and data"), color = Mist, style = MaterialTheme.typography.labelLarge)
+                    }
+                    if (menuSection == "privacy") Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     CompactSetting(Icons.Rounded.Lock, nexusCopy("Schermata privata", "Private screen"), nexusCopy("Protegge le anteprime e le catture", "Protects previews and screenshots"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }
                     CompactSetting(Icons.Rounded.VisibilityOff, nexusCopy("Chat temporanea", "Temporary chat"), nexusCopy("Non viene salvata nella cronologia", "Not saved in history"), { Switch(state.temporary, { if (!state.busy) dispatch("temporary", "") }, enabled = !state.busy) }) { if (!state.busy) dispatch("temporary", "") }
                     DrawerItem(Icons.Rounded.Backup, nexusCopy("Esporta backup cifrato", "Export encrypted backup")) { dispatch("exportBackup", "") }
                     DrawerItem(Icons.Rounded.Restore, nexusCopy("Importa backup", "Import backup")) { dispatch("importBackup", "") }
                     Text(nexusCopy("La cronologia è conservata sul dispositivo. Lingua e dimensioni del testo seguono Android.", "History is stored on this device. Language and text size follow Android."), color = Mist, style = MaterialTheme.typography.bodySmall)
+                    }
                     }
                 }
             }
