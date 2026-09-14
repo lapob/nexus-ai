@@ -2680,6 +2680,17 @@ private fun JSONArray?.toTurns() = buildList {
     val haptic = LocalHapticFeedback.current
     val focusRequester = remember { FocusRequester() }
     val coreConfiguration = LocalConfiguration.current
+    val drawerWidth = minOf(coreConfiguration.screenWidthDp * .84f, 380f).dp
+    val drawerWidthPx = with(LocalDensity.current) { drawerWidth.toPx() }
+    var drawerDragging by remember { mutableStateOf(false) }
+    var drawerDragFraction by remember { mutableFloatStateOf(0f) }
+    val drawerSettledFraction by animateFloatAsState(
+        targetValue = if (drawerDragging) drawerDragFraction else if (settingsOpen) 1f else 0f,
+        animationSpec = tween(if (drawerDragging || reduceMotion) 0 else 220, easing = NexusFlow.standard),
+        label = "drawerPosition"
+    )
+    val drawerFraction = if (drawerDragging) drawerDragFraction else drawerSettledFraction
+    val currentDrawerFraction by rememberUpdatedState(drawerFraction)
     val homeCoreDiameter = minOf(coreConfiguration.screenWidthDp * .98f, coreConfiguration.screenHeightDp * .78f, 1200f).dp
     var textMode by rememberSaveable { mutableStateOf(state.assistantEntry == "text") }
     var typedSession by rememberSaveable { mutableStateOf(state.assistantEntry.isNotBlank()) }
@@ -2754,28 +2765,33 @@ private fun JSONArray?.toTurns() = buildList {
         Box(Modifier.fillMaxSize()) {
         CosmicScene(Modifier.fillMaxSize())
         Box(
-            Modifier.fillMaxSize().pointerInput(Unit) {
+            Modifier.fillMaxSize().pointerInput(drawerWidthPx) {
                 awaitPointerEventScope {
                     var origin = androidx.compose.ui.geometry.Offset.Zero
                     var rejected = false
-                    var opened = false
+                    var tracking = false
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull()
-                        if (change != null && change.pressed && !change.previousPressed) { origin = change.position; rejected = false; opened = false }
-                        if (event.changes.count { it.pressed } > 1) rejected = true
-                        if (change != null && change.pressed) {
-                            val delta = change.position - origin
-                            if (kotlin.math.abs(delta.y) > 32.dp.toPx() || delta.x < -24.dp.toPx()) rejected = true
-                            if (!rejected && !opened && delta.x > 80.dp.toPx() && delta.x > kotlin.math.abs(delta.y) * 2f) {
-                                keyboard?.hide(); settingsOpen = true; opened = true
+                        val change = event.changes.firstOrNull() ?: continue
+                        if (change.pressed && !change.previousPressed) {
+                            origin = change.position; rejected = settingsOpen || origin.x > 40.dp.toPx(); tracking = false
+                        }
+                        val delta = change.position - origin
+                        if (!tracking && (event.changes.count { it.pressed } > 1 || kotlin.math.abs(delta.y) > viewConfiguration.touchSlop || delta.x < -viewConfiguration.touchSlop)) rejected = true
+                        if (!rejected && change.pressed && delta.x > viewConfiguration.touchSlop && !tracking) {
+                            keyboard?.hide(); drawerDragging = true; tracking = true
+                        }
+                        if (tracking) {
+                            drawerDragFraction = (delta.x / drawerWidthPx).coerceIn(0f, 1f)
+                            change.consume()
+                            if (!change.pressed) {
+                                settingsOpen = drawerDragFraction >= .35f
+                                drawerDragging = false; tracking = false
                             }
                         }
-                        if (opened) event.changes.forEach { it.consume() }
-                        if (event.changes.any { it.pressed }) lastInteraction = System.nanoTime()
+                        if (change.pressed) lastInteraction = System.nanoTime()
                     }
-                }
-            }.statusBarsPadding().navigationBarsPadding().imePadding()
+                }            }.statusBarsPadding().navigationBarsPadding().imePadding()
                 .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = 10.dp)
         ) {
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
@@ -2997,28 +3013,30 @@ private fun JSONArray?.toTurns() = buildList {
     }
         }
         BackHandler(enabled = settingsOpen) { if (menuPreferences) menuPreferences = false else settingsOpen = false }
-        AnimatedVisibility(settingsOpen, enter = fadeIn(tween(if (reduceMotion) 0 else 180)), exit = fadeOut(tween(if (reduceMotion) 0 else 140))) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
-        }
-        AnimatedVisibility(settingsOpen, enter = slideInHorizontally(tween(if (reduceMotion) 0 else 260, easing = NexusFlow.standard)) { -it }, exit = slideOutHorizontally(tween(if (reduceMotion) 0 else 220, easing = NexusFlow.standard)) { -it }) {
-            Surface(color = Surface, shape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp), modifier = Modifier.fillMaxHeight().width(minOf(coreConfiguration.screenWidthDp * .84f, 380f).dp)
+        if (drawerFraction > 0f || settingsOpen || drawerDragging) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f * drawerFraction)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
+            Surface(color = Ink, shape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp), modifier = Modifier.fillMaxHeight().width(drawerWidth)
+                .offset { IntOffset(((drawerFraction - 1f) * drawerWidthPx).toInt(), 0) }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                .pointerInput(Unit) {
-                    var travel = 0f
-                    detectHorizontalDragGestures(onDragStart = { travel = 0f }, onHorizontalDrag = { change, delta ->
-                        travel += delta
-                        if (travel < -60.dp.toPx()) { change.consume(); settingsOpen = false }
-                    })
-                }) {
-                Column(Modifier.statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                .pointerInput(drawerWidthPx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { drawerDragFraction = currentDrawerFraction; drawerDragging = true },
+                        onDragEnd = { settingsOpen = drawerDragFraction >= .65f; drawerDragging = false },
+                        onDragCancel = { drawerDragging = false },
+                        onHorizontalDrag = { change, delta ->
+                            change.consume()
+                            drawerDragFraction = (drawerDragFraction + delta / drawerWidthPx).coerceIn(0f, 1f)
+                        }
+                    )
+                }) {                Column(Modifier.statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         if (menuPreferences) IconButton({ menuPreferences = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
                         Text(if (menuPreferences) nexusCopy("Impostazioni", "Settings") else "NexusNXS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ice, modifier = Modifier.weight(1f))
                         IconButton({ settingsOpen = false }) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi menu", "Close menu"), tint = Mist) }
                     }
                     if (!menuPreferences) {
-                    TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).background(Cyan.copy(alpha = .08f), RoundedCornerShape(14.dp)), onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy) {
-                        Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(8.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"))
+                    TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)) {
+                        Icon(Icons.Rounded.Add, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     }
                     InstantHistory(state, dispatch, Modifier.weight(1f)) { chat ->
                         voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
@@ -3030,6 +3048,7 @@ private fun JSONArray?.toTurns() = buildList {
                     Text(nexusCopy("Aspetto e interazione", "Appearance and interaction"), color = Mist, style = MaterialTheme.typography.labelLarge)
             CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
             CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
+            Text(nexusCopy("Dispositivi", "Devices"), color = Mist, style = MaterialTheme.typography.labelLarge)
             CompactSetting(
                 Icons.Outlined.Computer,
                 nexusCopy("Controllo remoto", "Remote control"),
@@ -3040,6 +3059,7 @@ private fun JSONArray?.toTurns() = buildList {
                 },
                 { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }
             ) { settingsOpen = false; remoteSettingsOpen = true }
+            Text(nexusCopy("Voce e assistente", "Voice and assistant"), color = Mist, style = MaterialTheme.typography.labelLarge)
             TextButton(onClick = {
                 val role = if (android.os.Build.VERSION.SDK_INT >= 29) context.getSystemService(android.app.role.RoleManager::class.java) else null
                 val request = if (Build.VERSION.SDK_INT >= 29 && role?.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT) == true && !role.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT)) role.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT) else Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
@@ -3048,11 +3068,11 @@ private fun JSONArray?.toTurns() = buildList {
             Text(nexusCopy("Il richiamo con il tasto laterale dipende dalle impostazioni del telefono. Il microfono resta sotto il tuo controllo.", "Side-button activation depends on your phone settings. The microphone remains under your control."), style = MaterialTheme.typography.bodySmall, color = Mist)
 
                     HorizontalDivider(color = Hairline)
+                    Text(nexusCopy("Privacy e dati", "Privacy and data"), color = Mist, style = MaterialTheme.typography.labelLarge)
                     CompactSetting(Icons.Rounded.Lock, nexusCopy("Schermata privata", "Private screen"), nexusCopy("Protegge le anteprime e le catture", "Protects previews and screenshots"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }
                     CompactSetting(Icons.Rounded.VisibilityOff, nexusCopy("Chat temporanea", "Temporary chat"), nexusCopy("Non viene salvata nella cronologia", "Not saved in history"), { Switch(state.temporary, { if (!state.busy) dispatch("temporary", "") }, enabled = !state.busy) }) { if (!state.busy) dispatch("temporary", "") }
-                    Text(nexusCopy("Dati e conversazioni", "Data and conversations"), color = Mist, style = MaterialTheme.typography.labelLarge)
-                    TextButton({ dispatch("exportBackup", "") }) { Text(nexusCopy("Esporta backup cifrato", "Export encrypted backup")) }
-                    TextButton({ dispatch("importBackup", "") }) { Text(nexusCopy("Importa backup", "Import backup")) }
+                    DrawerItem(Icons.Rounded.Backup, nexusCopy("Esporta backup cifrato", "Export encrypted backup")) { dispatch("exportBackup", "") }
+                    DrawerItem(Icons.Rounded.Restore, nexusCopy("Importa backup", "Import backup")) { dispatch("importBackup", "") }
                     Text(nexusCopy("La cronologia è conservata sul dispositivo. Lingua e dimensioni del testo seguono Android.", "History is stored on this device. Language and text size follow Android."), color = Mist, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -3921,27 +3941,38 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
-    Text(nexusCopy("Cronologia", "History"), color = Mist, style = MaterialTheme.typography.labelMedium)
+    var menuChatId by remember { mutableStateOf<String?>(null) }
     OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
-        placeholder = { Text(nexusCopy("Cerca conversazioni", "Search conversations")) }, leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist) }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
+        placeholder = { Text(nexusCopy("Cerca conversazioni", "Search conversations"), style = MaterialTheme.typography.bodyMedium) },
+        leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
+        trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
+        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
     val chats = state.chats.filter { query.isBlank() || it.title.contains(query, true) || it.preview.contains(query, true) }
         .sortedWith(compareByDescending<ChatRow> { it.pinned }.thenByDescending { it.updatedAt })
-    if (chats.isEmpty()) Text(nexusCopy("Nessuna conversazione trovata", "No conversations found"), color = Mist)
+    if (chats.isEmpty()) Text(if (query.isBlank()) nexusCopy("Le tue conversazioni appariranno qui", "Your conversations will appear here") else nexusCopy("Nessuna conversazione trovata", "No conversations found"), color = Mist, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp))
     val pinnedLabel = nexusCopy("Fissate", "Pinned")
     val italian = nexusCopy("it", "en") == "it"
     val groups = chats.groupBy { if (it.pinned) pinnedLabel else historyGroupLabel(it.updatedAt, italian) }
     LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
     groups.forEach { (group, rows) ->
-        item(key = "group-" + group) { Text(group, color = Mist, style = MaterialTheme.typography.labelMedium) }
+        item(key = "group-" + group) { Text(group, color = Mist, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp)) }
         items(rows.size, key = { rows[it].id }) { index ->
             val chat = rows[index]
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (chat.id == state.conversationId) Cyan.copy(alpha = .075f) else Color.Transparent), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(enabled = !state.busy) { open(chat) }.padding(10.dp)) {
-                    Text(chat.title, maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (chat.id == state.conversationId) Cyan else Ice)
+                    Text(chat.title, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Ice, style = MaterialTheme.typography.bodyMedium, fontWeight = if (chat.id == state.conversationId) FontWeight.SemiBold else FontWeight.Normal)
                     if (chat.preview.isNotBlank()) Text(chat.preview, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Mist, style = MaterialTheme.typography.bodySmall)
                 }
-                IconButton(onClick = { selected = chat; title = chat.title }, enabled = !state.busy) {
+                Box {
+                IconButton(onClick = { menuChatId = chat.id }, enabled = !state.busy) {
                     Icon(Icons.Rounded.MoreVert, nexusCopy("Gestisci conversazione", "Manage conversation"), tint = Mist)
+                }
+                DropdownMenu(expanded = menuChatId == chat.id, onDismissRequest = { menuChatId = null }, containerColor = Surface) {
+                    DropdownMenuItem(text = { Text(if (chat.pinned) nexusCopy("Non fissare più", "Unpin") else nexusCopy("Fissa", "Pin")) }, onClick = { menuChatId = null; dispatch("pinChat", chat.id) }, enabled = !state.busy)
+                    DropdownMenuItem(text = { Text(nexusCopy("Rinomina", "Rename")) }, onClick = { menuChatId = null; selected = chat; title = chat.title; renaming = true }, enabled = !state.busy)
+                    DropdownMenuItem(text = { Text(nexusCopy("Elimina", "Delete")) }, onClick = { menuChatId = null; selected = chat; deleting = true }, enabled = !state.busy)
+                }
                 }
             }
         }
@@ -3955,11 +3986,6 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                     if (renaming) OutlinedTextField(value = title, onValueChange = { title = it.take(120) }, singleLine = true,
                         label = { Text(nexusCopy("Titolo", "Title")) })
                     else if (deleting) Text(nexusCopy("Verrà rimossa dalla cronologia locale. Questa azione non si può annullare.", "It will be removed from local history. This cannot be undone."))
-                    else {
-                        TextButton({ dispatch("pinChat", chat.id); selected = null }) { Text(if (chat.pinned) nexusCopy("Non fissare più", "Unpin") else nexusCopy("Fissa", "Pin")) }
-                        TextButton({ renaming = true }) { Text(nexusCopy("Rinomina", "Rename")) }
-                        TextButton({ deleting = true }) { Text(nexusCopy("Elimina", "Delete")) }
-                    }
                 }
             },
             confirmButton = { TextButton(onClick = {
@@ -4044,7 +4070,7 @@ private fun historyGroupLabel(updatedAt: Long, italian: Boolean = true): String 
     val background by animateColorAsState(if (pressed) Cyan.copy(alpha = .065f) else Color.Transparent, tween(NexusFlow.QUICK, easing = NexusFlow.standard), label = "settingPress")
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(background).clickable(interactionSource = interaction, indication = null, onClick = click).padding(horizontal = 15.dp, vertical = if (fontScale > 1.3f) 16.dp else 13.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = if (pressed) Cyan else Mist, modifier = Modifier.size(21.dp)); Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium); Text(detail, color = Mist, fontSize = 12.sp, maxLines = if (fontScale > 1.3f) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis) }
+        Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium); if (detail.isNotBlank()) Text(detail, color = Mist, fontSize = 12.sp, maxLines = if (fontScale > 1.3f) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis) }
         Box(Modifier.widthIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) { trailing() }
     }
 }
