@@ -90,21 +90,29 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   // #region Playback and conversational loop
   async function speak(text) {
     const id = epoch; if (!active) return;
-    let url = '';
+    const synthesis = new AbortController(), sessionSignal = controller.signal;
+    let url = '', current = null, settlePlayback = null;
+    const cancel = () => {
+      synthesis.abort(); playbackActive = false;
+      current?.pause(); settlePlayback?.();
+    };
+    finishPlayback = cancel;
+    sessionSignal.addEventListener('abort', cancel, { once: true });
     try {
       const canDuplex = duplex && stream?.getAudioTracks()[0]?.getSettings().echoCancellation === true;
-      state('speaking', canDuplex ? copy('Puoi interrompermi parlando', 'You can interrupt me by speaking') : copy('NexusNXS parla · tocca il Core per interrompere', 'NexusNXS is speaking · tap the Core to interrupt'));
-      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: spokenLanguage(text) }) });
-      if (!valid(id)) return;
+      state('thinking', copy('Preparo la voce · tocca il Core per interrompere', 'Preparing audio · tap the Core to interrupt'));
+      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: spokenLanguage(text) }) });
+      if (!valid(id) || synthesis.signal.aborted) return;
       if (!response.ok) throw new Error(copy('Audio non disponibile. La risposta resta nella chat.', 'Audio unavailable. Your answer remains in chat.'));
-      const blob = await response.blob(); if (!valid(id)) return;
-      url = URL.createObjectURL(blob); const current = new Audio(url);
+      const blob = await response.blob(); if (!valid(id) || synthesis.signal.aborted) return;
+      url = URL.createObjectURL(blob); current = new Audio(url);
       await new Promise((resolve, reject) => {
-        finishPlayback = () => { playbackActive = false; current.pause(); resolve(); };
+        settlePlayback = resolve;
         current.onended = () => { playbackActive = false; resolve(); }; current.onerror = () => reject(new Error(copy('Riproduzione audio non riuscita.', 'Audio playback failed.')));
         current.play().then(() => {
-          if (!valid(id)) { current.pause(); resolve(); return; }
+          if (!valid(id) || synthesis.signal.aborted) { current.pause(); resolve(); return; }
           playbackActive = true;
+          state('speaking', canDuplex ? copy('Puoi interrompermi parlando', 'You can interrupt me by speaking') : copy('NexusNXS parla · tocca il Core per interrompere', 'NexusNXS is speaking · tap the Core to interrupt'));
           if (canDuplex && !pendingCapture) {
             // Retain the whole utterance, including its beginning during playback.
             // Catch immediately: the conversational loop consumes the outcome later.
@@ -112,8 +120,13 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
           }
         }).catch(reject);
       });
-    } catch (error) { if (valid(id)) throw error; }
-    finally { playbackActive = false; finishPlayback = null; if (url) URL.revokeObjectURL(url); }
+    } catch (error) { if (valid(id) && !synthesis.signal.aborted) throw error; }
+    finally {
+      sessionSignal.removeEventListener('abort', cancel);
+      current?.pause();
+      if (finishPlayback === cancel) { playbackActive = false; finishPlayback = null; }
+      if (url) URL.revokeObjectURL(url);
+    }
   }
   async function start() {
     if (active || isBusy()) return;

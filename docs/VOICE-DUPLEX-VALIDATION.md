@@ -2,7 +2,7 @@
 
 Stato: prototipo web, disattivato nel percorso pubblico. Non costituisce
 full-duplex su Android o Electron e non gestisce ancora l'interruzione durante
-la generazione del testo. Nessuna registrazione umana è stata valutata.
+la generazione del testo tramite voce (il tocco sul Core annulla la risposta). Nessuna registrazione umana è stata valutata.
 
 Il parametro `voiceDuplex=1` abilita il prototipo solo su hostname loopback.
 Usare `http://127.0.0.1:32147/?voiceDuplex=1` sul computer del servizio.
@@ -32,3 +32,7 @@ umano autorizzato e `voice:evaluate:stt`, come richiesto da AGENTS.md.
 interruzione, fallback senza AEC e rilascio delle risorse con dispositivi
 simulati. Non misura eco acustico, accuratezza STT o qualità conversazionale.
 Non promuovere il prototipo a predefinito sulla sola base di questi test.
+
+La preparazione della sintesi è annullabile al tocco e all'uscita. Le risposte
+audio tardive vengono ignorate, anche se il trasporto restituisce dati dopo
+l'annullamento. Lo stato speaking inizia solo quando il playback è avviato.

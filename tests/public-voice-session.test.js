@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { createPublicVoiceSession } = require('../src/remote/public-voice-session');
 
-function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false) {
-  let frames=0, recordings=0, transcriptions=0, paused=0, stopped=0, speaking=false, busy=false, cancelled=0, instance;
+function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null) {
+  let frames=0, recordings=0, transcriptions=0, paused=0, stopped=0, speaking=false, busy=false, cancelled=0, audioStarts=0, synthesisAborted=false, instance;
   const element=()=>({hidden:false,value:'',className:'',textContent:'',inert:false,classList:{contains:()=>false,add(){},remove(){}},setAttribute(){},getAttribute(){return '';},append(){},focus(){},blur(){},dispatchEvent(){}});
   const prompt=element(),core=element();
   const document={createElement:element,body:element(),addEventListener(){},querySelectorAll:()=>[],getElementById:()=>null};
@@ -20,14 +20,22 @@ function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, i
     stop(){if(this.state!=='recording')return;this.state='inactive';queueMicrotask(()=>{this.ondataavailable?.({data:new Blob(['audio'])});this.onstop?.();});}
   }
   class Audio {
-    async play(){speaking=true;if(leaveDuringPlayback){queueMicrotask(()=>instance.leave());return;}if(!duplex||!echoCancellation)queueMicrotask(()=>{speaking=false;this.onended?.();});}
+    async play(){audioStarts++;speaking=true;if(leaveDuringPlayback){queueMicrotask(()=>instance.leave());return;}if(!duplex||!echoCancellation)queueMicrotask(()=>{speaking=false;this.onended?.();});}
     pause(){if(speaking)paused++;speaking=false;}
   }
   const sandbox={document,navigator:{language:'it-IT',mediaDevices:{getUserMedia:async()=>stream}},AudioContext:Context,MediaRecorder:Recorder,Audio,AbortController,Blob,Event,URL:{createObjectURL:()=> 'blob:qa',revokeObjectURL(){}},performance:{now:()=>frames*80},requestAnimationFrame:callback=>setImmediate(()=>{frames++;if(frames>200)throw Error('capture did not settle');callback(frames*80);}),cancelAnimationFrame:clearImmediate,setTimeout,clearTimeout,addEventListener(){}};
   const factory=vm.runInNewContext(`(${createPublicVoiceSession.toString()})`,sandbox);
   const runtime={};
-  instance=factory({core,prompt,runtime,duplex,session:async()=>{},fetchAudio:async path=>path.endsWith('synthesize')?{ok:true,blob:async()=>new Blob(['speech'])}:{ok:true,json:async()=>({text:`phrase ${++transcriptions}`})},ask:async()=>{if(transcriptions===1){if(interruptGeneration){busy=true;instance.interact();busy=false;}else await instance.speak('response');}else instance.leave();},encodeWav:()=>new Uint8Array(4),spokenLanguage:()=> 'it',setState:s=>{runtime.voiceState=s;},setPhase(){},isBusy:()=>busy,cancelResponse:()=>{cancelled++;},showText(){}});
-  return {instance,run:()=>instance.start(),stats:()=>({recordings,transcriptions,paused,stopped,speaking,cancelled})};
+  const synthesize=async options=>{
+    if(synthesisInterruption){
+      if(synthesisInterruption==='leave') instance.leave(); else instance.interact();
+      synthesisAborted=options.signal.aborted;
+      if(synthesisInterruption==='reject') throw Object.assign(new Error('Cancelled'),{name:'AbortError'});
+    }
+    return {ok:true,blob:async()=>new Blob(['speech'])};
+  };
+  instance=factory({core,prompt,runtime,duplex,session:async()=>{},fetchAudio:async (path,options)=>path.endsWith('synthesize')?await synthesize(options):{ok:true,json:async()=>({text:`phrase ${++transcriptions}`})},ask:async()=>{if(transcriptions===1){if(interruptGeneration){busy=true;instance.interact();busy=false;}else await instance.speak('response');}else instance.leave();},encodeWav:()=>new Uint8Array(4),spokenLanguage:()=> 'it',setState:s=>{runtime.voiceState=s;},setPhase(){},isBusy:()=>busy,cancelResponse:()=>{cancelled++;},showText(){}});
+  return {instance,run:()=>instance.start(),stats:()=>({recordings,transcriptions,paused,stopped,speaking,cancelled,audioStarts,synthesisAborted})};
 }
 
 test('duplex captures a complete interruption during playback and releases the microphone',async()=>{
@@ -52,3 +60,13 @@ test('Core reuses response cancellation during generation and resumes the same v
   assert.equal(h.stats().paused,0);
   assert.equal(h.instance.active,false);
 });
+for(const mode of ['late-response','reject','leave']){
+  test(`synthesis interruption ${mode} prevents stale audio and releases the session`,async()=>{
+    const h=harness(false,true,false,false,mode);await h.run();const s=h.stats();
+    assert.equal(s.synthesisAborted,true);
+    assert.equal(s.audioStarts,0);
+    assert.equal(s.transcriptions,mode==='leave'?1:2);
+    assert.ok(s.stopped>=1);
+    assert.equal(h.instance.active,false);
+  });
+}
