@@ -5,7 +5,7 @@ full-duplex su Android o Electron e non gestisce ancora l'interruzione durante
 la generazione del testo. Nessuna registrazione umana è stata valutata.
 
 Il parametro `voiceDuplex=1` abilita il prototipo solo su hostname loopback.
-Usare `http://127.0.0.1:32145/?voiceDuplex=1` sul computer del servizio.
+Usare `http://127.0.0.1:32147/?voiceDuplex=1` sul computer del servizio.
 Il browser deve confermare `echoCancellation: true` nelle impostazioni della
 traccia audio; in caso contrario resta l'interruzione al tocco.
 
