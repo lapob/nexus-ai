@@ -322,3 +322,13 @@ Ogni famiglia deve dichiarare piattaforme supportate, requisiti hardware,
 modalità locale/cloud, dati trattati e limiti; nascondere comandi non collegati.
 La dashboard amministrativa mostra salute e utilizzo aggregati: non deve
 trasformarsi in un accesso indiscriminato alle conversazioni personali.
+### Direzione visiva minimale — richiesta 14 settembre
+
+Comandi comuni (allega, invia, interrompi, scarica, chiudi, feedback) a icona,
+con nome accessibile. Categorie delle impostazioni con icona e titolo breve;
+spiegazioni soltanto nella pagina di dettaglio quando servono a scegliere.
+Niente sottotitoli ripetuti o nuove barre permanenti. La ricerca deve trovare
+anche parole non mostrate nella lista compatta. Mantenere target tattili,
+focus da tastiera, contrasto e testi delle conferme importanti.
+Applicazione corrente: indice impostazioni Android compatto in6.5.15.
+Estensione all'intero progetto da verificare componente per componente.

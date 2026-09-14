@@ -3971,7 +3971,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     else SettingsGroup {
         matches.forEach { (id, title, detail) ->
             val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
-            CompactSetting(icon, title, detail, { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
+            CompactSetting(icon, title, "", { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
         }
     }
 }
