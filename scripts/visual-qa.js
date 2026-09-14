@@ -20,6 +20,7 @@ const cases = [
   ['settings-data', 900, 700],
   ['settings-connections', 900, 700],
   ['settings-shortcuts', 900, 700],
+  ['settings-activity', 900, 700],
   ['remote-pairing', 900, 760],
   ['settings-select', 720, 640],
   ['models', 900, 700],

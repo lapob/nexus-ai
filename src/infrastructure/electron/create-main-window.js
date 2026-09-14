@@ -74,7 +74,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
       if (smokeView) {
         // Le catture usano un profilo Chromium temporaneo: è quindi sicuro
         // preparare lo stato necessario senza alterare le preferenze reali.
-        if (smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing' || smokeView === 'settings-select' || smokeView === 'permission' || smokeView === 'barge-in' || smokeView === 'queued-text' || smokeView === 'response' || smokeView === 'command' || smokeView === 'command-policy' || smokeView === 'history' || smokeView === 'conversation' || smokeView === 'artifacts' || smokeView === 'models' || smokeView === 'saturn' || smokeView === 'jarvis' || smokeView === 'neural') {
+        if (smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-activity' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing' || smokeView === 'settings-select' || smokeView === 'permission' || smokeView === 'barge-in' || smokeView === 'queued-text' || smokeView === 'response' || smokeView === 'command' || smokeView === 'command-policy' || smokeView === 'history' || smokeView === 'conversation' || smokeView === 'artifacts' || smokeView === 'models' || smokeView === 'saturn' || smokeView === 'jarvis' || smokeView === 'neural') {
           if (smokeView === 'history' || smokeView === 'conversation' || smokeView === 'artifacts') {
             await win.webContents.executeJavaScript(`
               localStorage.setItem('nexus.conversations.v1', JSON.stringify([{
@@ -153,7 +153,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
           win.showInactive();
           await new Promise((resolve) => setTimeout(resolve, 120));
         }
-        const shortcut = smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing' || smokeView === 'settings-select'
+        const shortcut = smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-activity' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing' || smokeView === 'settings-select'
           ? ','
           : smokeView === 'history' || smokeView === 'artifacts'
             ? 'H'
@@ -165,7 +165,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
               ? 'V'
               : null;
         if (shortcut) {
-            if (smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing' || smokeView === 'settings-select' || smokeView === 'command-policy') {
+            if (smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-activity' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing' || smokeView === 'settings-select' || smokeView === 'command-policy') {
               // Gli acceleratori dipendono dal layout tastiera della macchina;
               // l'evento DOM rende la QA deterministica anche in CI.
               const smokeKey = smokeView === 'command-policy' ? 'k' : ',';
@@ -206,7 +206,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
             await new Promise((resolve) => setTimeout(resolve, 260));
           }
         }
-        if (smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing') {
+        if (smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-activity' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing') {
           await win.webContents.executeJavaScript(`
             (async () => {
               const requested = ${JSON.stringify(smokeView)};
@@ -215,6 +215,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
                 'settings-data': 'data',
                 'settings-connections': 'connections',
                 'settings-shortcuts': 'shortcuts',
+                'settings-activity': 'activity',
                 'settings-pets': 'appearance',
                 'remote-pairing': 'remote'
               };
@@ -332,7 +333,7 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
           }
           await new Promise((resolve) => setTimeout(resolve, 420));
         }
-        const expectedSelector = smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-connections' || smokeView === 'settings-shortcuts'
+        const expectedSelector = smokeView === 'settings' || smokeView === 'settings-ai' || smokeView === 'settings-connections' || smokeView === 'settings-activity' || smokeView === 'settings-shortcuts'
           ? '.settings-overlay'
           : smokeView === 'settings-pets'
             ? '#settings-panel-appearance .settings-page-intro'

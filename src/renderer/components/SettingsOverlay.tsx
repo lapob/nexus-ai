@@ -38,7 +38,7 @@ interface SettingsOverlayProps {
   onImportPersonalData: (passphrase: string) => Promise<'imported' | 'cancelled'>;
 }
 
-type SettingsTab = 'audio' | 'appearance' | 'ai' | 'connections' | 'shortcuts' | 'permissions' | 'data' | 'updates' | 'remote';
+type SettingsTab = 'audio' | 'appearance' | 'ai' | 'connections' | 'shortcuts' | 'permissions' | 'data' | 'updates' | 'remote' | 'activity';
 interface SettingsSection {
   value: SettingsTab;
   label: string;
@@ -137,6 +137,8 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
   const [responseCache, setResponseCache] = useState<{ entries: number; hits: number }>({ entries: 0, hits: 0 });
   const [confirmTrainingClear, setConfirmTrainingClear] = useState(false);
   const [actionHistory, setActionHistory] = useState<Array<{ timestamp: string; event: string; tool: string; preview?: string }>>([]);
+  const [availableTools, setAvailableTools] = useState<Array<{ name: string; label: string; description: string }>>([]);
+  const [capabilitiesFailed, setCapabilitiesFailed] = useState(false);
   const [localIntegrations, setLocalIntegrations] = useState<Array<{ id: string; label: string }>>([]);
   const [backupPassphrase, setBackupPassphrase] = useState('');
   const [remoteStatus, setRemoteStatus] = useState<RemoteSessionStatus | null>(null);
@@ -153,7 +155,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
   useEffect(() => {
     const openRequestedTab = (event: Event) => {
       const requested = (event as CustomEvent<SettingsTab>).detail;
-      if (requested && ['audio', 'appearance', 'ai', 'connections', 'shortcuts', 'permissions', 'data', 'updates', 'remote'].includes(requested)) {
+      if (requested && ['audio', 'appearance', 'ai', 'connections', 'shortcuts', 'permissions', 'data', 'updates', 'remote', 'activity'].includes(requested)) {
         setTab(requested);
         setSettingsQuery('');
         requestAnimationFrame(() => settingsContent.current?.scrollTo({ top: 0 }));
@@ -193,11 +195,16 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
       keywords: 'permessi autorizzazioni autonomia accesso completo conferma azioni strumenti integrazioni attività sicurezza'
     },
     {
-      value: 'connections', label: 'Funzioni',
-      detail: 'Git, Computer Use e plugin',
-      title: 'Strumenti e connessioni',
+      value: 'connections', label: labels.connections,
+      detail: labels.connectionsDetail,
+      title: labels.connections,
       description: 'Collega un progetto, controlla le capacità operative e scopri le integrazioni disponibili senza esporre dettagli tecnici.',
       keywords: 'git repository cartella computer use plugin integrazioni strumenti progetto'
+    },
+    {
+      value: 'activity', label: labels.activity,
+      detail: labels.activityDetail, title: labels.activity, description: labels.activityDetail,
+      keywords: 'attivita activity azioni actions cronologia history esecuzioni executions'
     },
     {
       value: 'shortcuts', label: 'Scorciatoie',
@@ -311,8 +318,8 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
     window.nexus.responseCacheStats().then(setResponseCache).catch(() => setResponseCache({ entries: 0, hits: 0 }));
     window.nexus.actionHistory().then(setActionHistory).catch(() => setActionHistory([]));
     window.nexus.listAgentCapabilities()
-      .then((capabilities) => setLocalIntegrations(capabilities.applications))
-      .catch(() => setLocalIntegrations([]));
+      .then((capabilities) => { setLocalIntegrations(capabilities.applications); setAvailableTools(capabilities.tools); setCapabilitiesFailed(false); })
+      .catch(() => { setLocalIntegrations([]); setAvailableTools([]); setCapabilitiesFailed(true); });
     window.nexus.getWorkspace().then(setWorkspace).catch(() => setWorkspace(null));
     window.nexus.remoteStatus().then(setRemoteStatus).catch(() => setRemoteStatus(null));
     window.nexus.startupStatus().then(setStartupStatus).catch(() => setStartupStatus({ available: false, enabled: false }));
@@ -1079,7 +1086,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                 </div>
               )}
 
-              {(['ai', 'permissions', 'data', 'connections', 'shortcuts', 'updates'] as SettingsTab[]).includes(tab) && (
+              {(['ai', 'permissions', 'data', 'connections', 'shortcuts', 'updates', 'activity'] as SettingsTab[]).includes(tab) && (
                 <div className="settings-panel" id={`settings-panel-${tab}`} role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
                   <div className="settings-section-copy settings-wide">
                     <span>{activeSection.label}</span>
@@ -1192,17 +1199,20 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                         {workspace?.active && <button className="settings-secondary" type="button" onClick={async () => setWorkspace(await window.nexus.clearWorkspace())}>Scollega</button>}
                       </div>
                     </div>
-                    <div className="settings-section-copy settings-wide"><strong>Computer Use</strong><p>NexusNXS può usare applicazioni e strumenti locali; ogni azione rispetta il livello di autorizzazione configurato.</p></div>
-                    <div className="settings-feature-card settings-wide">
-                      <span><strong>{localIntegrations.length ? 'Disponibile' : 'In attesa di strumenti compatibili'}</strong><small>{localIntegrations.length ? `${localIntegrations.length} integrazioni pronte` : 'Le capacità vengono rilevate automaticamente.'}</small></span>
-                      <button className="settings-secondary" type="button" onClick={() => setTab('permissions')}>Gestisci permessi</button>
-                    </div>
-                    <div className="settings-section-copy settings-wide"><strong>Plugin</strong><p>Le estensioni compatibili vengono convalidate prima di apparire e non possono ottenere permessi impliciti.</p></div>
+                    <div className="settings-section-copy settings-wide"><strong>{labels.tools}</strong><p>{labels.toolsHelp}</p></div>
+                    {capabilitiesFailed && <p className="settings-wide" role="status">{labels.capabilitiesFailed}</p>}
                     <div className="local-integrations settings-wide">
-                      <span><strong>Integrazioni disponibili</strong><small>Rilevate automaticamente in questo dispositivo.</small></span>
-                      <div>{localIntegrations.length ? localIntegrations.map((integration) => <i key={integration.id}>{integration.label}</i>) : <i>Nessun plugin attivo</i>}</div>
+                      <span><strong>{labels.tools}</strong><small>{labels.detectedCapabilities}</small></span>
+                      <div>{availableTools.length ? availableTools.map((tool) => <i key={tool.name}>{tool.label}</i>) : <i>{labels.noTools}</i>}</div>
                     </div>
-                  </>}
+                    <div className="local-integrations settings-wide">
+                      <span><strong>{labels.localApplications}</strong><small>{labels.detectedCapabilities}</small></span>
+                      <div>{localIntegrations.length ? localIntegrations.map((integration) => <i key={integration.id}>{integration.label}</i>) : <i>{labels.noApplications}</i>}</div>
+                    </div>
+                    <div className="settings-inline-actions settings-wide">
+                      <button className="settings-secondary" type="button" onClick={() => setTab('permissions')}>{labels.permissions}</button>
+                      <button className="settings-secondary" type="button" onClick={() => setTab('activity')}>{labels.activity}</button>
+                    </div>                  </>}
                   {tab === 'shortcuts' && <>
                     <div className="settings-section-copy settings-wide"><strong>Comandi rapidi</strong><p>Le etichette nella schermata principale si aggiornano insieme alle combinazioni.</p></div>
                     {([
@@ -1262,22 +1272,13 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     })}
                   </div>
                   <p className="action-policy-note settings-wide">Le azioni distruttive, i percorsi protetti e i comandi non consentiti restano bloccati in ogni modalità.</p>
-                  <div className="local-integrations settings-wide">
-                    <span>
-                      <strong>Integrazioni locali disponibili</strong>
-                      <small>Rilevate sul computer. Ogni utilizzo segue il profilo di autorizzazione scelto.</small>
-                    </span>
-                    <div>
-                      {localIntegrations.length
-                        ? localIntegrations.map((integration) => <i key={integration.id}>{integration.label}</i>)
-                        : <i>Nessuna applicazione compatibile rilevata</i>}
-                    </div>
-                  </div>
+                  </>}
+                  {tab === 'activity' && <>
                   <div className="action-history settings-wide">
-                    <strong>Attività recenti</strong>
+                    <strong>{labels.activity}</strong>
                     {actionHistory.length === 0
-                      ? <small>Nessuna azione eseguita.</small>
-                      : actionHistory.slice(0, 5).map((item, index) => (
+                      ? <small>{labels.noActivity}</small>
+                      : actionHistory.slice(0, 30).map((item, index) => (
                         <div key={`${item.timestamp}-${index}`}>
                           <span>{item.tool || 'azione'} · {item.event}</span>
                           <small>{item.preview || new Date(item.timestamp).toLocaleString(document.documentElement.lang || navigator.language)}</small>
