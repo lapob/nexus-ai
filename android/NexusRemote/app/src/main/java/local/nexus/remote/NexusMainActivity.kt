@@ -3055,13 +3055,8 @@ private fun JSONArray?.toTurns() = buildList {
                     DrawerItem(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings")) { menuPreferences = true }
                     } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (menuSection.isEmpty()) {
-                        SettingsGroup {
-                            CompactSetting(Icons.Rounded.Animation, nexusCopy("Aspetto", "Appearance"), nexusCopy("Movimento e feedback", "Motion and feedback"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "appearance" }
-                            CompactSetting(Icons.Rounded.Mic, nexusCopy("Voce e assistente", "Voice and assistant"), nexusCopy("Richiamo e microfono", "Activation and microphone"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "voice" }
-                        }
-                        SettingsGroup {
-                            CompactSetting(Icons.Outlined.Computer, nexusCopy("Dispositivi", "Devices"), nexusCopy("Connessioni e controllo remoto", "Connections and remote control"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "devices" }
-                            CompactSetting(Icons.Rounded.Lock, nexusCopy("Privacy e dati", "Privacy and data"), nexusCopy("Cronologia e backup", "History and backup"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { menuSection = "privacy" }
+                        InstantSettingsNavigation { section ->
+                            keyboard?.hide(); focusManager.clearFocus(force = true); menuSection = section
                         }
                     }
                     if (menuSection == "appearance") SettingsGroup {
@@ -3956,6 +3951,30 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }
 }
 
+@Composable private fun InstantSettingsNavigation(open: (String) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val sections = listOf(
+        Triple("appearance", nexusCopy("Aspetto", "Appearance"), nexusCopy("Movimento, animazioni e feedback aptico", "Motion, animations and haptic feedback")),
+        Triple("voice", nexusCopy("Voce e assistente", "Voice and assistant"), nexusCopy("Richiamo, microfono e tasto laterale", "Activation, microphone and side button")),
+        Triple("devices", nexusCopy("Dispositivi", "Devices"), nexusCopy("Connessioni, associazione e controllo remoto", "Connections, pairing and remote control")),
+        Triple("privacy", nexusCopy("Privacy e dati", "Privacy and data"), nexusCopy("Cronologia, chat temporanea, backup e ripristino", "History, temporary chat, backup and restore"))
+    )
+    val terms = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val matches = sections.filter { (_, title, detail) -> terms.all { (title + " " + detail).contains(it, ignoreCase = true) } }
+    OutlinedTextField(value = query, onValueChange = { query = it.take(120) }, singleLine = true,
+        placeholder = { Text(nexusCopy("Cerca impostazioni", "Search settings"), style = MaterialTheme.typography.bodyMedium) },
+        leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
+        trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
+        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
+    if (matches.isEmpty()) Text(nexusCopy("Nessuna impostazione trovata", "No settings found"), color = Mist, style = MaterialTheme.typography.bodySmall)
+    else SettingsGroup {
+        matches.forEach { (id, title, detail) ->
+            val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
+            CompactSetting(icon, title, detail, { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
+        }
+    }
+}
 @Composable private fun InstantHistory(state: NexusUiState, dispatch: (String, String) -> Unit, modifier: Modifier = Modifier, open: (ChatRow) -> Unit) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     var query by rememberSaveable { mutableStateOf("") }
