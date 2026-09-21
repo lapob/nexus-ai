@@ -301,7 +301,7 @@
 .permission-heading > div { display: grid; min-width: 0; gap: 0.12rem; }
 .permission-heading small {
   color: rgba(123, 192, 194, 0.58);
-  font: 0.58rem/1.2 var(--font-mono);
+  font: 0.58rem/1.2 var(--font-sans);
   letter-spacing: 0.075em;
   text-transform: uppercase;
 }
@@ -768,7 +768,7 @@
 .remote-pairing-code > div { display: flex; align-items: flex-start; flex-direction: column; gap: 0.5rem; }
 .remote-pairing-code b {
   color: rgba(204, 235, 235, 0.86);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   font-weight: 560;
   letter-spacing: 0.08em;
@@ -807,7 +807,7 @@
 
 .remote-pairing-close { position: absolute; top: .75rem; right: .75rem; width: 2.35rem; height: 2.35rem; border: 0; border-radius: 50%; color: rgba(167,194,195,.6); background: rgba(105,172,174,.045); font-size: 1.35rem; }
 .remote-pairing-close:hover,.remote-pairing-close:focus-visible { color: rgba(226,240,240,.92); background: rgba(105,190,192,.1); outline: none; }
-.remote-pairing-eyebrow { color: rgba(91, 185, 188, .7); font: 600 .63rem/1 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; }
+.remote-pairing-eyebrow { color: rgba(91, 185, 188, .7); font: 600 .63rem/1 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; }
 .remote-pairing-card h2 { margin: .6rem 0 .35rem; color: rgba(230,241,241,.96); font-size: 1.42rem; font-weight: 480; letter-spacing: -.035em; }
 .remote-pairing-card > p { margin: 0; color: rgba(149,174,175,.62); font-size: .78rem; }
 .remote-qr-orbit { position: relative; display: grid; width: 13.5rem; height: 13.5rem; margin: 1.35rem auto 1rem; place-items: center; }
@@ -816,7 +816,7 @@
 .remote-qr-orbit > i { inset: -.25rem; border-style: dashed; border-color: rgba(81,224,220,.11); border-radius: 50%; animation:remote-orbit 14s linear infinite; }
 .remote-qr-orbit img { z-index: 1; width: 11.6rem; height: 11.6rem; padding: .65rem; border-radius: 1.35rem; background: #031010; box-shadow: 0 0 2.2rem rgba(68,210,209,.1); image-rendering: pixelated; }
 .remote-pairing-card > small { display: block; color: rgba(126,153,154,.48); font-size: .66rem; }
-.remote-manual-code { display: block; margin: .35rem 0 .9rem; color: rgba(207,234,234,.9); font: 560 .9rem/1.2 var(--font-mono); letter-spacing: .23em; }
+.remote-manual-code { display: block; margin: .35rem 0 .9rem; color: rgba(207,234,234,.9); font: 560 .9rem/1.2 var(--font-sans); letter-spacing: .23em; }
 .remote-pairing-actions { display: flex; justify-content: center; gap: .35rem; }
 .remote-pairing-actions button { min-height: 2.15rem; border: 0; border-radius: .7rem; padding: 0 .7rem; color: rgba(142,204,204,.72); background: rgba(80,174,176,.065); font-size: .68rem; }
 .remote-pairing-actions button:hover,.remote-pairing-actions button:focus-visible { color: rgba(213,238,237,.94); background: rgba(80,190,192,.12); outline: none; }

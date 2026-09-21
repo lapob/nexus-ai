@@ -402,7 +402,7 @@
 }
 
 .remote-session-settings > span small:last-child {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   overflow-wrap: anywhere;
 }
 
@@ -420,7 +420,7 @@
 
 .remote-pairing-code strong {
   color: rgba(103, 239, 241, 0.9);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 1.35rem;
   letter-spacing: 0.22em;
 }

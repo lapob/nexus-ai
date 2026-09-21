@@ -11,12 +11,16 @@ const TIME_SENSITIVE_PATTERN = /\b(?:oggi|adesso|attuale|attualmente|corrente|co
 const RESEARCH_PATTERN = /\b(?:approfondisci|confronta|letteratura|studi|paper|ricerca\s+scientifica|prove|evidenze|benchmark|deep\s+research|research)\b/iu;
 const LOCAL_OPERATION_PATTERN = /\b(?:quest[oa]\s+(?:pc|computer|cartella|file|progetto)|workspace|repository\s+locale|desktop|disco|volume|terminale|powershell|prompt|apri|chiudi|avvia|spegni|riavvia|modifica|elimina|sposta|rinomina)\b/iu;
 const PRIVATE_LITERAL_PATTERN = /(?:\b[A-Z]:\\|\/(?:Users|home)\/|\b(?:api[_ -]?key|token|password|secret|chiave\s+privata)\s*[:=]\s*[^\s]{6,}|\b(?:sk|pk|ghp|github_pat)_[A-Za-z0-9_-]{12,})/iu;
+// A date in a personal planning request is not a request for public facts.
+// Keep external subjects eligible even when the same request also asks for a plan.
+const PERSONAL_PLANNING_PATTERN = /\bpriorit[aà](?=\s|[,.!?;:]|$)|\b(?:priorities|to-do|(?:mia|tua|my|your)\s+agenda|(?:mia|tua)\s+giornata|(?:my|your)\s+day)\b/iu;
+const PUBLIC_FACT_PATTERN = /\b(?:meteo|tempo\s+far[aà]|notizie|news|prezz\w*|quotaz\w*|partita|elezion\w*|classifica|version\w*|release|legge|normativ\w*|regolament\w*|presidente|ceo|weather|forecast|price\w*|stock\w*|election\w*|standings|law|regulation\w*|event\w*|scioper\w*|strike\w*|traffico|traffic)\b/iu;
 
 function researchIntent(question = '') {
   const text = String(question || '').trim();
   return {
     explicit: EXPLICIT_WEB_PATTERN.test(text),
-    timeSensitive: TIME_SENSITIVE_PATTERN.test(text),
+    timeSensitive: TIME_SENSITIVE_PATTERN.test(text) && !(PERSONAL_PLANNING_PATTERN.test(text) && !PUBLIC_FACT_PATTERN.test(text)),
     research: RESEARCH_PATTERN.test(text),
     localOperation: LOCAL_OPERATION_PATTERN.test(text),
     containsPrivateLiteral: PRIVATE_LITERAL_PATTERN.test(text)

@@ -24,3 +24,17 @@ test('non invia sul web richieste che contengono segreti o percorsi locali', () 
   assert.equal(webResearchPolicy({ question: 'Cerca C:\\Users\\utente\\segreto.txt sul web' }).reason, 'privacy-boundary');
   assert.equal(webResearchPolicy({ question: 'Verifica api_key=supersegreto123456 online' }).reason, 'privacy-boundary');
 });
+
+test('le priorità personali di oggi non richiedono una ricerca pubblica', () => {
+  for (const question of [
+    'Ho poco tempo: aiutami a organizzare tre priorità per oggi. Prima fammi una sola domanda utile.',
+    'Help me plan my priorities today. Ask me one question first.',
+    'Organizza la mia agenda di oggi'
+  ]) assert.equal(webResearchPolicy({ question }).level, 'none', question);
+  for (const question of [
+    'Organizza la giornata considerando il meteo di oggi a Roma',
+    'Plan my day around the latest weather forecast',
+    'Cerca online come organizzare le priorità di oggi',
+    'Pianifica il viaggio considerando gli scioperi di oggi'
+  ]) assert.equal(webResearchPolicy({ question }).level, 'required', question);
+});

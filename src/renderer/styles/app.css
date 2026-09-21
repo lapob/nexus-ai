@@ -10,7 +10,9 @@
 
 :root {
   color-scheme: dark;
-  font-family: "Inter Variable", Inter, "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;
   --ink: #020405;
@@ -424,7 +426,7 @@ a:focus:not(:focus-visible) {
 
 .model-switcher > header span {
   color: rgba(113, 225, 228, 0.72);
-  font: 600 0.62rem/1 var(--font-mono);
+  font: 600 0.62rem/1 var(--font-sans);
   letter-spacing: 0.18em;
 }
 
@@ -450,7 +452,7 @@ a:focus:not(:focus-visible) {
   padding: 0.25rem 0.42rem;
   background: rgba(255, 255, 255, 0.025);
   color: rgba(190, 216, 218, 0.44);
-  font: 500 0.62rem/1 var(--font-mono);
+  font: 500 0.62rem/1 var(--font-sans);
 }
 
 .model-search {
@@ -1199,7 +1201,7 @@ a:focus:not(:focus-visible) {
   background: transparent;
   color: rgba(190, 226, 228, 0.64);
   cursor: pointer;
-  font-family: "JetBrains Mono Variable", "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-sans);
   font-size: 0.78rem;
   letter-spacing: 0.035em;
 }
@@ -1369,7 +1371,7 @@ a:focus:not(:focus-visible) {
   gap: 0.52rem;
   align-items: baseline;
   color: rgba(173, 207, 210, 0.46);
-  font-family: "JetBrains Mono Variable", "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-sans);
   font-size: clamp(0.66rem, 0.64vw, 0.74rem);
   letter-spacing: 0.006em;
   line-height: 1.5;
@@ -1496,7 +1498,7 @@ a:focus:not(:focus-visible) {
   gap: 1rem;
   opacity: 0.42;
   color: rgba(181, 222, 225, 0.56);
-  font-family: "JetBrains Mono Variable", "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   letter-spacing: 0.045em;
   white-space: nowrap;
@@ -2732,7 +2734,7 @@ button.shortcut-item:focus-visible kbd {
 
 .application-fallback span {
   color: rgba(121, 207, 211, 0.72);
-  font: 600 0.68rem/1 var(--font-mono);
+  font: 600 0.68rem/1 var(--font-sans);
   letter-spacing: 0.3em;
 }
 
@@ -3181,7 +3183,7 @@ button.shortcut-item:focus-visible kbd {
 .training-quality-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .training-quality-heading > span { display: grid; gap: 0.2rem; }
 .training-quality-heading small, .training-quality-grid small { color: rgba(166, 202, 204, 0.5); font-size: 0.68rem; }
-.training-quality-heading b { color: rgba(102, 229, 225, 0.82); font: 1.15rem var(--font-mono); font-weight: 430; }
+.training-quality-heading b { color: rgba(102, 229, 225, 0.82); font: 1.15rem var(--font-sans); font-weight: 430; }
 .training-quality-meter { height: 0.2rem; overflow: hidden; border-radius: 999px; background: rgba(114, 203, 205, 0.08); }
 .training-quality-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(71, 178, 181, 0.72), rgba(99, 235, 224, 0.9)); transition: width 360ms cubic-bezier(.22, 1, .36, 1); }
 .training-quality-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 0.55rem; }
@@ -3231,7 +3233,7 @@ button.shortcut-item:focus-visible kbd {
 .model-evaluation-results article { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.72rem 0.9rem; border-radius: 0.8rem; background: rgba(92, 165, 168, 0.025); }
 .model-evaluation-results article[data-best="true"] { background: rgba(72, 215, 219, 0.06); }
 .model-evaluation-results article > span { display: grid; gap: 0.2rem; }
-.model-evaluation-results em { color: rgba(108, 224, 227, 0.72); font: 0.7rem var(--font-mono); font-style: normal; }
+.model-evaluation-results em { color: rgba(108, 224, 227, 0.72); font: 0.7rem var(--font-sans); font-style: normal; }
 
 @media (max-width: 720px) {
   .data-overview { grid-template-columns: 1fr; }
