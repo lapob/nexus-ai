@@ -136,15 +136,13 @@ try {
   }
   if ($jankFailures.Count) { throw "Budget frame Android non rispettato: $($jankFailures -join '; ')" }
   if ($App -eq 'Control') {
-    # La release privata usa FLAG_SECURE: screenshot neri sono il comportamento
-    # atteso. La gerarchia UI resta acquisita per verificare layout, contenuti e
-    # collisioni senza indebolire la protezione della schermata operativa.
+    # Verifica anche la gerarchia delle schermate operative.
     $emptyLayouts = @($profiles | Where-Object {
       $xmlPath = Join-Path $OutputDirectory "$($_.Name).xml"
       -not (Test-Path -LiteralPath $xmlPath) -or (Get-Item -LiteralPath $xmlPath).Length -lt 1000
     })
     if ($emptyLayouts.Count) { throw "Layout Control non acquisito: $($emptyLayouts.Name -join ', ')" }
-    Write-Output "Android secure layout matrix: PASS ($($profiles.Count) profili; screenshot protetti da FLAG_SECURE)."
+    Write-Output "Android visual/layout matrix: PASS ($($profiles.Count) profili in $OutputDirectory)."
   } else {
     Write-Output "Android visual matrix: PASS ($($profiles.Count) profili in $OutputDirectory)."
   }

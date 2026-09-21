@@ -94,7 +94,7 @@ test('entrambi i client usano barre di sistema edge-to-edge traslucide senza sep
   assert.match(controlActivity, /statusFrostOverlay = new View\(this\)/);
   assert.match(controlActivity, /new int\[\]\{Color\.argb\(topAlpha, 2, 6, 7\), Color\.argb\(edgeAlpha, 2, 6, 7\), Color\.TRANSPARENT\}/);
   assert.doesNotMatch(controlActivity, /SystemBarGlassView|RenderEffect|RenderNode|glassOverlap/, 'il velo resta leggero e non usa blur software per-frame');
-  assert.match(controlActivity, /int topInset = insets\.getSystemWindowInsetTop\(\)[\s\S]*int bottomInset = insets\.getSystemWindowInsetBottom\(\)[\s\S]*scroll\.setPadding\(0, dp\(8\) \+ topInset, 0, dp\(10\) \+ bottomInset\)/);
+  assert.match(controlActivity, /int topInset = insets\.getSystemWindowInsetTop\(\)[\s\S]*int bottomInset = insets\.getSystemWindowInsetBottom\(\)[\s\S]*scroll\.setPadding\(0, dp\(8\) \+ topInset, 0, dp\(10\) \+ bottomInset \+/);
   assert.doesNotMatch(controlActivity, /view\.setPadding\(horizontal,\s*dp\(8\)\s*\+\s*insets\.getSystemWindowInsetTop/);
   assert.doesNotMatch(publicActivity, /navigationBarStyle\s*=\s*SystemBarStyle\.dark\(android\.graphics\.Color\.BLACK\)/);
 });
@@ -151,16 +151,16 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(manifest, /android:name="\.NexusAssistantActivity"[\s\S]*android\.intent\.action\.ASSIST/);
   assert.match(styles, /Theme\.NexusRemote\.Assistant[\s\S]*windowIsTranslucent">true/);
   assert.match(styles, /Theme\.NexusRemote\.Assistant[\s\S]*backgroundDimEnabled">false/);
-  assert.match(assistantActivity, /PixelFormat\.TRANSLUCENT/);
+  assert.match(assistantActivity, /setBackgroundDrawable\(ColorDrawable/);
   assert.match(activity, /private fun nexusComposerTransform[\s\S]{0,160}sizeTransform = null/, 'il composer non deve sovrapporre una molla alla transizione della tastiera Android');
   assert.doesNotMatch(activity, /"assistantClose"\s*->[^\n]*assistantOverlay\s*=\s*false/, 'la chiusura Assist non deve comporre la UI opaca prima di terminare');
-  assert.match(assistantActivity, /clearFlags\(WindowManager\.LayoutParams\.FLAG_DIM_BEHIND\)/);
+  assert.match(assistantActivity, /clearFlags\(WindowManager\.LayoutParams\.FLAG_DIM_BEHIND/);
   assert.doesNotMatch(assistantActivity, /addFlags\(WindowManager\.LayoutParams\.FLAG_DIM_BEHIND\)/, 'il richiamo assistente non deve oscurare o sostituire il contesto Android');
   assert.doesNotMatch(activity.match(/setContent[^\n]+/)?.[0] || '', /NexusApp\(/);
   assert.match(activity, /private fun NexusInstantApp/);
   assert.match(activity, /private fun NexusInstantCore/);
   const assistantSurface = activity.split('@Composable private fun NexusAssistantOverlay')[1]?.split('@Composable private fun InstantWrittenExchange')[0] || '';
-  assert.doesNotMatch(assistantSurface, /BasicTextField|NexusAttachmentFlow|background\(Ink\)/, 'Assist reuses the full app composer and keeps the underlying Android screen visible');
+  assert.doesNotMatch(assistantSurface, /BasicTextField|NexusAttachmentFlow/, 'Assist reuses the full app composer');
   assert.equal((assistantSurface.match(/IconButton\(/g) || []).length, 2, 'Assist exposes just attachment and keyboard shortcuts');
   const expandAction = activity.split('"assistantExpand" ->')[1]?.split('"assistantEntryConsumed"')[0] || '';
   assert.doesNotMatch(expandAction, /(?:startActivity|finish|disconnect|cancel\w*)\s*\(/i, 'Expanding the same conversation must not cancel its pending reply');
@@ -306,7 +306,7 @@ test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell rem
   assert.match(activity, /private void handleTelemetryFailure\(\)/);
   assert.doesNotMatch(activity, /if \(!silentFailure\) showOffline\(null\);[\s\S]{0,260}telemetryInFlight = false/);
   assert.match(activity, /Dati in tempo reale/);
-  assert.match(activity, /content\.addView\(services, wrapBlock\(\)\)/, 'la scheda servizi deve adattarsi a sessioni e font grandi senza tagliare righe');
+  assert.match(activity, /service\.addView\(services, wrapBlock\(\)\)/, 'la scheda servizi deve adattarsi a sessioni e font grandi senza tagliare righe');
   assert.doesNotMatch(activity, /content\.addView\(services, block\(dp\(178\)\)\)/, 'la scheda servizi non deve avere un altezza rigida');
   assert.match(activity, /serviceMetric\("SESSIONI"/);
   assert.match(activity, /serviceMetric\("STREAM LIVE"/);

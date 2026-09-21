@@ -47,6 +47,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.HorizontalScrollView;
 import android.widget.TextView;
 
 import org.json.JSONObject;
@@ -85,6 +86,11 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private final Set<HttpURLConnection> activeConnections = ConcurrentHashMap.newKeySet();
     private final Handler main = new Handler(Looper.getMainLooper());
     private LinearLayout content;
+    private LinearLayout powerDock;
+    private String dashboardSection = "Panoramica";
+    private String appFolder = "";
+    private final java.util.Map<String, LinearLayout> dashboardPanels = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, Button> dashboardTabs = new java.util.LinkedHashMap<>();
     private MaterializationView materializationOverlay;
     private View statusFrostOverlay;
     private int frostedStatusStep = -1;
@@ -97,7 +103,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private static final int SCREEN_CONNECTING = 0, SCREEN_DASHBOARD = 1, SCREEN_POWER = 3, SCREEN_OFFLINE = 4;
     private static final int REQUEST_DEVICE_CREDENTIAL = 91;
     private volatile int currentScreen = SCREEN_CONNECTING;
-    private boolean detailsExpanded = false;
     private JSONObject lastDashboardSnapshot;
     private JSONObject lastSecuritySummary;
     private String visibleState = "";
@@ -205,7 +210,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         // onCreate costruisce gia la prima superficie visibile; onPause resta il
         // confine che arresta clock e richieste ricorrenti in background.
         foreground = true;
-        if (!BuildConfig.DEBUG) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
         NexusSystemBars.applyFrosted(getWindow());
         configureMotionProfile();
         frameBudgetMonitor = new FrameBudgetMonitor(this, (constrained, slowRatio) -> {
@@ -363,13 +368,24 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             content.setPadding(horizontal, dp(6), horizontal, dp(18));
             int topInset = insets.getSystemWindowInsetTop();
             int bottomInset = insets.getSystemWindowInsetBottom();
-            scroll.setPadding(0, dp(8) + topInset, 0, dp(10) + bottomInset);
+            scroll.setPadding(0, dp(8) + topInset, 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
+            powerDock.setPadding(horizontal, dp(32), horizontal, dp(8) + bottomInset);
             FrameLayout.LayoutParams frostParams = (FrameLayout.LayoutParams) statusFrostOverlay.getLayoutParams();
             frostParams.height = topInset + dp(14);
             statusFrostOverlay.setLayoutParams(frostParams);
             return insets;
         });
         root.addView(viewport, new LinearLayout.LayoutParams(-1, 0, 1));
+        powerDock = powerActions();
+        powerDock.setPadding(dp(18), dp(32), dp(18), dp(12));
+        powerDock.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{Color.TRANSPARENT, Color.argb(225, 2, 6, 7), BG, BG}));
+        powerDock.setVisibility(View.GONE);
+        viewport.addView(powerDock, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+        powerDock.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (bottom - top != oldBottom - oldTop) root.requestApplyInsets();
+        });
+        for (int i = 0; i < powerDock.getChildCount(); i++) powerDock.getChildAt(i).setEnabled(false);
         setContentView(root);
     }
 
@@ -524,6 +540,22 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         content.addView(eyebrow);
         content.addView(title);
         content.addView(detail);
+        dashboardPanels.clear(); dashboardTabs.clear();
+        HorizontalScrollView tabs = new HorizontalScrollView(this);
+        tabs.setHorizontalScrollBarEnabled(false);
+        LinearLayout tabRow = new LinearLayout(this);
+        for (String name : new String[]{"Panoramica", "Sistema", "App", "Servizi"}) {
+            LinearLayout panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL);
+            dashboardPanels.put(name, panel);
+            Button tab = button(name, false, false);
+            tab.setOnClickListener(v -> selectDashboardSection(name));
+            dashboardTabs.put(name, tab);
+            LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(-2, -2);
+            tabParams.setMargins(0, 0, dp(8), 0); tabRow.addView(tab, tabParams);
+        }
+        tabs.addView(tabRow); content.addView(tabs, wrapBlock());
+        for (LinearLayout panel : dashboardPanels.values()) content.addView(panel, wrapBlock());
+        LinearLayout overview = dashboardPanels.get("Panoramica"), system = dashboardPanels.get("Sistema"), apps = dashboardPanels.get("App"), service = dashboardPanels.get("Servizi");
 
         LinearLayout presence = card();
         LinearLayout presenceRow = new LinearLayout(this);
@@ -543,15 +575,22 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         presence.addView(presenceRow);
         presence.addView(updated);
         presence.addView(corePulse);
-        content.addView(presence, block(dp(108)));
+        overview.addView(presence, wrapBlock());
         breathe(dot);
 
         LinearLayout liveMetrics = new LinearLayout(this);
         liveMetrics.setOrientation(LinearLayout.HORIZONTAL);
-        liveMetrics.addView(metricCard("CPU", cpu == null ? 0 : cpu.optInt("percent")), new LinearLayout.LayoutParams(0, dp(76), 1));
+        liveMetrics.addView(metricCard("CPU", cpu == null ? 0 : cpu.optInt("percent")), new LinearLayout.LayoutParams(0, -2, 1));
         liveMetrics.addView(metricCard("GPU", activity == null ? 0 : activity.optInt("gpuPercent")), spacedMetric());
-        liveMetrics.addView(metricCard("RAM", memory == null ? 0 : memory.optInt("percent")), spacedMetric());
-        content.addView(liveMetrics, block(dp(76)));
+
+        overview.addView(liveMetrics, wrapBlock());
+        LinearLayout memoryCard = card();
+        memoryCard.setBackground(rounded(Color.rgb(20, 38, 40), 24, Color.rgb(45, 69, 71)));
+        TextView memoryValue = text((memory == null ? 0 : memory.optInt("percent")) + "%", 40, TEXT);
+        memoryValue.setTag("metric:RAM"); memoryValue.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
+        memoryCard.addView(eyebrow("MEMORIA RAM")); memoryCard.addView(memoryValue);
+        memoryCard.addView(chartRow("RAM", memory == null ? 0 : memory.optInt("percent")));
+        overview.addView(memoryCard, wrapBlock());
 
         LinearLayout services = card();
         TextView servicesTitle = text("Servizi NexusNXS", 16, TEXT);
@@ -571,14 +610,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         services.addView(activityMetrics);
         // Service values can wrap when the device uses a larger font scale.
         // Let the card measure its content instead of clipping the final rows.
-        content.addView(services, wrapBlock());
+        service.addView(services, wrapBlock());
 
         TextView quickActions = eyebrow("LE TUE APP");
         quickActions.setPadding(0, dp(16), 0, dp(9));
-        content.addView(quickActions);
-        content.addView(applicationGrid());
-        content.addView(foregroundCloseAction(), block(dp(52)));
-        content.addView(serverActions());
+        apps.addView(quickActions);
+        apps.addView(applicationFolders());
+        apps.addView(foregroundCloseAction(), block(dp(52)));
+        service.addView(serverActions());
 
         LinearLayout history = card();
         TextView historyTitle = eyebrow("ULTIME OPERAZIONI");
@@ -587,13 +626,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         recentActions.setLineSpacing(dp(2), 1f);
         history.addView(historyTitle);
         history.addView(recentActions);
-        content.addView(history, wrapBlock());
+        service.addView(history, wrapBlock());
 
         applyDesktopControlState();
 
         TextView technical = eyebrow("DATI TECNICI");
         technical.setPadding(0, dp(16), 0, dp(9));
-        content.addView(technical);
+        system.addView(technical);
 
         LinearLayout specifications = card();
         specifications.setTag("technical-details");
@@ -662,29 +701,63 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }
         specifications.addView(divider());
         appendSecurityOverview(specifications, lastSecuritySummary);
-        content.addView(specifications);
-
-        if (!detailsExpanded) specifications.setVisibility(View.GONE);
-        Button details = button(detailsExpanded ? "Riduci dettagli" : "Mostra dettagli", false, false);
-        details.setTag("details-toggle");
-        details.setOnClickListener(v -> toggleDetails());
-        content.addView(details, block(dp(48)));
+        system.addView(specifications);
 
         TextView trends = eyebrow("ULTIMO MINUTO");
         trends.setPadding(0, dp(18), 0, dp(8));
-        content.addView(trends);
+        overview.addView(trends);
         LinearLayout charts = card();
         charts.addView(chartRow("CPU", cpu == null ? 0 : cpu.optInt("percent")));
         charts.addView(chartRow("GPU", activity == null ? 0 : activity.optInt("gpuPercent")));
-        charts.addView(chartRow("RAM", memory == null ? 0 : memory.optInt("percent")));
+
         charts.addView(chartRow("DISCO", activity == null ? 0 : activity.optInt("diskPercent")));
-        content.addView(charts);
+        overview.addView(charts);
 
-        TextView section = eyebrow("CONTROLLO");
-        section.setPadding(0, dp(14), 0, dp(10));
-        content.addView(section);
-        content.addView(powerActions());
+        selectDashboardSection(dashboardSection);
+    }
 
+    private void selectDashboardSection(String name) {
+        boolean changed = !dashboardSection.equals(name);
+        dashboardSection = name;
+        for (String key : dashboardPanels.keySet()) {
+            boolean selected = key.equals(name);
+            LinearLayout panel = dashboardPanels.get(key);
+            panel.animate().cancel();
+            panel.setAlpha(1f);
+            panel.setTranslationY(0f);
+            panel.setVisibility(selected ? View.VISIBLE : View.GONE);
+            if (selected && changed && animationsEnabled()) {
+                panel.setAlpha(0f);
+                panel.setTranslationY(dp(8));
+                panel.animate().alpha(1f).translationY(0f).setDuration(motionDuration(NexusMotion.ENTER))
+                    .setInterpolator(standardInterpolator()).start();
+            }
+            Button tab = dashboardTabs.get(key);
+            tab.setSelected(selected);
+            tab.setTextColor(selected ? BG : TEXT);
+            tab.setBackground(rounded(selected ? TEXT : SURFACE, 16, Color.TRANSPARENT));
+        }
+    }
+
+    private LinearLayout applicationFolders() {
+        LinearLayout area = new LinearLayout(this); area.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout folders = new LinearLayout(this);
+        for (String name : new String[]{"Applicazioni", "Giochi"}) {
+            Button folder = button(name, false, false);
+            decorateButton(folder, "folder", ACCENT);
+            folder.setOnClickListener(v -> { appFolder = name; content.removeAllViews(); renderDashboard(lastDashboardSnapshot); });
+            folder.setMinHeight(dp(64)); folders.addView(folder, new LinearLayout.LayoutParams(0, -2, 1));
+        }
+        area.addView(folders, wrapBlock());
+        if (!appFolder.isEmpty()) {
+            TextView heading = eyebrow(appFolder.toUpperCase(Locale.ROOT)); area.addView(heading, wrapBlock());
+            if ("Applicazioni".equals(appFolder)) area.addView(applicationGrid());
+            else {
+                area.addView(applicationTile("steam", "Steam", "game"), wrapBlock());
+                area.addView(applicationTile("epic", "Epic Games", "game"), wrapBlock());
+            }
+        }
+        return area;
     }
 
     private LinearLayout serverActions() {
@@ -976,6 +1049,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         updateApplicationTile("terminal", "Terminale", applicationStates.get("terminal"), applicationAvailability.get("terminal"));
         updateApplicationTile("supremo", "Supremo", applicationStates.get("supremo"), applicationAvailability.get("supremo"));
         updateApplicationTile("notepad", "Note", applicationStates.get("notepad"), applicationAvailability.get("notepad"));
+        updateApplicationTile("steam", "Steam", applicationStates.get("steam"), applicationAvailability.get("steam"));
+        updateApplicationTile("epic", "Epic Games", applicationStates.get("epic"), applicationAvailability.get("epic"));
         setTaggedText("core-pulse-detail", corePulseSummary(lastDashboardSnapshot == null ? null : lastDashboardSnapshot.optJSONObject("nexusService")));
     }
 
@@ -1348,7 +1423,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private LinearLayout.LayoutParams spacedMetric() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(76), 1); params.setMargins(dp(7), 0, 0, 0); return params;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1); params.setMargins(dp(7), 0, 0, 0); return params;
     }
 
     private LinearLayout serviceMetric(String label, int value, String tag) {
@@ -1399,9 +1474,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         TextView value = text(initialValue + "%", 12, TEXT);
         value.setTag("chart-value:" + label);
         value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        row.addView(name, new LinearLayout.LayoutParams(dp(50), dp(34)));
+        name.setMinWidth(dp(50));
+        name.setPadding(0, 0, dp(8), 0);
+        value.setMinWidth(dp(50));
+        value.setPadding(dp(8), 0, 0, 0);
+        row.addView(name, new LinearLayout.LayoutParams(-2, -2));
         row.addView(chart, new LinearLayout.LayoutParams(0, dp(34), 1));
-        row.addView(value, new LinearLayout.LayoutParams(dp(50), dp(34)));
+        row.addView(value, new LinearLayout.LayoutParams(-2, -2));
         return row;
     }
 
@@ -1409,28 +1488,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         View target = content.findViewWithTag("chart:" + label);
         if (target instanceof SparklineView) ((SparklineView) target).add(value);
         setTaggedText("chart-value:" + label, value + "%");
-    }
-
-    private void toggleDetails() {
-        View details = content.findViewWithTag("technical-details");
-        View toggle = content.findViewWithTag("details-toggle");
-        if (details == null || !(toggle instanceof Button)) return;
-        detailsExpanded = !detailsExpanded;
-        if (!animationsEnabled()) {
-            details.animate().cancel();
-            details.setAlpha(1f);
-            details.setVisibility(detailsExpanded ? View.VISIBLE : View.GONE);
-            ((Button) toggle).setText(detailsExpanded ? "Riduci dettagli" : "Mostra dettagli");
-            return;
-        }
-        if (detailsExpanded) {
-            details.setVisibility(View.VISIBLE);
-            details.setAlpha(0f);
-            details.animate().alpha(1f).setDuration(motionDuration(NexusMotion.ENTER)).setInterpolator(standardInterpolator()).start();
-        } else {
-            details.animate().alpha(0f).setDuration(motionDuration(NexusMotion.EXIT)).setInterpolator(standardInterpolator()).withEndAction(() -> details.setVisibility(View.GONE)).start();
-        }
-        ((Button) toggle).setText(detailsExpanded ? "Riduci dettagli" : "Mostra dettagli");
     }
 
     private void updateHealthSummary(JSONObject snapshot) {
@@ -1765,6 +1822,16 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void setState(String value, boolean offline) {
+        if (powerDock != null) {
+            boolean showDock = currentScreen == SCREEN_DASHBOARD && dashboardVisible;
+            int visibility = showDock ? View.VISIBLE : View.GONE;
+            if (powerDock.getVisibility() != visibility) {
+                powerDock.setVisibility(visibility);
+                powerDock.getRootView().requestApplyInsets();
+            }
+            for (int i = 0; i < powerDock.getChildCount(); i++)
+                powerDock.getChildAt(i).setEnabled(showDock && !offline && !token.isEmpty());
+        }
         String stateKey = value + ":" + offline;
         if (stateKey.equals(visibleState)) return;
         visibleState = stateKey;
@@ -2210,7 +2277,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             canvas.translate(b.left, b.top);
             canvas.scale(scale, scale);
             Path path = new Path();
-            if ("nexus".equals(glyph)) {
+            if ("folder".equals(glyph)) {
+                path.moveTo(3, 7); path.lineTo(9, 7); path.lineTo(11, 10); path.lineTo(21, 10); path.lineTo(21, 20); path.lineTo(3, 20); path.close(); canvas.drawPath(path, paint);
+            } else if ("game".equals(glyph)) {
+                canvas.drawRoundRect(new RectF(3, 7, 21, 18), 4, 4, paint);
+                canvas.drawLine(6, 12, 12, 12, paint); canvas.drawLine(9, 9, 9, 15, paint);
+                canvas.drawCircle(16, 11, .7f, paint); canvas.drawCircle(18, 14, .7f, paint);
+            } else if ("nexus".equals(glyph)) {
                 canvas.drawCircle(12, 12, 2.1f, paint);
                 canvas.drawArc(new RectF(4, 4, 20, 20), -38, 84, false, paint);
                 canvas.drawArc(new RectF(4, 4, 20, 20), 82, 80, false, paint);

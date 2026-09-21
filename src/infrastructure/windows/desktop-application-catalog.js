@@ -42,6 +42,8 @@ $visible=[NexusNXS.WindowControl]::IsWindowVisible($handle)
 // #region 01 — Catalogo e risoluzione confinata
 
 const DESKTOP_APPLICATIONS = Object.freeze([
+  Object.freeze({ id: 'steam', label: 'Steam', icon: 'game', processes: ['steam.exe'] }),
+  Object.freeze({ id: 'epic', label: 'Epic Games', icon: 'game', processes: ['EpicGamesLauncher.exe'] }),
   Object.freeze({ id: 'brave', label: 'Brave', icon: 'browser', processes: ['brave.exe'] }),
   // Un pwsh headless può appartenere al server: soltanto Windows Terminal
   // indica una finestra realmente aperta e controllabile dall'utente.
@@ -59,6 +61,8 @@ function executableCandidates(id, env = process.env) {
   const programFiles = String(env.ProgramFiles || env.PROGRAMFILES || '');
   const programFilesX86 = String(env['ProgramFiles(x86)'] || env.PROGRAMFILES_X86 || '');
   const windows = String(env.WINDIR || 'C:\\Windows');
+  if (id === 'steam') return [path.join(programFilesX86, 'Steam', 'steam.exe'), path.join(programFiles, 'Steam', 'steam.exe')];
+  if (id === 'epic') return [path.join(programFilesX86, 'Epic Games', 'Launcher', 'Portal', 'Binaries', 'Win64', 'EpicGamesLauncher.exe'), path.join(programFiles, 'Epic Games', 'Launcher', 'Portal', 'Binaries', 'Win64', 'EpicGamesLauncher.exe')];
   if (id === 'brave') return [
     path.join(local, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
     path.join(programFiles, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),

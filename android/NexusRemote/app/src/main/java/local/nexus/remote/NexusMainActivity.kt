@@ -235,10 +235,10 @@ private fun Context.copyToClipboard(value: String) {
 @Composable private fun nexusIsItalian(): Boolean = LocalConfiguration.current.locales[0].language == Locale.ITALIAN.language
 
 private val Ink = Color(0xFF020405)
-private val Surface = Color(0xFF121718)
+private val Surface = Color(0xFF162022)
 private val Surface2 = Color(0xFF242B2C)
 private val Ice = Color(0xFFF7FBFB)
-private val Mist = Color(0xFFABBABB)
+private val Mist = Color(0xFFB9C7C8)
 private val Cyan = Color(0xFF4BE7E9)
 private val Hairline = Color(0xFF5B696A)
 private val NexusSans = FontFamily(
@@ -3200,7 +3200,7 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
     Box(
-        Modifier.fillMaxSize()
+        Modifier.fillMaxSize().background(Ink)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { dispatch("assistantClose", "") }
     ) {
         CosmicScene(Modifier.fillMaxSize())
