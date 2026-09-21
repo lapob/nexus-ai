@@ -94,6 +94,49 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private float dockTouchX, dockTouchY;
     private String dashboardSection = "Panoramica";
     private String appFolder = "";
+    private final java.util.Map<String, Integer> dashboardPositions = new java.util.HashMap<>();
+    private boolean restoringDashboardPosition;
+    private int navigationGeneration;
+
+    private String navigationKey() {
+        return "App".equals(dashboardSection) ? "App/" + appFolder : dashboardSection;
+    }
+
+    private void rememberDashboardPosition() {
+        if (dashboardVisible && currentScreen == SCREEN_DASHBOARD && !restoringDashboardPosition && dashboardScroll != null)
+            dashboardPositions.put(navigationKey(), Math.max(0, Math.round(dashboardScroll.getScrollY() / getResources().getDisplayMetrics().density)));
+    }
+
+    private void restoreDashboardPosition() {
+        restoringDashboardPosition = true;
+        int generation = ++navigationGeneration;
+        String key = navigationKey();
+        dashboardScroll.post(() -> {
+            if (generation != navigationGeneration) return;
+            if (currentScreen == SCREEN_DASHBOARD && key.equals(navigationKey()))
+                dashboardScroll.scrollTo(0, dp(dashboardPositions.getOrDefault(key, 0)));
+            restoringDashboardPosition = false;
+        });
+    }
+
+    private void restoreNavigation() {
+        SharedPreferences preferences = getPreferences(MODE_PRIVATE);
+        String section = preferences.getString("navigation.section", "Panoramica");
+        if (java.util.Arrays.asList("Panoramica", "Sistema", "App", "Servizi").contains(section)) dashboardSection = section;
+        String folder = preferences.getString("navigation.folder", "");
+        if (java.util.Arrays.asList("", "Applicazioni", "Giochi").contains(folder)) appFolder = folder;
+        for (String key : new String[]{"Panoramica", "Sistema", "Servizi", "App/", "App/Applicazioni", "App/Giochi"})
+            dashboardPositions.put(key, Math.max(0, Math.min(100000, preferences.getInt("navigation.scroll." + key, 0))));
+    }
+
+    private void persistNavigation() {
+        rememberDashboardPosition();
+        SharedPreferences.Editor editor = getPreferences(MODE_PRIVATE).edit()
+            .putString("navigation.section", dashboardSection).putString("navigation.folder", appFolder);
+        for (java.util.Map.Entry<String, Integer> entry : dashboardPositions.entrySet())
+            editor.putInt("navigation.scroll." + entry.getKey(), entry.getValue());
+        editor.apply();
+    }
     private final java.util.Map<String, LinearLayout> dashboardPanels = new java.util.LinkedHashMap<>();
     private final java.util.Map<String, Button> dashboardTabs = new java.util.LinkedHashMap<>();
     private MaterializationView materializationOverlay;
@@ -235,6 +278,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             secureTokenStore.clear();
         }
         serverUrl = getPreferences(MODE_PRIVATE).getString("serverUrl", "");
+        restoreNavigation();
         createShell();
         registerSystemBackNavigation();
         getSystemService(ConnectivityManager.class).registerDefaultNetworkCallback(networkCallback);
@@ -271,6 +315,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     @Override protected void onPause() {
+        persistNavigation();
         foreground = false;
         materializeOnResume = !isFinishing();
         if (frameBudgetMonitor != null) frameBudgetMonitor.stop();
@@ -293,6 +338,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration) {
+        rememberDashboardPosition();
         super.onConfigurationChanged(configuration);
         configureMotionProfile();
         if (frameBudgetMonitor != null) frameBudgetMonitor.refreshBudget();
@@ -325,6 +371,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }
         if (currentScreen == SCREEN_DASHBOARD) {
             if ("App".equals(dashboardSection) && !appFolder.isEmpty()) {
+                rememberDashboardPosition();
                 appFolder = "";
                 content.removeAllViews();
                 renderDashboard(lastDashboardSnapshot);
@@ -461,16 +508,19 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         float eased = 1f - ((1f - clamped) * (1f - clamped));
         NexusSystemBars.updateFrostedStatus(getWindow(), eased);
         if (statusFrostOverlay == null) return;
-        int topAlpha = Math.round(82f + (34f * eased));
-        int edgeAlpha = Math.round(34f + (22f * eased));
+        int topAlpha = Math.round(82f + (173f * eased));
+        int edgeAlpha = Math.round(34f + (201f * eased));
         GradientDrawable veil = new GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             new int[]{Color.argb(topAlpha, 2, 6, 7), Color.argb(edgeAlpha, 2, 6, 7), Color.TRANSPARENT}
         );
+        veil.setColors(new int[]{Color.argb(topAlpha, 2, 6, 7), Color.argb(topAlpha, 2, 6, 7),
+            Color.argb(topAlpha, 2, 6, 7), Color.argb(edgeAlpha, 2, 6, 7), Color.TRANSPARENT});
         statusFrostOverlay.setBackground(veil);
     }
 
     private void showConnecting() {
+        rememberDashboardPosition();
         currentScreen = SCREEN_CONNECTING;
         dashboardVisible = false;
         materializeNextContent = true;
@@ -781,12 +831,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         overview.addView(charts);
 
         selectDashboardSection(dashboardSection);
+        restoreDashboardPosition();
     }
 
     private void selectDashboardSection(String name) {
         boolean changed = !dashboardSection.equals(name);
+        if (changed) rememberDashboardPosition();
         dashboardSection = name;
-        if (changed && dashboardScroll != null) dashboardScroll.scrollTo(0, 0);
+        if (changed) restoreDashboardPosition();
         for (String key : dashboardPanels.keySet()) {
             boolean selected = key.equals(name);
             LinearLayout panel = dashboardPanels.get(key);
@@ -822,6 +874,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             decorateButton(folder, name.equals(appFolder) ? "folder-open" : "folder", ACCENT);
             folder.setOnClickListener(v -> {
                 if (name.equals(appFolder)) return;
+                rememberDashboardPosition();
                 appFolder = name;
                 content.removeAllViews();
                 renderDashboard(lastDashboardSnapshot);
@@ -1597,8 +1650,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         TextView name = text(label, 13, MUTED);
         TextView statusValue = text(value, 13, TEXT);
         statusValue.setTag("value:" + label);
+        if (getResources().getConfiguration().fontScale >= 1.5f) {
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.addView(name, new LinearLayout.LayoutParams(-1, -2));
+            statusValue.setPadding(0, dp(3), 0, 0);
+            row.addView(statusValue, new LinearLayout.LayoutParams(-1, -2));
+            return row;
+        }
         statusValue.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        statusValue.setMaxLines(2);
         row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
         row.addView(statusValue, new LinearLayout.LayoutParams(0, -2, 1.65f));
         return row;
@@ -1641,6 +1700,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void planPower(String action) {
+        rememberDashboardPosition();
         currentScreen = SCREEN_POWER;
         dashboardVisible = false;
         main.removeCallbacks(refresh);
@@ -1656,6 +1716,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void planServerStop() {
+        rememberDashboardPosition();
         currentScreen = SCREEN_POWER;
         dashboardVisible = false;
         main.removeCallbacks(refresh);
@@ -1772,6 +1833,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void showOffline(String ignoredReason) {
+        rememberDashboardPosition();
         if (destroyed || !foreground) return;
         boolean enteringOffline = currentScreen != SCREEN_OFFLINE;
         stopLiveTelemetry();

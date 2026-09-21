@@ -1410,6 +1410,46 @@ test('lo stream riprende dal cursore senza rigenerare né duplicare output', asy
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('upload interrotto e ritentato conserva il file e produce una sola risposta', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-upload-recovery-'));
+  const fixture = path.join(root, 'nota.txt');
+  fs.writeFileSync(fixture, 'Documento di collaudo: contenuto integro.');
+  let calls = 0;
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: record => record }, logger: { info() {}, warn() {} },
+    onMessage: async ({ conversation, text, attachments }) => {
+      calls++;
+      assert.match(attachments.context, /Documento di collaudo: contenuto integro\./);
+      return { ...conversation, updatedAt: 7, turns: [{ role: 'user', content: text }, { role: 'assistant', content: 'File ricevuto una volta' }] };
+    }
+  });
+  try {
+    const port = await freePort(); await gateway.configure({ enabled: true, port });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const guest = await bootstrapGuest(baseUrl);
+    const headers = { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' };
+    const body = JSON.stringify({ text: 'Leggi il file', history: [], clientMessageId: '019fa53a-63c1-79b1-bf97-08fdf3bb5cb8',
+      attachments: [{ name: 'nota.txt', mime: 'text/plain', data: fs.readFileSync(fixture).toString('base64') }] });
+    await new Promise(resolve => {
+      const request = http.request(`${baseUrl}/api/guest/messages`, { method: 'POST', headers: { ...headers, 'Content-Length': Buffer.byteLength(body) } });
+      request.on('error', () => {});
+      request.on('close', resolve);
+      request.write(body.slice(0, Math.floor(body.length / 2)), () => setTimeout(() => request.destroy(), 30));
+    });
+    assert.equal(calls, 0, 'un upload incompleto non avvia inferenza');
+    const deliver = async () => {
+      const response = await fetch(`${baseUrl}/api/guest/messages`, { method: 'POST', headers, body });
+      assert.equal(response.status, 200);
+      return response.json();
+    };
+    const result = await deliver();
+    assert.equal(result.message, 'File ricevuto una volta');
+    assert.deepEqual(await deliver(), result);
+    assert.equal(calls, 1, 'il retry non duplica il lavoro');
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('retry simultanei condividono una sola inferenza in-flight', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-singleflight-'));
   let release; let calls = 0;

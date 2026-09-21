@@ -122,6 +122,7 @@ body.initial-reveal:not(.keyboard-open):not(.request-active):not(.conversation-a
 @media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){body:not(.keyboard-open):not(.request-active) .keyboard-toggle:hover,body:not(.keyboard-open):not(.request-active) .attachment-toggle:hover{animation:nxs-idle-control-bounce .85s cubic-bezier(.4,0,.2,1) both}@keyframes nxs-idle-control-bounce{0%,100%{transform:translate3d(var(--nxs-collapse-shift),0,0) scale(1)}48%{transform:translate3d(var(--nxs-collapse-shift),-3px,0) scale(1.035)}}}
 @media(max-height:540px){body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock,body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .dock{transform:translate3d(0,calc(-1 * (var(--nxs-privacy-height) + 12px - max(0px,env(safe-area-inset-bottom)))),0)}body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{transform:translateY(-4px)}}
 @media(max-width:560px){:root{--nxs-collapse-shift:calc((min(760px,calc(100vw - 28px)) - 116px)/2)}}
+@media(max-height:540px) and (max-width:599px){body:not(.keyboard-open):not(.request-active):not(.conversation-active) .stage{padding-top:0}body:not(.keyboard-open):not(.request-active):not(.conversation-active) .core{margin-bottom:8px}body:not(.keyboard-open):not(.request-active):not(.conversation-active) .copy h1{font-size:clamp(22px,6vw,28px)}}
 @media(max-height:540px) and (min-width:600px){body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .core-caption{display:none}body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .copy{max-width:none}body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .copy h1{font-size:clamp(2rem,5vw,2.6rem);white-space:nowrap}body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-active .phase{width:min(620px,100%);margin-top:6px}}
 @media(prefers-reduced-motion:reduce){body:not(.motion-ready) .keyboard-toggle,body:not(.motion-ready) .attachment-toggle{opacity:1}body.initial-reveal:not(.keyboard-open):not(.request-active):not(.conversation-active) .keyboard-toggle,body.initial-reveal:not(.keyboard-open):not(.request-active):not(.conversation-active) .attachment-toggle{animation:none}}
 body:not(.request-active):not(.conversation-active):not(.status-active) .core{width:min(78vw,42dvh,450px)}
@@ -264,7 +265,9 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     const style = getComputedStyle(copy);
     const copyHeight = copy.getBoundingClientRect().height + parseFloat(style.marginTop || 0) + parseFloat(style.marginBottom || 0);
     const coreStyle = getComputedStyle(button);
-    const stageTop = Math.max(innerWidth < 600 ? 112 : 96, header.getBoundingClientRect().bottom + 16);
+    const stage = document.querySelector('.stage');
+    const stageTop = Math.max(header.getBoundingClientRect().bottom + 16,
+      (stage?.getBoundingClientRect().top || 0) + parseFloat(stage ? getComputedStyle(stage).paddingTop : '0'));
     // Reserve the same two-line status area before and after a voice error.
     const statusHeight = 96;
     const available = dockTop - stageTop - copyHeight - statusHeight - parseFloat(coreStyle.marginBottom || 0) - parseFloat(coreStyle.marginTop || 0) - 24;
