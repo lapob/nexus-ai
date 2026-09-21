@@ -38,6 +38,8 @@ import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowManager;
@@ -88,6 +90,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private LinearLayout content;
     private LinearLayout powerDock;
     private ScrollView dashboardScroll;
+    private boolean dockScrollCandidate, dockScrollActive;
+    private float dockTouchX, dockTouchY;
     private String dashboardSection = "Panoramica";
     private String appFolder = "";
     private final java.util.Map<String, LinearLayout> dashboardPanels = new java.util.LinkedHashMap<>();
@@ -332,6 +336,55 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             }
         }
         finishWithMaterialization();
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            dockScrollActive = false;
+            dockTouchX = event.getRawX();
+            dockTouchY = event.getRawY();
+            int[] location = new int[2];
+            if (powerDock != null) powerDock.getLocationOnScreen(location);
+            dockScrollCandidate = currentScreen == SCREEN_DASHBOARD && powerDock != null
+                && powerDock.getVisibility() == View.VISIBLE && dashboardScroll != null
+                && dockTouchX >= location[0] && dockTouchX < location[0] + powerDock.getWidth()
+                && dockTouchY >= location[1] && dockTouchY < location[1] + powerDock.getHeight();
+        }
+        if (dockScrollCandidate && action == MotionEvent.ACTION_MOVE && !dockScrollActive && event.getPointerCount() == 1) {
+            float dx = Math.abs(event.getRawX() - dockTouchX);
+            float dy = Math.abs(event.getRawY() - dockTouchY);
+            int slop = ViewConfiguration.get(this).getScaledTouchSlop();
+            if (dy > slop && dy > dx) {
+                MotionEvent cancel = MotionEvent.obtain(event);
+                cancel.setAction(MotionEvent.ACTION_CANCEL);
+                super.dispatchTouchEvent(cancel);
+                cancel.recycle();
+                int[] location = new int[2];
+                dashboardScroll.getLocationOnScreen(location);
+                MotionEvent down = MotionEvent.obtain(event);
+                down.setAction(MotionEvent.ACTION_DOWN);
+                down.setLocation(dockTouchX - location[0], dockTouchY - location[1]);
+                dashboardScroll.dispatchTouchEvent(down);
+                down.recycle();
+                dockScrollActive = true;
+            } else if (dx > slop && dx > dy) dockScrollCandidate = false;
+        }
+        if (dockScrollActive) {
+            int[] location = new int[2];
+            dashboardScroll.getLocationOnScreen(location);
+            MotionEvent forwarded = MotionEvent.obtain(event);
+            forwarded.setLocation(event.getRawX() - location[0], event.getRawY() - location[1]);
+            dashboardScroll.dispatchTouchEvent(forwarded);
+            forwarded.recycle();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                dockScrollCandidate = false;
+                dockScrollActive = false;
+            }
+            return true;
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) dockScrollCandidate = false;
+        return super.dispatchTouchEvent(event);
     }
 
     private void createShell() {

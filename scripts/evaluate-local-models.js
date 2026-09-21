@@ -6,18 +6,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
+const { evaluationPlan } = require('./lib/evaluation-isolation');
 const { selectManagedRuntimePort } = require('../src/ai/managed-ollama-runtime');
-
-function persistedPrivateEndpoint() {
-  const dataRoot = String(process.env.NEXUS_USER_DATA_ROOT || path.resolve(__dirname, '..', '..', '.nexus-data')).trim();
-  try {
-    const settings = JSON.parse(fs.readFileSync(path.join(dataRoot, 'settings.json'), 'utf8'));
-    const candidate = String(settings?.ai?.ollama?.baseUrl || settings?.baseUrl || '').replace(/\/$/, '');
-    const parsed = new URL(candidate);
-    if (parsed.protocol === 'http:' && ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname)) return candidate;
-  } catch {}
-  return '';
-}
 
 function activeManagedEndpoint() {
   const dataRoot = String(process.env.NEXUS_USER_DATA_ROOT || path.resolve(__dirname, '..', '..', '.nexus-data')).trim();
@@ -45,15 +36,13 @@ const extended = process.argv.includes('--extended');
 const REQUEST_TIMEOUT_MS = Math.max(15_000, Number(option('request-timeout-ms') || 150_000));
 const localFetch = (url, options = {}) => fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
 let endpoint = '';
+let inferenceOptions = {};
 
 async function resolveEvaluationEndpoint() {
-  const candidates = [...new Set([
-    option('endpoint'),
-    process.env.NEXUS_OLLAMA_BASE_URL,
-    activeManagedEndpoint(),
-    'http://127.0.0.1:11435',
-    persistedPrivateEndpoint()
-  ].map((value) => String(value || '').replace(/\/$/, '')).filter(Boolean))];
+  const candidate = option('endpoint') || process.env.NEXUS_EVALUATION_ENDPOINT || 'http://127.0.0.1:11435';
+  // Validate before making any network request, including endpoint overrides.
+  evaluationPlan({ endpoint: candidate, activeEndpoint: activeManagedEndpoint(), freeBytes: os.freemem(), modelBytes: 0 });
+  const candidates = [candidate];
   for (const candidate of candidates) {
     try {
       const response = await fetch(`${candidate}/api/version`, { signal: AbortSignal.timeout(2_500) });
@@ -163,7 +152,7 @@ async function evaluate(model) {
     // Mantieni identico il contesto usato dai casi: cambiare num_ctx tra
     // warm-up e prima chat costringe Ollama a ricreare il runner e falsifica
     // p95/TTFT con un secondo cold-load artificiale.
-    body: JSON.stringify({ model, prompt: '', stream: false, keep_alive: '2m', options: { num_ctx: 4096 } })
+    body: JSON.stringify({ model, prompt: '', stream: false, keep_alive: '2m', options: { num_ctx: 4096, ...inferenceOptions } })
   });
   if (!warmupResponse.ok) throw new Error(`${model}: warm-up HTTP ${warmupResponse.status}`);
   await warmupResponse.json();
@@ -177,7 +166,7 @@ async function evaluate(model) {
         // /no_think mantiene comparabili anche le build Qwen3 che ignorano
         // il campo `think:false` dell'API Ollama.
         { role: 'user', content: deep ? item.prompt : `/no_think\n${item.prompt}` }
-      ], options: { temperature: 0, num_predict: deep ? 1024 : 160, num_ctx: 4096 } })
+      ], options: { temperature: 0, num_predict: deep ? 1024 : 160, num_ctx: 4096, ...inferenceOptions } })
     });
     if (!response.ok) throw new Error(`${model}: HTTP ${response.status}`);
     const streamed = await readOllamaStream(response, startedAt);
@@ -211,9 +200,25 @@ async function evaluate(model) {
   const available = new Set(installed.map((item) => item.model || item.name));
   const models = (requested.length ? requested : ['qwen3:8b', 'qwen3:14b', 'qwen3:30b']).filter((model) => available.has(model));
   if (!models.length) throw new Error('Nessuno dei modelli richiesti è installato.');
+  if (requested.some(model => !available.has(model))) throw new Error('Alcuni modelli richiesti non sono installati; valutazione incompleta rifiutata.');
+  const largestModel = Math.max(...installed.filter(item => models.includes(item.model || item.name)).map(item => Number(item.size) || 0));
+  if (!(largestModel > 0)) throw new Error('Dimensione modelli non disponibile per la stima delle risorse.');
+  const plan = evaluationPlan({ endpoint, activeEndpoint: activeManagedEndpoint(), freeBytes: os.freemem(), modelBytes: largestModel });
+  inferenceOptions = plan.options;
   const report = [];
-  for (const model of models) report.push(await evaluate(model));
-  const payload = { endpoint, mode: deep ? 'deep' : 'quick', minimumPassRate: minPassRate, evaluatedAt: new Date().toISOString(), report };
+  for (const model of models) {
+    try { report.push(await evaluate(model)); }
+    finally {
+      // Release only the model loaded by this run on the dedicated endpoint.
+      const released = await localFetch(`${endpoint}/api/generate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, stream: false, keep_alive: 0 })
+      });
+      if (!released.ok) throw new Error(`Rilascio modello di valutazione non riuscito: HTTP ${released.status}`);
+      await released.arrayBuffer();
+    }
+  }
+  const payload = { endpoint, execution: plan.cpuOnly ? 'isolated-cpu' : 'dedicated-runtime', mode: deep ? 'deep' : 'quick', minimumPassRate: minPassRate, evaluatedAt: new Date().toISOString(), report };
   const serialized = `${JSON.stringify(payload, null, 2)}\n`;
   if (outputPath) {
     const destination = path.resolve(process.cwd(), outputPath);

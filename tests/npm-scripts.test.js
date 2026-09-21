@@ -204,11 +204,11 @@ test('il gate di produzione richiede firma e origini per entrambi i client pubbl
   ]) assert.match(releaseReadiness, new RegExp(variable));
 });
 
-test('la valutazione AI segue la porta privata posseduta dal runtime NexusNXS', () => {
-  assert.match(modelEvaluator, /persistedPrivateEndpoint/);
-  assert.match(modelEvaluator, /\.nexus-data/);
-  assert.match(modelEvaluator, /settings\?\.ai\?\.ollama\?\.baseUrl/);
-  assert.match(modelEvaluator, /\['127\.0\.0\.1', 'localhost', '::1'\]/);
+test('la valutazione AI usa un runtime dedicato e verifica le risorse prima del caricamento', () => {
+  assert.match(modelEvaluator, /NEXUS_EVALUATION_ENDPOINT/);
+  assert.match(modelEvaluator, /evaluationPlan/);
+  assert.match(modelEvaluator, /os\.freemem/);
+  assert.doesNotMatch(modelEvaluator, /persistedPrivateEndpoint/);
 });
 
 test('il gate AI concede al modello profondo un cold start misurabile senza alterare gli SLO di risposta', () => {

@@ -80,7 +80,7 @@ if (includePublic) {
 if (includePrivate) run('android:console', { secrets: ANDROID_SIGNING_SECRETS });
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-cleanupAndroidReleases({ releaseRoot: path.join(root, 'release-android') });
+cleanupAndroidReleases({ releaseRoot: path.join(root, 'release-android'), dryRun: false });
 
 // #endregion
 // #region Distinte pubbliche e private

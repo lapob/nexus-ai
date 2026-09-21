@@ -1,47 +1,39 @@
 /**
  * @module scripts/clean-android-releases
- * @description Conserva soltanto gli artefatti Android correnti e rigenerabili.
+ * @description Conserva alias, versione corrente e rollback; ignora file sconosciuti.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 
-function cleanupAndroidReleases({ releaseRoot = path.resolve(__dirname, '..', 'release-android') } = {}) {
+function cleanupAndroidReleases({ releaseRoot = path.resolve(__dirname, '..', 'release-android'), dryRun = true } = {}) {
   const root = path.resolve(releaseRoot);
-  if (path.basename(root).toLowerCase() !== 'release-android') {
-    throw new Error(`Cartella release Android non valida: ${root}`);
+  if (path.basename(root).toLowerCase() !== 'release-android') throw new Error('Cartella release Android non valida.');
+  if (!fs.existsSync(root)) return { removed: 0, recoveredBytes: 0, plannedBytes: 0, planned: [], kept: [] };
+  if (fs.lstatSync(root).isSymbolicLink()) throw new Error('La cartella release non puo essere un collegamento.');
+  const entries = fs.readdirSync(root, { withFileTypes: true });
+  const groups = new Map();
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const match = /^NexusNXS-(Android|Control)-(\d+)\.(\d+)\.(\d+)(?:-nexus-control)?\.(apk|aab)$/.exec(entry.name);
+    if (!match) continue;
+    const key = `${match[1]}.${match[5]}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ name: entry.name, version: match.slice(2, 5).map(Number) });
   }
-  if (!fs.existsSync(root)) return { removed: 0, recoveredBytes: 0, kept: [] };
-
-  const names = fs.readdirSync(root);
-  const keep = new Set(['NexusNXS-Android.apk', 'NexusNXS-Control.apk', 'NexusNXS-Android.aab']
-    .filter((name) => fs.existsSync(path.join(root, name))));
-  for (const prefix of ['NexusNXS-Android-', 'NexusNXS-Control-']) {
-    for (const extension of ['.apk', '.aab']) {
-      const latest = names
-        .filter((name) => name.startsWith(prefix) && name.endsWith(extension))
-        .map((name) => ({ name, modifiedAt: fs.statSync(path.join(root, name)).mtimeMs }))
-        .sort((left, right) => right.modifiedAt - left.modifiedAt)[0];
-      if (latest) keep.add(latest.name);
-    }
+  const planned = [];
+  for (const group of groups.values()) {
+    group.sort((a, b) => b.version[0] - a.version[0] || b.version[1] - a.version[1] || b.version[2] - a.version[2]);
+    planned.push(...group.slice(2).map(item => item.name));
   }
-
-  let removed = 0;
-  let recoveredBytes = 0;
-  for (const name of names) {
-    if (!['.apk', '.aab'].includes(path.extname(name).toLowerCase()) || keep.has(name)) continue;
+  let plannedBytes = 0;
+  for (const name of planned) {
     const target = path.resolve(root, name);
-    if (path.dirname(target) !== root) throw new Error(`Artefatto fuori confine: ${target}`);
-    recoveredBytes += fs.statSync(target).size;
-    fs.rmSync(target);
-    removed += 1;
+    if (path.dirname(target) !== root || !fs.lstatSync(target).isFile()) throw new Error('Artefatto fuori confine o modificato.');
+    plannedBytes += fs.statSync(target).size;
+    if (!dryRun) fs.unlinkSync(target);
   }
-  return { removed, recoveredBytes, kept: [...keep].sort() };
+  return { removed: dryRun ? 0 : planned.length, recoveredBytes: dryRun ? 0 : plannedBytes, plannedBytes,
+    planned, kept: entries.map(entry => entry.name).filter(name => !planned.includes(name)).sort() };
 }
-
-if (require.main === module) {
-  const result = cleanupAndroidReleases();
-  console.log(`Release Android ripulite: ${result.removed} file, ${(result.recoveredBytes / 1_048_576).toFixed(1)} MB recuperati.`);
-  console.log(`Conservati: ${result.kept.join(', ')}`);
-}
-
+if (require.main === module) console.log(JSON.stringify(cleanupAndroidReleases({ dryRun: !process.argv.includes('--apply') }), null, 2));
 module.exports = { cleanupAndroidReleases };
