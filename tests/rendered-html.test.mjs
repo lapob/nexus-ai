@@ -193,7 +193,8 @@ test("keeps the floating navigation fullscreen, accessible, and paired with the 
   assert.match(navigationStyles, /\[data-awake="false"\]/);
   assert.match(navigationStyles, /font-size: clamp\(1\.15rem, 2\.4vw, 1\.8rem\)/);
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
-  assert.match(globalStyles, /--font-geist-mono:"NexusNXS Mono",ui-monospace,SFMono-Regular,Consolas/);
+  assert.match(globalStyles, /--font-geist-mono:var\(--font-inter\)/);
+  assert.equal((globalStyles.match(/@font-face/g) || []).length, 1, 'Import only the shared Inter family');
   assert.match(globalStyles, /\.card-top,\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);
   assert.match(globalStyles, /\.presence-grid small\{color:rgba\(176,210,214,\.60\)\}/);
   assert.match(globalStyles, /\.trust-hero > \*,[\s\S]*\.data-flow > \*[\s\S]*min-width: 0/);
