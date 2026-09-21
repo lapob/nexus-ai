@@ -578,6 +578,7 @@ test("the continuous field moves particles locally without scaling the interface
   await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
   await page.mouse.move(before.x + before.width * .65, before.y + before.height * .57, {steps:24});
   await expect(page.locator('html')).toHaveClass(/nxs-field-dragging/);
+  await page.screenshot({ path: 'outputs/particles-during-stroke.png' });
   await page.waitForTimeout(600);
   expect(await page.evaluate(()=>{window.nxsGestureSampling=false;return window.nxsGesturePeak;})).toBeGreaterThan(3);
   expect((await core.getAttribute('data-rotation')).split(',').some(v => Math.abs(Number(v)) > .01)).toBe(true);
@@ -588,6 +589,7 @@ test("the continuous field moves particles locally without scaling the interface
   await expect.poll(async () => Math.max(...(await core.getAttribute('data-rotation')).split(',').map(v=>Math.abs(Number(v)))), {timeout:12000}).toBeLessThan(.01);
   expect(await core.boundingBox()).toEqual(before);
   expect(await core.getAttribute('data-background-particles')).toBe(backgroundCount);
+  await page.screenshot({ path: 'outputs/particles-settled.png' });
 });
 
 test("real desktop and Android image zoom is centered and keyboard dismissible", async ({page}) => {

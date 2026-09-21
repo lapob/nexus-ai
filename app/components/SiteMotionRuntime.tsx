@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { advanceDrift, strokeDistance } from "./particle-drift";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -17,6 +18,8 @@ type CosmicParticle = {
   speed: number;
   offsetX: number;
   offsetY: number;
+  vx: number;
+  vy: number;
 };
 
 const MOTION_TIER_CLASSES = ["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
@@ -81,7 +84,7 @@ export function SiteMotionRuntime() {
     let cosmicLastFrame = 0;
     let cosmicWidth = 1;
     let cosmicHeight = 1;
-    const pointer = { x: 0, y: 0, vx: 0, vy: 0, time: 0, active: 0 };
+    const pointer = { x: 0, y: 0, frameX: 0, frameY: 0, vx: 0, vy: 0, time: 0, active: 0 };
     const routeName = window.location.pathname.replace(/^\/+|\/+$/g, "") || "home";
     const quietPage = routeName !== "home";
     const sections = Array.from(document.querySelectorAll<HTMLElement>("main > section:not(.narrative-apps), main > .narrative-apps .app-card, main > footer"));
@@ -129,6 +132,8 @@ export function SiteMotionRuntime() {
       speed: .22 + random() * .42,
       offsetX: 0,
       offsetY: 0,
+      vx: 0,
+      vy: 0,
     }));
     // Independent persistent stars: composing a shape never empties the sky.
     const backgroundStars = Array.from({ length: tier === "lite" ? 180 : 520 }, () => ({
@@ -344,16 +349,19 @@ export function SiteMotionRuntime() {
         const compose = (1 - transitionScatter) * arrival;
         const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (1 + particle.depth * 2);
         const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (1 + particle.depth * 2);
-        // Advect grains along the passing hand. First-order settling has no
-        // spring velocity, overshoot or radial inflation around the cursor.
-        const distance = Math.hypot(x - pointer.x, y - pointer.y);
+        // Local, depth-dependent momentum follows the entire hand stroke.
+        // Dissipation restores the shape without a rubber-band spring or zoom.
+        const distance = strokeDistance(x + particle.offsetX, y + particle.offsetY,
+          pointer.frameX, pointer.frameY, pointer.x, pointer.y);
         const radius = Math.min(150, Math.max(85, cosmicWidth * .085));
         const proximity = Math.max(0, 1 - distance / radius);
-        const speed = Math.hypot(pointer.vx, pointer.vy);
-        const influence = (reduced ? 0 : pointer.active) * proximity * proximity;
-        const blend = 1 - Math.exp(-delta * (influence > .01 && speed > 2 ? 24 : 3.6));
-        particle.offsetX += (pointer.vx * .14 * influence - particle.offsetX) * blend;
-        particle.offsetY += (pointer.vy * .14 * influence - particle.offsetY) * blend;
+        const influence = (reduced ? 0 : pointer.active) * proximity * proximity * (3 - 2 * proximity);
+        const driftX = advanceDrift(particle.offsetX, particle.vx, pointer.vx * influence, particle.depth, delta);
+        const driftY = advanceDrift(particle.offsetY, particle.vy, pointer.vy * influence, particle.depth, delta);
+        particle.offsetX = reduced ? 0 : driftX.offset;
+        particle.offsetY = reduced ? 0 : driftY.offset;
+        particle.vx = reduced ? 0 : driftX.velocity;
+        particle.vy = reduced ? 0 : driftY.velocity;
         maxDrift = Math.max(maxDrift, Math.hypot(particle.offsetX, particle.offsetY));
         const px = x + particle.offsetX, py = y + particle.offsetY;
         // One uninterrupted field: text must not punch rectangular holes in it.
@@ -404,6 +412,8 @@ export function SiteMotionRuntime() {
       }
       cosmicContext.globalCompositeOperation = "source-over";
       cosmicContext.globalAlpha = 1;
+      pointer.frameX = pointer.x;
+      pointer.frameY = pointer.y;
       paintMs += (performance.now() - paintStart - paintMs) * .1;
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
@@ -514,6 +524,7 @@ export function SiteMotionRuntime() {
       pointer.vx = pointer.active ? Math.max(-650, Math.min(650, (event.clientX - pointer.x) / seconds)) : 0;
       pointer.vy = pointer.active ? Math.max(-650, Math.min(650, (event.clientY - pointer.y) / seconds)) : 0;
       pointer.time = now;
+      if (!pointer.active) { pointer.frameX = event.clientX; pointer.frameY = event.clientY; }
       pointer.x = event.clientX;
       pointer.y = event.clientY;
       pointer.active = 1;
