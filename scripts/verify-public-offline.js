@@ -22,6 +22,7 @@ const { chromium } = require('../../.SITE/node_modules/@playwright/test');
       await page.waitForFunction(() => document.body.dataset.serviceReadiness === 'offline');
       assert.equal(await page.locator('#send').isDisabled(), true);
       assert.equal(await page.locator('#prompt').inputValue(), 'Bozza sintetica di collaudo offline');
+      await page.waitForTimeout(450); // Let the 360 ms composer transition settle.
       await page.screenshot({ path: path.resolve(__dirname, `../qa-artifacts/offline-live-${viewport.width}.png`) });
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.body.dataset.serviceReadiness === 'offline');

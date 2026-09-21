@@ -232,6 +232,16 @@
 
 /* #endregion */
 
+.response-icon-action {
+  min-width: 36px;
+  min-height: 36px;
+  display: inline-grid;
+  place-items: center;
+  padding: 6px;
+}
+
+.response-icon-action svg { pointer-events: none; }
+
 /* #region 02 — Markdown editoriale */
 
 .answer-markdown {

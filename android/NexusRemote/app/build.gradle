@@ -52,8 +52,8 @@ android {
         applicationId = "local.nexus.remote"
         minSdk = 26
         targetSdk = 36
-        versionCode = 105
-        versionName = "6.5.15"
+        versionCode = 106
+        versionName = "6.5.16"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "NEXUS_URL", quotedBuildValue(publicNexusUrl)
         buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)

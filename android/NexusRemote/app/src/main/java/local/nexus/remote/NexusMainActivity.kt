@@ -2661,6 +2661,8 @@ private fun JSONArray?.toTurns() = buildList {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var menuPreferences by rememberSaveable { mutableStateOf(false) }
     var menuSection by rememberSaveable { mutableStateOf("") }
+    var menuSearchOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(settingsOpen, menuPreferences, menuSection) { menuSearchOpen = false }
     LaunchedEffect(settingsOpen) { if (!settingsOpen) { menuPreferences = false; menuSection = "" } }
     var remoteSettingsOpen by rememberSaveable { mutableStateOf(false) }
     var remotePairCode by rememberSaveable { mutableStateOf("") }
@@ -3015,7 +3017,7 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
         }
-        BackHandler(enabled = settingsOpen) { if (menuSection.isNotEmpty()) menuSection = "" else if (menuPreferences) menuPreferences = false else settingsOpen = false }
+        BackHandler(enabled = settingsOpen) { if (menuSearchOpen) { menuSearchOpen = false; keyboard?.hide() } else if (menuSection.isNotEmpty()) menuSection = "" else if (menuPreferences) menuPreferences = false else settingsOpen = false }
         if (drawerFraction > 0f || settingsOpen || drawerDragging) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f * drawerFraction)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
             Surface(color = Ink, shape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp), modifier = Modifier.fillMaxHeight().width(drawerWidth)
@@ -3041,21 +3043,20 @@ private fun JSONArray?.toTurns() = buildList {
                             "privacy" -> nexusCopy("Privacy e dati", "Privacy and data")
                             else -> if (menuPreferences) nexusCopy("Impostazioni", "Settings") else "NexusNXS"
                         }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ice, modifier = Modifier.weight(1f))
-                        IconButton({ settingsOpen = false }) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi menu", "Close menu"), tint = Mist) }
+                        if (menuSection.isEmpty()) IconButton({ menuSearchOpen = !menuSearchOpen; if (!menuSearchOpen) keyboard?.hide() }) { Icon(Icons.Rounded.Search, nexusCopy("Cerca", "Search"), tint = if (menuSearchOpen) Cyan else Mist) }
                     }
                     if (!menuPreferences) {
                     TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)) {
                         Icon(Icons.Rounded.Add, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     }
-                    InstantHistory(state, dispatch, Modifier.weight(1f)) { chat ->
+                    InstantHistory(state, dispatch, Modifier.weight(1f), searchVisible = menuSearchOpen) { chat ->
                         voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
                         settingsOpen = false; typedSession = true; textMode = false
                     }
-                    HorizontalDivider(color = Hairline)
-                    DrawerItem(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings")) { menuPreferences = true }
+                    IconButton(onClick = { menuPreferences = true }, modifier = Modifier.align(Alignment.Start)) { Icon(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings"), tint = Mist) }
                     } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (menuSection.isEmpty()) {
-                        InstantSettingsNavigation { section ->
+                        InstantSettingsNavigation(searchVisible = menuSearchOpen) { section ->
                             keyboard?.hide(); focusManager.clearFocus(force = true); menuSection = section
                         }
                     }
@@ -3951,8 +3952,10 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }
 }
 
-@Composable private fun InstantSettingsNavigation(open: (String) -> Unit) {
+@Composable private fun InstantSettingsNavigation(searchVisible: Boolean, open: (String) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
+    val searchFocus = remember { FocusRequester() }
+    LaunchedEffect(searchVisible) { if (searchVisible) searchFocus.requestFocus() else query = "" }
     val sections = listOf(
         Triple("appearance", nexusCopy("Aspetto", "Appearance"), nexusCopy("Movimento, animazioni e feedback aptico", "Motion, animations and haptic feedback")),
         Triple("voice", nexusCopy("Voce e assistente", "Voice and assistant"), nexusCopy("Richiamo, microfono e tasto laterale", "Activation, microphone and side button")),
@@ -3961,12 +3964,12 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     )
     val terms = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     val matches = sections.filter { (_, title, detail) -> terms.all { (title + " " + detail).contains(it, ignoreCase = true) } }
-    OutlinedTextField(value = query, onValueChange = { query = it.take(120) }, singleLine = true,
+    if (searchVisible) OutlinedTextField(value = query, onValueChange = { query = it.take(120) }, singleLine = true,
         placeholder = { Text(nexusCopy("Cerca impostazioni", "Search settings"), style = MaterialTheme.typography.bodyMedium) },
         leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
         trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
-        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
+        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().focusRequester(searchFocus))
     if (matches.isEmpty()) Text(nexusCopy("Nessuna impostazione trovata", "No settings found"), color = Mist, style = MaterialTheme.typography.bodySmall)
     else SettingsGroup {
         matches.forEach { (id, title, detail) ->
@@ -3975,20 +3978,22 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
         }
     }
 }
-@Composable private fun InstantHistory(state: NexusUiState, dispatch: (String, String) -> Unit, modifier: Modifier = Modifier, open: (ChatRow) -> Unit) {
+@Composable private fun InstantHistory(state: NexusUiState, dispatch: (String, String) -> Unit, modifier: Modifier = Modifier, searchVisible: Boolean = true, open: (ChatRow) -> Unit) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     var query by rememberSaveable { mutableStateOf("") }
+    val searchFocus = remember { FocusRequester() }
+    LaunchedEffect(searchVisible) { if (searchVisible) searchFocus.requestFocus() else query = "" }
     var selected by remember { mutableStateOf<ChatRow?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var title by remember { mutableStateOf("") }
     var menuChatId by remember { mutableStateOf<String?>(null) }
-    OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
+    if (searchVisible) OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
         placeholder = { Text(nexusCopy("Cerca conversazioni", "Search conversations"), style = MaterialTheme.typography.bodyMedium) },
         leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
         trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
-        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth())
+        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().focusRequester(searchFocus))
     val chats = state.chats.filter { query.isBlank() || it.title.contains(query, true) || it.preview.contains(query, true) }
         .sortedWith(compareByDescending<ChatRow> { it.pinned }.thenByDescending { it.updatedAt })
     if (chats.isEmpty()) Text(if (query.isBlank()) nexusCopy("Le tue conversazioni appariranno qui", "Your conversations will appear here") else nexusCopy("Nessuna conversazione trovata", "No conversations found"), color = Mist, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp))

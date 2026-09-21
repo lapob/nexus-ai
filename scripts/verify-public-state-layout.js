@@ -1,6 +1,7 @@
 /** @module scripts/verify-public-state-layout
  * Verifies narrow, landscape and enlarged-text layouts with synthetic conversations.
  */
+// #region Dependencies and output
 const path=require('node:path');
 process.env.PLAYWRIGHT_BROWSERS_PATH ||= path.resolve(__dirname,'../../.toolchains/playwright');
 const {chromium}=require('../../.SITE/node_modules/@playwright/test');
@@ -8,6 +9,8 @@ const {PUBLIC_AI_HTML}=require('../src/remote/remote-session-gateway');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const output=path.resolve(__dirname,'../qa-artifacts');
+// #endregion
+// #region Layout and interaction verification
 (async()=>{
  const browser=await chromium.launch({headless:true}); const report=[];
  try { for(const [width,height,font] of [[320,568,100],[390,844,200],[844,390,100],[1440,900,100]]){
@@ -35,6 +38,14 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   assert.equal(await page.locator('.identity').evaluate(el=>getComputedStyle(el,'::before').opacity),'0','Idle chrome must not tint the shared background');
   await page.locator('#download').click();await capture('download');await page.locator('#sheetClose').click();
   await page.locator('#keyboard').click();await page.locator('#prompt').fill('Prova sintetica della disposizione');await capture('compose');await page.locator('#send').click();await page.locator('#answer').filter({hasText:'Risposta di prova.'}).waitFor();await capture('answer');
+  for(const id of ['copyResponse','deepenResponse','exportResponse']){
+   assert.equal(await page.locator('#'+id).innerText(),'','Response commands use icons');
+   assert.ok(await page.locator('#'+id).getAttribute('aria-label'),'Icon has an accessible name');
+   assert.equal(await page.locator('#'+id+' svg').count(),1);
+  }
+  await page.locator('#copyResponse').click();
+  await page.waitForFunction(()=>document.querySelector('#copyResponse').dataset.done==='true');
+  assert.equal(await page.locator('#copyResponse svg').count(),1,'Copy confirmation preserves the icon and its layout');
   await page.locator('#feedbackAction').click();await page.waitForFunction(()=>document.querySelector('#feedbackAction').getAttribute('aria-pressed')==='true');
   await page.locator('#feedbackNegative').click();await page.waitForFunction(()=>document.querySelector('#feedbackNegative').getAttribute('aria-pressed')==='true');
   await page.locator('#feedbackNegative').click();await page.waitForFunction(()=>document.querySelector('#feedbackNegative').getAttribute('aria-pressed')==='false');
@@ -75,3 +86,5 @@ const output=path.resolve(__dirname,'../qa-artifacts');
  }}finally{fs.writeFileSync(path.join(output,'web-states-report.json'),JSON.stringify(report,null,2));await browser.close();}
  console.log('Captured '+report.length+' web states');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+// #endregion

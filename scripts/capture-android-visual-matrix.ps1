@@ -31,10 +31,12 @@ if (-not $device) {
 if (-not $ApkPath) {
   $ApkPath = Join-Path $projectRoot $(if ($App -eq 'Public') { 'release-android\NexusNXS-Android.apk' } else { 'release-android\NexusNXS-Control.apk' })
 }
+if (-not [IO.Path]::IsPathRooted($ApkPath)) { $ApkPath = Join-Path $projectRoot $ApkPath }
 if (-not (Test-Path -LiteralPath $ApkPath)) { throw "APK non trovato: $ApkPath" }
 $apkSha256 = (Get-FileHash -LiteralPath $ApkPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot $(if ($App -eq 'Public') { 'qa-artifacts\android-public-matrix' } else { 'qa-artifacts\android-control-matrix' }) }
-New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+if (-not [IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory = Join-Path $projectRoot $OutputDirectory }
+[IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
 
 $package = if ($App -eq 'Public') { 'local.nexus.remote' } else { 'local.nexus.console' }
 $activity = if ($App -eq 'Public') { "$package/.NexusMainActivity" } else { "$package/.NativeMainActivity" }

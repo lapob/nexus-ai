@@ -8,6 +8,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { QuietClose } from './QuietClose';
 import type { OperationalArtifact } from '../types/nexus';
 
+function CopyGlyph({ state = 'idle' }: { state?: 'idle' | 'copied' | 'error' }) {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {state === 'copied' ? <path d="m5 12 4 4L19 6" /> : state === 'error' ? <path d="m7 7 10 10M17 7 7 17" /> : <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V4H4v12h4" /></>}
+  </svg>;
+}
+
 // #region 01 — Markdown leggero e sicuro
 
 interface ResponseSurfaceProps {
@@ -310,8 +316,8 @@ function CodeBlock({ language, content }: { language: string; content: string })
     <section className="code-card">
       <div className="code-card-meta">
         <span>{language}</span>
-        <button type="button" onClick={copy}>
-          {copyState === 'copied' ? 'Copiato' : copyState === 'error' ? 'Non riuscito' : 'Copia'}
+        <button className="response-icon-action" type="button" onClick={copy} aria-label={copyState === 'copied' ? 'Copiato' : copyState === 'error' ? 'Copia non riuscita' : 'Copia codice'}>
+          <CopyGlyph state={copyState} />
         </button>
       </div>
       <pre><HighlightedCode language={language} content={content} /></pre>
@@ -355,7 +361,7 @@ export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] 
                         <button type="button" data-active={viewMode === 'diff'} onClick={() => setViewMode('diff')}>Modifiche</button>
                         <button type="button" data-active={viewMode === 'split'} onClick={() => setViewMode('split')}>Prima / dopo</button>
                       </>}
-                      <button type="button" onClick={() => void window.nexus.copyText(artifact.content || '')}>Copia</button>
+                      <button className="response-icon-action" type="button" aria-label="Copia contenuto" onClick={() => void window.nexus.copyText(artifact.content || '')}><CopyGlyph /></button>
                       <button type="button" onClick={() => setOpenId('')} aria-label="Chiudi dettaglio">Chiudi</button>
                     </span>
                   </div>
@@ -526,7 +532,7 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
               )}
               <button className="answer-feedback-action" type="button" disabled={trainingSaved || (correcting && !correction.trim())} onClick={() => correcting ? onApproveTraining(correction, response) : onApproveTraining()}>{trainingSaved ? 'Approvata' : correcting ? 'Salva correzione' : 'Utile'}</button>
               {!trainingSaved && <button className="answer-feedback-action" type="button" onClick={() => { setCorrection(response); setCorrecting((current) => !current); }}>{correcting ? 'Annulla' : 'Correggi'}</button>}
-              <button className="answer-action-primary" type="button" onClick={() => void window.nexus.copyText(response)}>Copia</button>
+              <button className="answer-action-primary response-icon-action" type="button" aria-label="Copia risposta" onClick={() => void window.nexus.copyText(response)}><CopyGlyph /></button>
               <button className="answer-action-menu-trigger" type="button" aria-expanded={actionsOpen} aria-label="Altre azioni sulla risposta" onClick={() => setActionsOpen((open) => !open)}>•••</button>
               {actionsOpen && <div className="answer-action-menu" role="menu">
                 <button role="menuitem" type="button" onClick={() => { onRegenerate(); setActionsOpen(false); }}>Rigenera</button>
