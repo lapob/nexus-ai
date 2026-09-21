@@ -87,6 +87,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private final Handler main = new Handler(Looper.getMainLooper());
     private LinearLayout content;
     private LinearLayout powerDock;
+    private ScrollView dashboardScroll;
     private String dashboardSection = "Panoramica";
     private String appFolder = "";
     private final java.util.Map<String, LinearLayout> dashboardPanels = new java.util.LinkedHashMap<>();
@@ -318,11 +319,24 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             cancelPowerConfirmation();
             return;
         }
+        if (currentScreen == SCREEN_DASHBOARD) {
+            if ("App".equals(dashboardSection) && !appFolder.isEmpty()) {
+                appFolder = "";
+                content.removeAllViews();
+                renderDashboard(lastDashboardSnapshot);
+                return;
+            }
+            if (!"Panoramica".equals(dashboardSection)) {
+                selectDashboardSection("Panoramica");
+                return;
+            }
+        }
         finishWithMaterialization();
     }
 
     private void createShell() {
         ScrollView scroll = new ScrollView(this);
+        dashboardScroll = scroll;
         scroll.setFillViewport(true);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setVerticalScrollBarEnabled(false);
@@ -604,7 +618,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         LinearLayout activityMetrics = new LinearLayout(this);
         activityMetrics.setOrientation(LinearLayout.HORIZONTAL);
         activityMetrics.setPadding(0, dp(12), 0, 0);
-        activityMetrics.addView(serviceMetric("RICHIESTE", requestCount(requests), "requests"), new LinearLayout.LayoutParams(0, dp(68), 1));
+        activityMetrics.addView(serviceMetric("RICHIESTE", requestCount(requests), "requests"), new LinearLayout.LayoutParams(0, -2, 1));
         activityMetrics.addView(serviceMetric("SESSIONI", nexusService == null ? 0 : nexusService.optInt("anonymousSessions"), "sessions"), spacedServiceMetric());
         activityMetrics.addView(serviceMetric("STREAM LIVE", nexusService == null ? 0 : nexusService.optInt("connectedStreams"), "streams"), spacedServiceMetric());
         services.addView(activityMetrics);
@@ -616,7 +630,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         quickActions.setPadding(0, dp(16), 0, dp(9));
         apps.addView(quickActions);
         apps.addView(applicationFolders());
-        apps.addView(foregroundCloseAction(), block(dp(52)));
+        apps.addView(foregroundCloseAction(), wrapBlock());
         service.addView(serverActions());
 
         LinearLayout history = card();
@@ -719,6 +733,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private void selectDashboardSection(String name) {
         boolean changed = !dashboardSection.equals(name);
         dashboardSection = name;
+        if (changed && dashboardScroll != null) dashboardScroll.scrollTo(0, 0);
         for (String key : dashboardPanels.keySet()) {
             boolean selected = key.equals(name);
             LinearLayout panel = dashboardPanels.get(key);
@@ -726,12 +741,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             panel.setAlpha(1f);
             panel.setTranslationY(0f);
             panel.setVisibility(selected ? View.VISIBLE : View.GONE);
-            if (selected && changed && animationsEnabled()) {
-                panel.setAlpha(0f);
-                panel.setTranslationY(dp(8));
-                panel.animate().alpha(1f).translationY(0f).setDuration(motionDuration(NexusMotion.ENTER))
-                    .setInterpolator(standardInterpolator()).start();
-            }
+            if (selected && changed) animateSectionEntry(panel);
             Button tab = dashboardTabs.get(key);
             tab.setSelected(selected);
             tab.setTextColor(selected ? BG : TEXT);
@@ -739,14 +749,39 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }
     }
 
+    private void animateSectionEntry(View panel) {
+        if (panel == null) return;
+        panel.animate().cancel();
+        panel.setAlpha(1f);
+        panel.setTranslationY(0f);
+        if (!animationsEnabled()) return;
+        panel.setAlpha(0f);
+        panel.setTranslationY(dp(8));
+        panel.animate().alpha(1f).translationY(0f).setDuration(motionDuration(NexusMotion.ENTER))
+            .setInterpolator(standardInterpolator()).start();
+    }
+
     private LinearLayout applicationFolders() {
         LinearLayout area = new LinearLayout(this); area.setOrientation(LinearLayout.VERTICAL);
         LinearLayout folders = new LinearLayout(this);
         for (String name : new String[]{"Applicazioni", "Giochi"}) {
             Button folder = button(name, false, false);
-            decorateButton(folder, "folder", ACCENT);
-            folder.setOnClickListener(v -> { appFolder = name; content.removeAllViews(); renderDashboard(lastDashboardSnapshot); });
-            folder.setMinHeight(dp(64)); folders.addView(folder, new LinearLayout.LayoutParams(0, -2, 1));
+            decorateButton(folder, name.equals(appFolder) ? "folder-open" : "folder", ACCENT);
+            folder.setOnClickListener(v -> {
+                if (name.equals(appFolder)) return;
+                appFolder = name;
+                content.removeAllViews();
+                renderDashboard(lastDashboardSnapshot);
+                animateSectionEntry(dashboardPanels.get("App"));
+            });
+            folder.setMinHeight(dp(64));
+            folder.setSelected(name.equals(appFolder));
+            folder.setTextColor(name.equals(appFolder) ? TEXT : MUTED);
+            folder.setBackground(rounded(name.equals(appFolder) ? Color.rgb(7, 35, 36) : SURFACE, 19,
+                name.equals(appFolder) ? ACCENT : Color.TRANSPARENT));
+            LinearLayout.LayoutParams folderParams = new LinearLayout.LayoutParams(0, -2, 1);
+            if (folders.getChildCount() > 0) folderParams.setMargins(dp(8), 0, 0, 0);
+            folders.addView(folder, folderParams);
         }
         area.addView(folders, wrapBlock());
         if (!appFolder.isEmpty()) {
@@ -1132,7 +1167,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         GradientDrawable surface = rounded(fill, 19, stroke);
         tile.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(42, 109, 224, 221)), surface, null));
         tile.setTextColor(Boolean.TRUE.equals(open) ? Color.rgb(226, 247, 246) : Color.rgb(190, 211, 211));
-        String glyph = "nexusnxs".equals(id) ? "nexus" : "chatgpt".equals(id) ? "chat" : id;
+        String glyph = "nexusnxs".equals(id) ? "nexus" : "chatgpt".equals(id) ? "chat" : ("steam".equals(id) || "epic".equals(id)) ? "game" : id;
         Drawable icon = new NexusGlyphDrawable(glyph, Boolean.TRUE.equals(open) ? ACCENT : Color.rgb(151, 190, 191), dp(20));
         tile.setCompoundDrawables(icon, null, null, null);
         if (pending && animationsEnabled()) tile.animate().alpha(.58f).setDuration(motionDuration(NexusMotion.STATUS_PULSE)).withEndAction(() -> {
@@ -1447,7 +1482,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private LinearLayout.LayoutParams spacedServiceMetric() {
-        return spacedServiceMetric(dp(68));
+        return spacedServiceMetric(-2);
     }
 
     private LinearLayout.LayoutParams spacedServiceMetric(int height) {
@@ -2256,6 +2291,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private final class NexusGlyphDrawable extends Drawable {
         private final String glyph;
+        private final Runnable nextIconFrame = this::invalidateSelf;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final int size;
 
@@ -2277,7 +2313,19 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             canvas.translate(b.left, b.top);
             canvas.scale(scale, scale);
             Path path = new Path();
-            if ("folder".equals(glyph)) {
+            if ("folder-open".equals(glyph)) {
+                boolean moving = foreground && animationsEnabled() && !lowMotionBudget;
+                float phase = moving ? (android.os.SystemClock.uptimeMillis() % 2400L) / 2400f : 0f;
+                float lift = (float) Math.sin(phase * Math.PI * 2) * 1.2f;
+                canvas.drawRoundRect(new RectF(7, 4 + lift, 16, 16 + lift), 1, 1, paint);
+                canvas.drawRoundRect(new RectF(10, 6 - lift, 19, 18 - lift), 1, 1, paint);
+                canvas.drawLine(12, 9 - lift, 17, 9 - lift, paint);
+                canvas.drawLine(12, 12 - lift, 16, 12 - lift, paint);
+                path.moveTo(3, 11); path.lineTo(9, 11); path.lineTo(11, 13);
+                path.lineTo(22, 13); path.lineTo(19, 21); path.lineTo(3, 21); path.close();
+                canvas.drawPath(path, paint);
+                if (moving) scheduleSelf(nextIconFrame, android.os.SystemClock.uptimeMillis() + 33);
+            } else if ("folder".equals(glyph)) {
                 path.moveTo(3, 7); path.lineTo(9, 7); path.lineTo(11, 10); path.lineTo(21, 10); path.lineTo(21, 20); path.lineTo(3, 20); path.close(); canvas.drawPath(path, paint);
             } else if ("game".equals(glyph)) {
                 canvas.drawRoundRect(new RectF(3, 7, 21, 18), 4, 4, paint);

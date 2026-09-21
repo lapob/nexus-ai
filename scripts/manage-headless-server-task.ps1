@@ -127,7 +127,14 @@ function Stop-HeadlessServer([string]$InstalledTaskName) {
   # attraversano app.quit()/shutdownApplication. Stop-ScheduledTask e taskkill
   # restano soltanto il fallback per una vecchia build o un processo bloccato.
   $requested = Request-GracefulProcessShutdown -LockPath $headlessLockPath
-  if ($requested -and (Wait-ForGateway $false 12)) { return }
+  if ($requested -and (Wait-ForGateway $false 12)) {
+    # Il gateway puo essere terminato mentre il launcher conserva pipe ereditate.
+    # Libera anche il task: IgnoreNew altrimenti rifiuta il riavvio successivo.
+    if ($InstalledTaskName) {
+      Stop-ScheduledTask -TaskName $InstalledTaskName -ErrorAction SilentlyContinue
+    }
+    return
+  }
   if ($InstalledTaskName) {
     Stop-ScheduledTask -TaskName $InstalledTaskName -ErrorAction SilentlyContinue
   }
