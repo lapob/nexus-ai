@@ -285,3 +285,18 @@ test('il public ingress restituisce 404 per stato, piano ed esecuzione presence'
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test('il contratto conserva i launcher giochi e rifiuta identificatori eseguibili', () => {
+  const normalized = normalizeDesktopPresenceStatus({available: true, applications: [
+    {id: 'steam', available: true, open: true},
+    {id: 'epic', available: false, open: false},
+    {id: 'cmd.exe', available: true}
+  ]});
+  assert.deepEqual(normalized.applications.map(app => app.id), ['steam', 'epic']);
+  assert.equal(normalized.applications[0].state, 'open');
+  for (const applicationId of ['steam', 'epic']) {
+    assert.equal(normalizePresenceAction({action: 'open-application', applicationId}).applicationId, applicationId);
+  }
+  assert.throws(() => normalizePresenceAction({action: 'open-application', applicationId: 'steam;cmd.exe'}));
+});

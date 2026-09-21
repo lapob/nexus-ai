@@ -22,7 +22,7 @@ const PRESENCE_ACTIONS = Object.freeze([
 ]);
 const PRESENCE_ACTION_SET = new Set(PRESENCE_ACTIONS);
 const LOGICAL_DISPLAY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const APPLICATION_ID = /^(?:brave|terminal|supremo|notepad)$/;
+const APPLICATION_ID = /^(?:brave|terminal|supremo|notepad|steam|epic)$/;
 
 // #region 01 — Normalizzazione metadata-only
 
