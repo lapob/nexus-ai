@@ -7,6 +7,7 @@ import '@fontsource-variable/inter/wght.css';
 import { App } from './App';
 import { ApplicationBoundary } from './components/ApplicationBoundary';
 import './styles/app.css';
+import './styles/design-tokens.generated.css';
 import './styles/settings-minimal.css';
 import './styles/surfaces-minimal.css';
 import './styles/response-surface.css';

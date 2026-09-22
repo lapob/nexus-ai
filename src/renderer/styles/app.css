@@ -15,7 +15,7 @@
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: geometricPrecision;
-  --ink: #020405;
+  --ink: var(--nxs-ink);
   --ink-soft: #060a0c;
   --ice: #e9fdff;
   --mist: rgba(201, 238, 241, 0.64);

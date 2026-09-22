@@ -2,11 +2,21 @@
 
 ## Struttura
 
-`src` contiene il runtime, `renderer` l'interfaccia desktop, `android` i client nativi,
+`src` contiene il runtime, `src/renderer` l'interfaccia desktop, `android` i client nativi,
 `scripts` gli strumenti e `tests` le regressioni. `qa-artifacts` conserva prove locali;
 `release`, `release-android` e `release-private` contengono artefatti generati.
 Il sito resta nel repository `.SITE`. Non spostare moduli per sola estetica:
 prima verificare import, script di build e percorsi di distribuzione.
+
+## Fonti grafiche
+
+`config/nexus-design-tokens.json` e la fonte dei colori condivisi.
+`node scripts/generate-interaction-contracts.js` genera le variabili CSS desktop e
+`NexusColors.java` per i due client Android, insieme ai contratti degli stati.
+`npm run interaction:check` rifiuta copie generate non aggiornate. Non modificarle
+a mano. La web app legge il fondo direttamente dalla stessa configurazione.
+Le varianti di superficie e contrasto non ancora migrate restano esplicite nei client;
+questo passaggio non significa che ogni icona, colore o spaziatura sia centralizzato.
 
 ## Pulizia
 

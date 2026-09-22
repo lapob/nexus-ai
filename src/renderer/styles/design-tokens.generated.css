@@ -1,0 +1,13 @@
+/** @module renderer/styles/design-tokens.generated
+ * Generated from config/nexus-design-tokens.json. Do not edit. */
+:root {
+  --nxs-ink: #020405;
+  --nxs-surface: #121718;
+  --nxs-surface-raised: #242B2C;
+  --nxs-ice: #F7FBFB;
+  --nxs-mist: #ABBABB;
+  --nxs-cyan: #4BE7E9;
+  --nxs-hairline: #5B696A;
+  --nxs-success: #58E8BD;
+  --nxs-attention: #D69A58;
+}

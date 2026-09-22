@@ -1,11 +1,11 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 21 settembre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 22 settembre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
 
 | Area | Verificato | Residuo |
 | --- | --- | --- |
-| Componenti condivisi | Stati generati da `config/nexus-interaction-states.json`, Core condivisi, asset di marchio verificati da `config/brand-assets.json`, movimento Android condiviso | Colori e icone delle superfici conservano ancora definizioni locali. Migrazione progressiva ai token, con confronto visivo: non sono tutti unificati |
+| Componenti condivisi | Stati generati, Core e movimento Android condivisi, asset di marchio verificati; colori principali Android e fondo desktop/web collegati a `config/nexus-design-tokens.json` con verifica delle copie generate | Varianti di superficie, icone e spaziature conservano ancora definizioni locali. La migrazione non e totale |
 | Pulizia | Politica dry-run, due versioni per client/formato, alias e file sconosciuti conservati; igiene di 830 file e 276 moduli senza duplicati accidentali rilevati | Il controllo delle copie non dimostra che ogni componente o dipendenza sia utilizzato. Nessuna rimozione speculativa di asset, dati o modelli |
 | Repository | Sorgenti, strumenti, prove e output distinti; mappa in MAINTENANCE.md | Le versioni dei client restano indipendenti nei manifest nativi. Non confondere una versione unica con una distribuzione coordinata |
 | Continuita | Control salva sezione, cartella e offset in dp; riapertura reale dopo arresto processo: stesso contenuto, scarto 1px. Le conferme sensibili non sono salvate | Bozze e conversazioni hanno percorsi gia esistenti, ma manca una matrice completa di tutti i client dopo rotazione/rete/process death |

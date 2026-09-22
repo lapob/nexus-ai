@@ -76,11 +76,11 @@ import java.util.concurrent.RejectedExecutionException;
 
 /** Centro di comando privato per monitorare e controllare la workstation NexusNXS. */
 public final class NativeMainActivity extends androidx.activity.ComponentActivity {
-    private static final int BG = Color.rgb(2, 4, 5);
-    private static final int SURFACE = Color.rgb(18, 23, 24);
-    private static final int TEXT = Color.rgb(247, 251, 251);
-    private static final int MUTED = Color.rgb(171, 186, 187);
-    private static final int ACCENT = Color.rgb(75, 231, 233);
+    private static final int BG = local.nexus.motion.NexusColors.INK;
+    private static final int SURFACE = local.nexus.motion.NexusColors.SURFACE;
+    private static final int TEXT = local.nexus.motion.NexusColors.ICE;
+    private static final int MUTED = local.nexus.motion.NexusColors.MIST;
+    private static final int ACCENT = local.nexus.motion.NexusColors.CYAN;
     private static final int DANGER = Color.rgb(255, 154, 145);
 
     private final ExecutorService network = Executors.newFixedThreadPool(2);

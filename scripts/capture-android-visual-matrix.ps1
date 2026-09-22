@@ -4,6 +4,7 @@
 #>
 param(
   [ValidateSet('Control', 'Public')][string]$App = 'Control',
+  [ValidateSet('Online', 'Offline')][string]$ControlState = 'Online',
   [string]$ApkPath = "",
   [string]$OutputDirectory = "",
   [ValidateRange(1, 100)][double]$MaxJankyPercent = 18,
@@ -97,6 +98,13 @@ try {
     if (-not $capturedXml.SelectSingleNode("//node[@package='$package']")) {
       throw "La cattura $($profile.Name) non contiene l'app prevista."
     }
+    if ($App -eq 'Control') {
+      $offline = $null -ne $capturedXml.SelectSingleNode("//node[@package='$package' and @text='OFFLINE']")
+      $dashboard = $null -ne $capturedXml.SelectSingleNode("//node[@package='$package' and @text='Riavvia']")
+      if (($ControlState -eq 'Online' -and -not $dashboard) -or ($ControlState -eq 'Offline' -and -not $offline)) {
+        throw "Control $($profile.Name): atteso stato $ControlState. La schermata di connessione non dimostra il layout della dashboard."
+      }
+    }
     $capturedPng = [IO.File]::ReadAllBytes((Join-Path $OutputDirectory "$($profile.Name).png"))
     if ($capturedPng.Length -lt 24 -or [BitConverter]::ToString($capturedPng, 0, 8) -ne '89-50-4E-47-0D-0A-1A-0A') {
       throw "Screenshot $($profile.Name) non valido."
@@ -128,6 +136,7 @@ try {
     Device = $device
     ApkSha256 = $apkSha256
     App = $App
+    ExpectedControlState = if ($App -eq 'Control') { $ControlState } else { $null }
     Package = $package
     CapturedAt = (Get-Date).ToString('o')
     Profiles = @($profiles.Name)
@@ -142,7 +151,7 @@ try {
       -not (Test-Path -LiteralPath $xmlPath) -or (Get-Item -LiteralPath $xmlPath).Length -lt 1000
     })
     if ($emptyLayouts.Count) { throw "Layout Control non acquisito: $($emptyLayouts.Name -join ', ')" }
-    Write-Output "Android visual/layout matrix: PASS ($($profiles.Count) profili in $OutputDirectory)."
+    Write-Output "Android visual/layout matrix $ControlState`: PASS ($($profiles.Count) profili in $OutputDirectory)."
   } else {
     Write-Output "Android visual matrix: PASS ($($profiles.Count) profili in $OutputDirectory)."
   }

@@ -874,8 +874,8 @@ test('i token NexusNXS documentano una sola grammatica visiva desktop e mobile',
   assert.equal(tokens.qualityProfiles.reducedMotion.targetFps, 0);
   assert.equal(tokens.motion.quickMs, 170);
   assert.equal(tokens.motion.authority, 'android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
-  assert.match(activity, /Color\(0xFF020405\)/);
-  assert.match(activity, /Color\(0xFF4BE7E9\)/);
+  assert.match(activity, /Color\(local\.nexus\.motion\.NexusColors\.INK\)/);
+  assert.match(activity, /Color\(local\.nexus\.motion\.NexusColors\.CYAN\)/);
   assert.match(activity, /private object NexusFlow/);
   assert.deepEqual(tokens.motion.emphasizedCurve, [0.2, 0, 0, 1]);
 });

@@ -99,6 +99,16 @@ const outputs = new Map([
   [path.join(root, 'src', 'renderer', 'types', 'interaction-states.generated.ts'), typeScript],
   [path.join(root, 'android', 'shared-motion', 'src', 'main', 'java', 'local', 'nexus', 'motion', 'NexusInteractionStates.java'), java]
 ]);
+const design = JSON.parse(fs.readFileSync(path.join(root, 'config', 'nexus-design-tokens.json'), 'utf8'));
+const colors = Object.entries(design.colors);
+for (const [name, value] of colors) {
+  if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(name) || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`Colore non valido: ${name}`);
+}
+const cssName = name => name.replace(/[A-Z]/g, char => `-${char.toLowerCase()}`);
+outputs.set(path.join(root, 'src', 'renderer', 'styles', 'design-tokens.generated.css'),
+  `/** @module renderer/styles/design-tokens.generated\n * Generated from config/nexus-design-tokens.json. Do not edit. */\n:root {\n${colors.map(([name, value]) => `  --nxs-${cssName(name)}: ${value};`).join('\n')}\n}\n`);
+outputs.set(path.join(root, 'android', 'shared-motion', 'src', 'main', 'java', 'local', 'nexus', 'motion', 'NexusColors.java'),
+  `/** Generated from config/nexus-design-tokens.json. Do not edit. */\npackage local.nexus.motion;\n\npublic final class NexusColors {\n${colors.map(([name, value]) => `    public static final int ${constant(cssName(name))} = 0xFF${value.slice(1).toUpperCase()};`).join('\n')}\n    private NexusColors() {}\n}\n`);
 let changed = 0;
 for (const [target, content] of outputs) {
   const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';

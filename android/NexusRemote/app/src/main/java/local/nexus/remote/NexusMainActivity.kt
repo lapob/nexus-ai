@@ -234,13 +234,13 @@ private fun Context.copyToClipboard(value: String) {
 
 @Composable private fun nexusIsItalian(): Boolean = LocalConfiguration.current.locales[0].language == Locale.ITALIAN.language
 
-private val Ink = Color(0xFF020405)
+private val Ink = Color(local.nexus.motion.NexusColors.INK)
 private val Surface = Color(0xFF162022)
-private val Surface2 = Color(0xFF242B2C)
-private val Ice = Color(0xFFF7FBFB)
+private val Surface2 = Color(local.nexus.motion.NexusColors.SURFACE_RAISED)
+private val Ice = Color(local.nexus.motion.NexusColors.ICE)
 private val Mist = Color(0xFFB9C7C8)
-private val Cyan = Color(0xFF4BE7E9)
-private val Hairline = Color(0xFF5B696A)
+private val Cyan = Color(local.nexus.motion.NexusColors.CYAN)
+private val Hairline = Color(local.nexus.motion.NexusColors.HAIRLINE)
 private val NexusSans = FontFamily(
     androidx.compose.ui.text.font.Font(R.font.inter_variable, FontWeight.Normal),
     androidx.compose.ui.text.font.Font(R.font.inter_variable, FontWeight.Medium),

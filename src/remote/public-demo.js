@@ -6,6 +6,7 @@
 const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../shared/desktop-recipes');
 const { createPublicVoiceSession } = require('./public-voice-session');
+const { colors: designColors } = require('../../config/nexus-design-tokens.json');
 const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.16-preview.4/NexusNXS-0.3.16-Setup.exe';
 const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.16-preview.4/NexusNXS-Android.apk';
 
@@ -65,7 +66,7 @@ const CONVERSATION_LAYOUT_STYLE = `<style>
 /* Decorative transforms must not enlarge the mobile layout viewport: a
    viewport resize during keyboard collapse moves the entire dock vertically. */
 html{overflow-x:clip}body{width:100%;max-width:100vw;overflow-x:clip}
-:root{--nxs-surface:#020607;--nxs-glass-edge:48px;--nxs-privacy-height:16px;--nxs-idle-dock-shift:0px;--nxs-status-dock-shift:0px;--nxs-keyboard-dock-shift:0px;--nxs-collapse-shift:0px}
+:root{--nxs-surface:${designColors.ink};--nxs-glass-edge:48px;--nxs-privacy-height:16px;--nxs-idle-dock-shift:0px;--nxs-status-dock-shift:0px;--nxs-keyboard-dock-shift:0px;--nxs-collapse-shift:0px}
 html,body{background:var(--nxs-surface)}
 .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom))}
 body:not(.keyboard-open):not(.request-active):not(.conversation-active) .dock{top:auto;bottom:max(0px,env(safe-area-inset-bottom));transform:translate3d(0,var(--nxs-idle-dock-shift),0)}
