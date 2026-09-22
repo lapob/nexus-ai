@@ -869,6 +869,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private LinearLayout applicationFolders() {
         LinearLayout area = new LinearLayout(this); area.setOrientation(LinearLayout.VERTICAL);
         LinearLayout folders = new LinearLayout(this);
+        boolean stacked = getResources().getConfiguration().fontScale >= 1.3f
+            || getResources().getConfiguration().screenWidthDp < 360;
+        folders.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
         for (String name : new String[]{"Applicazioni", "Giochi"}) {
             Button folder = button(name, false, false);
             decorateButton(folder, name.equals(appFolder) ? "folder-open" : "folder", ACCENT);
@@ -885,8 +888,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             folder.setTextColor(name.equals(appFolder) ? TEXT : MUTED);
             folder.setBackground(rounded(name.equals(appFolder) ? Color.rgb(7, 35, 36) : SURFACE, 19,
                 name.equals(appFolder) ? ACCENT : Color.TRANSPARENT));
-            LinearLayout.LayoutParams folderParams = new LinearLayout.LayoutParams(0, -2, 1);
-            if (folders.getChildCount() > 0) folderParams.setMargins(dp(8), 0, 0, 0);
+            LinearLayout.LayoutParams folderParams = stacked
+                ? new LinearLayout.LayoutParams(-1, -2) : new LinearLayout.LayoutParams(0, -2, 1);
+            if (folders.getChildCount() > 0) folderParams.setMargins(stacked ? 0 : dp(8), stacked ? dp(8) : 0, 0, 0);
             folders.addView(folder, folderParams);
         }
         area.addView(folders, wrapBlock());
@@ -1255,8 +1259,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         boolean supremo = "supremo".equals(id);
         boolean adminReady = Boolean.TRUE.equals(applicationAdminReady.get(id));
         String status = pending ? (pendingApplicationOpening ? "Apertura…" : "Chiusura…")
-            : Boolean.TRUE.equals(open) ? (supremo ? (adminReady ? "Aperta · UAC pronto" : "Aperta · UAC limitato") : "Aperta · tocca per chiudere")
-            : Boolean.FALSE.equals(open) ? (supremo && !adminReady ? "Chiusa · configura UAC sul PC" : "Chiusa · tocca per aprire") : "Stato in verifica…";
+            : Boolean.TRUE.equals(open) ? (supremo ? (adminReady ? "Aperta · UAC pronto" : "Aperta · UAC limitato") : "Aperta")
+            : Boolean.FALSE.equals(open) ? (supremo && !adminReady ? "Chiusa · configura UAC sul PC" : "Chiusa") : "Stato in verifica…";
         String next = label + "\n" + status;
         if (!next.contentEquals(tile.getText())) {
             SpannableString styled = new SpannableString(next);
@@ -1267,7 +1271,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }
         tile.setEnabled(enabled);
         tile.setAlpha(enabled ? 1f : .42f);
-        tile.setContentDescription(label + ", " + status.toLowerCase(Locale.getDefault()).replace("·", ""));
+        String actionHint = enabled && !pending && open != null ? (open ? ", tocca per chiudere" : ", tocca per aprire") : "";
+        tile.setContentDescription(label + ", " + status.toLowerCase(Locale.getDefault()).replace("·", "") + actionHint);
         int fill = Boolean.TRUE.equals(open) ? Color.rgb(6, 31, 32) : SURFACE;
         int stroke = Boolean.TRUE.equals(open) ? Color.argb(92, 101, 220, 216) : Color.argb(25, 128, 188, 190);
         GradientDrawable surface = rounded(fill, 19, stroke);

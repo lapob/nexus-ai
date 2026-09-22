@@ -376,8 +376,9 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /L’app in primo piano non è controllabile da NexusNXS/);
   assert.match(activity, /Apertura…/);
   assert.match(activity, /Chiusura…/);
-  assert.match(activity, /Aperta · tocca per chiudere/);
-  assert.match(activity, /Chiusa · tocca per aprire/);
+  assert.match(activity, /String actionHint = enabled && !pending && open != null/);
+  assert.match(activity, /setContentDescription\(label \+ ", " \+ status[\s\S]*?\+ actionHint\)/);
+  assert.doesNotMatch(activity, /Aperta · tocca per chiudere|Chiusa · tocca per aprire/);
   assert.match(activity, /class NexusGlyphDrawable extends Drawable/);
   assert.match(activity, /class ControlCoreView extends View/);
   assert.match(activity, /applicationId/);
