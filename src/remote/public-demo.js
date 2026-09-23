@@ -354,7 +354,15 @@ function publicDraftRuntime() {
 function publicReadinessRuntime() {
   const badge = document.querySelector('.identity .state');
   const labels = { checking: 'Verifica servizio…', ready: 'Operativo', warming: 'In preparazione', offline: 'Non raggiungibile' };
-  let timer, pending, generation = 0;
+  let timer, pending, generation = 0, probeGeneration = 0;
+  const invalidate = () => {
+    ++generation;
+    ++probeGeneration;
+    clearTimeout(timer);
+    const previous = pending;
+    pending = null;
+    previous?.controller.abort();
+  };
   const render = state => {
     const previous = document.body.dataset.serviceReadiness;
     if (badge) { badge.textContent = labels[state]; badge.dataset.readiness = state; badge.setAttribute('role', 'status'); }
@@ -362,27 +370,32 @@ function publicReadinessRuntime() {
     const core = document.getElementById('core');
     const send = document.getElementById('send');
     if (core) core.disabled = state !== 'ready';
-    if (send && state !== 'ready') send.disabled = true;
+    if (send && state !== 'ready' && send.dataset.mode !== 'stop') send.disabled = true;
     if (state === 'ready' && previous !== 'ready') document.getElementById('prompt')?.dispatchEvent(new Event('input', { bubbles: true }));
     return state === 'ready';
   };
   const check = () => {
     if (navigator.onLine === false) return Promise.resolve(render('offline'));
-    if (pending) return pending;
-    pending = (async () => {
+    if (pending) return pending.promise;
+    const probe = { controller: new AbortController(), generation: probeGeneration };
+    pending = probe;
+    const timeout = setTimeout(() => probe.controller.abort(), 5000);
+    probe.promise = (async () => {
       try {
-        const response = await fetch('/readyz', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        const response = await fetch('/readyz', { cache: 'no-store', signal: probe.controller.signal });
         const data = await response.json();
+        if (probe.generation !== probeGeneration) return false;
+        if (navigator.onLine === false) return render('offline');
         return render(response.ok && data.status === 'ready' ? 'ready' : response.status === 503 && data.status === 'not_ready' ? 'warming' : 'offline');
-      } catch { return render('offline'); }
-      finally { pending = null; }
+      } catch { return probe.generation === probeGeneration ? render('offline') : false; }
+      finally { clearTimeout(timeout); if (pending === probe) pending = null; }
     })();
-    return pending;
+    return probe.promise;
   };
   const poll = async () => {
     const current = ++generation;
     clearTimeout(timer);
-    if (document.hidden) return;
+    if (document.hidden) { invalidate(); return; }
     const ready = await check();
     if (current === generation && !document.hidden) timer = setTimeout(poll, ready ? 30000 : 5000);
   };
@@ -392,12 +405,12 @@ function publicReadinessRuntime() {
   document.addEventListener('input', () => queueMicrotask(() => {
     if (document.body.dataset.serviceReadiness !== 'ready') {
       const send = document.getElementById('send');
-      if (send) send.disabled = true;
+      if (send && send.dataset.mode !== 'stop') send.disabled = true;
     }
   }));
   addEventListener('online', poll);
-  addEventListener('offline', () => { ++generation; clearTimeout(timer); render('offline'); });
-  addEventListener('pagehide', () => { ++generation; clearTimeout(timer); });
+  addEventListener('offline', () => { invalidate(); render('offline'); });
+  addEventListener('pagehide', invalidate);
   addEventListener('pageshow', poll);
   poll();
 }
@@ -680,7 +693,7 @@ for(const [button,path,it,en] of [
 ]){button.dataset.label=composerCopy(it,en);button.setAttribute('aria-label',button.dataset.label);button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+path+'</svg>'}
 `;
   const artifactRuntime = "function capability(id){return runtime.capabilities[id]?.state||'unavailable'}function renderArtifacts(values){artifacts.replaceChildren();for(const item of Array.isArray(values)?values:[]){const card=document.createElement(item.url?'a':'article');card.className='artifact-card';if(item.url){card.href=item.url;card.target='_blank';card.rel='noopener noreferrer'}const title=document.createElement('strong'),content=document.createElement('span');title.textContent=String(item.title||'Risultato');content.textContent=String(item.content||'').slice(0,240);card.append(title,content);artifacts.append(card)}}";
-  const streamFollowRuntime = "const sendArrow='<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 19V5m0 0-6 6m6-6 6 6\"/></svg>',sendStop='<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"7\" y=\"7\" width=\"10\" height=\"10\" rx=\"2\"/></svg>';function setSendMode(stopping){send.dataset.mode=stopping?'stop':'send';send.setAttribute('aria-label',stopping?'Interrompi risposta':'Invia');send.innerHTML=stopping?sendStop:sendArrow;send.disabled=stopping?false:attachmentLoading||!prompt.value.trim()}async function stopGeneration(){if(!busy)return;stopRequested=true;requestAbort?.abort();const id=requestMessageId;if(token&&id)authenticatedFetch('/api/guest/messages/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientMessageId:id}),keepalive:true}).catch(()=>{})}function answerBottom(){return Math.max(0,document.documentElement.scrollHeight-innerHeight)}function followAnswer(){if(!followStream)return;const now=performance.now();if(now-lastAnswerScroll<96)return;lastAnswerScroll=now;requestAnimationFrame(()=>window.scrollTo({top:answerBottom(),behavior:'auto'}))}function settleAnswerPosition(){if(!followStream)return;requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:answerBottom(),behavior:'auto'})))}window.addEventListener('wheel',()=>{if(busy)followStream=false},{passive:true});window.addEventListener('touchstart',()=>{if(busy)followStream=false},{passive:true});window.addEventListener('keydown',event=>{if(busy&&['PageUp','Home','ArrowUp'].includes(event.key))followStream=false});";
+  const streamFollowRuntime = "const sendArrow='<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 19V5m0 0-6 6m6-6 6 6\"/></svg>',sendStop='<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"7\" y=\"7\" width=\"10\" height=\"10\" rx=\"2\"/></svg>';function setSendMode(stopping){send.dataset.mode=stopping?'stop':'send';send.setAttribute('aria-label',stopping?'Interrompi risposta':'Invia');send.innerHTML=stopping?sendStop:sendArrow;send.disabled=stopping?false:attachmentLoading||!prompt.value.trim()||Boolean(document.body.dataset.serviceReadiness&&document.body.dataset.serviceReadiness!=='ready')}async function stopGeneration(){if(!busy)return;stopRequested=true;requestAbort?.abort();const id=requestMessageId;if(token&&id)authenticatedFetch('/api/guest/messages/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientMessageId:id}),keepalive:true}).catch(()=>{})}function answerBottom(){return Math.max(0,document.documentElement.scrollHeight-innerHeight)}function followAnswer(){if(!followStream)return;const now=performance.now();if(now-lastAnswerScroll<96)return;lastAnswerScroll=now;requestAnimationFrame(()=>window.scrollTo({top:answerBottom(),behavior:'auto'}))}function settleAnswerPosition(){if(!followStream)return;requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:answerBottom(),behavior:'auto'})))}window.addEventListener('wheel',()=>{if(busy)followStream=false},{passive:true});window.addEventListener('touchstart',()=>{if(busy)followStream=false},{passive:true});window.addEventListener('keydown',event=>{if(busy&&['PageUp','Home','ArrowUp'].includes(event.key))followStream=false});";
   const sessionExperienceRuntime = "function setViewportMetrics(){const viewport=globalThis.visualViewport,height=viewport?.height||innerHeight,compact=matchMedia('(max-width:560px)').matches,dockNode=document.querySelector('.dock'),dockRect=dockNode?.getBoundingClientRect(),halfDock=Math.max(27,(dockRect?.height||58)/2),controlWidth=compact?54:58,controlGap=compact?8:12,collapsedGroup=controlWidth*2+controlGap,collapseShift=Math.max(0,((dockRect?.width||collapsedGroup)-collapsedGroup)/2),root=document.documentElement;root.style.setProperty('--nxs-vvh',height+'px');root.style.setProperty('--nxs-vv-top',(viewport?.offsetTop||0)+'px');root.style.setProperty('--nxs-idle-dock-shift',Math.round(-(compact?.3:.27)*height+halfDock)+'px');root.style.setProperty('--nxs-status-dock-shift',Math.round(-.22*height+halfDock)+'px');root.style.setProperty('--nxs-keyboard-dock-shift',Math.round(-.5*height+halfDock)+'px');root.style.setProperty('--nxs-collapse-shift',collapseShift+'px')}function renderSessionHistory(){sessionHistory.replaceChildren();for(const turn of turns){const assistant=turn.role==='assistant',item=document.createElement('article'),label=document.createElement('small'),content=document.createElement('div');item.className='session-turn';item.dataset.role=assistant?'assistant':'user';item.setAttribute('aria-label',assistant?'Messaggio di NexusNXS':'Il tuo messaggio');label.textContent=assistant?'NexusNXS':'Tu';content.className='session-turn-content';if(assistant&&turn.image){appendGeneratedImage(content,turn.image)}else if(assistant){content.classList.add('answer');formatAnswer(String(turn.content||''),{target:content,announce:false})}else content.textContent=String(turn.content||'');item.append(label,content);sessionHistory.append(item)}}let voicePresentation=false;function enterRequestLayout(voice=false){voicePresentation=voice;renderSessionHistory();if(voice){document.body.classList.remove('composer-collapsed','keyboard-open','request-active','conversation-active');setViewportMetrics();return}document.body.classList.remove('composer-collapsed');document.body.classList.add('request-active','keyboard-open');setViewportMetrics()}function leaveRequestLayout(){if(voicePresentation){const caption=byId('coreCaption');if(caption)caption.textContent='Apri la tastiera per leggere la conversazione';return}document.body.classList.remove('request-active','composer-collapsed');document.body.classList.add('conversation-active','keyboard-open');setViewportMetrics()}function spokenLanguage(text){const value=' '+String(text||'').toLowerCase()+' ',rules=[['it',/\\b(?:che|chi|come|cosa|questo|questa|sono|puoi|deve|della|perché|anche|risposta|ecco)\\b|[àèéìòù]/g],['es',/\\b(?:que|cómo|qué|esto|esta|puedes|para|porque|respuesta|también)\\b|[áéíóúñ¿¡]/g],['fr',/\\b(?:que|comment|quoi|ceci|vous|pour|parce|réponse|aussi)\\b|[àâçéèêëîïôûùüÿœ]/g],['de',/\\b(?:und|der|die|das|wie|was|kann|für|weil|antwort|auch)\\b|[äöüß]/g],['en',/\\b(?:the|and|how|what|this|that|you|can|because|answer|also)\\b/g]];let best=[language(),0];for(const rule of rules){const score=(value.match(rule[1])||[]).length;if(score>best[1])best=[rule[0],score]}return best[1]>=2?best[0]:language()}setViewportMetrics();requestAnimationFrame(()=>requestAnimationFrame(()=>{document.body.classList.add('motion-ready','initial-reveal');setTimeout(()=>document.body.classList.remove('initial-reveal'),1260)}));globalThis.visualViewport?.addEventListener('resize',setViewportMetrics,{passive:true});globalThis.visualViewport?.addEventListener('scroll',setViewportMetrics,{passive:true});";
 const idleKeyboardRuntime = "const privacyNote=document.querySelector('.privacy');function syncPrivacyHeight(){if(!privacyNote)return;const root=document.documentElement,dock=document.querySelector('.dock'),values={'--nxs-privacy-height':Math.ceil(privacyNote.offsetHeight)+'px','--nxs-dock-height':Math.ceil(dock?.offsetHeight||100)+'px'};for(const [key,value]of Object.entries(values)){if(root.style.getPropertyValue(key)!==value)root.style.setProperty(key,value)}}syncPrivacyHeight();document.fonts?.ready.then(()=>syncPrivacyHeight()).catch(()=>{});if(globalThis.ResizeObserver&&privacyNote){new ResizeObserver(()=>syncPrivacyHeight()).observe(privacyNote);const dock=document.querySelector('.dock');if(dock)new ResizeObserver(()=>syncPrivacyHeight()).observe(dock)}addEventListener('resize',()=>syncPrivacyHeight(),{passive:true});function dismissIdleKeyboard(){if(busy||document.body.classList.contains('conversation-active')||!document.body.classList.contains('keyboard-open'))return;document.body.classList.remove('keyboard-open');prompt.blur();setViewportMetrics()}document.addEventListener('pointerdown',event=>{if(event.target.closest?.('.dock,dialog'))return;dismissIdleKeyboard()});window.addEventListener('keydown',event=>{if(event.key==='Escape')dismissIdleKeyboard()});";
   const slashCommandRuntime = `const slashBuiltins=[
@@ -734,7 +747,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("if(/^https:///.test(piece))", "if(piece.startsWith('https://'))")
     .replace("answer.textContent='';pendingAnswer='';answer.classList.add", "answer.textContent='';pendingAnswer='';rawAnswer='';followStream=true;lastAnswerScroll=0;lastStreamRender=0;lastStreamValue='';hideAnswerContext();responseActions.hidden=true;feedbackStatus.textContent='';answer.classList.remove('rich');imageResult.hidden=true;document.body.classList.remove('image-result');answer.classList.add")
     .replace("if(!text||busy)return;busy=true;send.disabled=true;", "if(!text||busy||attachmentLoading)return;busy=true;stopRequested=false;requestAbort=new AbortController();requestMessageId=globalThis.crypto?.randomUUID?.()||('019fa53a-'+Date.now().toString(16)+'-'+Math.random().toString(16).slice(2));const requestAttachments=pendingAttachments.slice(),requestReasoningMode=reasoningMode;setSendMode(true);")
-    .replace('if(!text||busy||attachmentLoading)return;busy=true;', "if(!text||busy||attachmentLoading)return;busy=true;if(globalThis.nexusCheckReadiness&&!await globalThis.nexusCheckReadiness()){busy=false;prompt.value=text;document.body.classList.add('keyboard-open');setPhase('Il servizio non è ancora pronto. La richiesta è conservata: riprova tra poco.',true);send.disabled=false;return;}")
+    .replace('if(!text||busy||attachmentLoading)return;busy=true;', "if(!text||busy||attachmentLoading)return;busy=true;if(globalThis.nexusCheckReadiness&&!await globalThis.nexusCheckReadiness()){busy=false;prompt.value=text;document.body.classList.add('keyboard-open');setPhase('Il servizio non è ancora pronto. La richiesta è conservata: riprova tra poco.',true);setSendMode(false);return;}")
     .replace("setSendMode(true);document.body.classList.remove('keyboard-open');prompt.blur();", "setSendMode(true);enterRequestLayout(voice);prompt.blur();")
     .replace("const credential=await session();const response=await fetch('/api/guest/messages/stream'", "await session();if(isImageRequest(text)){if(requestAttachments.length)throw new Error(composerCopy('La modifica di immagini allegate non è ancora disponibile. Rimuovi gli allegati per creare una nuova immagine.','Editing attached images is not available yet. Remove attachments to create a new image.'));const responseText=await generateImage(text);turns.push({role:'user',content:text},{role:'assistant',content:responseText,image:{url:imageObjectUrl,alt:text,filename:byId('imageDownload').download}});await memoryWrite();answer.classList.remove('streaming');return}const response=await authenticatedFetch('/api/guest/messages/stream'")
     .replace("headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:JSON.stringify({text,history:previous", "headers:{'Content-Type':'application/json'},body:JSON.stringify({text,history:previous")

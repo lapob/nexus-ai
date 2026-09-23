@@ -1,6 +1,6 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 22 settembre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 23 settembre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
 
 | Area | Verificato | Residuo |
@@ -15,6 +15,38 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 | Distribuzione | Build/lint Control e verifiche automatiche di integrita/rollout PASS; rollback APK conservato | Certificati Windows/Android, chiavi manifest e feed aggiornamenti non configurati. Installazione e rollback firmati su macchina pulita ancora necessari |
 
 ## Regole di chiusura
+
+### Verifica del 23 settembre
+
+- Gate precedente Control 1.19.5 terminato: AI 8B 94%, 14B 100% nel set breve,
+  voce, smoke, shutdown e soak 250 superati. Non equivale alla verifica visiva
+  dell'APK: ADB non rileva il dispositivo nella sessione corrente.
+- Suite completa: 893 test superati; check sorgenti superato. Ripristino di
+  quattro file sintetici superato; audit npm produzione zero segnalazioni.
+- Web: corrette risposte readiness obsolete dopo perdita rete, sospensione o
+  uscita pagina. L'aggiunta di allegati offline non riabilita Invio;
+  Interrompi rimane utilizzabile durante una risposta anche senza rete.
+- `npm run qa:web:offline` verifica un browser isolato, senza inferenza: bozza
+  e allegato sintetico conservati tra tre dimensioni/orientamenti, riconnessione
+  senza invio automatico. Il reload cancella la sessione anonima come dichiarato
+  nell'interfaccia; non e una promessa di persistenza delle chat pubbliche.
+- Layout web: 11 viewport superati, screenshot compatto ispezionato.
+- Il controllo Stable segnala 14 requisiti non soddisfatti: firme, origine
+  aggiornamenti, SLO, evidenze Android correnti, backup esterno, continuita
+  elettrica, failover rete, rotazione chiavi, upgrade su macchina pulita,
+  esercitazione incidente e penetration test esterno. Sono prerequisiti di
+  rilascio, non 14 bug riprodotti. Non abbassare i requisiti per pubblicare.
+- Il preflight segnala ancora finding High/Critical nei moduli del runtime
+  Ollama, consentito dalla policy soltanto nello sviluppo loopback. L'audit npm
+  non copre questo runtime. Eseguito anche il gate di distribuzione del runtime:
+  rifiuta correttamente Ollama 0.32.15 con 45 finding High/Critical. Non aggirare
+  il blocco e non includere questo runtime in una release commerciale.
+  Lo scan Codex Security non e stato eseguito: avviata
+  installazione richiesta, ma tool non ancora disponibile nella sessione.
+
+Le prove umane di eco/interruzione, le firme e i collaudi esterni richiedono
+evidenze reali; le migrazioni grafiche e la matrice completa dei client restano
+lavoro di implementazione. Non confondere le due categorie di lavoro residuo.
 
 - Non marcare l'intero programma concluso sulla base di questa sessione.
 - Conservare le copie di asset richieste dai packaging: sono derivate intenzionali.

@@ -40,7 +40,15 @@ confrontabili direttamente con quelle GPU della produzione.
 Se mancano risorse, il gate fallisce prima di caricare modelli. Non interpretarlo
 come una valutazione qualitativa superata e non chiudere applicazioni dell'utente.
 
-## Stato verificato il 21 settembre 2026
+## Verifica offline della web app
+
+`npm run qa:web:offline` avvia un gateway e un browser temporanei isolati dal
+servizio attivo. Usa soltanto una bozza e un file sintetici; verifica perdita
+rete, allegati, rotazione, riconnessione senza invio automatico e cancellazione
+della sessione anonima al reload. Il report resta in `qa-artifacts/web-offline`.
+Non modifica la connessione del PC e non chiama il modello di produzione.
+
+## Stato verificato il 23 settembre 2026
 
 - Backup/ripristino sintetico: superato; non equivale a prova di tutti i dati personali.
 - Audit dipendenze npm di produzione: zero vulnerabilita segnalate nel controllo.
