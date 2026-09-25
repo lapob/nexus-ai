@@ -5,6 +5,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseUpdateInfo } = require('electron-updater/out/providers/Provider');
 
 const PUBLIC_CHANNELS = new Set(['preview', 'beta', 'stable']);
 const MAX_REMOTE_MANIFEST_BYTES = 2 * 1024 * 1024;
@@ -181,19 +182,39 @@ function updateFeedRecords(manifest) {
 }
 
 function verifyRemoteUpdateManifestText(source, manifest) {
-  const version = yamlScalar(source, 'version');
-  const installerPath = yamlScalar(source, 'path').replaceAll('\\', '/');
-  const sha512 = yamlScalar(source, 'sha512');
+  // Use the same YAML parser as electron-updater, including duplicate-key
+  // rejection. Its files[] representation must agree with the legacy fields.
+  const info = parseUpdateInfo(source, 'latest.yml', 'signed release manifest');
+  if (!info || typeof info !== 'object' || Array.isArray(info)) throw new Error('Manifest Electron non valido.');
+  const { version, sha512 } = info;
+  const installerPath = info.path;
   if (version !== manifest.version) throw new Error('Versione latest.yml non coerente con la distinta firmata.');
-  if (!installerPath || installerPath.startsWith('/') || installerPath.split('/').includes('..') || /^https?:/i.test(installerPath)) throw new Error('Percorso installer latest.yml non valido.');
-  if (!/^[A-Za-z0-9+/]{86}==$/.test(sha512)) throw new Error('Digest installer latest.yml non valido.');
+  if (typeof installerPath !== 'string' || !installerPath.endsWith('.exe')
+    || /[\\:%?#\u0000-\u001f\u007f]/.test(installerPath)
+    || installerPath.split('/').some((segment) => !segment || segment === '.' || segment === '..')) throw new Error('Percorso installer latest.yml non valido.');
+  if (typeof sha512 !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(sha512)) throw new Error('Digest installer latest.yml non valido.');
   const installer = manifest.artifacts.find((artifact) => artifact.kind === 'installer'
     && String(artifact.feedPath || path.basename(artifact.path || '')).replaceAll('\\', '/') === installerPath);
   if (!installer) throw new Error('Installer latest.yml assente dalla distinta firmata.');
-  return { version, installerPath, sha512 };
+  // Nexus ships one complete Windows x64 NSIS installer. Web-install packages
+  // or another files[] target must never introduce a second download authority.
+  if (info.packages !== undefined) throw new Error('Pacchetti web installer non consentiti.');
+  if (info.files !== undefined) {
+    if (!Array.isArray(info.files) || info.files.length !== 1) throw new Error('Elenco installer latest.yml non valido.');
+    const file = info.files[0];
+    if (!file || file.url !== installerPath || file.sha512 !== sha512
+      || (file.size !== undefined && file.size !== installer.bytes)
+      || (file.sha2 !== undefined && String(file.sha2).toUpperCase() !== installer.sha256.toUpperCase())
+      || file.packageInfo !== undefined) throw new Error('Installer latest.yml non coerente con la distinta firmata.');
+  }
+  if (info.sha2 !== undefined && String(info.sha2).toUpperCase() !== installer.sha256.toUpperCase()) throw new Error('Digest installer latest.yml non coerente con la distinta firmata.');
+  return { version, installerPath, sha512, installer, updateInfo: {
+    ...info,
+    files: [{ ...info.files?.[0], url: installerPath, sha512, sha2: installer.sha256.toLowerCase(), size: installer.bytes }]
+  } };
 }
 
-async function verifyRemoteReleaseManifest({ updateUrl, publicKey, keyId, channel, fetchImpl = globalThis.fetch }) {
+async function verifyRemoteReleaseFeed({ updateUrl, publicKey, keyId, channel, fetchImpl = globalThis.fetch }) {
   if (typeof fetchImpl !== 'function') throw new Error('Client HTTPS non disponibile per verificare gli aggiornamenti.');
   const base = cleanRemoteUpdateUrl(updateUrl);
   const controller = new AbortController();
@@ -224,11 +245,19 @@ async function verifyRemoteReleaseManifest({ updateUrl, publicKey, keyId, channe
     if (Buffer.byteLength(updateText) !== updateManifest.bytes || sha256Bytes(Buffer.from(updateText)) !== String(updateManifest.sha256).toUpperCase()) {
       throw new Error('latest.yml non corrisponde alla distinta firmata.');
     }
-    verifyRemoteUpdateManifestText(updateText, manifest);
-    return manifest;
+    const verified = verifyRemoteUpdateManifestText(updateText, manifest);
+    return {
+      manifest,
+      updateInfo: verified.updateInfo,
+      installerUrl: remoteArtifactUrl(base, verified.installer)
+    };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function verifyRemoteReleaseManifest(options) {
+  return (await verifyRemoteReleaseFeed(options)).manifest;
 }
 
 // #endregion
@@ -245,5 +274,6 @@ module.exports = {
   verifyElectronUpdateManifest,
   verifyRemoteUpdateManifestText,
   verifyRemoteReleaseManifest,
+  verifyRemoteReleaseFeed,
   verifySignatureEnvelope
 };

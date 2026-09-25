@@ -433,6 +433,7 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val attachmentUri: String = "",
     val attachmentMime: String = "",
     val attachmentData: String = "",
+    val attachmentLoading: Boolean = false,
     val busy: Boolean = false,
     val streaming: String = "",
     val speechPlayback: String = "idle",
@@ -515,6 +516,7 @@ private data class NexusComposerState(
     val attachmentUri: String,
     val attachmentMime: String,
     val attachmentData: String,
+    val attachmentLoading: Boolean,
     val busy: Boolean,
     val connection: NexusConnection,
     val pendingCount: Int,
@@ -533,6 +535,7 @@ private fun NexusUiState.composerState() = NexusComposerState(
     attachmentUri = attachmentUri,
     attachmentMime = attachmentMime,
     attachmentData = attachmentData,
+    attachmentLoading = attachmentLoading,
     busy = busy,
     connection = connection,
     pendingCount = pendingCount,
@@ -598,7 +601,7 @@ open class NexusMainActivity : ComponentActivity() {
             return true
         }
         private const val SESSION_RESUME_WINDOW_MS = 30L * 60L * 1000L
-        private const val MAX_ATTACHMENT_BYTES = 1_500_000
+        private const val MAX_ATTACHMENT_BYTES = LocalChatStore.MAX_COMPOSER_ATTACHMENT_BYTES
         private const val MAX_BACKUP_BYTES = 16 * 1024 * 1024
         private const val WAKE_RELAY_PROTOCOL_VERSION = 1
         private const val WAKE_TOKEN_ROTATION_MS = 24L * 60L * 60L * 1000L
@@ -609,7 +612,6 @@ open class NexusMainActivity : ComponentActivity() {
     protected val assistantOverlayActive: Boolean get() = state.assistantOverlay
     protected open fun onAssistantPresentationChanged() = Unit
     private var temporaryReturnConversationId = ""
-    private var temporaryReturnDraft = ""
     private var temporaryReturnWork = false
     private var pendingAuthorizationTicket = ""
     private var pendingAuthorizationKind = NexusAuthorizationKind.NONE
@@ -618,35 +620,122 @@ open class NexusMainActivity : ComponentActivity() {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var pendingDraftConversationId = ""
     private var pendingDraftValue = ""
+    private val attachmentImportLock = Any()
+    @Volatile private var attachmentImportGeneration = 0L
+    private var legacyDraftMigrationIncomplete = false
     private val persistDraftRunnable = Runnable {
         val id = pendingDraftConversationId
         val value = pendingDraftValue
+        if (id.isNotBlank()) {
+            runCatching { check(store.saveDraft(id, value)) }.onFailure {
+                state = state.copy(error = nexusCopy("Impossibile conservare la bozza. Riprova prima di chiudere.", "Could not save the draft. Retry before closing."))
+                return@Runnable
+            }
+        }
         pendingDraftConversationId = ""
         pendingDraftValue = ""
-        if (id.isNotBlank()) prefs.edit { putString("draft:$id", value) }
     }
 
     private fun queueDraftPersistence(conversationId: String, value: String) {
         if (conversationId.isBlank()) return
+        if (pendingDraftConversationId.isNotBlank() && pendingDraftConversationId != conversationId && !flushDraftPersistence()) return
         pendingDraftConversationId = conversationId
         pendingDraftValue = value
         uiHandler.removeCallbacks(persistDraftRunnable)
         uiHandler.postDelayed(persistDraftRunnable, 220L)
     }
 
-    private fun flushDraftPersistence() {
-        if (pendingDraftConversationId.isBlank()) return
+    private fun flushDraftPersistence(): Boolean {
+        if (pendingDraftConversationId.isBlank()) return true
         uiHandler.removeCallbacks(persistDraftRunnable)
         persistDraftRunnable.run()
+        return pendingDraftConversationId.isBlank()
     }
 
-    private fun discardDraftPersistence(conversationId: String) {
+    private fun cancelPendingDraftPersistence(conversationId: String) {
         if (pendingDraftConversationId == conversationId) {
             uiHandler.removeCallbacks(persistDraftRunnable)
             pendingDraftConversationId = ""
             pendingDraftValue = ""
         }
-        if (conversationId.isNotBlank()) prefs.edit { remove("draft:$conversationId") }
+    }
+
+    private fun discardDraftPersistence(conversationId: String): Boolean {
+        if (conversationId.isNotBlank()) {
+            runCatching { check(store.saveDraft(conversationId, "")) }.onFailure {
+                state = state.copy(error = nexusCopy("Impossibile aggiornare la bozza. Riprova.", "Could not update the draft. Try again."))
+                return false
+            }
+        }
+        cancelPendingDraftPersistence(conversationId)
+        return true
+    }
+
+    private fun migrateLegacyDrafts() {
+        prefs.all.forEach { (key, value) ->
+            if (key.startsWith("draft:") && value is String) {
+                val id = key.removePrefix("draft:")
+                runCatching {
+                    if (store.hasConversation(id)) {
+                        if (store.getDraft(id).isEmpty()) check(store.saveDraft(id, value))
+                        prefs.edit { remove(key) }
+                    }
+                }.onFailure {
+                    legacyDraftMigrationIncomplete = true
+                    state = state.copy(error = nexusCopy("Alcune bozze non sono ancora state trasferite. I dati originali sono conservati.", "Some drafts could not be migrated yet. Their original data is retained."))
+                }
+            }
+        }
+        runCatching { store.pruneComposerAttachments() }
+    }
+
+    private fun cancelAttachmentImport() {
+        synchronized(attachmentImportLock) { attachmentImportGeneration++ }
+        state = state.copy(attachmentLoading = false)
+    }
+
+    private fun selectComposerAttachment(value: String) {
+        if (value.isBlank()) {
+            cancelAttachmentImport()
+            runCatching {
+                if (!state.temporary && state.conversationId.isNotBlank()) store.saveComposerAttachment(state.conversationId, null)
+                state = state.copy(attachment = null, attachmentUri = "", attachmentMime = "", attachmentData = "")
+            }.onFailure {
+                state = state.copy(error = nexusCopy("Impossibile rimuovere l’allegato. Riprova.", "Could not remove the attachment. Try again."))
+            }
+            return
+        }
+        if (state.connection != NexusConnection.ONLINE) return
+        val conversationId = state.conversationId
+        val temporary = state.temporary
+        val generation = synchronized(attachmentImportLock) { ++attachmentImportGeneration }
+        state = state.copy(attachmentLoading = true, error = null)
+        runTask {
+            val result = runCatching {
+                val source = JSONObject(value)
+                val data = source.optString("data")
+                require(data.length <= ((MAX_ATTACHMENT_BYTES + 2) / 3) * 4)
+                val bytes = if (data.isNotBlank()) Base64.decode(data, Base64.DEFAULT)
+                    else readBoundedContent(source.optString("uri").toUri(), MAX_ATTACHMENT_BYTES)
+                require(bytes.isNotEmpty() && bytes.size <= MAX_ATTACHMENT_BYTES)
+                val attachment = JSONObject().put("name", source.optString("name").take(120))
+                    .put("mime", source.optString("mime").take(80)).put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                // A cancelled import cannot write into a deleted or different composer.
+                synchronized(attachmentImportLock) {
+                    if (generation != attachmentImportGeneration || destroyed) return@runTask
+                    if (!temporary) check(store.saveComposerAttachment(conversationId, attachment))
+                }
+                attachment
+            }
+            postUi {
+                if (generation != attachmentImportGeneration || state.conversationId != conversationId || state.temporary != temporary) return@postUi
+                result.onSuccess { attachment ->
+                    state = state.copy(attachment = attachment.optString("name"), attachmentUri = "", attachmentMime = attachment.optString("mime"), attachmentData = attachment.optString("data"), attachmentLoading = false, error = null)
+                }.onFailure {
+                    state = state.copy(attachmentLoading = false, error = nexusCopy("Allegato non disponibile o oltre il limite di 1,5 MB. Selezionalo nuovamente.", "Attachment unavailable or over the 1.5 MB limit. Select it again."))
+                }
+            }
+        }
     }
 
     private data class StreamUiUpdate(
@@ -754,7 +843,15 @@ open class NexusMainActivity : ComponentActivity() {
         if (destroyed || backgroundExecutor.isShutdown) return
         try {
             backgroundExecutor.execute {
-                if (!destroyed && !Thread.currentThread().isInterrupted) block()
+                try {
+                    if (!destroyed && !Thread.currentThread().isInterrupted) block()
+                } catch (_: InterruptedException) {
+                    // shutdownNow interrupts sleeping probes during Activity recreation.
+                    // Preserve cancellation instead of crashing the application process.
+                    Thread.currentThread().interrupt()
+                } catch (error: RejectedExecutionException) {
+                    if (!destroyed && !backgroundExecutor.isShutdown) throw error
+                }
             }
         } catch (_: RejectedExecutionException) {
             // La chiusura dell'activity ha precedenza su un callback di rete tardivo.
@@ -848,6 +945,7 @@ open class NexusMainActivity : ComponentActivity() {
         AndroidCrashStore.install(this)
         NexusSystemBars.apply(window)
         store = LocalChatStore(this)
+        migrateLegacyDrafts()
         store.reconcileAnsweredPendingRequests()
         secureTokens = SecureTokenStore(this)
         frameHealth = FrameHealthMonitor(this)
@@ -872,7 +970,7 @@ open class NexusMainActivity : ComponentActivity() {
             override fun onError(utteranceId: String?) = update(utteranceId, "idle")
             override fun onError(utteranceId: String?, errorCode: Int) = update(utteranceId, "idle")
         })
-        if (!prefs.getBoolean("legacyTransportErrorsCleaned", false)) {
+        if (!legacyDraftMigrationIncomplete && !prefs.getBoolean("legacyTransportErrorsCleaned", false)) {
             store.deleteLegacyTransportFailureConversations()
             prefs.edit { putBoolean("legacyTransportErrorsCleaned", true) }
         }
@@ -892,7 +990,7 @@ open class NexusMainActivity : ComponentActivity() {
         // Work resta chiuso finché il server autenticato non pubblica una
         // capability esplicita. Una preferenza salvata non può riattivarlo da sola.
         val startAsAssistant = savedInstanceState?.getBoolean("nexusAssistantOverlay") ?: (intent?.action == Intent.ACTION_ASSIST)
-        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, draft = prefs.getString("draft:$initialConversationId", "").orEmpty(), conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = startAsAssistant, slashCommands = loadCustomSlashCommands())
+        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = startAsAssistant, slashCommands = loadCustomSlashCommands())
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
                 NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
@@ -923,6 +1021,7 @@ open class NexusMainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        flushDraftPersistence()
         super.onSaveInstanceState(outState)
         outState.putBoolean("nexusAssistantOverlay", state.assistantOverlay)
     }
@@ -959,7 +1058,6 @@ open class NexusMainActivity : ComponentActivity() {
 
     private fun clearTemporaryReturnState() {
         temporaryReturnConversationId = ""
-        temporaryReturnDraft = ""
         temporaryReturnWork = false
     }
 
@@ -1004,10 +1102,7 @@ open class NexusMainActivity : ComponentActivity() {
             "chatQuery" -> state = state.copy(chatQuery = value, chats = (if (value.isBlank()) store.list() else store.search(value)).toChatRows())
             "conversationSearchOpen" -> state = state.copy(conversationSearchOpen = !state.conversationSearchOpen, conversationSearch = "")
             "conversationSearch" -> state = state.copy(conversationSearch = value)
-            "attach" -> if (value.isBlank()) state = state.copy(attachment = null, attachmentUri = "", attachmentMime = "", attachmentData = "") else if (state.connection == NexusConnection.ONLINE) runCatching { JSONObject(value) }.fold(
-                onSuccess = { state = state.copy(attachment = it.optString("name"), attachmentUri = it.optString("uri"), attachmentMime = it.optString("mime"), attachmentData = it.optString("data")) },
-                onFailure = { state = state.copy(attachment = value) }
-            )
+            "attach" -> selectComposerAttachment(value)
             "profilePhoto" -> { prefs.edit { putString("profileUri", value) }; state = state.copy(profileUri = value) }
             "reduceMotion" -> { val enabled = !state.reduceMotion; prefs.edit { putBoolean("reduceMotion", enabled) }; state = state.copy(reduceMotion = enabled) }
             "haptics" -> { val enabled = !state.hapticsEnabled; prefs.edit { putBoolean("hapticsEnabled", enabled) }; state = state.copy(hapticsEnabled = enabled) }
@@ -1015,18 +1110,39 @@ open class NexusMainActivity : ComponentActivity() {
             "exportBackup" -> backupExporter.launch("NexusNXS-backup-${System.currentTimeMillis()}.nexus")
             "importBackup" -> backupImporter.launch(arrayOf("application/octet-stream", "application/json", "text/plain"))
             "diagnostics" -> state = state.copy(diagnosticsOpen = !state.diagnosticsOpen)
-            "new" -> openConversation(store.createConversation())
+            "new" -> if (flushDraftPersistence()) openConversation(store.createConversation())
             "open" -> openConversation(value)
-            "deleteChat" -> { val deletingCurrent = value == state.conversationId; store.deleteConversation(value); if (deletingCurrent) openConversation(store.createConversation()) else refreshChats(true) }
+            "deleteChat" -> {
+                val deletingCurrent = value == state.conversationId
+                if (deletingCurrent) cancelAttachmentImport()
+                runCatching { store.deleteConversation(value) }.onFailure {
+                    state = state.copy(error = nexusCopy("Impossibile eliminare la conversazione. Riprova.", "Could not delete the conversation. Try again."))
+                    return
+                }
+                cancelPendingDraftPersistence(value)
+                if (deletingCurrent) openConversation(store.createConversation()) else refreshChats(true)
+            }
             "renameChat" -> { val parts = value.split('\n', limit = 2); if (parts.size == 2) { store.renameConversation(parts[0], parts[1]); refreshChats() } }
-            "editTurn" -> { val parts = value.split('\n', limit = 2); val index = parts.firstOrNull()?.toIntOrNull(); if (index != null && parts.size == 2 && state.conversationId.isNotBlank()) { val branch = store.branchConversation(state.conversationId, index); openConversation(branch); prefs.edit { putString("draft:$branch", parts[1]) }; state = state.copy(draft = parts[1]); refreshChats() } }
+            "editTurn" -> {
+                val parts = value.split('\n', limit = 2)
+                val index = parts.firstOrNull()?.toIntOrNull()
+                if (index != null && parts.size == 2 && state.conversationId.isNotBlank()) {
+                    if (!flushDraftPersistence()) return
+                    val branch = runCatching { store.branchWithDraft(state.conversationId, index, parts[1]) }.getOrElse {
+                        state = state.copy(error = nexusCopy("Impossibile creare la modifica. La conversazione originale è conservata.", "Could not create the edit. Your original conversation is retained."))
+                        return
+                    }
+                    if (openConversation(branch)) refreshChats()
+                }
+            }
             "pinChat" -> { store.togglePinned(value); refreshChats() }
-            "archiveChat" -> { store.archiveConversation(value); openConversation(store.createConversation()); refreshChats(true) }
+            "archiveChat" -> { if (!flushDraftPersistence()) return; store.archiveConversation(value); if (openConversation(store.createConversation())) refreshChats(true) }
             "restoreChat" -> { store.restoreConversation(value); refreshChats(true) }
             "send" -> sendMessage()
             "voiceSend" -> {
                 val spoken = value.trim()
                 if (spoken.isNotBlank() && !state.busy && state.connection == NexusConnection.ONLINE) {
+                    if (state.attachmentLoading) return
                     state = state.copy(draft = spoken)
                     speakNextAnswer = true
                     sendMessage()
@@ -1049,30 +1165,32 @@ open class NexusMainActivity : ComponentActivity() {
             "temporary" -> if (state.temporary) {
                 val returnId = temporaryReturnConversationId.takeIf { it.isNotBlank() && store.get(it) != null } ?: store.createConversation()
                 val returnWork = temporaryReturnWork
-                val returnDraft = temporaryReturnDraft
+                if (!openConversation(returnId)) return
                 activeConnection?.disconnect()
                 activeConnection = null
                 protectTemporaryConversation(false)
-                openConversation(returnId)
                 prefs.edit {
                     putBoolean("workMode", returnWork)
-                    putString("draft:$returnId", returnDraft)
                 }
-                state = state.copy(work = returnWork, draft = returnDraft, busy = false, streaming = "", activity = "")
+                state = state.copy(work = returnWork, busy = false, streaming = "", activity = "")
                 clearTemporaryReturnState()
             } else {
+                if (!flushDraftPersistence()) return
+                cancelAttachmentImport()
                 temporaryReturnConversationId = state.conversationId
-                temporaryReturnDraft = state.draft
                 temporaryReturnWork = state.work
                 protectTemporaryConversation(true)
                 state = state.copy(temporary = true, work = false, screen = NexusScreen.CHAT, conversationId = "", turns = emptyList(), draft = "", attachment = null, attachmentUri = "", attachmentMime = "", attachmentData = "", error = null)
             }
             "saveTemporary" -> if (state.temporary) {
-                val savedTurns = state.turns
-                val id = store.createConversation()
-                savedTurns.forEach { store.addTurn(id, it.role, it.content) }
+                if (state.attachmentLoading || !flushDraftPersistence()) return
+                val savedTurns = JSONArray().also { turns -> state.turns.forEach { turns.put(JSONObject().put("role", it.role).put("content", it.content)) } }
+                val id = runCatching { store.saveTemporaryConversation(savedTurns, state.draft, encodedAttachment()) }.getOrElse {
+                    state = state.copy(error = nexusCopy("Impossibile salvare la chat temporanea. Il contenuto resta aperto.", "Could not save the temporary chat. Its contents remain open."))
+                    return
+                }
+                if (!openConversation(id)) return
                 protectTemporaryConversation(false)
-                openConversation(id)
                 clearTemporaryReturnState()
                 refreshChats()
             }
@@ -1097,25 +1215,37 @@ open class NexusMainActivity : ComponentActivity() {
             // completarsi con la relativa notifica privata.
             "probe" -> if (appVisible) probeConnection()
             "models" -> if (appVisible) refreshModels()
-            "clear" -> { uiHandler.removeCallbacks(persistDraftRunnable); pendingDraftConversationId = ""; pendingDraftValue = ""; store.clearAll(); refreshChats(true); state = state.copy(screen = NexusScreen.CHAT) }
+            "clear" -> { cancelAttachmentImport(); uiHandler.removeCallbacks(persistDraftRunnable); pendingDraftConversationId = ""; pendingDraftValue = ""; store.clearAll(); prefs.edit { prefs.all.keys.filter { it.startsWith("draft:") }.forEach { remove(it) } }; state = state.copy(conversationId = "", temporary = false); refreshChats(true); state = state.copy(screen = NexusScreen.CHAT) }
         }
     }
 
     private fun refreshChats(openIfEmpty: Boolean = false) {
-        store.deleteEmptyConversationsExcept(state.conversationId)
+        if (!flushDraftPersistence()) return
+        if (!legacyDraftMigrationIncomplete) store.deleteEmptyConversationsExcept(state.conversationId)
         var rows = store.list().toChatRows()
         if (rows.isEmpty() && openIfEmpty) { store.createConversation(); rows = store.list().toChatRows() }
         val id = state.conversationId.ifBlank { rows.firstOrNull()?.id.orEmpty() }
         state = state.copy(chats = rows)
-        if (id.isNotBlank()) openConversation(id)
+        if (id.isNotBlank() && !state.temporary) openConversation(id)
     }
 
-    private fun openConversation(id: String) {
-        flushDraftPersistence()
-        val row = store.get(id)
-        val turns = row?.optJSONArray("turns")?.toTurns() ?: emptyList()
+    private fun openConversation(id: String): Boolean {
+        if (!flushDraftPersistence()) return false
+        val sameComposer = state.conversationId == id && !state.temporary
+        if (!sameComposer) cancelAttachmentImport()
+        val row = store.get(id) ?: return false
+        val draft = runCatching { store.getDraft(id).ifEmpty { prefs.getString("draft:$id", "").orEmpty() } }.getOrElse {
+            state = state.copy(error = nexusCopy("Impossibile recuperare la bozza. Riprova.", "Could not restore the draft. Try again."))
+            return false
+        }
+        val turns = row.optJSONArray("turns")?.toTurns() ?: emptyList()
+        val attachmentResult = runCatching {
+            if (sameComposer && state.attachmentLoading) encodedAttachment() else store.getComposerAttachment(id)
+        }
+        val attachment = attachmentResult.getOrNull()
         prefs.edit { putString("currentConversationId", id) }
-        state = state.copy(screen = NexusScreen.CHAT, drawer = false, temporary = false, conversationId = id, turns = turns, draft = prefs.getString("draft:$id", "").orEmpty(), streaming = "", error = null, conversationSearchOpen = false, conversationSearch = "")
+        state = state.copy(screen = NexusScreen.CHAT, drawer = false, temporary = false, conversationId = id, chats = store.list().toChatRows(), turns = turns, draft = draft, attachment = attachment?.optString("name"), attachmentUri = "", attachmentMime = attachment?.optString("mime").orEmpty(), attachmentData = attachment?.optString("data").orEmpty(), streaming = "", error = if (attachmentResult.isFailure) nexusCopy("Impossibile recuperare l’allegato. Selezionalo nuovamente.", "Could not restore the attachment. Select it again.") else if (legacyDraftMigrationIncomplete) state.error else null, conversationSearchOpen = false, conversationSearch = "")
+        return true
     }
 
     private fun loadCustomSlashCommands(): List<SlashCommandRow> = runCatching {
@@ -1178,12 +1308,12 @@ open class NexusMainActivity : ComponentActivity() {
             return
         }
         val enteredText = state.draft.trim().replace(Regex("%20", RegexOption.IGNORE_CASE), " ")
-        if ((enteredText.isBlank() && state.attachment == null) || state.busy) return
+        if ((enteredText.isBlank() && state.attachment == null) || state.busy || state.attachmentLoading) return
         val inputText = enteredText.ifBlank { nexusCopy("Analizza questo allegato.", "Analyze this attachment.") }
         val slashResolution = resolveSlashInput(inputText)
         if (slashResolution.handled) {
             val id = state.conversationId
-            if (!state.temporary && id.isNotBlank()) discardDraftPersistence(id)
+            if (!state.temporary && id.isNotBlank() && !discardDraftPersistence(id)) return
             state = state.copy(draft = "", activity = slashResolution.message, slashCommands = slashResolution.commands ?: state.slashCommands)
             return
         }
@@ -1198,7 +1328,7 @@ open class NexusMainActivity : ComponentActivity() {
         if (state.temporary) {
             val previous = state.turns
             val pendingTurns = previous + Turn("user", text)
-            state = state.copy(draft = "", attachment = null, turns = pendingTurns, busy = true, streaming = "", activity = nexusCopy("Comprendo la richiesta…", "Understanding your request…"), error = null, status = nexusCopy("Chat temporanea", "Temporary chat"))
+            state = state.copy(draft = "", attachment = null, attachmentUri = "", attachmentMime = "", attachmentData = "", turns = pendingTurns, busy = true, streaming = "", activity = nexusCopy("Comprendo la richiesta…", "Understanding your request…"), error = null, status = nexusCopy("Chat temporanea", "Temporary chat"))
             runTask {
                 var failure: String? = null
                 val answer = try { guestStream(effectiveText, state.model, previous, attachment, uiTemporary = true, uiGeneration = generation) } catch (_: Exception) { failure = nexusCopy("I server NexusNXS non sono raggiungibili. In modalità temporanea il messaggio non viene archiviato.", "NexusNXS servers are unreachable. Temporary-chat messages are not stored."); "" }
@@ -1216,10 +1346,14 @@ open class NexusMainActivity : ComponentActivity() {
         }
         val id = state.conversationId.ifBlank { store.createConversation() }
         val previousTurns = state.turns
-        store.addTurn(id, "user", text + (state.attachment?.let { "\n\nAllegato: $it" } ?: ""))
-        val clientMessageId = store.queueRequest(id, effectiveText, state.model, attachment?.toString().orEmpty())
-        discardDraftPersistence(id)
-        state = state.copy(conversationId = id, chats = store.list().toChatRows(), draft = "", attachment = null, busy = true, streaming = "", activity = nexusCopy("Comprendo la richiesta…", "Understanding your request…"), error = null, turns = store.get(id).optJSONArray("turns").toTurns(), status = nexusCopy("NexusNXS sta lavorando…", "NexusNXS is working…"), pendingCount = store.pendingCount())
+        val clientMessageId = runCatching {
+            store.acceptUserMessage(id, text + (state.attachment?.let { "\n\nAllegato: $it" } ?: ""), effectiveText, state.model, attachment?.toString().orEmpty(), true)
+        }.getOrElse {
+            state = state.copy(error = nexusCopy("Impossibile conservare il messaggio. La bozza è ancora disponibile.", "Could not save the message. Your draft is still available."))
+            return
+        }
+        cancelPendingDraftPersistence(id)
+        state = state.copy(conversationId = id, chats = store.list().toChatRows(), draft = "", attachment = null, attachmentUri = "", attachmentMime = "", attachmentData = "", busy = true, streaming = "", activity = nexusCopy("Comprendo la richiesta…", "Understanding your request…"), error = null, turns = store.get(id).optJSONArray("turns").toTurns(), status = nexusCopy("NexusNXS sta lavorando…", "NexusNXS is working…"), pendingCount = store.pendingCount())
         runTask {
             var failed = false
             val answer = try { guestStream(effectiveText, state.model, contextTurns = previousTurns, attachment = attachment, clientMessageId = clientMessageId, uiConversationId = id, uiGeneration = generation) } catch (_: Exception) { failed = true; "" }
@@ -1306,8 +1440,11 @@ open class NexusMainActivity : ComponentActivity() {
         }
         val generation = ++chatGeneration
         val id = state.conversationId.ifBlank { store.createConversation() }
-        store.addTurn(id, "user", instruction)
-        discardDraftPersistence(id)
+        runCatching { store.acceptUserMessage(id, instruction, "", "", "", false) }.onFailure {
+            state = state.copy(error = nexusCopy("Impossibile conservare la richiesta. La bozza è ancora disponibile.", "Could not save the request. Your draft is still available."))
+            return
+        }
+        cancelPendingDraftPersistence(id)
         state = state.copy(conversationId = id, draft = "", busy = true, activity = nexusCopy("Creo un piano verificabile…", "Creating a verifiable plan…"), error = null, turns = store.get(id)?.optJSONArray("turns")?.toTurns().orEmpty())
         runTask {
             val result = try { http("/api/actions/plan", JSONObject().put("instruction", instruction), token) } catch (_: Exception) { JSONObject().put("error", nexusCopy("La workstation non è raggiungibile. Il lavoro resta nella cronologia.", "The workstation is unreachable. This work remains in history.")) }
@@ -1813,6 +1950,7 @@ open class NexusMainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         flushDraftPersistence()
+        cancelAttachmentImport()
         destroyed = true
         pendingAuthorizationTicket = ""
         pendingAuthorizationKind = NexusAuthorizationKind.NONE
@@ -2593,7 +2731,10 @@ open class NexusMainActivity : ComponentActivity() {
         val detectedMime = stream?.let { runCatching { contentResolver.getType(it).orEmpty().lowercase(Locale.ROOT) }.getOrDefault("") }.orEmpty()
         if (stream != null && detectedMime.isNotBlank() && !allowedMime(detectedMime)) { incoming.action = null; return }
         val mime = detectedMime.ifBlank { declaredMime }
+        if (!flushDraftPersistence()) return
+        if (state.conversationId.isBlank() && !openConversation(store.createConversation())) return
         state = state.copy(screen = NexusScreen.CHAT, work = false, temporary = false, draft = sharedText.take(80_000).ifBlank { if (stream != null) "Analizza questo contenuto" else state.draft })
+        queueDraftPersistence(state.conversationId, state.draft)
         if (stream != null) {
             val name = stream.lastPathSegment?.substringAfterLast('/')?.replace(Regex("[\\p{Cntrl}]"), "")?.take(120).orEmpty().ifBlank { "Contenuto condiviso" }
             dispatch("attach", JSONObject().put("name", name).put("uri", stream.toString()).put("mime", mime).toString())
@@ -2892,10 +3033,14 @@ private fun JSONArray?.toTurns() = buildList {
                         ) {
                             Row(Modifier.padding(horizontal = 7.dp, vertical = 7.dp), verticalAlignment = Alignment.Bottom) {
                                 IconButton(
-                                    onClick = { attachmentSheet = true },
+                                    onClick = { if (state.attachmentLoading) dispatch("attach", "") else attachmentSheet = true },
                                     enabled = interactionAvailable,
                                     modifier = Modifier.size(42.dp)
-                                ) { Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice, modifier = Modifier.size(21.dp)) }
+                                ) {
+                                    val cancelAttachmentLabel = nexusCopy("Annulla importazione allegato", "Cancel attachment import")
+                                    if (state.attachmentLoading) CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelAttachmentLabel }, color = Cyan, strokeWidth = 1.5.dp)
+                                    else Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice, modifier = Modifier.size(21.dp))
+                                }
                                 BasicTextField(
                                     value = state.draft,
                                     onValueChange = { dispatch("draft", it.take(12_000)) },
@@ -2932,7 +3077,7 @@ private fun JSONArray?.toTurns() = buildList {
                                             dispatch("send", "")
                                         }
                                     },
-                                    enabled = state.busy || (interactionAvailable && state.draft.isNotBlank()),
+                                    enabled = state.busy || (interactionAvailable && !state.attachmentLoading && state.draft.isNotBlank()),
                                     modifier = Modifier.size(42.dp),
                                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Cyan, contentColor = Color(0xFF002223), disabledContainerColor = Surface2, disabledContentColor = Mist)
                                 ) { Icon(if (state.busy) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward, if (state.busy) nexusCopy("Interrompi", "Stop") else nexusCopy("Invia", "Send"), Modifier.size(20.dp)) }

@@ -1,6 +1,13 @@
 package local.nexus.remote;
 
 import android.content.Context;
+import android.util.Base64;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -17,7 +24,18 @@ import java.util.Locale;
 /** Archivio privato delle conversazioni anonime, confinato nel sandbox Android. */
 public final class LocalChatStore extends SQLiteOpenHelper {
     private final SecureChatCodec codec = new SecureChatCodec();
-    public LocalChatStore(Context context) { super(context, "nexusnxs-chats.db", null, 7); }
+    public static final int MAX_COMPOSER_ATTACHMENT_BYTES = 1_500_000;
+    private static final int MAX_COMPOSER_FILE_BYTES = 2_800_000;
+    private final File composerDirectory;
+    public LocalChatStore(Context context) { this(context, null); }
+    LocalChatStore(Context context, SQLiteDatabase.CursorFactory cursorFactory) {
+        super(context, "nexusnxs-chats.db", cursorFactory, 8);
+        composerDirectory = new File(context.getNoBackupFilesDir(), "nexus-composer");
+    }
+
+    private void createComposerTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS conversation_composers(conversation_id TEXT PRIMARY KEY,draft TEXT NOT NULL DEFAULT '',attachment_file TEXT NOT NULL DEFAULT '',FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE)");
+    }
 
     @Override public void onConfigure(SQLiteDatabase db) {
         super.onConfigure(db);
@@ -30,6 +48,7 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX turns_conversation ON turns(conversation_id,id)");
         db.execSQL("CREATE TABLE pending_requests(id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,prompt TEXT NOT NULL,model TEXT NOT NULL,attachment TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL,last_attempt_at INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE)");
         db.execSQL("CREATE INDEX pending_requests_due ON pending_requests(last_attempt_at,created_at)");
+        createComposerTable(db);
     }
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) db.execSQL("ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
@@ -46,6 +65,7 @@ public final class LocalChatStore extends SQLiteOpenHelper {
             db.execSQL("DELETE FROM turns WHERE NOT EXISTS (SELECT 1 FROM conversations WHERE conversations.id=turns.conversation_id)");
             db.execSQL("DELETE FROM pending_requests WHERE NOT EXISTS (SELECT 1 FROM conversations WHERE conversations.id=pending_requests.conversation_id)");
         }
+        if (oldVersion < 8) createComposerTable(db);
     }
 
     private void encryptExistingHistory(SQLiteDatabase db) {
@@ -55,6 +75,179 @@ public final class LocalChatStore extends SQLiteOpenHelper {
                     while (rows.moveToNext()) for (int i = 0; i < columns.length; i++)
                         db.execSQL("UPDATE " + table + " SET " + columns[i] + "=? WHERE rowid=?", new Object[]{codec.encrypt(rows.getString(i + 1)), rows.getLong(0)});
                 }
+        }
+    }
+
+    public boolean hasConversation(String id) {
+        if (id == null || id.isEmpty()) return false;
+        try (Cursor row = getReadableDatabase().rawQuery("SELECT 1 FROM conversations WHERE id=?", new String[]{id})) {
+            return row.moveToFirst();
+        }
+    }
+
+    public synchronized String getDraft(String id) {
+        try (Cursor row = getReadableDatabase().rawQuery("SELECT draft FROM conversation_composers WHERE conversation_id=?", new String[]{id})) {
+            return row.moveToFirst() ? codec.decrypt(row.getString(0)) : "";
+        }
+    }
+
+    public synchronized boolean saveDraft(String id, String value) {
+        String draft = value == null ? "" : value;
+        if (draft.length() > 80_000) throw new IllegalArgumentException("Bozza troppo lunga");
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            if (!hasConversation(id)) { db.setTransactionSuccessful(); return false; }
+            db.execSQL("INSERT OR IGNORE INTO conversation_composers(conversation_id) VALUES(?)", new Object[]{id});
+            db.execSQL("UPDATE conversation_composers SET draft=? WHERE conversation_id=?", new Object[]{codec.encrypt(draft), id});
+            removeEmptyComposer(db, id);
+            db.setTransactionSuccessful();
+            return true;
+        } finally { db.endTransaction(); }
+    }
+
+    private void removeEmptyComposer(SQLiteDatabase db, String id) {
+        db.delete("conversation_composers", "conversation_id=? AND draft='' AND attachment_file=''", new String[]{id});
+    }
+
+    private String composerAttachmentName(String id) {
+        try (Cursor row = getReadableDatabase().rawQuery("SELECT attachment_file FROM conversation_composers WHERE conversation_id=?", new String[]{id})) {
+            return row.moveToFirst() ? row.getString(0) : "";
+        }
+    }
+
+    private File composerFile(String name) {
+        // Only store-generated basenames may address this private directory.
+        if (!name.matches("[a-f0-9-]{36}\\.nxs")) throw new IllegalStateException("Allegato locale non valido");
+        return new File(composerDirectory, name);
+    }
+
+    private JSONObject normalizedAttachment(JSONObject source) throws Exception {
+        String data = source.optString("data");
+        if (data.length() > ((MAX_COMPOSER_ATTACHMENT_BYTES + 2) / 3) * 4) throw new IllegalArgumentException("Allegato troppo grande");
+        byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+        if (bytes.length == 0 || bytes.length > MAX_COMPOSER_ATTACHMENT_BYTES) throw new IllegalArgumentException("Allegato vuoto o troppo grande");
+        String name = source.optString("name"), mime = source.optString("mime");
+        return new JSONObject().put("name", name.substring(0, Math.min(name.length(), 120)))
+            .put("mime", mime.substring(0, Math.min(mime.length(), 80)))
+            .put("data", Base64.encodeToString(bytes, Base64.NO_WRAP));
+    }
+
+    public synchronized JSONObject getComposerAttachment(String id) {
+        String name = composerAttachmentName(id);
+        if (name.isEmpty()) return null;
+        try {
+            File file = composerFile(name);
+            if (file.length() < 1 || file.length() > MAX_COMPOSER_FILE_BYTES) throw new IllegalStateException("Allegato locale non disponibile");
+            try (FileInputStream input = new FileInputStream(file)) {
+                byte[] bytes = new byte[(int) file.length()];
+                int offset = 0, count;
+                while (offset < bytes.length && (count = input.read(bytes, offset, bytes.length - offset)) != -1) offset += count;
+                if (offset != bytes.length || input.read() != -1) throw new IllegalStateException("Allegato locale incompleto");
+                String encrypted = new String(bytes, StandardCharsets.UTF_8);
+                if (!encrypted.startsWith("nexus:v1:")) throw new IllegalStateException("Allegato locale non autenticato");
+                return normalizedAttachment(new JSONObject(codec.decrypt(encrypted)));
+            }
+        } catch (Exception error) { throw new IllegalStateException("Impossibile recuperare l’allegato locale", error); }
+    }
+
+    public synchronized boolean saveComposerAttachment(String id, JSONObject attachment) {
+        SQLiteDatabase db = getWritableDatabase();
+        String previous = "", next = "";
+        boolean written = false, committed = false, transactionEnded = false;
+        db.beginTransaction();
+        try {
+            if (!hasConversation(id)) { db.setTransactionSuccessful(); return false; }
+            previous = composerAttachmentName(id);
+            if (attachment != null) {
+                byte[] encrypted = codec.encrypt(normalizedAttachment(attachment).toString()).getBytes(StandardCharsets.UTF_8);
+                if (encrypted.length > MAX_COMPOSER_FILE_BYTES) throw new IllegalArgumentException("Allegato troppo grande");
+                if (!composerDirectory.isDirectory() && !composerDirectory.mkdirs()) throw new IllegalStateException("Archivio allegati non disponibile");
+                next = UUID.randomUUID().toString() + ".nxs";
+                try (FileOutputStream output = new FileOutputStream(composerFile(next))) {
+                    output.write(encrypted);
+                    output.getFD().sync();
+                }
+            }
+            db.execSQL("INSERT OR IGNORE INTO conversation_composers(conversation_id) VALUES(?)", new Object[]{id});
+            db.execSQL("UPDATE conversation_composers SET attachment_file=? WHERE conversation_id=?", new Object[]{next, id});
+            removeEmptyComposer(db, id);
+            db.setTransactionSuccessful();
+            written = true;
+        } catch (Exception error) { throw new IllegalStateException("Impossibile conservare l’allegato", error); }
+        finally {
+            try { db.endTransaction(); transactionEnded = true; committed = written; }
+            finally {
+                // An uncertain commit keeps both files; the next successful reopen
+                // can reclaim the unreferenced one from the authoritative DB state.
+                if (transactionEnded && !committed && !next.isEmpty()) composerFile(next).delete();
+                if (transactionEnded && committed && !previous.isEmpty()) composerFile(previous).delete();
+            }
+        }
+        return committed;
+    }
+
+    public synchronized void clearComposer(String id) {
+        String name = composerAttachmentName(id);
+        getWritableDatabase().delete("conversation_composers", "conversation_id=?", new String[]{id});
+        if (!name.isEmpty()) composerFile(name).delete();
+    }
+
+    /** Accepts a user turn and consumes its composer in one durable transaction. */
+    public synchronized String acceptUserMessage(String id, String content, String prompt, String model, String attachment, boolean queued) {
+        SQLiteDatabase db = getWritableDatabase();
+        String request = "";
+        db.beginTransaction();
+        try {
+            if (!hasConversation(id)) throw new IllegalArgumentException("Conversazione non disponibile");
+            addTurn(id, "user", content);
+            if (queued) {
+                request = queueRequest(id, prompt, model, attachment);
+                db.delete("conversation_composers", "conversation_id=?", new String[]{id});
+            } else saveDraft(id, "");
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
+        // File cleanup must never turn an accepted request into an apparent send failure.
+        try { pruneComposerAttachments(); } catch (RuntimeException ignored) { }
+        return request;
+    }
+
+    public synchronized String branchWithDraft(String sourceId, int beforeTurnIndex, String draft) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String id = branchConversation(sourceId, beforeTurnIndex);
+            saveDraft(id, draft);
+            db.setTransactionSuccessful();
+            return id;
+        } finally { db.endTransaction(); }
+    }
+
+    public synchronized String saveTemporaryConversation(JSONArray turns, String draft, JSONObject attachment) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String id = createConversation();
+            for (int index = 0; index < turns.length(); index++) {
+                JSONObject turn = turns.optJSONObject(index);
+                if (turn != null) addTurn(id, turn.optString("role"), turn.optString("content"), turn.optJSONArray("artifacts") == null ? "" : turn.optJSONArray("artifacts").toString());
+            }
+            saveDraft(id, draft);
+            saveComposerAttachment(id, attachment);
+            db.setTransactionSuccessful();
+            return id;
+        } finally { db.endTransaction(); }
+    }
+
+    /** Reclaims only our unreferenced encrypted files, including an interrupted pre-commit write. */
+    public synchronized void pruneComposerAttachments() {
+        Set<String> retained = new HashSet<>();
+        try (Cursor rows = getReadableDatabase().rawQuery("SELECT attachment_file FROM conversation_composers WHERE attachment_file<>''", null)) {
+            while (rows.moveToNext()) retained.add(rows.getString(0));
+        }
+        File[] files = composerDirectory.listFiles();
+        if (files != null) for (File file : files) {
+            if (file.isFile() && file.getName().matches("[a-f0-9-]{36}\\.nxs") && !retained.contains(file.getName())) file.delete();
         }
     }
 
@@ -156,8 +349,9 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         return row;
     }
 
-    public void deleteConversation(String id) {
+    public synchronized void deleteConversation(String id) {
         getWritableDatabase().delete("conversations", "id=?", new String[]{id});
+        try { pruneComposerAttachments(); } catch (RuntimeException ignored) { }
     }
 
     public void renameConversation(String id, String title) {
@@ -211,7 +405,7 @@ public final class LocalChatStore extends SQLiteOpenHelper {
     public void deleteEmptyConversationsExcept(String keepId) {
         getWritableDatabase().delete(
             "conversations",
-            "id<>? AND NOT EXISTS(SELECT 1 FROM turns WHERE turns.conversation_id=conversations.id)",
+            "id<>? AND NOT EXISTS(SELECT 1 FROM turns WHERE turns.conversation_id=conversations.id) AND NOT EXISTS(SELECT 1 FROM conversation_composers WHERE conversation_composers.conversation_id=conversations.id)",
             new String[]{keepId == null ? "" : keepId}
         );
     }
@@ -222,7 +416,7 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             db.execSQL("DELETE FROM turns WHERE conversation_id IN (" + failures + ")");
-            db.execSQL("DELETE FROM conversations WHERE id NOT IN (SELECT DISTINCT conversation_id FROM turns)");
+            db.execSQL("DELETE FROM conversations WHERE id NOT IN (SELECT DISTINCT conversation_id FROM turns) AND NOT EXISTS(SELECT 1 FROM conversation_composers WHERE conversation_composers.conversation_id=conversations.id)");
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
     }
@@ -254,14 +448,39 @@ public final class LocalChatStore extends SQLiteOpenHelper {
     public JSONObject nextPendingRequest() {
         // Backoff esponenziale limitato: 2, 4, 8, 16, 32, 60 secondi.
         long now = System.currentTimeMillis();
-        String sql = "SELECT id,conversation_id,prompt,model,attachment,attempts,last_attempt_at,created_at FROM pending_requests " +
+        String sql = "SELECT id,conversation_id,prompt,model,attempts,last_attempt_at,created_at,length(attachment) FROM pending_requests " +
             "WHERE last_attempt_at=0 OR last_attempt_at + MIN(60000,2000 * (1 << MIN(attempts,5))) <= ? ORDER BY created_at LIMIT 1";
-        try (Cursor cursor = getReadableDatabase().rawQuery(sql, new String[]{String.valueOf(now)})) {
-            if (!cursor.moveToFirst()) return null;
-            return new JSONObject().put("id", cursor.getString(0)).put("conversationId", cursor.getString(1))
-                .put("prompt", codec.decrypt(cursor.getString(2))).put("model", codec.decrypt(cursor.getString(3))).put("attachment", codec.decrypt(cursor.getString(4)))
-                .put("attempts", cursor.getInt(5)).put("lastAttemptAt", cursor.getLong(6)).put("createdAt", cursor.getLong(7));
+        SQLiteDatabase db = getReadableDatabase();
+        boolean reading = false;
+        try {
+            // A full encrypted 1.5 MB attachment exceeds a 2 MiB CursorWindow.
+            // Read bounded slices under one snapshot so metadata and content
+            // cannot come from different queue states during cancellation.
+            db.beginTransactionNonExclusive();
+            reading = true;
+            try (Cursor cursor = db.rawQuery(sql, new String[]{String.valueOf(now)})) {
+                if (!cursor.moveToFirst()) { db.setTransactionSuccessful(); return null; }
+                String id = cursor.getString(0);
+                int length = cursor.getInt(7);
+                if (length < 0 || length > MAX_COMPOSER_FILE_BYTES) throw new IllegalStateException("Allegato in coda troppo grande");
+                StringBuilder encrypted = new StringBuilder(length);
+                for (int offset = 0; offset < length; offset += 64 * 1024) {
+                    int count = Math.min(64 * 1024, length - offset);
+                    try (Cursor chunk = db.rawQuery("SELECT substr(attachment,?,?) FROM pending_requests WHERE id=?", new String[]{String.valueOf(offset + 1), String.valueOf(count), id})) {
+                        if (!chunk.moveToFirst()) throw new IllegalStateException("Richiesta in coda non disponibile");
+                        String value = chunk.getString(0);
+                        if (value.length() != count) throw new IllegalStateException("Allegato in coda incompleto");
+                        encrypted.append(value);
+                    }
+                }
+                JSONObject pending = new JSONObject().put("id", id).put("conversationId", cursor.getString(1))
+                    .put("prompt", codec.decrypt(cursor.getString(2))).put("model", codec.decrypt(cursor.getString(3))).put("attachment", codec.decrypt(encrypted.toString()))
+                    .put("attempts", cursor.getInt(4)).put("lastAttemptAt", cursor.getLong(5)).put("createdAt", cursor.getLong(6));
+                db.setTransactionSuccessful();
+                return pending;
+            }
         } catch (Exception ignored) { return null; }
+        finally { if (reading) db.endTransaction(); }
     }
 
     public void markPendingAttempt(String id) {
@@ -285,7 +504,7 @@ public final class LocalChatStore extends SQLiteOpenHelper {
         );
     }
 
-    public void clearAll() {
+    public synchronized void clearAll() {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -294,6 +513,7 @@ public final class LocalChatStore extends SQLiteOpenHelper {
             db.delete("pending_requests", null, null);
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
+        try { pruneComposerAttachments(); } catch (RuntimeException ignored) { }
     }
 
     public String exportEncryptedArchive() throws Exception {

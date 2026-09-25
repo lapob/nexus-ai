@@ -559,7 +559,7 @@ test('NexusNXS per Android Compose conserva la coda offline e autorizza Cuore pr
   assert.match(activity, /createConfirmDeviceCredentialIntent/);
   assert.match(activity, /pendingAuthorizationKind != NexusAuthorizationKind\.WORK \|\| pendingAuthorizationTicket != ticket/);
   assert.match(activity, /executeAuthorizedWorkProposal\(ticket\)/);
-  assert.match(activity, /branchConversation/);
+  assert.match(activity, /branchWithDraft/);
   assert.match(store, /archiveConversation/);
   assert.match(activity, /Modalità Cuore/);
   assert.match(activity, /conversationGlass\(true, metrics\.adaptiveReducedMotion\)/);
@@ -837,7 +837,7 @@ test('NexusNXS per Android cifra cronologia, misura i frame e mantiene private l
   const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
   const codec = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'SecureChatCodec.java');
   const monitor = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'FrameHealthMonitor.java');
-  assert.match(store, /super\(context, "nexusnxs-chats\.db", null, 7\)/);
+  assert.match(store, /super\(context, "nexusnxs-chats\.db", cursorFactory, 8\)/);
   assert.match(store, /encryptExistingHistory/);
   assert.match(codec, /AES\/GCM\/NoPadding/);
   assert.match(codec, /AndroidKeyStore/);

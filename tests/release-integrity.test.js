@@ -15,6 +15,7 @@ const {
   verifyArtifactRecords,
   verifyElectronUpdateManifest,
   verifyRemoteReleaseManifest,
+  verifyRemoteUpdateManifestText,
   verifySignatureEnvelope
 } = require('../src/security/release-integrity');
 
@@ -44,6 +45,30 @@ test('firma e verifica una distinta Ed25519 senza generare chiavi nel repository
     assert.deepEqual(verifyArtifactRecords(root, manifest), ['release/client.bin']);
     assert.throws(() => verifySignatureEnvelope(Buffer.concat([payload, Buffer.from('tamper')]), envelope, { publicKey: keys.publicKey, keyId: 'release-2026' }), /Digest/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('le rappresentazioni alternative del feed firmato non cambiano installer o introducono web package', () => {
+  const sha512 = crypto.createHash('sha512').update('synthetic bytes').digest('base64');
+  const manifest = { version: '2.0.0', artifacts: [{ kind: 'installer', path: 'release/NexusNXS-2.0.0-Setup.exe', bytes: 15, sha256: 'A'.repeat(64) }] };
+  const legacy = `version: 2.0.0\npath: NexusNXS-2.0.0-Setup.exe\nsha512: ${sha512}\n`;
+  const safe = verifyRemoteUpdateManifestText(legacy, manifest);
+  assert.equal(safe.updateInfo.files[0].url, 'NexusNXS-2.0.0-Setup.exe');
+  assert.equal(safe.updateInfo.files[0].sha2, 'a'.repeat(64));
+  const nsis = verifyRemoteUpdateManifestText(legacy + `files:\n  - url: NexusNXS-2.0.0-Setup.exe\n    sha512: ${sha512}\n    isAdminRightsRequired: true\n`, manifest);
+  assert.equal(nsis.updateInfo.files[0].isAdminRightsRequired, true);
+  for (const alternate of [
+    `files:\n  - url: https://attacker.invalid/evil.exe\n    sha512: ${sha512}\n`,
+    `files:\n  - url: NexusNXS-2.0.0-Setup.exe\n    sha512: ${'B'.repeat(86)}==\n`,
+    `files:\n  - url: NexusNXS-2.0.0-Setup.exe\n    sha512: ${sha512}\n    size: 999\n`,
+    'files: []\n',
+    'packages: {x64: {path: "other.7z", sha512: "attacker"}}\n',
+    `files:\n  - url: NexusNXS-2.0.0-Setup.exe\n    sha512: ${sha512}\n    packageInfo: {path: other.7z}\n`,
+    'path: other.exe\n',
+    `sha2: ${'B'.repeat(64)}\n`
+  ]) assert.throws(() => verifyRemoteUpdateManifestText(legacy + alternate, manifest));
+  for (const path of ['../other.exe', '//attacker.invalid/other.exe', 'https://attacker.invalid/other.exe', 'a%2fother.exe', 'a\\other.exe']) {
+    assert.throws(() => verifyRemoteUpdateManifestText(legacy.replace('NexusNXS-2.0.0-Setup.exe', path), manifest), /Percorso/);
+  }
 });
 
 test('verifica che latest.yml punti esattamente all installer atteso', () => {

@@ -34,6 +34,28 @@ test('il gate accetta soltanto firma ufficiale e scansione senza High o Critical
   assert.match(result.sha256, /^[a-f0-9]{64}$/);
 });
 
+test('il gate passa allo scanner il file reale anche attraverso una junction', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-runtime-alias-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const actual = path.join(root, 'actual');
+  fs.mkdirSync(actual);
+  fs.writeFileSync(path.join(actual, 'ollama.exe'), 'synthetic-runtime');
+  fs.symlinkSync(actual, path.join(root, 'alias'), process.platform === 'win32' ? 'junction' : 'dir');
+  const expected = fs.realpathSync.native(path.join(actual, 'ollama.exe'));
+  const runner = fixtureRunner();
+  let scanned = false;
+  const result = auditOllamaRuntime(path.join(root, 'alias', 'ollama.exe'), {
+    platform: 'linux', requireSignature: false,
+    runProcess(command, args) {
+      if (command === 'grype') { assert.equal(args[0], `file:${expected}`); scanned = true; }
+      else assert.equal(command, expected);
+      return runner(command, args);
+    }
+  });
+  assert.equal(scanned, true);
+  assert.equal(result.executable, expected);
+});
+
 test('il gate blocca vulnerabilità High o Critical e ignora severità inferiori', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ollama-security-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

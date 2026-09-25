@@ -44,3 +44,26 @@ test('registro sicurezza non ricostruisce una catena manomessa durante la retent
     assert.equal(reopened.summary().integrity, false);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('la rotazione a 10000 eventi conserva integrita e ripristino del registro', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-security-rotation-'));
+  try {
+    const filePath = path.join(root, 'events.jsonl');
+    const store = new SecurityEventStore({ filePath });
+    for (let index = 0; index < 10002; index += 1) {
+      store.append('workflow.created', { deviceId: `synthetic-${index}` });
+    }
+    assert.equal(store.events.length, 10000);
+    assert.equal(store.events[0].deviceId, 'synthetic-2');
+    assert.equal(store.verifyIntegrity(), true);
+    const reopened = new SecurityEventStore({ filePath });
+    assert.equal(reopened.verifyIntegrity(), true);
+    reopened.append('workflow.completed', { deviceId: 'synthetic-final' });
+    assert.equal(reopened.verifyIntegrity(), true);
+    assert.equal(new SecurityEventStore({ filePath }).verifyIntegrity(), true);
+    reopened.events[0].detail = 'altered-before-compaction';
+    reopened.append('workflow.completed', { deviceId: 'synthetic-tampered' });
+    assert.equal(reopened.verifyIntegrity(), false);
+    assert.equal(new SecurityEventStore({ filePath }).verifyIntegrity(), false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

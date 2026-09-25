@@ -1,6 +1,6 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 23 settembre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 25 settembre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
 
 | Area | Verificato | Residuo |
@@ -19,8 +19,10 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 ### Verifica del 23 settembre
 
 - Gate precedente Control 1.19.5 terminato: AI 8B 94%, 14B 100% nel set breve,
-  voce, smoke, shutdown e soak 250 superati. Non equivale alla verifica visiva
-  dell'APK: ADB non rileva il dispositivo nella sessione corrente.
+  voce, smoke, shutdown e soak 250 superati. Completata anche la matrice fisica
+  Online su Samsung: cinque profili PASS, screenshot compatto/font grande e
+  landscape ispezionati. Cartelle App/Giochi e ripristino dopo arresto processo
+  verificati; display e dimensione font ripristinati. Nessun comando PC eseguito.
 - Suite completa: 893 test superati; check sorgenti superato. Ripristino di
   quattro file sintetici superato; audit npm produzione zero segnalazioni.
 - Web: corrette risposte readiness obsolete dopo perdita rete, sospensione o
@@ -31,7 +33,7 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   senza invio automatico. Il reload cancella la sessione anonima come dichiarato
   nell'interfaccia; non e una promessa di persistenza delle chat pubbliche.
 - Layout web: 11 viewport superati, screenshot compatto ispezionato.
-- Il controllo Stable segnala 14 requisiti non soddisfatti: firme, origine
+- Il controllo Stable precedente segnalava 14 requisiti non soddisfatti: firme, origine
   aggiornamenti, SLO, evidenze Android correnti, backup esterno, continuita
   elettrica, failover rete, rotazione chiavi, upgrade su macchina pulita,
   esercitazione incidente e penetration test esterno. Sono prerequisiti di
@@ -41,8 +43,46 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   non copre questo runtime. Eseguito anche il gate di distribuzione del runtime:
   rifiuta correttamente Ollama 0.32.15 con 45 finding High/Critical. Non aggirare
   il blocco e non includere questo runtime in una release commerciale.
-  Lo scan Codex Security non e stato eseguito: avviata
-  installazione richiesta, ma tool non ancora disponibile nella sessione.
+  Anche il candidato ufficiale Ollama 0.34.3, verificato tramite SHA256, e stato
+  rifiutato per 45 finding High/Critical: nessuna promozione. Rimosso soltanto
+  l'archivio scaricato dopo la verifica (1.46 GB); eseguibile e prove conservati.
+- Codex Security: scan `6f00900a-10d0-4f91-912e-74c2103f3cd2` avviata su
+  `1a3d8e6`. Due finding Medium salvati nel draft: controllo dei file sensibili
+  nelle anteprime/operazioni e binding dell'updater alla distinta firmata.
+  Copertura ancora parziale: 42 file tracciati completamente esaminati, non l'intero
+  repository. Le correzioni sono sviluppate nel worktree separato
+  `.AI-fixes-sep23`; non costituiscono una pubblicazione o uno scan concluso.
+- Registro sicurezza: riprodotto il falso errore d'integrita dopo 10000 eventi,
+  corretto il ricalcolo durante rotazione legittima. Quattro test PASS,
+  compresi riapertura e rifiuto di una catena manomessa.
+- Android 6.5.19 candidato locale: 22 test SQLite/Keystore e Activity sul Samsung
+  superati. Bozze e allegati sono separati per chat e cifrati; migrazione e
+  invio sono recuperabili in caso di errore. Riprodotto il mancato recupero
+  di un allegato da 1.5 MB con CursorWindow limitata a 2 MiB: risolto con lettura
+  a blocchi sotto transazione. Corretto inoltre un crash da interruzione del
+  probe durante ricreazione Activity. Cinque profili visuali PASS; font e
+  display originali ripristinati. Screenshot compatto, font grande e landscape
+  ispezionati. Questo non certifica ogni combinazione Android o ogni stato UI.
+- Correzioni sicurezza nel worktree: nomi sensibili controllati anche tramite
+  alias Windows 8.3, junction e operazioni su directory; recupero checkpoint
+  mantenuto. Updater verificato con provider NSIS reale e trasporto sintetico:
+  non usa metadati di canale diversi da quelli firmati. Cross-review effettuata.
+- Suite finale: 920 PASS, 2 skip su 922; check PASS.
+  Scanner Grype non attraversava la junction
+  del worktree: ora firma, scansione e hash usano lo stesso file risolto; sette
+  test mirati PASS. Il gate esperienza ha completato AI e voce, poi il processo
+  e terminato con codice -1073740791 entrando nello smoke. Lo smoke ripetuto
+  separatamente e passato; la causa dell'interruzione resta indeterminata.
+  La conferma del 23 settembre ha superato lo smoke ma incontrato un timeout
+  di chiusura a 15 secondi. Retry mirato del 25 settembre PASS senza aumentare
+  le soglie. Gate completo del 25 settembre PASS (exit 0): AI, voce, smoke,
+  shutdown e soak 250 cicli, zero richieste orfane. Log:
+  `qa-artifacts/continuity-experience-sep25.log`. L'esito positivo non dimostra
+  la causa dei due precedenti arresti intermittenti: conservarne le evidenze.
+- Feedback desktop: rilevato staticamente che "Utile" e "Preferisco questa"
+  chiamano il salvataggio dell'esempio di training. Separare il voto dal consenso
+  esplicito al contributo e verificare il percorso locale/pubblico prima della
+  distribuzione. Non e stata eseguita alcuna raccolta o sessione di training.
 
 Le prove umane di eco/interruzione, le firme e i collaudi esterni richiedono
 evidenze reali; le migrazioni grafiche e la matrice completa dei client restano

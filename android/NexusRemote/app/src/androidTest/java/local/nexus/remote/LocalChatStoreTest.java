@@ -1,7 +1,14 @@
 package local.nexus.remote;
 
 import android.content.Context;
+import android.util.Base64;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import org.json.JSONObject;
 import android.database.Cursor;
+import android.database.CursorWindow;
+import android.database.sqlite.SQLiteCursor;
+import android.os.Build;
 import android.database.sqlite.SQLiteDatabase;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -25,8 +32,171 @@ public class LocalChatStoreTest {
     }
 
     @After public void close() {
-        if (store != null) store.close();
+        if (store != null) { store.clearAll(); store.close(); }
         if (context != null && context.getPackageName().endsWith(".qa")) context.deleteDatabase("nexusnxs-chats.db");
+    }
+
+    private JSONObject attachment(String text) throws Exception {
+        return new JSONObject().put("name", "qa-document.txt").put("mime", "text/plain")
+            .put("data", Base64.encodeToString(text.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP));
+    }
+
+    private int composerFileCount() {
+        File[] files = new File(context.getNoBackupFilesDir(), "nexus-composer").listFiles();
+        return files == null ? 0 : files.length;
+    }
+
+    @Test public void composerSurvivesReopenAndNeverLeaksIntoAnotherConversation() throws Exception {
+        String first = store.createConversation(), second = store.createConversation();
+        JSONObject selected = attachment("private composer content");
+        store.saveDraft(first, "bozza non inviata");
+        store.saveComposerAttachment(first, selected);
+        assertEquals("", store.getDraft(second));
+        assertNull(store.getComposerAttachment(second));
+        store.close();
+        store = new LocalChatStore(context);
+        store.pruneComposerAttachments();
+        assertEquals("bozza non inviata", store.getDraft(first));
+        assertEquals(selected.toString(), store.getComposerAttachment(first).toString());
+        try (Cursor row = store.getReadableDatabase().rawQuery("SELECT draft,attachment_file FROM conversation_composers WHERE conversation_id=?", new String[]{first})) {
+            assertTrue(row.moveToFirst());
+            assertNotEquals("bozza non inviata", row.getString(0));
+            String raw = new String(java.nio.file.Files.readAllBytes(new File(context.getNoBackupFilesDir(), "nexus-composer/" + row.getString(1)).toPath()), StandardCharsets.UTF_8);
+            assertTrue(raw.startsWith("nexus:v1:"));
+            assertFalse(raw.contains("private composer content"));
+            assertFalse(raw.contains(selected.optString("data")));
+        }
+    }
+
+    @Test public void emptyConversationCleanupRetainsDraftOrAttachmentUntilCleared() throws Exception {
+        String draft = store.createConversation(), file = store.createConversation(), empty = store.createConversation(), active = store.createConversation();
+        store.saveDraft(draft, "conserva");
+        store.saveComposerAttachment(file, attachment("conserva file"));
+        store.deleteEmptyConversationsExcept(active);
+        assertNotNull(store.get(draft)); assertNotNull(store.get(file)); assertNotNull(store.get(active)); assertNull(store.get(empty));
+        store.clearComposer(draft); store.clearComposer(file);
+        store.deleteEmptyConversationsExcept(active);
+        assertNull(store.get(draft)); assertNull(store.get(file)); assertEquals(0, composerFileCount());
+    }
+
+    @Test public void removingReplacingAndDeletingAttachmentsRetainsOnlyReferencedFiles() throws Exception {
+        String id = store.createConversation();
+        store.saveDraft(id, "retain text");
+        store.saveComposerAttachment(id, attachment("first"));
+        store.saveComposerAttachment(id, attachment("second"));
+        assertEquals(1, composerFileCount());
+        store.saveComposerAttachment(id, null);
+        assertEquals("retain text", store.getDraft(id)); assertNull(store.getComposerAttachment(id)); assertEquals(0, composerFileCount());
+        store.saveComposerAttachment(id, attachment("third"));
+        store.deleteConversation(id);
+        assertEquals(0, composerFileCount());
+        assertFalse(store.saveDraft(id, "late callback"));
+        assertFalse(store.saveComposerAttachment(id, attachment("late callback")));
+        assertNull(store.get(id));
+    }
+
+    @Test public void queuedAttachmentSurvivesComposerCleanupAfterSending() throws Exception {
+        String id = store.createConversation();
+        JSONObject selected = attachment("queued content");
+        store.saveDraft(id, "question"); store.saveComposerAttachment(id, selected);
+        store.addTurn(id, "user", "question");
+        store.queueRequest(id, "question", "fast", store.getComposerAttachment(id).toString());
+        store.clearComposer(id);
+        assertEquals("", store.getDraft(id)); assertNull(store.getComposerAttachment(id)); assertEquals(0, composerFileCount());
+        assertEquals(selected.toString(), store.nextPendingRequest().getString("attachment"));
+    }
+
+    @Test public void maximumAttachmentQueueSurvivesReopen() throws Exception {
+        assertMaximumAttachmentQueue(null);
+    }
+
+    @Test public void maximumAttachmentQueueSurvivesTwoMiBWindow() throws Exception {
+        if (Build.VERSION.SDK_INT < 28) {
+            org.junit.Assume.assumeTrue("Custom CursorWindow sizing requires API28", false);
+            return;
+        }
+        assertMaximumAttachmentQueue((db, driver, table, query) -> {
+            SQLiteCursor cursor = new SQLiteCursor(driver, table, query);
+            cursor.setWindow(new CursorWindow("nexus-qa-two-mib", 2L * 1024L * 1024L));
+            return cursor;
+        });
+    }
+
+    private void assertMaximumAttachmentQueue(SQLiteDatabase.CursorFactory factory) throws Exception {
+        byte[] content = new byte[LocalChatStore.MAX_COMPOSER_ATTACHMENT_BYTES];
+        for (int index = 0; index < content.length; index++) content[index] = (byte) (index % 251);
+        JSONObject selected = new JSONObject().put("name", "maximum.bin").put("mime", "application/octet-stream")
+            .put("data", Base64.encodeToString(content, Base64.NO_WRAP));
+        String id = store.createConversation();
+        String requestId = store.queueRequest(id, "inspect attachment", "fast", selected.toString());
+        store.close(); store = new LocalChatStore(context, factory);
+        JSONObject pending = store.nextPendingRequest();
+        assertNotNull("The maximum accepted attachment must remain readable by the retry queue", pending);
+        assertEquals(requestId, pending.getString("id"));
+        assertArrayEquals(content, Base64.decode(new JSONObject(pending.getString("attachment")).getString("data"), Base64.DEFAULT));
+    }
+
+    @Test public void invalidOrOversizeAttachmentDoesNotReplaceTheExistingOne() throws Exception {
+        String id = store.createConversation();
+        JSONObject original = attachment("retained");
+        store.saveComposerAttachment(id, original);
+        for (JSONObject invalid : new JSONObject[]{attachment(""), new JSONObject().put("data", Base64.encodeToString(new byte[LocalChatStore.MAX_COMPOSER_ATTACHMENT_BYTES + 1], Base64.NO_WRAP))}) {
+            try { store.saveComposerAttachment(id, invalid); fail("Invalid content must fail"); }
+            catch (IllegalStateException expected) { assertEquals(original.toString(), store.getComposerAttachment(id).toString()); }
+        }
+        assertEquals(1, composerFileCount());
+    }
+
+    @Test public void privateComposerDoesNotEnterConversationExports() throws Exception {
+        String id = store.createConversation();
+        store.saveDraft(id, "private draft"); store.saveComposerAttachment(id, attachment("private file"));
+        store.importEncryptedArchive(store.exportEncryptedArchive());
+        assertEquals(2, store.list().length());
+        assertEquals(1, count("conversation_composers"));
+        store.clearAll();
+        assertEquals(0, count("conversation_composers")); assertEquals(0, composerFileCount());
+    }
+
+    @Test public void failedAttachmentUpdateKeepsThePreviousCommittedFile() throws Exception {
+        String id = store.createConversation();
+        JSONObject previous = attachment("previous file");
+        store.saveComposerAttachment(id, previous);
+        store.getWritableDatabase().execSQL("CREATE TRIGGER qa_reject_attachment BEFORE UPDATE OF attachment_file ON conversation_composers BEGIN SELECT RAISE(ABORT, 'qa failure'); END");
+        try {
+            try { store.saveComposerAttachment(id, attachment("replacement")); fail("Update must fail"); }
+            catch (IllegalStateException expected) { }
+            assertEquals(previous.toString(), store.getComposerAttachment(id).toString());
+            assertEquals(1, composerFileCount());
+        } finally { store.getWritableDatabase().execSQL("DROP TRIGGER qa_reject_attachment"); }
+    }
+
+    @Test public void failedMessageAcceptanceKeepsTheComposerWithoutPartialTurnOrQueue() throws Exception {
+        String id = store.createConversation(); JSONObject selected = attachment("retained file");
+        store.saveDraft(id, "retained draft"); store.saveComposerAttachment(id, selected);
+        store.getWritableDatabase().execSQL("CREATE TRIGGER qa_reject_queue BEFORE INSERT ON pending_requests BEGIN SELECT RAISE(ABORT, 'qa failure'); END");
+        try {
+            try { store.acceptUserMessage(id, "question", "question", "fast", selected.toString(), true); fail("Acceptance must fail"); }
+            catch (RuntimeException expected) { }
+            assertEquals(0, store.get(id).getJSONArray("turns").length()); assertEquals(0, store.pendingCount());
+            assertEquals("retained draft", store.getDraft(id)); assertEquals(selected.toString(), store.getComposerAttachment(id).toString());
+        } finally { store.getWritableDatabase().execSQL("DROP TRIGGER qa_reject_queue"); }
+        store.acceptUserMessage(id, "question", "question", "fast", selected.toString(), true);
+        assertEquals(1, store.get(id).getJSONArray("turns").length()); assertEquals(1, store.pendingCount());
+        assertEquals("", store.getDraft(id)); assertNull(store.getComposerAttachment(id)); assertEquals(0, composerFileCount());
+    }
+
+    @Test public void composerMigrationAndInterruptedWriteCleanupPreserveHistory() throws Exception {
+        String id = store.createConversation(); store.addTurn(id, "user", "old history");
+        store.getWritableDatabase().execSQL("DROP TABLE conversation_composers");
+        store.getWritableDatabase().setVersion(7); store.close();
+        store = new LocalChatStore(context);
+        assertTrue(store.saveDraft(id, "after migration"));
+        assertEquals("old history", store.get(id).getJSONArray("turns").getJSONObject(0).getString("content"));
+        File directory = new File(context.getNoBackupFilesDir(), "nexus-composer"); directory.mkdirs();
+        File orphan = new File(directory, "00000000-0000-0000-0000-000000000000.nxs");
+        assertTrue(orphan.createNewFile());
+        store.pruneComposerAttachments();
+        assertFalse(orphan.exists()); assertEquals("after migration", store.getDraft(id));
     }
 
     private long count(String table) {

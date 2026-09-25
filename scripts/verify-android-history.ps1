@@ -20,14 +20,14 @@ foreach ($apk in @('app\build\outputs\apk\debug\app-debug.apk', 'app\build\outpu
     & $adb -s $device install -r (Join-Path $androidProject $apk)
     if ($LASTEXITCODE -ne 0) { throw 'Installazione APK di test fallita.' }
 }
-$output = & $adb -s $device shell am instrument -w -r -e class local.nexus.remote.LocalChatStoreTest local.nexus.remote.qa.test/androidx.test.runner.AndroidJUnitRunner 2>&1
+$output = & $adb -s $device shell am instrument -w -r -e class 'local.nexus.remote.LocalChatStoreTest,local.nexus.remote.ComposerContinuityTest' local.nexus.remote.qa.test/androidx.test.runner.AndroidJUnitRunner 2>&1
 $exitCode = $LASTEXITCODE
 $report = $output -join [Environment]::NewLine
 $artifactDirectory = Join-Path $projectRoot 'qa-artifacts'
 [IO.Directory]::CreateDirectory($artifactDirectory) | Out-Null
 [IO.File]::WriteAllText((Join-Path $artifactDirectory 'android-history-device.log'), $report)
-if ($exitCode -ne 0 -or $report -notmatch 'OK \(7 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
+if ($exitCode -ne 0 -or $report -notmatch 'OK \(22 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
     Write-Output $report
     throw 'Test nativi della cronologia non superati.'
 }
-Write-Output 'PASS: 7 test SQLite/Keystore sul dispositivo, sandbox QA separata.'
+Write-Output 'PASS: 22 test SQLite/Keystore e continuita Activity sul dispositivo, sandbox QA separata.'

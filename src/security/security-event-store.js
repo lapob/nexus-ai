@@ -29,6 +29,17 @@ function validChain(events = []) {
   return true;
 }
 
+function rechain(events) {
+  let previousHash = '0'.repeat(64);
+  return events.map((event) => {
+    const { hash: _hash, previousHash: _previousHash, ...rest } = event;
+    const base = { ...rest, previousHash };
+    const chained = { ...base, hash: digest(base) };
+    previousHash = chained.hash;
+    return chained;
+  });
+}
+
 // #endregion
 // #region Registro persistente
 
@@ -45,14 +56,7 @@ class SecurityEventStore {
     if (!this.invalidInput && !validChain(loaded)) this.invalidInput = true;
     this.events = loaded.filter((event) => Date.now() - event.at <= retentionMs).slice(-MAX_EVENTS);
     if (!this.invalidInput && this.events.length !== loaded.length) {
-      let previousHash = '0'.repeat(64);
-      this.events = this.events.map((event) => {
-        const { hash: _hash, previousHash: _previousHash, ...rest } = event;
-        const base = { ...rest, previousHash };
-        const chained = { ...base, hash: digest(base) };
-        previousHash = chained.hash;
-        return chained;
-      });
+      this.events = rechain(this.events);
     }
     this.lastHash = this.events.at(-1)?.hash || '0'.repeat(64);
     if (!this.invalidInput) this.rewrite();
@@ -100,13 +104,20 @@ class SecurityEventStore {
     this.lastHash = event.hash;
     this.events.push(event);
     const compact = this.events.length > MAX_EVENTS;
-    if (compact) this.events = this.events.slice(-MAX_EVENTS);
+    if (compact) {
+      // Validate before removing the prefix, as during startup retention.
+      // Never make a corrupted journal appear healthy by rebuilding its hashes.
+      if (!this.invalidInput && !validChain(this.events)) this.invalidInput = true;
+      this.events = this.events.slice(-MAX_EVENTS);
+      if (!this.invalidInput) this.events = rechain(this.events);
+      this.lastHash = this.events.at(-1)?.hash || '0'.repeat(64);
+    }
     try {
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
       fs.appendFileSync(this.filePath, `${JSON.stringify(event)}\n`, { encoding: 'utf8', mode: 0o600 });
       if (compact) this.rewrite();
     } catch { /* best effort */ }
-    return event;
+    return this.events.at(-1);
   }
 
   verifyIntegrity() {

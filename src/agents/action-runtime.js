@@ -24,6 +24,8 @@ const SENSITIVE_FILE_NAME = /^(?:\.env(?:\..*)?|id_(?:rsa|dsa|ecdsa|ed25519)|cre
 const COMMANDS = new Set(['npm']);
 const ARTIFACT_CONTENT_LIMIT = 48 * 1024;
 const MAX_PENDING_TICKETS = 256;
+const MAX_CONTENT_TREE_ENTRIES = 10_000;
+const MAX_CONTENT_TREE_DEPTH = 64;
 const CHILD_ENV_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'COMSPEC',
   'TEMP', 'TMP', 'USERPROFILE', 'HOME', 'LANG', 'LC_ALL', 'TERM'
@@ -290,30 +292,79 @@ function applicationAvailable(application) {
   return commands.some((command) => executableAvailable(command));
 }
 
-function resolveInsideRoot(root, value, { allowRoot = false } = {}) {
+function assertContentPath(root, target) {
+  const segments = path.relative(root, target).split(path.sep);
+  if (segments.some((segment) => segment.startsWith('.')
+    || SENSITIVE_FILE_NAME.test(segment.replace(/[ .]+$/g, ''))
+    || (process.platform === 'win32' && segment.includes(':')))) {
+    throw new Error('Il file contiene materiale riservato e non può entrare nel contesto AI.');
+  }
+}
+
+function realPathForBoundary(target) {
+  // On Windows the JS resolver can preserve 8.3 names such as CREDEN~1.JSO.
+  // Only the native resolver exposes the long basename to the content policy.
+  return process.platform === 'win32' ? fs.realpathSync.native(target) : fs.realpathSync(target);
+}
+
+function resolveInsideRoot(root, value, { allowRoot = false, protectContent = false } = {}) {
   const target = path.resolve(root, asText(value, 'Il percorso'));
   if ((!allowRoot && target === root) || (target !== root && !isInside(root, target))) throw new Error('Il percorso deve rimanere nella vault NexusNXS.');
   if (target !== root && containsPrivateSegment(root, target)) throw new Error('Le cartelle interne dell’app non sono accessibili.');
-  const realRoot = fs.realpathSync(root);
-  const realTarget = fs.realpathSync(target);
+  if (protectContent) assertContentPath(root, target);
+  const realRoot = realPathForBoundary(root);
+  const realTarget = realPathForBoundary(target);
   if ((realTarget !== realRoot || !allowRoot) && !isInside(realRoot, realTarget)) throw new Error('Il percorso risolto esce dalla vault NexusNXS.');
   if (realTarget !== realRoot && containsPrivateSegment(realRoot, realTarget)) throw new Error('Le cartelle interne dell’app non sono accessibili.');
-  return realTarget;
+  if (protectContent) assertContentPath(realRoot, realTarget);
+  // Preserve the existing spelling used by workspace fingerprints/checkpoints
+  // and by the lexical check when a proposal is validated again at execution.
+  return process.platform === 'win32' ? fs.realpathSync(target) : realTarget;
 }
 
-function resolveWritableInsideRoot(root, value) {
+function resolveWritableInsideRoot(root, value, { protectContent = false } = {}) {
   const target = path.resolve(root, asText(value, 'Il percorso'));
   if (target === root || !isInside(root, target) || containsPrivateSegment(root, target)) throw new Error('Il file deve rimanere nello spazio di lavoro.');
-  const realRoot = fs.realpathSync(root);
+  if (protectContent) assertContentPath(root, target);
+  const realRoot = realPathForBoundary(root);
   if (fs.existsSync(target)) {
-    const realTarget = fs.realpathSync(target);
+    const realTarget = realPathForBoundary(target);
     if (!isInside(realRoot, realTarget) || containsPrivateSegment(realRoot, realTarget)) throw new Error('Il file di destinazione esce dallo spazio di lavoro.');
+    if (protectContent) assertContentPath(realRoot, realTarget);
   }
   let ancestor = path.dirname(target);
   while (!fs.existsSync(ancestor) && ancestor !== path.dirname(ancestor)) ancestor = path.dirname(ancestor);
-  const realAncestor = fs.realpathSync(ancestor);
+  const realAncestor = realPathForBoundary(ancestor);
   if (realAncestor !== realRoot && !isInside(realRoot, realAncestor)) throw new Error('La cartella di destinazione esce dallo spazio di lavoro.');
+  if (protectContent) assertContentPath(realRoot, realAncestor);
   return target;
+}
+
+// Copy/move must not turn protected descendants into ordinary readable files.
+// Follow aliases for validation even though cpSync preserves the links, and
+// visit each canonical directory once so an internal link cycle is bounded.
+function assertContentTree(root, source) {
+  const pending = [{ path: source, depth: 0 }];
+  const directories = new Set();
+  let checked = 0;
+  while (pending.length) {
+    const current = pending.pop();
+    checked += 1;
+    const target = resolveInsideRoot(root, current.path, { allowRoot: true, protectContent: true });
+    if (!fs.statSync(target).isDirectory()) continue;
+    const directoryIdentity = realPathForBoundary(target);
+    if (directories.has(directoryIdentity)) continue;
+    directories.add(directoryIdentity);
+    const directory = fs.opendirSync(target);
+    try {
+      for (let entry = directory.readSync(); entry; entry = directory.readSync()) {
+        if (checked + pending.length >= MAX_CONTENT_TREE_ENTRIES || current.depth >= MAX_CONTENT_TREE_DEPTH) {
+          throw Object.assign(new Error('La cartella supera i limiti di verifica. Suddividi l’operazione in cartelle più piccole.'), { code: 'ACTION_TREE_LIMIT' });
+        }
+        pending.push({ path: path.join(target, entry.name), depth: current.depth + 1 });
+      }
+    } finally { directory.closeSync(); }
+  }
 }
 
 function normalizeCommand(value) {
@@ -585,26 +636,25 @@ class ActionRuntime {
       return { command, args: validateCommandArguments(command, args.args), cwd };
     }
     if (tool === 'list_directory') {
-      return { path: resolveInsideRoot(this.vaultPath, args.path || '.', { allowRoot: true }) };
+      return { path: resolveInsideRoot(this.vaultPath, args.path || '.', { allowRoot: true, protectContent: true }) };
     }
     if (tool === 'read_file') {
-      const target = resolveInsideRoot(this.vaultPath, args.path);
+      const target = resolveInsideRoot(this.vaultPath, args.path, { protectContent: true });
       if (!fs.statSync(target).isFile()) throw new Error('Il percorso deve indicare un file.');
-      if (SENSITIVE_FILE_NAME.test(path.basename(target))) throw new Error('Il file contiene materiale riservato e non può entrare nel contesto AI.');
       if (fs.statSync(target).size > 2 * 1024 * 1024) throw new Error('Il file è troppo grande per la lettura contestuale.');
       return { path: target };
     }
     if (tool === 'write_file') {
       const content = String(args.content ?? '');
       if (content.length > 500_000 || content.includes('\0')) throw new Error('Il contenuto del file non è valido o supera 500.000 caratteri.');
-      return { path: resolveWritableInsideRoot(this.vaultPath, args.path), content };
+      return { path: resolveWritableInsideRoot(this.vaultPath, args.path, { protectContent: true }), content };
     }
     if (tool === 'write_files') {
       if (!Array.isArray(args.files) || !args.files.length || args.files.length > 20) throw new Error('Il progetto deve contenere da 1 a 20 file.');
       let total = 0;
       const seen = new Set();
       const files = args.files.map((file) => {
-        const target = resolveWritableInsideRoot(this.vaultPath, file?.path);
+        const target = resolveWritableInsideRoot(this.vaultPath, file?.path, { protectContent: true });
         const content = String(file?.content ?? '');
         total += content.length;
         if (content.includes('\0') || content.length > 500_000 || seen.has(target)) throw new Error('Un file del progetto non è valido o è duplicato.');
@@ -616,9 +666,10 @@ class ActionRuntime {
     }
     if (tool === 'create_directory') return { path: resolveWritableInsideRoot(this.vaultPath, args.path) };
     if (tool === 'copy_path' || tool === 'move_path') {
-      const source = resolveInsideRoot(this.vaultPath, args.source);
-      const destination = resolveWritableInsideRoot(this.vaultPath, args.destination);
+      const source = resolveInsideRoot(this.vaultPath, args.source, { protectContent: true });
+      const destination = resolveWritableInsideRoot(this.vaultPath, args.destination, { protectContent: true });
       if (destination === source || isInside(source, destination)) throw new Error('La destinazione non può trovarsi dentro la sorgente.');
+      assertContentTree(this.vaultPath, source);
       return { source, destination };
     }
     if (tool === 'trash_path') return { path: resolveInsideRoot(this.vaultPath, args.path) };

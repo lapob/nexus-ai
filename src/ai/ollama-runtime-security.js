@@ -104,10 +104,13 @@ function auditOllamaRuntime(executablePath, {
   host = '',
   minimumVersion = DEVELOPMENT_MINIMUM_VERSION
 } = {}) {
-  const executable = path.resolve(String(executablePath || ''));
+  let executable = path.resolve(String(executablePath || ''));
   if (!fs.existsSync(executable) || !fs.statSync(executable).isFile()) {
     throw runtimeSecurityError('Runtime Ollama non disponibile.', 'OLLAMA_RUNTIME_MISSING', { executable });
   }
+  // External scanners may not traverse Windows junctions used by worktrees.
+  // Audit, execute and hash the same resolved file, without bypassing the gate.
+  executable = fs.realpathSync.native(executable);
   const signature = requireSignature
     ? verifyAuthenticode(executable, { platform, runProcess })
     : { status: 'NotRequired', signer: '' };

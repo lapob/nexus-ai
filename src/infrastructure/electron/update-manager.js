@@ -4,8 +4,9 @@
  */
 const { app, ipcMain } = require('electron');
 const { NsisUpdater } = require('electron-updater');
+const { Provider } = require('electron-updater/out/providers/Provider');
 const { CHANNELS } = require('../../application/ipc-contracts');
-const { verifyRemoteReleaseManifest } = require('../../security/release-integrity');
+const { verifyRemoteReleaseFeed } = require('../../security/release-integrity');
 const { evaluateUpdateRollout } = require('./update-rollout');
 
 // #region 01 — Validazione e stato
@@ -32,6 +33,26 @@ function publicUpdateInfo(info = {}) {
 // #endregion
 
 // #region 02 — Lifecycle updater
+
+// electron-updater's supported custom-provider interface lets each check own
+// one verified snapshot. GenericProvider would fetch mutable <channel>.yml
+// again, losing the Ed25519 binding established for latest.yml.
+class VerifiedReleaseProvider extends Provider {
+  constructor(configuration, _updater, runtimeOptions) {
+    super(runtimeOptions);
+    this.feed = configuration.verifiedFeed ? JSON.parse(JSON.stringify(configuration.verifiedFeed)) : null;
+  }
+
+  async getLatestVersion() {
+    if (!this.feed) throw new Error('Distinta aggiornamenti non ancora verificata.');
+    return JSON.parse(JSON.stringify(this.feed.updateInfo));
+  }
+
+  resolveFiles(info) {
+    if (!this.feed || info.version !== this.feed.updateInfo.version) throw new Error('Versione aggiornamento non autorizzata.');
+    return [{ url: new URL(this.feed.installerUrl), info: { ...this.feed.updateInfo.files[0] } }];
+  }
+}
 
 function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey = '', manifestKeyId = '', rolloutSeed = '', trustedRendererUrl, logger }) {
   channel = ['preview', 'beta', 'stable'].includes(channel) ? channel : 'stable';
@@ -72,11 +93,11 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
   }
   const checkTrustedUpdates = async () => {
     setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() });
-    const manifest = await verifyRemoteReleaseManifest({
+    const verifiedFeed = await verifyRemoteReleaseFeed({
       updateUrl: cleanUpdateUrl(updateUrl), publicKey: manifestPublicKey,
       keyId: manifestKeyId, channel
     });
-    const rollout = evaluateUpdateRollout(manifest, { rolloutSeed });
+    const rollout = evaluateUpdateRollout(verifiedFeed.manifest, { rolloutSeed });
     if (!rollout.eligible) {
       setState({
         status: rollout.reason === 'paused' ? 'paused' : 'deferred',
@@ -86,10 +107,13 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       return null;
     }
     setState({ rollout: { reason: rollout.reason, percentage: rollout.percentage } });
+    updater.setFeedURL({ provider: 'custom', updateProvider: VerifiedReleaseProvider, verifiedFeed });
     return updater.checkForUpdates();
   };
   try {
-    updater = new NsisUpdater({ provider: 'generic', url: cleanUpdateUrl(updateUrl), channel });
+    cleanUpdateUrl(updateUrl);
+    updater = new NsisUpdater({ provider: 'custom', updateProvider: VerifiedReleaseProvider });
+    updater.disableWebInstaller = true;
     updater.autoDownload = true;
     updater.autoInstallOnAppQuit = true;
     updater.allowDowngrade = false;
@@ -133,6 +157,6 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
   };
 }
 
-module.exports = { cleanUpdateUrl, createUpdateManager, publicUpdateInfo };
+module.exports = { cleanUpdateUrl, createUpdateManager, publicUpdateInfo, VerifiedReleaseProvider };
 
 // #endregion
