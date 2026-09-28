@@ -90,6 +90,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private LinearLayout content;
     private LinearLayout powerDock;
     private ScrollView dashboardScroll;
+    private LinearLayout dashboardNavigation;
     private boolean dockScrollCandidate, dockScrollActive;
     private float dockTouchX, dockTouchY;
     private String dashboardSection = "Panoramica";
@@ -464,7 +465,17 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         content.setPadding(dp(18), dp(6), dp(18), dp(18));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
         FrameLayout viewport = new FrameLayout(this);
-        viewport.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout dashboardLayout = new LinearLayout(this);
+        dashboardLayout.setOrientation(LinearLayout.VERTICAL);
+        dashboardNavigation = new LinearLayout(this);
+        dashboardNavigation.setOrientation(LinearLayout.VERTICAL);
+        dashboardNavigation.setVisibility(View.GONE);
+        dashboardLayout.addView(dashboardNavigation, new LinearLayout.LayoutParams(-1, -2));
+        dashboardLayout.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        viewport.addView(dashboardLayout, new FrameLayout.LayoutParams(-1, -1));
+        dashboardNavigation.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (bottom - top != oldBottom - oldTop) root.requestApplyInsets();
+        });
         materializationOverlay = new MaterializationView();
         materializationOverlay.setVisibility(View.GONE);
         viewport.addView(materializationOverlay, new FrameLayout.LayoutParams(-1, -1));
@@ -482,7 +493,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             content.setPadding(horizontal, dp(6), horizontal, dp(18));
             int topInset = insets.getSystemWindowInsetTop();
             int bottomInset = insets.getSystemWindowInsetBottom();
-            scroll.setPadding(0, dp(8) + topInset, 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
+            boolean navigationVisible = dashboardNavigation.getVisibility() == View.VISIBLE;
+            dashboardNavigation.setPadding(horizontal, topInset + dp(8), horizontal, dp(8));
+            scroll.setPadding(0, dp(8) + (navigationVisible ? 0 : topInset), 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
             powerDock.setPadding(horizontal, dp(32), horizontal, dp(8) + bottomInset);
             FrameLayout.LayoutParams frostParams = (FrameLayout.LayoutParams) statusFrostOverlay.getLayoutParams();
             frostParams.height = topInset + dp(14);
@@ -635,6 +648,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void renderDashboard(JSONObject snapshot) {
+        dashboardNavigation.removeAllViews();
+        dashboardNavigation.setVisibility(View.VISIBLE);
+        dashboardNavigation.getRootView().requestApplyInsets();
         content.setGravity(Gravity.TOP);
         lastDashboardSnapshot = snapshot;
         recentActions = null;
@@ -670,7 +686,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(-2, -2);
             tabParams.setMargins(0, 0, dp(8), 0); tabRow.addView(tab, tabParams);
         }
-        tabs.addView(tabRow); content.addView(tabs, wrapBlock());
+        tabs.addView(tabRow);
+        dashboardNavigation.addView(tabs, new LinearLayout.LayoutParams(-1, -2));
         for (LinearLayout panel : dashboardPanels.values()) content.addView(panel, wrapBlock());
         LinearLayout overview = dashboardPanels.get("Panoramica"), system = dashboardPanels.get("Sistema"), apps = dashboardPanels.get("App"), service = dashboardPanels.get("Servizi");
 
@@ -1933,6 +1950,10 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         content.setScaleY(1f);
         content.removeAllViews();
         render.run();
+        if (currentScreen != SCREEN_DASHBOARD || !dashboardVisible) {
+            dashboardNavigation.setVisibility(View.GONE);
+            dashboardNavigation.getRootView().requestApplyInsets();
+        }
         if (!animationsEnabled()) {
             return;
         }
@@ -1977,6 +1998,11 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void setState(String value, boolean offline) {
+        if (dashboardNavigation != null && (currentScreen != SCREEN_DASHBOARD || !dashboardVisible)
+                && dashboardNavigation.getVisibility() != View.GONE) {
+            dashboardNavigation.setVisibility(View.GONE);
+            dashboardNavigation.getRootView().requestApplyInsets();
+        }
         if (powerDock != null) {
             boolean showDock = currentScreen == SCREEN_DASHBOARD && dashboardVisible;
             int visibility = showDock ? View.VISIBLE : View.GONE;

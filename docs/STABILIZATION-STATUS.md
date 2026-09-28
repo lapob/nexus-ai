@@ -16,6 +16,26 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Regole di chiusura
 
+### Control: navigazione persistente del 28 settembre
+
+- Versione privata 1.19.6/code40: Panoramica, Sistema, App e Servizi sono
+  fuori dallo scroller verticale, in un contenitore misurato da Android.
+  Gli insets superiori appartengono alla barra quando visibile; connessione
+  e conferme usano invece tutto lo spazio. Anche la preparazione dei comandi
+  nasconde subito la barra. Il dock inferiore conserva il comportamento esistente.
+- Samsung: selezione delle quattro sezioni e confronto XML prima/dopo swipe
+  PASS (`qa-artifacts/control-pinned-scroll.json`). Matrice online di cinque
+  formati, incluso font 200%, PASS; impostazioni display ripristinate.
+- Build/lint/firma Preview e 60 controlli Android PASS. Questa installazione
+  privata non costituisce una pubblicazione dei client pubblici o la chiusura
+  dei punti aperti elencati sotto. Gate globale PASS (AI, voce, smoke,
+  shutdown, soak250 con zero richieste orfane), registrato separatamente in
+  `qa-artifacts/control-pinned-experience.log`. Il precedente timeout
+  intermittente di shutdown resta da diagnosticare; un passaggio non ne
+  dimostra la risoluzione. APK finale verificato nella matrice
+  `qa-artifacts/control-pinned-final-matrix`, SHA256
+  `AB39995105E15A3B5E84D048F9B274357033FF8EB5990295F11A92DCA4536EEF`.
+
 ### Cancellazione cronologia web e verifiche del 28 settembre
 
 - Riprodotto nel browser il mancato annullamento della risposta dopo la

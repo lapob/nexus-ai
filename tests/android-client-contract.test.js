@@ -94,7 +94,8 @@ test('entrambi i client usano barre di sistema edge-to-edge traslucide senza sep
   assert.match(controlActivity, /statusFrostOverlay = new View\(this\)/);
   assert.match(controlActivity, /new int\[\]\{Color\.argb\(topAlpha, 2, 6, 7\), Color\.argb\(edgeAlpha, 2, 6, 7\), Color\.TRANSPARENT\}/);
   assert.doesNotMatch(controlActivity, /SystemBarGlassView|RenderEffect|RenderNode|glassOverlap/, 'il velo resta leggero e non usa blur software per-frame');
-  assert.match(controlActivity, /int topInset = insets\.getSystemWindowInsetTop\(\)[\s\S]*int bottomInset = insets\.getSystemWindowInsetBottom\(\)[\s\S]*scroll\.setPadding\(0, dp\(8\) \+ topInset, 0, dp\(10\) \+ bottomInset \+/);
+  assert.match(controlActivity, /dashboardNavigation\.setPadding\(horizontal, topInset \+ dp\(8\), horizontal, dp\(8\)\)/);
+  assert.match(controlActivity, /scroll\.setPadding\(0, dp\(8\) \+ \(navigationVisible \? 0 : topInset\), 0, dp\(10\) \+ bottomInset \+/);
   assert.doesNotMatch(controlActivity, /view\.setPadding\(horizontal,\s*dp\(8\)\s*\+\s*insets\.getSystemWindowInsetTop/);
   assert.doesNotMatch(publicActivity, /navigationBarStyle\s*=\s*SystemBarStyle\.dark\(android\.graphics\.Color\.BLACK\)/);
 });
