@@ -107,6 +107,8 @@ function startAppLifecycle({
 }) {
   let primaryWindow = null;
   const shutdown = installShutdownBarrier({ application: app, onShutdown, logger, timeoutMs: shutdownTimeoutMs });
+  app.on('will-quit', () => logger?.info?.('Chiusura UI: evento will-quit ricevuto.'));
+  app.on('quit', (_event, exitCode) => logger?.info?.('Chiusura UI: evento quit ricevuto.', { exitCode }));
   const showPrimaryWindow = () => {
     // A late bootstrap/activation must not resurrect the UI after the user
     // has closed it while providers were still loading.

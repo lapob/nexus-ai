@@ -16,6 +16,26 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Regole di chiusura
 
+### Correzione chiusura Windows del 28 settembre
+
+- La traccia nativa, risolta con i simboli ufficiali Electron 43.2.0,
+  identifica l'attesa in `GpuChannelProxy::DestroyCommandBuffer` durante
+  `BrowserMainLoop::ShutdownThreadsAndCleanUp`, dopo il completamento dei servizi.
+  Fermare il pet di prova liberava il processo della UI.
+- L'avvio Windows dei processi fratelli ora passa da ShellExecute, evitando
+  l'eredità degli handle Chromium. Il solo detached e il solo cambio del
+  processo padre non erano sufficienti. Percorso POSIX e accelerazione grafica
+  restano invariati; nessuna terminazione forzata introdotta nel prodotto.
+- Sei chiusure native e quattro chiusure normali consecutive PASS mantenendo
+  il pet attivo. Test reale di argomenti con spazi, parentesi, virgolette,
+  backslash e metacaratteri, directory e ambiente PASS. Suite 929 PASS/2 SKIP,
+  check e doctor PASS, audit dipendenze applicative: zero vulnerabilità.
+- Candidato desktop 0.3.17. Gate completo finale PASS, con log persistente
+  `shutdown-isolation-experience-final.log` e file `.exit=0`: AI 8B 94%,
+  14B 100% sul set breve CPU isolato; voce, smoke, shutdown e soak250 PASS,
+  zero richieste orfane, heap -0.51 MB. La prima esecuzione interrotta
+  non è una verifica superata. Nessuna nuova release pubblicata.
+
 ### Consenso e verifica desktop del 28 settembre
 
 - I voti desktop e le preferenze fra risposte registrano soltanto requestId,

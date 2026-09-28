@@ -117,7 +117,7 @@ async function rendererTarget() {
   throw new Error('La finestra NexusNXS non è diventata raggiungibile durante il test di chiusura.');
 }
 
-async function closePage(target, waitForUiExit, { WebSocketClass = WebSocket } = {}) {
+async function closePage(target, waitForUiExit, { WebSocketClass = WebSocket, nativeClose } = {}) {
   const socket = new WebSocketClass(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener('open', resolve, { once: true });
@@ -151,7 +151,8 @@ async function closePage(target, waitForUiExit, { WebSocketClass = WebSocket } =
   try {
     await waitForRendererReady(evaluate);
     // Acknowledge scheduling before the window destroys its execution context.
-    await evaluate('setTimeout(() => window.close(), 0); true');
+    if (nativeClose) await nativeClose();
+    else await evaluate('setTimeout(() => window.close(), 0); true');
     // The scheduling acknowledgement does not confirm that the timer has run.
     // Keep the debugging session attached until the real UI process exits;
     // detaching here can race the renderer's pending close request at startup.
@@ -223,7 +224,13 @@ async function verifyAppShutdown() {
     await waitForProcessLock(presenceLockPath, true, 20_000);
     const before = processSnapshot();
     const owned = new Set([child.pid, ...descendantsOf(before, child.pid)]);
-    const code = await closePage(target, () => waitForExit(child));
+    const nativeClose = process.platform === 'win32' && process.argv.includes('--native-close') ? () => {
+      const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `$testWindowProcess=Get-Process -Id ${child.pid} -ErrorAction Stop; if(-not $testWindowProcess.CloseMainWindow()){exit 1}`],
+        { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      if (result.status !== 0) throw new Error('Chiusura nativa della finestra di prova non inviata.');
+    } : undefined;
+    const code = await closePage(target, () => waitForExit(child), { nativeClose });
     const presenceDescriptor = await waitForProcessLock(presenceLockPath, true);
     await delay(350);
     const normalizedProfile = path.resolve(profile).toLowerCase();
@@ -241,6 +248,13 @@ async function verifyAppShutdown() {
     const diagnostics = path.join(root, 'qa-artifacts', 'shutdown-failure.log');
     fs.mkdirSync(path.dirname(diagnostics), { recursive: true });
     fs.writeFileSync(diagnostics, stderr);
+    const failedTree = processSnapshot();
+    const failedDescendants = descendantsOf(failedTree, child.pid);
+    fs.writeFileSync(path.join(root, 'qa-artifacts', 'shutdown-tree-failure.json'), JSON.stringify(
+      failedTree.filter(item => item.pid === child.pid || failedDescendants.has(item.pid))
+        .map(item => ({ pid: item.pid, parentPid: item.parentPid,
+          type: item.commandLine.match(/--type=([^\s]+)/)?.[1] || 'main',
+          presence: item.commandLine.includes('--presence') })), null, 2));
     fs.writeFileSync(path.join(root,'qa-artifacts','shutdown-process-failure.json'), JSON.stringify({pid:child.pid,exitCode:child.exitCode,signalCode:child.signalCode,alive:isProcessAlive(child.pid),message:error.message}));
     try {
       const targets = await fetch(`http://127.0.0.1:${debugPort}/json`,{signal:AbortSignal.timeout(2000)}).then(response=>response.json());
@@ -255,6 +269,11 @@ async function verifyAppShutdown() {
       if(fs.existsSync(presenceLog)) fs.copyFileSync(presenceLog,path.join(root,'qa-artifacts','shutdown-presence-failure.log'));
     } catch {}
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
+    await delay(1500);
+    fs.writeFileSync(path.join(root, 'qa-artifacts', 'shutdown-after-presence.json'), JSON.stringify({
+      uiAlive: isProcessAlive(child.pid), exitCode: child.exitCode,
+      presenceAlive: Boolean(readLock(path.join(profile, 'system-presence.lock')))
+    }));
     terminateTestTree(child);
     throw error;
   } finally {

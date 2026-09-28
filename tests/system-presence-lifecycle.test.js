@@ -12,6 +12,7 @@ const {
   WAKE_WORD_ARGUMENT_PREFIX,
   interactiveLaunchArguments,
   launchInteractiveDesktop,
+  launchIndependentWindowsProcess,
   launchSystemPresence,
   presenceLaunchArguments,
   processLockState
@@ -42,6 +43,7 @@ test('la UI avvia la Presence in un processo nascosto privo di runtime AI', asyn
   const calls = [];
   const result = await launchSystemPresence({
     executable: process.execPath,
+    platform: 'linux',
     defaultApp: false,
     appRoot: root,
     env: { NEXUS_MANAGED_OLLAMA: '1', NEXUS_SHARED_DATA_ROOT: 'Z:\\NexusData' },
@@ -68,6 +70,7 @@ test('packaged Presence and UI spawn outside ASAR and preserve the shared profil
     let captured;
     await launchDesktop({
       executable: process.execPath,
+      platform: 'linux',
       defaultApp: false,
       appRoot: path.join(root, 'resources', 'app.asar'),
       env: { NEXUS_SHARED_DATA_ROOT: root },
@@ -263,4 +266,30 @@ test('la chiusura ChatGPT passa automaticamente al fallback se WM_CLOSE viene ri
     ['/IM', 'ChatGPT.exe', '/T'],
     ['/IM', 'ChatGPT.exe', '/T', '/F']
   ]);
+});
+
+test('Windows independent launch preserves literal arguments, cwd and environment', { skip: process.platform !== 'win32' }, async (t) => {
+  const os = require('node:os');
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-launch-[literal] '));
+  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  const script = path.join(temporaryRoot, 'probe.js');
+  const output = path.join(temporaryRoot, 'result.json');
+  fs.writeFileSync(script, "require('node:fs').writeFileSync('result.json',JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),marker:process.env.NEXUS_LAUNCH_TEST_MARKER}))");
+  const args = ['space value', 'quote"value', 'backslash\\"quote', 'C:\\folder with spaces\\', '$env:PATH; $(anything)', ''];
+  const launched = await launchIndependentWindowsProcess(process.execPath, [script, ...args], {
+    cwd: temporaryRoot, env: { ...process.env, NEXUS_LAUNCH_TEST_MARKER: 'local-probe' }
+  });
+  assert.ok(launched.pid > 0);
+  for (let attempt = 0; attempt < 100 && !fs.existsSync(output); attempt++) await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')), { args, cwd: temporaryRoot, marker: 'local-probe' });
+});
+
+test('Windows independent launch reports failure and rejects invalid process IDs', async () => {
+  const options = { cwd: root, env: {} };
+  await assert.rejects(launchIndependentWindowsProcess('Nexus.exe', [], options,
+    (_file, _args, _options, callback) => callback(new Error('start failed'))), /non riuscito/);
+  for (const output of ['', '0', 'invalid', '-1', '1.5']) {
+    await assert.rejects(launchIndependentWindowsProcess('Nexus.exe', [], options,
+      (_file, _args, _options, callback) => callback(null, output)), /PID/);
+  }
 });
