@@ -48,6 +48,11 @@ rete, allegati, rotazione, riconnessione senza invio automatico e cancellazione
 della sessione anonima al reload. Il report resta in `qa-artifacts/web-offline`.
 Non modifica la connessione del PC e non chiama il modello di produzione.
 
+`npm run qa:web:history` verifica la cancellazione durante streaming, preparazione
+del servizio e generazione immagini. Il trasporto simulato consegna apposta dati
+dopo l'annullamento: la pagina deve ignorarli e la domanda successiva deve avere
+una cronologia vuota. Usa un browser isolato, senza inferenza o conversazioni reali.
+
 ## Stato verificato il 23 settembre 2026
 
 - Backup/ripristino sintetico: superato; non equivale a prova di tutti i dati personali.

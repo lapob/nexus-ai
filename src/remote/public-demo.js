@@ -721,7 +721,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("const setVoiceState=value=>", "const coreHintSeen=()=>{try{return localStorage.getItem('nexusnxs.core-hint.v1')==='1'}catch{return false}},markCoreHintSeen=()=>{try{localStorage.setItem('nexusnxs.core-hint.v1','1')}catch{}};const setVoiceState=value=>")
     .replace("idle:'Core pronto'", "idle:coreHintSeen()?'Core pronto':'Parla con Nexus'")
     .replace("core.addEventListener('click',event=>{", "core.addEventListener('click',event=>{markCoreHintSeen();")
-    .replace("pendingAnswer='';const runtime", "pendingAnswer='',rawAnswer='',followStream=true,lastAnswerScroll=0,lastStreamRender=0,lastStreamValue='',requestAbort=null,requestMessageId='',stopRequested=false;const runtime")
+    .replace("pendingAnswer='';", "pendingAnswer='',rawAnswer='',followStream=true,lastAnswerScroll=0,lastStreamRender=0,lastStreamValue='',requestAbort=null,requestMessageId='',stopRequested=false,historyGeneration=0;")
     .replace("function flushAnswer(){rafFlush=0;if(pendingAnswer){answer.textContent+=pendingAnswer;pendingAnswer=''}}", "function flushAnswer(){rafFlush=0;if(pendingAnswer){rawAnswer+=pendingAnswer;pendingAnswer=''}const now=performance.now();if(busy&&now-lastStreamRender<48){rafFlush=requestAnimationFrame(flushAnswer);return}if(rawAnswer!==lastStreamValue){lastStreamRender=now;lastStreamValue=rawAnswer;formatAnswer(rawAnswer,{streaming:true});followAnswer()}}")
     .replace("answer.textContent=recentAnswer.content;setPhase", "rawAnswer=recentAnswer.content;answer.textContent=recentAnswer.content;setPhase")
     .replace("const runtime={voiceState:'idle'}", "const runtime={voiceState:'idle',capabilities:{}}")
@@ -780,6 +780,24 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("recorder.onstop=()=>{clearTimeout(recordingTimer);stream.getTracks()", "recorder.onstop=()=>{clearTimeout(recordingTimer);stopVoiceMonitor();stream.getTracks()")
     .replace("recorder.start(250);setVoiceState('listening');setPhase('Ti ascolto · tocca ancora per inviare');recordingTimer=setTimeout(()=>recorder.state==='recording'&&recorder.stop(),10000)", "recorder.start(250);monitorVoice(stream,recorder);setVoiceState('listening');setPhase('Ti ascolto');recordingTimer=setTimeout(()=>recorder.state==='recording'&&recorder.stop(),15000)");
   return enhancedScript
+    // Clearing history invalidates the whole request, including frames that
+    // were already buffered when AbortController stopped the transport.
+    .replace('async function memoryReset(silent=false){', "async function memoryReset(silent=false){const resetGeneration=++historyGeneration;void stopGeneration();voiceSession.leave({focus:false});if(rafFlush)cancelAnimationFrame(rafFlush);rafFlush=0;pendingAnswer='';rawAnswer='';lastStreamValue='';answer.classList.remove('streaming');artifacts.replaceChildren();document.body.classList.remove('image-generating','image-result');setVoiceState('idle');")
+    .replace("localStorage.removeItem('nxs.demo.memory');document.body", "localStorage.removeItem('nxs.demo.memory');if(resetGeneration!==historyGeneration)return;document.body")
+    .replace('busy=true;if(globalThis.nexusCheckReadiness&&!await globalThis.nexusCheckReadiness())', "busy=true;document.body.classList.remove('memory-cleared');const requestGeneration=++historyGeneration;const ready=!globalThis.nexusCheckReadiness||await globalThis.nexusCheckReadiness();if(requestGeneration!==historyGeneration){busy=false;setSendMode(false);return}if(!ready)")
+    .replace("memoryClear.addEventListener('click',memoryReset)", "memoryClear.addEventListener('click',()=>void memoryReset())")
+    .replace("setTimeout(()=>{setPhase('');document.body.classList.remove('memory-cleared')},1300)", "setTimeout(()=>{if(resetGeneration===historyGeneration){setPhase('');document.body.classList.remove('memory-cleared')}},1300)")
+    .replace('try{await session();if(isImageRequest(text))', "try{await session();if(requestGeneration!==historyGeneration)throw new DOMException('Aborted','AbortError');if(isImageRequest(text))")
+    .replace('while(!streamComplete&&streamAttempt<3){try{', "while(!streamComplete&&streamAttempt<3){try{if(requestGeneration!==historyGeneration)throw new DOMException('Aborted','AbortError');")
+    .replace('const chunk=await reader.read();if(chunk.done)', "const chunk=await reader.read();if(requestGeneration!==historyGeneration){void reader.cancel().catch(()=>{});throw new DOMException('Aborted','AbortError')}if(chunk.done)")
+    .replace('if(stopRequested||streamError?.retryable', 'if(requestGeneration!==historyGeneration||stopRequested||streamError?.retryable')
+    .replace("catch(error){answer.classList.remove('streaming');", "catch(error){if(requestGeneration!==historyGeneration)return;answer.classList.remove('streaming');")
+    .replace('finally{busy=false;setSendMode(false);leaveRequestLayout()}', 'finally{busy=false;setSendMode(false);if(requestGeneration===historyGeneration)leaveRequestLayout()}')
+    .replace('async function generateImage(text){', 'async function generateImage(text){const imageGeneration=historyGeneration;')
+    .replace('const blob=await response.blob();', "const blob=await response.blob();if(imageGeneration!==historyGeneration)throw new DOMException('Aborted','AbortError');")
+    .replace("if(requestAbort.signal.aborted)throw", "if(imageGeneration!==historyGeneration||requestAbort.signal.aborted)throw")
+    .replace('const responseText=await generateImage(text);turns.push', "const responseText=await generateImage(text);if(requestGeneration!==historyGeneration)return;turns.push")
+    .replace('await memoryWrite();formatAnswer(responseText);', 'await memoryWrite();if(requestGeneration!==historyGeneration)return;formatAnswer(responseText);')
     .replace(/async function speak\(text\)\{[\s\S]*?currentAudio=null;setVoiceState\('ready'\)\}\}/, 'async function speak(text){await voiceSession.speak(text)}')
     .replace(/async function transcribe\(blob\)\{[\s\S]*?(?=function toggleKeyboard\()/, 'function toggleVoice(){return voiceSession.interact()}')
     .replace('function toggleKeyboard(){', 'function toggleKeyboard(){if(voiceSession.active){voiceSession.leave();return;}')

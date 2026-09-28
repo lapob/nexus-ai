@@ -1,6 +1,6 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 25 settembre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 28 settembre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
 
 | Area | Verificato | Residuo |
@@ -15,6 +15,24 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 | Distribuzione | Build/lint Control e verifiche automatiche di integrita/rollout PASS; rollback APK conservato | Certificati Windows/Android, chiavi manifest e feed aggiornamenti non configurati. Installazione e rollback firmati su macchina pulita ancora necessari |
 
 ## Regole di chiusura
+
+### Cancellazione cronologia web e verifiche del 28 settembre
+
+- Riprodotto nel browser il mancato annullamento della risposta dopo la
+  cancellazione. Corretto il reset: stop trasporto/server e voce, invalidazione
+  della richiesta e scarto di frame o immagini tardive. Una nuova domanda usa
+  una cronologia vuota; il normale pulsante Interrompi conserva invece il parziale.
+- `qa:web:history` e `qa:web:offline` PASS, 920 test PASS/2 skip,
+  typecheck PASS. Il nuovo test usa un browser isolato e trasporti sintetici.
+- `check` bloccato da due note knowledge con revisione scaduta il 23 settembre
+  (7-Zip e capa); non aggiornare le date senza revisione delle fonti.
+- `history-reset-experience.log`: AI, voce e smoke PASS, timeout shutdown15s,
+  exit1, soak non eseguito. Retry mirato del 28 settembre PASS; intermittenza
+  ancora aperta, nessuna pubblicazione di questo blocco.
+- Model Factory: dataset esistente verificato, 2 esempi, zero preferenze,
+  validation/test vuoti. SFT/DPO bloccati. Nessun training, download o promozione.
+  Eval breve CPU del 25 settembre: 8B94%, 14B100%, mediane3718/5672ms;
+  non dimostra superiorita o accuratezza generale. Consenso desktop ancora da separare.
 
 ### Verifica del 23 settembre
 
