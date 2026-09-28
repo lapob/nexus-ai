@@ -97,6 +97,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private String appFolder = "";
     private final java.util.Map<String, Integer> dashboardPositions = new java.util.HashMap<>();
     private boolean restoringDashboardPosition;
+    private ControlBackdropView backdrop;
     private int navigationGeneration;
 
     private String navigationKey() {
@@ -449,6 +450,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         // dietro. Ventiquattro livelli evitano invalidazioni ridondanti e
         // mantengono l'effetto continuo anche su GPU meno recenti.
         scroll.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            if (backdrop != null) backdrop.postInvalidateOnAnimation();
             float progress = Math.min(1f, Math.max(0f, scrollY) / (float) dp(56));
             int step = Math.round(progress * 24f);
             if (step == frostedStatusStep) return;
@@ -471,9 +473,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         // La barra sovrapposta lascia scorrere i contenuti sotto la sua coda
         // sfumata; il padding dello scroller segue la misura reale del titolo.
         GradientDrawable navigationVeil = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[]{BG, BG, BG, BG, BG, BG, BG, Color.TRANSPARENT});
+            new int[]{Color.argb(218, 2, 6, 7), Color.argb(218, 2, 6, 7), Color.argb(218, 2, 6, 7),
+                Color.argb(218, 2, 6, 7), Color.argb(218, 2, 6, 7), Color.argb(218, 2, 6, 7),
+                Color.argb(218, 2, 6, 7), Color.TRANSPARENT});
         dashboardNavigation.setBackground(navigationVeil);
         viewport.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        backdrop = new ControlBackdropView(this, scroll);
+        viewport.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
         viewport.addView(dashboardNavigation, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
         dashboardNavigation.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             if (bottom - top != oldBottom - oldTop) root.requestApplyInsets();
@@ -496,9 +502,10 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             int topInset = insets.getSystemWindowInsetTop();
             int bottomInset = insets.getSystemWindowInsetBottom();
             boolean navigationVisible = dashboardNavigation.getVisibility() == View.VISIBLE;
-            dashboardNavigation.setPadding(horizontal, topInset + dp(8), horizontal, dp(28));
+            dashboardNavigation.setPadding(horizontal, topInset + dp(8), horizontal, dp(16));
             int navigationHeight = navigationVisible ? dashboardNavigation.getHeight() : topInset;
-            scroll.setPadding(0, dp(8) + navigationHeight, 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
+            scroll.setPadding(0, navigationHeight, 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
+            backdrop.setBands(navigationVisible ? navigationHeight : 0, powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0);
             powerDock.setPadding(horizontal, dp(32), horizontal, dp(8) + bottomInset);
             FrameLayout.LayoutParams frostParams = (FrameLayout.LayoutParams) statusFrostOverlay.getLayoutParams();
             frostParams.height = topInset + dp(14);
@@ -690,7 +697,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }
         tabs.addView(tabRow);
         dashboardNavigation.addView(tabs, new LinearLayout.LayoutParams(-1, -2));
-        for (LinearLayout panel : dashboardPanels.values()) content.addView(panel, wrapBlock());
+        for (LinearLayout panel : dashboardPanels.values()) content.addView(panel, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout overview = dashboardPanels.get("Panoramica"), system = dashboardPanels.get("Sistema"), apps = dashboardPanels.get("App"), service = dashboardPanels.get("Servizi");
 
         LinearLayout presence = card();
@@ -857,7 +864,19 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         boolean changed = !dashboardSection.equals(name);
         if (changed) rememberDashboardPosition();
         dashboardSection = name;
-        if (changed) restoreDashboardPosition();
+        if (changed) {
+            dashboardPositions.put(navigationKey(), 0);
+            // Una nuova sequenza touch interrompe lo scroller nativo; uno
+            // smoothScrollBy(0, 0) puo invece ripristinare il vecchio offset.
+            long now = android.os.SystemClock.uptimeMillis();
+            MotionEvent stop = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, 0, 0, 0);
+            dashboardScroll.onTouchEvent(stop);
+            stop.setAction(MotionEvent.ACTION_CANCEL);
+            dashboardScroll.onTouchEvent(stop);
+            stop.recycle();
+            dashboardScroll.scrollTo(0, 0);
+            restoreDashboardPosition();
+        }
         for (String key : dashboardPanels.keySet()) {
             boolean selected = key.equals(name);
             LinearLayout panel = dashboardPanels.get(key);
@@ -898,6 +917,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 if (name.equals(appFolder)) return;
                 rememberDashboardPosition();
                 appFolder = name;
+                dashboardPositions.put(navigationKey(), 0);
                 content.removeAllViews();
                 renderDashboard(lastDashboardSnapshot);
                 animateSectionEntry(dashboardPanels.get("App"));
@@ -1627,6 +1647,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         if (target instanceof TextView && !value.contentEquals(((TextView) target).getText())) {
             ((TextView) target).setText(value);
             if ("value:host".equals(tag)) target.setContentDescription(value);
+            if (backdrop != null) backdrop.postInvalidateOnAnimation();
         }
     }
 

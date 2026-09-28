@@ -16,6 +16,27 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Regole di chiusura
 
+### Control 1.19.8: navigazione e blur
+
+- Cambio di sezione e cartella torna all'inizio; ripresa dell'app conserva
+  sezione e posizione. Interrotto lo scroller nativo prima del reset: la
+  prima soluzione `smoothScrollBy(0, 0)` ripristinava invece l'offset vecchio.
+  Ritorno verificato nelle quattro sezioni con XML prima/dopo.
+- Rimossi 26dp di spazi sommati sopra il primo pannello. Blur GPU su Android
+  12+, campionamento 4x ridotto delle sole due fasce, maschere sfumate; gli
+  altri sistemi mantengono la sfumatura senza blur software per frame.
+- Il primo blur a viewport intero e stato scartato dopo 29.73% di frame
+  lenti su un campione breve. La versione limitata alle barre ha registrato
+  0.39% su 1024 frame durante 16 swipe, p95 frame 9ms e GPU 7ms.
+- APK privato `3a8c67c54030e48077d75cdf5cb982173dc13d55c0a2b52750c6b7229df9b40a`
+  installato: build/lint PASS, matrice finale 5 profili PASS (1.19–2.79%
+  frame lenti), dimensioni originali del Samsung ripristinate. Non equivale
+  a test fisico su cinque differenti dispositivi o versioni Android.
+- Backup/ripristino cifrato con dati sintetici: PASS, quattro file.
+  Certificati, feed e controlli operativi esterni per Stable restano aperti.
+- Gate finale `control-blur-bands-experience.exit=0`: AI, voce, smoke,
+  shutdown e soak250 PASS, zero orfani, heap +0.08 MB. Suite 929 PASS/2 SKIP.
+
 ### Control 1.19.7 e confezionamento del 28 settembre
 
 - Titolo compatto sopra le schede, entrambi fissi; contenuti scorrevoli dietro
