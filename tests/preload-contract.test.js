@@ -20,6 +20,14 @@ function loadPreloadBridge() {
   return { ...exposed, calls };
 }
 
+test('il voto usa un canale separato dagli esempi di training', async () => {
+  const { value, calls } = loadPreloadBridge();
+  const rating = { requestId: 'test', rating: 'down', target: 'current' };
+  await value.rateResponse(rating);
+  assert.equal(calls.at(-1).channel, CHANNELS.responseRating);
+  assert.deepEqual(calls.at(-1).args, [rating]);
+});
+
 test('il preload espone il bridge NexusNXS completo nel namespace ufficiale', () => {
   const { name, value } = loadPreloadBridge();
   assert.equal(name, 'nexus');

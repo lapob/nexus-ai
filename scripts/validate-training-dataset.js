@@ -46,6 +46,7 @@ for (const split of required) {
       throw new Error(`${split}.jsonl:${index + 1} non rispetta lo schema conversazionale.`);
     }
     if (!['user-approved-conversation', 'reviewer-approved-community'].includes(row.metadata?.provenance)) throw new Error(`${split}.jsonl:${index + 1} non ha provenienza approvata.`);
+    if (row.metadata?.consent !== true || row.metadata?.reviewStatus !== 'approved') throw new Error(`${split}.jsonl:${index + 1} non ha consenso e revisione espliciti.`);
     if (containsSensitiveMemory(user) || containsSensitiveMemory(assistant)) throw new Error(`${split}.jsonl:${index + 1} contiene dati potenzialmente sensibili.`);
     if (evaluationPrompts.has(normalized(user))) throw new Error(`${split}.jsonl:${index + 1} contamina un prompt di valutazione.`);
     const promptHash = digest(normalized(user));
@@ -81,6 +82,7 @@ for (const split of required) {
     }
     if (normalized(chosen) === normalized(rejected)) throw new Error(`preference-${split}.jsonl:${index + 1} non distingue chosen e rejected.`);
     if (!['user-approved-conversation', 'reviewer-approved-community'].includes(row.metadata?.provenance)) throw new Error(`preference-${split}.jsonl:${index + 1} non ha provenienza approvata.`);
+    if (row.metadata?.consent !== true || row.metadata?.reviewStatus !== 'approved') throw new Error(`preference-${split}.jsonl:${index + 1} non ha consenso e revisione espliciti.`);
     if (containsSensitiveMemory(prompt) || containsSensitiveMemory(chosen) || containsSensitiveMemory(rejected)) {
       throw new Error(`preference-${split}.jsonl:${index + 1} contiene dati potenzialmente sensibili.`);
     }

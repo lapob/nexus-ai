@@ -450,7 +450,11 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
     }, screenshotPath ? 4400 : 2500));
   }
   if (!smokeTest && !startHidden) win.once('ready-to-show', () => win.show());
-  win.on('close', () => { if (!smokeTest) saveWindowState(statePath, win); });
+  win.on('close', () => {
+    logger?.info?.('Chiusura UI: richiesta finestra ricevuta.');
+    if (!smokeTest) saveWindowState(statePath, win);
+    logger?.info?.('Chiusura UI: stato finestra salvato.');
+  });
   win.loadURL(rendererUrl);
   return win;
 }

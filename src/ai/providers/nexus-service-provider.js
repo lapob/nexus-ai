@@ -267,6 +267,7 @@ class NexusServiceProvider {
   }
 
   async submitFeedback(example, retried = false) {
+    if (example?.consent !== true) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'Consenso esplicito richiesto per il contributo.', { provider: this.name });
     const token = await this.ensureToken(retried);
     const body = {
       requestId: String(example.requestId || '').slice(0, 128), prompt: String(example.prompt || '').slice(0, 12_000),

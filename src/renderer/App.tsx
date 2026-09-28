@@ -226,6 +226,7 @@ export function App() {
           artifacts={nexus.artifacts}
           trainingSaved={nexus.trainingSaved}
           onApproveTraining={nexus.approveForTraining}
+          onRateResponse={nexus.rateResponse}
           onRegenerate={nexus.regenerateResponse}
           onContinue={nexus.continueResponse}
           onStop={nexus.stopResponse}

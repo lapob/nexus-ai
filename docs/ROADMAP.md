@@ -1,5 +1,25 @@
 # Roadmap tecnica
 
+## Programma competitivo autorizzato il 28 settembre 2026
+
+L'implementazione segue l'ordine sotto. Una voce pianificata non e una
+funzione consegnata: usare STABILIZATION-STATUS.md e CONTINUITA.md per le prove.
+
+| Blocco | Criterio di completamento |
+| --- | --- |
+| Base affidabile | Audit completo, chiusura desktop ripetibile, nessun voto usato come consenso, aggiornamenti firmati e rollback provato |
+| Valutazione delle capacita | Almeno 100 compiti distinti e revisionati su documenti, codice, ricerca, PC, contesto e ambiguita; risultati riproducibili, test separati dal training |
+| Memoria controllabile | Creazione, modifica, provenienza, scadenza e cancellazione verificate per identita; sessioni temporanee escluse dalla persistenza |
+| Agente operativo | Pianificazione, azioni autorizzate, ricevute e verifica dello stato finale; ripresa dopo crash senza duplicare effetti |
+| Voce continua | Corpus umano autorizzato; errori STT e latenza misurati; interruzione ed eco verificati con speaker e cuffie |
+| Documenti e artefatti | Caricamento, interruzione, retry, citazioni, anteprima, modifica ed esportazione con originali conservati e isolamento utenti |
+| Plugin e automazioni | MCP/n8n con permessi per integrazione, revoca, budget, scadenze e registro; nodo sempre acceso esplicitamente configurato |
+| Interfaccia condivisa | Componenti comuni, contrasto, tastiera/accessibilita, riduzione movimento e matrice di errori/offline/contenuti lunghi sui client |
+| Beta commerciale | Tre percorsi verificati (voce, documenti, operazioni PC), utenti pilota consenzienti, metriche di riuscita/ritorno/costo assistenza e condizioni di servizio definite |
+
+Non attivare cloud, acquistare infrastruttura, reclutare utenti o usare
+conversazioni per training come effetto implicito di questa roadmap.
+
 ## Priorita prodotto concordate il 13 settembre 2026
 
 Impostazione scelta: inferenza locale predefinita; cloud opzionale, disattivato.

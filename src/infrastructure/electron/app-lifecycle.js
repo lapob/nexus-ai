@@ -39,6 +39,7 @@ function installShutdownBarrier({ application = app, onShutdown = async () => {}
   const beginShutdown = () => {
     if (shutdownPromise) return shutdownPromise;
     state = 'running';
+    logger?.info?.('Chiusura UI: avvio pulizia servizi.');
     shutdownPromise = new Promise((resolve) => {
       const timeout = setTimeout(() => {
         logger?.warn?.('Arresto NexusNXS oltre il tempo previsto; chiusura forzata del processo Electron.', { timeoutMs });
@@ -54,6 +55,7 @@ function installShutdownBarrier({ application = app, onShutdown = async () => {}
         .finally(() => clearTimeout(timeout));
     }).finally(() => {
       state = 'finished';
+      logger?.info?.('Chiusura UI: pulizia terminata, uscita Electron.');
       application.quit();
     });
     return shutdownPromise;
@@ -122,6 +124,7 @@ function startAppLifecycle({
   // (consenso modelli, errori setup). La loro chiusura non deve terminare
   // Electron prima che esista la finestra applicativa principale.
   app.on('window-all-closed', () => {
+    logger?.info?.('Chiusura UI: tutte le finestre chiuse.');
     primaryWindow = null;
     if (shouldQuitAfterAllWindowsClosed(process.platform, shouldKeepAlive())) app.quit();
   });

@@ -16,7 +16,7 @@ test('la Model Factory resta bloccata finché il dataset approvato non raggiunge
   const output = path.join(directory, 'status.json');
   const store = new TrainingStore({ filePath: input });
   for (let index = 0; index < 12; index += 1) {
-    store.append({ prompt: `Esempio approvato ${index} per matematica`, response: `Risposta verificata ${index}` });
+    store.append({ consent: true, prompt: `Esempio approvato ${index} per matematica`, response: `Risposta verificata ${index}` });
   }
   const result = spawnSync(process.execPath, [
     path.join(root, 'scripts', 'model-factory-status.js'),

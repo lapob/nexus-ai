@@ -45,6 +45,7 @@ const CHANNELS = Object.freeze({
   knowledgeList: 'nexus:knowledge-list',
   knowledgeRead: 'nexus:knowledge-read',
   trainingExample: 'nexus:training-example',
+  responseRating: 'nexus:response-rating',
   trainingStats: 'nexus:training-stats',
   trainingEvaluation: 'nexus:training-evaluation',
   trainingClear: 'nexus:training-clear',

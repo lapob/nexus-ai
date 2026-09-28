@@ -311,6 +311,7 @@ export function useNexusController() {
   const [voiceNotice, setVoiceNotice] = useState('');
   const [fatalError, setFatalError] = useState('');
   const [trainingSaved, setTrainingSaved] = useState(false);
+  const trainingSubmissionPending = useRef(false);
   const [generating, setGenerating] = useState(false);
   const [bargeInListening, setBargeInListening] = useState(false);
   const [queuedVoicePrompt, setQueuedVoicePrompt] = useState('');
@@ -1604,22 +1605,35 @@ export function useNexusController() {
 
   const approveForTraining = useCallback(async (approvedResponse?: string, rejectedResponse?: string) => {
     if (!transcript.trim() || !response.trim() || !lastCompletedRequest.current || !settings) return;
-    const chosen = approvedResponse?.trim() || response;
-    const rejected = rejectedResponse?.trim()
-      || (approvedResponse?.trim() && approvedResponse.trim() !== response ? response : undefined);
-    await window.nexus.saveTrainingExample({
-      requestId: lastCompletedRequest.current,
-      prompt: transcript,
-      response: chosen,
-      originalResponse: rejected && rejected !== chosen ? rejected : undefined,
-      model: activeConversationMode.current === 'deep'
-        ? settings.chatModel || settings.model
-        : settings.fastModel || settings.chatModel || settings.model,
-      mode: activeConversationMode.current
-    });
-    setTrainingSaved(true);
-    addLog('Esempio approvato per il miglioramento');
+    if (trainingSubmissionPending.current) return;
+    trainingSubmissionPending.current = true;
+    const requestId = lastCompletedRequest.current;
+    try {
+      const chosen = approvedResponse?.trim() || response;
+      const rejected = rejectedResponse?.trim()
+        || (approvedResponse?.trim() && approvedResponse.trim() !== response ? response : undefined);
+      const result = await window.nexus.saveTrainingExample({
+        requestId,
+        prompt: transcript,
+        response: chosen,
+        originalResponse: rejected && rejected !== chosen ? rejected : undefined,
+        model: activeConversationMode.current === 'deep'
+          ? settings.chatModel || settings.model
+          : settings.fastModel || settings.chatModel || settings.model,
+        mode: activeConversationMode.current
+      });
+      if (result.status !== 'saved' || lastCompletedRequest.current !== requestId) return;
+      setTrainingSaved(true);
+      addLog('Esempio approvato per il miglioramento');
+    } catch {
+      addLog('Contributo non salvato. Riprova dalle azioni della risposta.');
+    } finally { trainingSubmissionPending.current = false; }
   }, [addLog, response, settings, transcript]);
+
+  const rateResponse = useCallback(async (rating: 'up' | 'down', target: 'current' | 'previous' = 'current') => {
+    if (!lastCompletedRequest.current) return;
+    await window.nexus.rateResponse({ requestId: lastCompletedRequest.current, rating, target });
+  }, []);
 
   const saveUiPreferences = useCallback((next: InterfacePreferences) => {
     const saved = saveInterfacePreferences(next);
@@ -1933,6 +1947,7 @@ export function useNexusController() {
     setApprovalMode,
     selectActiveModel,
     approveForTraining,
+    rateResponse,
     exportPersonalData,
     importPersonalData,
     saveUiPreferences,

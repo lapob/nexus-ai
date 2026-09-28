@@ -1151,9 +1151,31 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     return { relativePath: safeRelativePath, title, content: body, backlinks };
   });
   ipcMain.handle(CHANNELS.embed, async (event, value) => { assertTrustedSender(event); const request = parseEmbeddingRequest(value); const settings = getSettings(); await ensureRuntime(settings); return aiRuntime.embed(request.input, { model: request.model || settings.embeddingModel }); });
+  ipcMain.handle(CHANNELS.responseRating, (event, value) => {
+    assertTrustedSender(event);
+    const requestId = parseRequestId(value?.requestId);
+    if (!['up', 'down'].includes(value?.rating) || !['current', 'previous'].includes(value?.target)) {
+      throw new Error('Valutazione non valida.');
+    }
+    // Ratings contain no conversation text and never enter the training store.
+    logger.info('Valutazione locale risposta.', { requestId, rating: value.rating, target: value.target });
+    return { status: 'saved' };
+  });
   ipcMain.handle(CHANNELS.trainingExample, async (event, value) => {
     assertTrustedSender(event);
     const example = parseTrainingExample(value);
+    const parentWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!parentWindow || parentWindow.isDestroyed()) return { status: 'cancelled' };
+    const decision = await dialog.showMessageBox(parentWindow, {
+      type: 'question', title: 'Contributo volontario',
+      message: 'Autorizzi l’utilizzo di questa conversazione per migliorare NexusNXS?',
+      detail: distributionMode === 'public'
+        ? 'La domanda, la risposta e l’eventuale correzione saranno inviate al servizio NexusNXS per revisione prima dell’uso nel training. Non includere dati personali o contenuti che non hai diritto di condividere. I voti non autorizzano questo invio.'
+        : 'La domanda, la risposta e l’eventuale correzione saranno salvate sul PC come esempio approvato, utilizzabile nella memoria e per la preparazione di dati di training. Puoi eliminarle dalle impostazioni. Nessun invio al cloud.',
+      buttons: ['Annulla', 'Autorizza contributo'], defaultId: 0, cancelId: 0, noLink: true
+    });
+    if (decision.response !== 1 || parentWindow.isDestroyed()) return { status: 'cancelled' };
+    example.consent = true;
     if (distributionMode === 'public') {
       const settings = getSettings();
       await ensureRuntime(settings);

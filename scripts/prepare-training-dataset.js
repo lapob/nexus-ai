@@ -49,7 +49,7 @@ const digest = (value) => crypto.createHash('sha256').update(value).digest('hex'
 
 const approvedRecords = new TrainingStore({ filePath: input }).records({ limit: 1000 })
   .filter((record) => ['user-approved-conversation', 'reviewer-approved-community'].includes(record.provenance))
-  .filter((record) => record.reviewStatus !== 'quarantine')
+  .filter((record) => record.reviewStatus === 'approved' && record.consent === true)
   .filter((record) => !containsSensitiveMemory(record.prompt) && !containsSensitiveMemory(record.response));
 const benchmarkPrompts = evaluationPromptFingerprints();
 const records = approvedRecords.filter((record) => !benchmarkPrompts.has(promptFingerprint(record)));
@@ -60,6 +60,8 @@ const preferenceSplits = { train: [], validation: [], test: [] };
 for (const record of unique) {
   const split = splitFor(record);
   const metadata = {
+    consent: true,
+    reviewStatus: record.reviewStatus,
     provenance: record.provenance,
     license: record.license || 'user-approved-private-use',
     confidence: record.confidence,

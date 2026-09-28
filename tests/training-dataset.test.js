@@ -16,6 +16,7 @@ test('prepara dataset SFT e DPO con split per prompt e ricevuta di integrità', 
   const store = new TrainingStore({ filePath: input });
   for (let index = 0; index < 16; index += 1) {
     store.append({
+      consent: true,
       requestId: `request-${index}`,
       prompt: `Correggi il bug TypeScript numero ${index}`,
       response: `Soluzione verificata ${index}`,
@@ -24,8 +25,10 @@ test('prepara dataset SFT e DPO con split per prompt e ricevuta di integrità', 
       mode: 'deep'
     });
   }
+  store.append({ requestId: 'legacy-vote', prompt: 'Vecchio voto senza consenso', response: 'Non esportare', model: 'qwen3:8b', mode: 'fast' });
   const suite = JSON.parse(fs.readFileSync(path.join(root, 'config', 'evals', 'nexusnxs-core-v1.json'), 'utf8'));
   store.append({
+    consent: true,
     requestId: 'benchmark-contamination',
     prompt: suite.cases[0].prompt,
     response: 'Risposta deliberatamente esclusa dal dataset.',
@@ -47,4 +50,12 @@ test('prepara dataset SFT e DPO con split per prompt e ricevuta di integrità', 
   assert.equal(report.datasetId, manifest.datasetId);
   assert.equal(report.preferencePairs, 1);
   assert.equal(fs.existsSync(path.join(output, 'integrity-receipt.json')), true);
+  const split = ['train', 'validation', 'test'].find(name => fs.readFileSync(path.join(output, `${name}.jsonl`), 'utf8').trim());
+  const splitFile = path.join(output, `${split}.jsonl`);
+  const rows = fs.readFileSync(splitFile, 'utf8').trim().split('\n').map(JSON.parse);
+  delete rows[0].metadata.consent;
+  fs.writeFileSync(splitFile, rows.map(JSON.stringify).join('\n') + '\n');
+  const rejected = spawnSync(process.execPath, [path.join(root, 'scripts', 'validate-training-dataset.js'), `--dataset=${output}`], { encoding: 'utf8' });
+  assert.notEqual(rejected.status, 0);
+  assert.match(rejected.stderr, /consenso e revisione/);
 });

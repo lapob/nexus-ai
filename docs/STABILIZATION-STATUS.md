@@ -16,6 +16,30 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Regole di chiusura
 
+### Consenso e verifica desktop del 28 settembre
+
+- I voti desktop e le preferenze fra risposte registrano soltanto requestId,
+  valutazione e variante nei log locali, senza testo, invio remoto o training.
+  Il contributo e separato nel menu; il main process chiede consenso esplicito
+  indicando destinazione e uso. Annulla e la scelta predefinita. Il provider
+  pubblico rifiuta contributi senza consenso prima di accedere alla rete.
+- Preparazione e validazione SFT/DPO richiedono consenso esplicito e stato
+  approved. Gli esempi storici senza questi metadati non sono autorizzati per
+  il training; non sono stati cancellati o retroattivamente approvati.
+- `verify-response-feedback.js` esercita il componente React reale: voti,
+  errori/retry, confronto e tre viewport PASS. La vecchia cattura response
+  usa un fixture HTML, quindi non dimostra il comportamento dei controlli;
+  la sua cattura al 150% ha inoltre fallito e resta registrata in consent-visual.log.
+- Gate `consent-experience.log`: AI/voce/smoke PASS, shutdown FAIL a 15s,
+  soak non eseguito. Diagnostica aggiunta: tutte le finestre risultano chiuse
+  e pulizia servizi completata, ma il processo talvolta non termina. Due
+  ipotesi provate (rilascio debugger e quit differito) non hanno risolto e
+  sono state rimosse. Nessun timeout aumentato o terminazione forzata usata
+  per far passare il gate. Distribuzione bloccata.
+- Le due schede private scadute sono state ricontrollate: eseguibili assenti
+  nelle posizioni inventariate. Disponibilita aggiornata, vecchi hash marcati
+  storici e backup conservati; nessun inventario privato pubblicato.
+
 ### Control: navigazione persistente del 28 settembre
 
 - Versione privata 1.19.6/code40: Panoramica, Sistema, App e Servizi sono

@@ -306,7 +306,8 @@ export interface NexusBridge {
   listKnowledgeNotes(): Promise<Array<{ title: string; relativePath: string }>>;
   readKnowledgeNote(path: string): Promise<{ title: string; content: string }>;
   openNote(path: string): Promise<string>;
-  saveTrainingExample(example: { requestId: string; prompt: string; response: string; originalResponse?: string; model: string; mode: 'fast' | 'deep' }): Promise<{ status: 'saved'; id: string }>;
+  saveTrainingExample(example: { requestId: string; prompt: string; response: string; originalResponse?: string; model: string; mode: 'fast' | 'deep' }): Promise<{ status: 'saved'; id: string } | { status: 'cancelled' }>;
+  rateResponse(rating: { requestId: string; rating: 'up' | 'down'; target: 'current' | 'previous' }): Promise<{ status: 'saved' }>;
   trainingStats(): Promise<{ examples: number; approved: number; quarantined: number; corrected: number; preferencePairs: number; domains: Record<string, number>; evaluationExamples: number; evaluationReady: boolean; nextMilestone: number; memories?: number }>;
   trainingEvaluation(): Promise<{ examples: number; readiness: number; diversity: number; correctionCoverage: number; averagePromptTokens: number; status: 'ready' | 'growing' | 'early' }>;
   clearTrainingExamples(): Promise<{ removed: number }>;

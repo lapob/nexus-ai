@@ -24,6 +24,7 @@ interface ResponseSurfaceProps {
   previousResponse?: string;
   trainingSaved: boolean;
   onApproveTraining: (approvedResponse?: string, rejectedResponse?: string) => void;
+  onRateResponse: (rating: 'up' | 'down', target?: 'current' | 'previous') => Promise<void>;
   onRegenerate: () => void;
   onContinue: () => void;
   onStop: () => void;
@@ -414,7 +415,22 @@ export const MarkdownContent = memo(function MarkdownContent({ text, streaming =
 
 // #region 02 — Canvas della risposta
 
-export function ResponseSurface({ response, error, active, artifacts, previousResponse = '', trainingSaved, onApproveTraining, onRegenerate, onContinue, onStop, onDismiss }: ResponseSurfaceProps) {
+export function ResponseSurface({ response, error, active, artifacts, previousResponse = '', trainingSaved, onApproveTraining, onRateResponse, onRegenerate, onContinue, onStop, onDismiss }: ResponseSurfaceProps) {
+  const [rating, setRating] = useState<'up' | 'down' | null>(null);
+  const [ratingError, setRatingError] = useState('');
+  const [ratingPending, setRatingPending] = useState(false);
+  const ratingGeneration = useRef(0);
+  useEffect(() => { ratingGeneration.current += 1; setRating(null); setRatingError(''); setRatingPending(false); }, [response]);
+  const rate = async (value: 'up' | 'down', target: 'current' | 'previous' = 'current') => {
+    const generation = ratingGeneration.current;
+    setRatingPending(true);
+    setRatingError('');
+    try {
+      await onRateResponse(value, target);
+      if (generation === ratingGeneration.current) { setRating(target === 'current' ? value : null); setComparing(false); }
+    } catch { if (generation === ratingGeneration.current) setRatingError('Valutazione non salvata. Riprova.'); }
+    finally { if (generation === ratingGeneration.current) setRatingPending(false); }
+  };
   const [correcting, setCorrecting] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -513,11 +529,11 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
             <section className="response-comparison" aria-label="Confronto risposte">
               <div>
                 <small>Precedente</small><MarkdownContent text={previousResponse} />
-                <button type="button" disabled={trainingSaved} onClick={() => { onApproveTraining(previousResponse, response); setComparing(false); }}>Preferisco questa</button>
+                <button type="button" disabled={ratingPending} onClick={() => void rate('up', 'previous')}>Preferisco questa</button>
               </div>
               <div>
                 <small>Nuova</small><MarkdownContent text={response} />
-                <button type="button" disabled={trainingSaved} onClick={() => { onApproveTraining(response, previousResponse); setComparing(false); }}>Preferisco questa</button>
+                <button type="button" disabled={ratingPending} onClick={() => void rate('up')}>Preferisco questa</button>
               </div>
             </section>
           )}
@@ -530,8 +546,8 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
                   onChange={(event) => setCorrection(event.target.value)}
                 />
               )}
-              <button className="answer-feedback-action" type="button" disabled={trainingSaved || (correcting && !correction.trim())} onClick={() => correcting ? onApproveTraining(correction, response) : onApproveTraining()}>{trainingSaved ? 'Approvata' : correcting ? 'Salva correzione' : 'Utile'}</button>
-              {!trainingSaved && <button className="answer-feedback-action" type="button" onClick={() => { setCorrection(response); setCorrecting((current) => !current); }}>{correcting ? 'Annulla' : 'Correggi'}</button>}
+              {(['up', 'down'] as const).map(value => <button key={value} className="response-icon-action" type="button" aria-label={value === 'up' ? 'Mi piace · valutazione locale' : 'Non mi piace · valutazione locale'} aria-pressed={rating === value} disabled={ratingPending} onClick={() => void rate(value)}><svg width="18" height="18" viewBox="0 0 24 24" fill={rating === value ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true" style={value === 'down' ? { transform: 'rotate(180deg)' } : undefined}><path d="M7 10v11H3V10zm0 0 5-8c3 0 3 3 2 7h5a2 2 0 0 1 2 2l-2 8a2 2 0 0 1-2 2H7" /></svg></button>)}
+              {ratingError && <span role="alert">{ratingError}</span>}
               <button className="answer-action-primary response-icon-action" type="button" aria-label="Copia risposta" onClick={() => void window.nexus.copyText(response)}><CopyGlyph /></button>
               <button className="answer-action-menu-trigger" type="button" aria-expanded={actionsOpen} aria-label="Altre azioni sulla risposta" onClick={() => setActionsOpen((open) => !open)}>•••</button>
               {actionsOpen && <div className="answer-action-menu" role="menu">
