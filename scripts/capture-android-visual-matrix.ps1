@@ -50,7 +50,7 @@ $profiles = @(
   @{ Name = 'phone-small'; Size = '720x1280'; Density = '320'; Font = '1.0' },
   @{ Name = 'phone-compact'; Size = '1080x2400'; Density = '480'; Font = '1.0' },
   @{ Name = 'phone-large-font'; Size = '1080x2400'; Density = '480'; Font = '2.0' },
-  @{ Name = 'phone-landscape'; Size = '2400x1080'; Density = '480'; Font = '1.0' },
+  @{ Name = 'phone-landscape'; Size = '1080x2400'; Density = '480'; Font = '1.0'; Rotation = 1 },
   @{ Name = 'tablet'; Size = '1600x2560'; Density = '320'; Font = '1.0' }
 )
 
@@ -74,6 +74,7 @@ try {
   $frameMetrics = @()
   $jankFailures = @()
   foreach ($profile in $profiles) {
+    Invoke-CheckedAdb -s $device shell settings put system user_rotation $(if ($profile.ContainsKey('Rotation')) { $profile.Rotation } else { 0 }) | Out-Null
     Invoke-CheckedAdb -s $device shell wm size $profile.Size | Out-Null
     Invoke-CheckedAdb -s $device shell wm density $profile.Density | Out-Null
     Invoke-CheckedAdb -s $device shell settings put system font_scale $profile.Font | Out-Null

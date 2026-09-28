@@ -17,6 +17,9 @@ if (Test-Path -LiteralPath $endpointConfig) {
         }
     }
 }
+if ([string]::IsNullOrWhiteSpace($env:NEXUS_CONSOLE_URL)) {
+    throw 'Configura NEXUS_CONSOLE_URL in config/android-endpoints.local.properties o nell ambiente prima di compilare Control.'
+}
 $androidEnvironment = Initialize-NexusAndroidBuildEnvironment -Layout $developmentLayout -AndroidProject $androidProject
 $sdkRoot = $androidEnvironment.SdkRoot
 $gradle = Resolve-NexusGradleExecutable -Layout $developmentLayout -Version '9.7.1'

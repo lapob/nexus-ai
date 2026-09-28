@@ -12,13 +12,20 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const npmCli = process.env.npm_execpath;
 if (!npmCli || !fs.existsSync(npmCli)) throw new Error('CLI npm non disponibile per la SBOM.');
-const result = spawnSync(process.execPath, [npmCli, 'sbom', '--sbom-format', 'cyclonedx'], { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+// Il lockfile del candidato e la fonte riproducibile, anche nei worktree che
+// condividono node_modules. Non includere dipendenze dev dei pacchetti installati.
+const lockfile = fs.readFileSync(path.join(root, 'package-lock.json'));
+const result = spawnSync(process.execPath, [npmCli, 'sbom', '--sbom-format', 'cyclonedx', '--package-lock-only'], { cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
 if (result.status !== 0) {
   process.stderr.write(result.stderr || 'Generazione SBOM non riuscita.\n');
   process.exitCode = 1;
 } else {
   const parsed = JSON.parse(result.stdout);
   if (parsed.bomFormat !== 'CycloneDX' || !Array.isArray(parsed.components)) throw new Error('SBOM prodotta in formato inatteso.');
+  parsed.metadata ||= {};
+  parsed.metadata.properties ||= [];
+  parsed.metadata.properties.push({ name: 'nexusnxs:dependency-source', value: 'package-lock.json' },
+    { name: 'nexusnxs:package-lock:sha256', value: crypto.createHash('sha256').update(lockfile).digest('hex') });
   const target = path.join(root, 'qa-artifacts', 'nexus-sbom.cdx.json');
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');

@@ -6,7 +6,6 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
-const packageMetadata = require('../package.json');
 const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed } = require('../src/remote/remote-session-gateway');
 
 const androidGradle = fs.readFileSync(path.join(__dirname, '..', 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
@@ -1281,7 +1280,11 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /rel="icon" href="\/nexus-icon\.png"/);
     assert.match(publicHtml, /class="brand-mark" src="\/nexus-icon\.png"/);
     assert.match(publicHtml, /api\/guest\/voice\/transcribe/);
-    assert.match(publicHtml, new RegExp(`NexusNXS-${packageMetadata.version.replaceAll('.', '\\.')}\\-Setup\\.exe`));
+    // Un candidato non pubblicato deve poter proporre l'ultima Preview reale.
+    // Verificare la coerenza tag/installer senza confondere HEAD e release.
+    const windowsRelease = publicHtml.match(/https:\/\/github\.com\/lapob\/nexus-ai\/releases\/download\/v(\d+\.\d+\.\d+)-preview\.\d+\/NexusNXS-(\d+\.\d+\.\d+)-Setup\.exe/);
+    assert.ok(windowsRelease, 'download Windows da una Preview esplicita');
+    assert.equal(windowsRelease[1], windowsRelease[2], 'tag e installer devono avere la stessa versione');
     assert.ok(androidVersion);
     assert.match(publicHtml, /releases\/download\/v\d+\.\d+\.\d+-preview\.\d+\/NexusNXS-Android\.apk/);
     assert.match(publicHtml, /id="keyboard"/);

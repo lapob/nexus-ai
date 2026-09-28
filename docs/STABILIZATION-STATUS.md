@@ -16,6 +16,25 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Regole di chiusura
 
+### Control 1.19.7 e confezionamento del 28 settembre
+
+- Titolo compatto sopra le schede, entrambi fissi; contenuti scorrevoli dietro
+  una sfumatura nativa. Non e un blur del contenuto sottostante. Misure della
+  barra e safe area determinano il padding, senza altezza fissa del titolo.
+- APK privato installato sul Samsung: cinque profili online, inclusi font 2x
+  e rotazione reale, verificati in `control-header-rotation-matrix`; frame
+  lenti 0.30–0.37%. Schede ferme durante swipe nelle quattro sezioni.
+- Il primo candidato era privo dell'endpoint locale e la matrice ha fallito
+  correttamente. Ripristinata la configurazione ignorata da Git; il comando
+  di build ora rifiuta Control senza endpoint privato. APK corretto: SHA256
+  `91ec78171380385db556b24fe0d1182b1e2a34b5f0d3c98e30028ec881f7a29c`.
+- Check e 929 test PASS/2 SKIP; `control-header-experience.exit=0`: AI,
+  voce, smoke, shutdown e soak250 PASS, zero orfani, heap +0.08 MB.
+- SBOM riproducibile dal lockfile con provenienza SHA256: 392 componenti,
+  digest e versione verificati. Il download web puo puntare all'ultima
+  Preview pubblicata mentre HEAD e un candidato: test verifica coerenza
+  tag/installer. Nuova Preview pubblica ancora da confezionare e pubblicare.
+
 ### Correzione chiusura Windows del 28 settembre
 
 - La traccia nativa, risolta con i simboli ufficiali Electron 43.2.0,

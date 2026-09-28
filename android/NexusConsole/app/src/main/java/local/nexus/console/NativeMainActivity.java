@@ -465,14 +465,16 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         content.setPadding(dp(18), dp(6), dp(18), dp(18));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
         FrameLayout viewport = new FrameLayout(this);
-        LinearLayout dashboardLayout = new LinearLayout(this);
-        dashboardLayout.setOrientation(LinearLayout.VERTICAL);
         dashboardNavigation = new LinearLayout(this);
         dashboardNavigation.setOrientation(LinearLayout.VERTICAL);
         dashboardNavigation.setVisibility(View.GONE);
-        dashboardLayout.addView(dashboardNavigation, new LinearLayout.LayoutParams(-1, -2));
-        dashboardLayout.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        viewport.addView(dashboardLayout, new FrameLayout.LayoutParams(-1, -1));
+        // La barra sovrapposta lascia scorrere i contenuti sotto la sua coda
+        // sfumata; il padding dello scroller segue la misura reale del titolo.
+        GradientDrawable navigationVeil = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{BG, BG, BG, BG, BG, BG, BG, Color.TRANSPARENT});
+        dashboardNavigation.setBackground(navigationVeil);
+        viewport.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        viewport.addView(dashboardNavigation, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
         dashboardNavigation.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             if (bottom - top != oldBottom - oldTop) root.requestApplyInsets();
         });
@@ -494,8 +496,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             int topInset = insets.getSystemWindowInsetTop();
             int bottomInset = insets.getSystemWindowInsetBottom();
             boolean navigationVisible = dashboardNavigation.getVisibility() == View.VISIBLE;
-            dashboardNavigation.setPadding(horizontal, topInset + dp(8), horizontal, dp(8));
-            scroll.setPadding(0, dp(8) + (navigationVisible ? 0 : topInset), 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
+            dashboardNavigation.setPadding(horizontal, topInset + dp(8), horizontal, dp(28));
+            int navigationHeight = navigationVisible ? dashboardNavigation.getHeight() : topInset;
+            scroll.setPadding(0, dp(8) + navigationHeight, 0, dp(10) + bottomInset + (powerDock.getVisibility() == View.VISIBLE ? powerDock.getHeight() : 0));
             powerDock.setPadding(horizontal, dp(32), horizontal, dp(8) + bottomInset);
             FrameLayout.LayoutParams frostParams = (FrameLayout.LayoutParams) statusFrostOverlay.getLayoutParams();
             frostParams.height = topInset + dp(14);
@@ -663,16 +666,15 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         JSONObject nexusService = snapshot.optJSONObject("nexusService");
         JSONObject performance = snapshot.optJSONObject("performance");
 
-        TextView eyebrow = eyebrow("NODO OPERATIVO PRIVATO");
-        TextView title = text(host, 30, TEXT);
+        boolean compactHeader = getResources().getConfiguration().orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        TextView title = text(host, compactHeader ? 20 : 24, TEXT);
         title.setTag("value:host");
+        title.setMaxLines(1);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setContentDescription(host);
         title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
-        title.setPadding(0, dp(6), 0, dp(5));
-        TextView detail = text("Acceso e raggiungibile", 15, MUTED);
-        detail.setPadding(0, 0, 0, dp(22));
-        content.addView(eyebrow);
-        content.addView(title);
-        content.addView(detail);
+        title.setPadding(0, 0, 0, dp(compactHeader ? 6 : 12));
+        dashboardNavigation.addView(title);
         dashboardPanels.clear(); dashboardTabs.clear();
         HorizontalScrollView tabs = new HorizontalScrollView(this);
         tabs.setHorizontalScrollBarEnabled(false);
@@ -1621,8 +1623,10 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private void setTaggedText(String tag, String value) {
         View target = content.findViewWithTag(tag);
+        if (target == null) target = dashboardNavigation.findViewWithTag(tag);
         if (target instanceof TextView && !value.contentEquals(((TextView) target).getText())) {
             ((TextView) target).setText(value);
+            if ("value:host".equals(tag)) target.setContentDescription(value);
         }
     }
 
