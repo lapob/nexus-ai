@@ -16,6 +16,12 @@ solo Cloudflare Worker, `nexusnxs-site`, nell'account che possiede
 
 ## Requisiti e controlli
 
+La shell AI di emergenza si genera dallo stesso sorgente della web app con
+`node scripts/sync-ai-shell.mjs`. Per una release isolata usare
+`node scripts/sync-ai-shell.mjs --source-root=<directory-della-revisione-verificata>`;
+questo evita di modificare un checkout impegnato in un audit. La generazione
+non pubblica il Worker e non include conversazioni o dati operativi.
+
 - Node.js `>=22.13.0`.
 - Credenziale Cloudflare fuori dal repository.
 - Per la produzione, Cloudflare Account API Token `nexusnxs-release`, non un
