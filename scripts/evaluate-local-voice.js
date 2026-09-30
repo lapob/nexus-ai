@@ -35,6 +35,7 @@ function inspectWave(audio) {
 (async () => {
   const root = path.resolve(__dirname, '..');
   const service = new NeuralSpeechService({
+    workerPath: path.join(root, 'src', 'voice', 'neural-worker.py'),
     runtimeDirectory: path.join(root, 'vendor', 'kokoro'),
     pythonRuntimeDirectory: path.join(root, ...pythonRuntimeManifest.runtimeDirectory.split('/'))
   });

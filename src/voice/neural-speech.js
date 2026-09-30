@@ -72,9 +72,10 @@ function terminateOwnedProcessTree(child, platform = process.platform, runTaskki
 }
 
 class NeuralSpeechService {
-  constructor({ runtimeDirectory, pythonRuntimeDirectory, platform = process.platform, spawnProcess = spawn, runTaskkill = spawnSync, terminateProcess } = {}) {
+  constructor({ runtimeDirectory, pythonRuntimeDirectory, workerPath, platform = process.platform, spawnProcess = spawn, runTaskkill = spawnSync, terminateProcess } = {}) {
     this.runtimeDirectory = runtimeDirectory || '';
     this.pythonRuntimeDirectory = pythonRuntimeDirectory || '';
+    this.workerPath = workerPath || '';
     this.platform = platform;
     this.spawnProcess = spawnProcess;
     this.terminateProcess = terminateProcess || ((child) => terminateOwnedProcessTree(child, this.platform, runTaskkill));
@@ -92,11 +93,10 @@ class NeuralSpeechService {
   }
 
   paths() {
-    const windowlessPython = path.join(this.pythonRuntimeDirectory, 'pythonw.exe');
     return {
-      python: process.platform === 'win32' && fs.existsSync(windowlessPython) ? windowlessPython : path.join(this.pythonRuntimeDirectory, 'python.exe'),
+      python: path.join(this.pythonRuntimeDirectory, 'python.exe'),
       sitePackages: path.join(this.runtimeDirectory, '.venv', 'Lib', 'site-packages'),
-      worker: path.join(this.runtimeDirectory, 'worker.py'),
+      worker: this.workerPath || path.join(this.runtimeDirectory, 'worker.py'),
       model: path.join(this.runtimeDirectory, 'models', 'kokoro-v1.0.onnx'),
       voices: path.join(this.runtimeDirectory, 'models', 'voices-v1.0.bin')
     };

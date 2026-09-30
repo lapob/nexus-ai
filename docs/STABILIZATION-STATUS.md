@@ -14,10 +14,25 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   ispezionata sul Samsung, ma manca la matrice fisica della variante finale.
 - `ios` contiene una base SwiftUI/WKWebView localizzata, senza bridge
   privilegiato. Compilazione Xcode e prove iPhone/iPad non eseguite.
-- Controlli sorgenti e build renderer passati. Suite dopo il recupero:
-  928 passati, 2 saltati, 1 fallito per `vendor/kokoro/worker.py` mancante.
-  Il worker era escluso da Git: la riproducibilita della voce va corretta,
-  conservando il codice necessario tra i sorgenti e separandolo dai modelli.
+- Voce recuperata: worker versionato in `src/voice/neural-worker.py`, runtime
+  Python verificato e manifest con dipendenze e hash dei modelli. Il provisioning
+  separa sorgenti e asset ed e verificabile senza reinstallazione. Sei frasi
+  italiane producono WAV validi: 5058 ms a freddo, mediana 900 ms a caldo.
+  Questa misura non certifica naturalezza, riconoscimento o cancellazione eco.
+- Riprodotta l'interruzione fra richieste TTS concorrenti. Il candidato usa
+  motori remoti distinti dal desktop e una coda limitata, con proprietario,
+  cancellazione HTTP e arresto. Due richieste reali completate; test mirati e
+  revisione indipendente passati. La verifica globale resta bloccata come sotto.
+- Suite finale: 940 passati, zero falliti, 2 saltati; controllo sorgenti e build
+  renderer passati. Otto lingue producono WAV nel probe sintetico, senza
+  certificazione umana della pronuncia.
+  Doctor 10/10, smoke, shutdown, soak 250 cicli senza orfani e web offline
+  passati. Il servizio gia avviato non ha ancora caricato queste modifiche.
+- Grafica web: 21 layout Core, 40 stati di interfaccia, pianeta ad alta densita
+  nei quattro stati vocali, dock su 11 viewport e audit automatico di sei
+  superfici passati. Corretta la verifica della larghezza mobile per rispettare
+  il padding effettivo; nessun allargamento della barra. Queste prove non
+  sostituiscono il controllo fisico Android o una certificazione di accessibilita.
 - Runtime Ollama 0.32.15 ripristinato dagli archivi ufficiali verificati;
   controllate le firme di 83 binari. Riparato il database locale dello scanner.
   Health e readiness tornati disponibili; una risposta pubblica breve completa
@@ -28,9 +43,17 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 - Model Factory: nessun esempio autorizzato esportabile e nessuna preferenza
   nel controllo corrente; training non pronto. Sono presenti 40 casi di
   valutazione in 9 categorie, ancora da ampliare e revisionare.
-- Gate esperienza interrotto, nessuna nuova release distribuita. Questi
+- Gate esperienza fermato dal controllo risorse: servono 12.8 GiB di RAM,
+  circa 6.4 GiB disponibili. Nessun benchmark avviato sul servizio attivo;
+  finestra di manutenzione richiesta al proprietario. Nessuna nuova release
+  distribuita. Questi
   candidati sono salvati nel branch di sviluppo, ma non sono una release
-  approvata. La voce Kokoro resta da recuperare e collaudare.
+  approvata. Collaudo vocale umano, matrice Android e build iOS restano aperti.
+- Provisioning Ollama: accettate esclusivamente tre DLL redistributable
+  Microsoft con firma valida e publisher Microsoft, oltre ai binari Ollama.
+  Matrice di dieci casi positivi/negativi e verifica runtime esistente passate.
+  Restano 45 rilievi High/Critical a granularita modulo: il gate permette solo
+  sviluppo loopback, non distribuzione. Nessuna eccezione di release aggiunta.
 
 Le evidenze del 28 settembre sotto restano riferite a quella revisione e
 all'ambiente precedente; non certificano il runtime ricostruito.

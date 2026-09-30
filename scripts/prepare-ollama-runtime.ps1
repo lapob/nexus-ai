@@ -69,7 +69,12 @@ function Assert-OfficialRuntimeTree([string]$Root) {
   $artifacts = @(Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object { $_.Extension -in '.exe', '.dll' })
   foreach ($artifact in $artifacts) {
     $signature = Get-AuthenticodeSignature -LiteralPath $artifact.FullName
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '\bOllama Inc\b') {
+    # Official GPU bundles also contain the Microsoft Visual C++ runtime.
+    # Restrict that publisher exception to these exact redistributable names.
+    $ollamaSigned = $signature.SignerCertificate.Subject -match '\bOllama Inc\b'
+    $microsoftRuntime = $artifact.Name -in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') -and
+      $signature.SignerCertificate.Subject -match '(?:^|,\s*)O=Microsoft Corporation(?:,|$)'
+    if ($signature.Status -ne 'Valid' -or -not ($ollamaSigned -or $microsoftRuntime)) {
       throw "Firma ufficiale non valida per $($artifact.FullName): $($signature.Status)."
     }
   }

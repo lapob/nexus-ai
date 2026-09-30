@@ -647,7 +647,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -676,6 +676,7 @@ class RemoteSessionGateway {
     this.onWorkflowStatus = onWorkflowStatus;
     this.voiceTranscriber = typeof voiceTranscriber === 'function' ? voiceTranscriber : null;
     this.voiceSynthesizer = typeof voiceSynthesizer === 'function' ? voiceSynthesizer : null;
+    this.voiceCapabilityProvider = typeof voiceCapabilityProvider === 'function' ? voiceCapabilityProvider : null;
     this.imageGenerationService = imageGenerationService && typeof imageGenerationService.generate === 'function'
       ? imageGenerationService
       : null;
@@ -711,6 +712,7 @@ class RemoteSessionGateway {
     this.activeGuests = new Set();
     this.guestQueue = [];
     this.activeGuestExecutions = new Map();
+    this.activeVoiceRequests = new Set();
     this.activeConsoleOperations = new Map();
     this.state = readState(statePath);
     this.deviceChallenges = deviceChallengeStore || new DeviceIdentityChallengeStore({
@@ -1135,6 +1137,11 @@ class RemoteSessionGateway {
     };
   }
 
+  voiceOutputAvailable() {
+    try { return Boolean(this.voiceSynthesizer) && (!this.voiceCapabilityProvider || this.voiceCapabilityProvider() === true); }
+    catch { return false; }
+  }
+
   capabilityManifest({ publicIngress = false, device = null } = {}) {
     const privateScope = !publicIngress && this.hasScope(device, 'console');
     const workflowsAvailable = privateScope && [
@@ -1159,7 +1166,7 @@ class RemoteSessionGateway {
         chat: Boolean(this.onMessage),
         attachments: true,
         'voice-input': this.voiceTranscriber ? 'available' : 'degraded',
-        'voice-output': this.voiceSynthesizer ? 'available' : 'degraded',
+        'voice-output': this.voiceOutputAvailable() ? 'available' : 'degraded',
         'web-research': researchCapability,
         'image-generation': imageCapability,
         artifacts: Boolean(this.onMessage),
@@ -1591,6 +1598,8 @@ class RemoteSessionGateway {
       queued.reject(Object.assign(new Error('Servizio in arresto.'), { code: 'GUEST_STOPPED' }));
     }
     for (const execution of this.activeGuestExecutions.values()) execution.controller.abort();
+    for (const controller of this.activeVoiceRequests) controller.abort();
+    this.activeVoiceRequests.clear();
     for (const operation of this.activeConsoleOperations.values()) {
       if (!operation.settled) operation.controller.abort(Object.assign(new Error('Servizio in arresto.'), { name: 'AbortError', code: 'ACTION_CANCELLED' }));
     }
@@ -2001,7 +2010,7 @@ class RemoteSessionGateway {
       if (request.method === 'POST' && url.pathname === '/api/guest/voice/synthesize') {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
-        if (!this.voiceSynthesizer) return this.json(response, 503, { error: 'La voce NexusNXS non è disponibile.' });
+        if (!this.voiceOutputAvailable()) return this.json(response, 503, { error: 'La voce NexusNXS non è disponibile.' });
         const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
         const voiceAllowed = this.guestAllowed(`voice:${guest.id}`, 8, REQUEST_WINDOW_MS)
           && this.guestDailyAllowed(guest, 'voice', 2, 120)
@@ -2014,8 +2023,14 @@ class RemoteSessionGateway {
         const text = String(body.text || '').trim().slice(0, 4_000);
         const language = /^[a-z]{2}(?:-[A-Z]{2})?$/.test(String(body.language || '')) ? String(body.language) : 'it';
         if (!text) return this.json(response, 400, { error: 'Testo vocale mancante.' });
+        const controller = new AbortController();
+        const disconnect = () => { if (!response.writableEnded) controller.abort(); };
+        response.once('close', disconnect);
+        this.activeVoiceRequests.add(controller);
         try {
-          const result = await this.voiceSynthesizer({ text, language, gender: body.gender === 'female' ? 'female' : 'male' });
+          if (response.destroyed || this.stopping || this.disposed) { controller.abort(); return; }
+          const result = await this.voiceSynthesizer({ text, language, gender: body.gender === 'female' ? 'female' : 'male', owner: guest.id, signal: controller.signal });
+          if (controller.signal.aborted || response.destroyed || this.stopping || this.disposed) return;
           const audio = Buffer.from(result?.audio || []);
           if (!audio.length || audio.length > 16 * 1024 * 1024) throw new Error('Audio non valido.');
           response.writeHead(200, {
@@ -2028,8 +2043,13 @@ class RemoteSessionGateway {
           });
           response.end(audio);
           return;
-        } catch {
+        } catch (error) {
+          if (controller.signal.aborted || response.destroyed) return;
+          if (error?.code === 'VOICE_BUSY') return this.json(response, 429, { error: 'Voce occupata. Riprova tra poco.' });
           return this.json(response, 503, { error: 'La voce NexusNXS non è pronta.' });
+        } finally {
+          response.removeListener('close', disconnect);
+          this.activeVoiceRequests.delete(controller);
         }
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/images/generate') {

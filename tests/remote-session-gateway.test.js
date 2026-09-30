@@ -518,6 +518,60 @@ test('la voce pubblica trascrive e sintetizza soltanto dentro una sessione guest
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('la voce non viene annunciata disponibile quando manca il runtime', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-voice-capability-'));
+  let available = false;
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [] },
+    voiceSynthesizer: async () => { throw new Error('must not synthesize'); },
+    voiceCapabilityProvider: () => available,
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    assert.equal(gateway.voiceOutputAvailable(), false);
+    available = true; assert.equal(gateway.voiceOutputAvailable(), true);
+    gateway.voiceCapabilityProvider = () => { throw new Error('probe unavailable'); };
+    assert.equal(gateway.voiceOutputAvailable(), false);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const mode of ['disconnect', 'stop']) {
+  test(`la sintesi guest riceve ownership e cancellazione su ${mode}`, { timeout: 8000 }, async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-voice-cancel-'));
+    let started, cancelled;
+    const entered = new Promise((resolve) => { started = resolve; });
+    const aborted = new Promise((resolve) => { cancelled = resolve; });
+    const gateway = new RemoteSessionGateway({
+      statePath: path.join(root, 'remote-access.json'),
+      conversationStore: { list: () => [], save: (record) => record },
+      voiceSynthesizer: ({ owner, signal }) => new Promise((resolve) => {
+        assert.equal(typeof owner, 'string'); assert.ok(owner.length);
+        signal.addEventListener('abort', () => { cancelled(); resolve({ audio: Buffer.from('late-wave') }); }, { once: true });
+        started();
+      }),
+      logger: { info() {}, warn() {} }
+    });
+    try {
+      const port = await freePort();
+      await gateway.configure({ enabled: true, allowLan: false, port });
+      const base = `http://127.0.0.1:${port}`;
+      const guest = await bootstrapGuest(base);
+      const controller = new AbortController();
+      const response = fetch(`${base}/api/guest/voice/synthesize`, {
+        method: 'POST', signal: controller.signal,
+        headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Prova sintetica', language: 'it-IT' })
+      }).catch((error) => error);
+      await entered;
+      if (mode === 'disconnect') controller.abort();
+      else await gateway.stop();
+      await aborted; await response; await new Promise(setImmediate);
+      assert.equal(gateway.activeVoiceRequests.size, 0);
+    } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
 test('la generazione immagini pubblica resta server-side, autenticata e fail-closed', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-guest-image-'));
   const image = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4]);

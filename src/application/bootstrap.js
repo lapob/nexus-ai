@@ -55,6 +55,7 @@ const { ActionRuntime } = require('../agents/action-runtime');
 const { WorkflowRuntime } = require('../agents/workflow-runtime');
 const { NativeSpeechService } = require('../voice/native-speech');
 const { NeuralSpeechService } = require('../voice/neural-speech');
+const { RemoteSpeechQueue } = require('../voice/speech-arbiter');
 const { ExpressiveSpeechService } = require('../voice/expressive-speech');
 recordModuleStage('agents-voice');
 const { TrainingStore } = require('../infrastructure/storage/training-store');
@@ -257,6 +258,9 @@ function bootstrapElectron({ env = process.env } = {}) {
     ? path.join(process.resourcesPath, 'python', 'windows-x64')
     : path.join(appRoot, ...pythonRuntimeManifest.runtimeDirectory.split('/'));
   const neuralSpeechService = new NeuralSpeechService({
+    workerPath: app.isPackaged
+      ? path.join(process.resourcesPath, 'kokoro', 'worker.py')
+      : path.join(appRoot, 'src', 'voice', 'neural-worker.py'),
     runtimeDirectory: app.isPackaged
       ? path.join(process.resourcesPath, 'kokoro')
       : path.join(appRoot, 'vendor', 'kokoro'),
@@ -268,6 +272,16 @@ function bootstrapElectron({ env = process.env } = {}) {
       : path.join(appRoot, 'vendor', 'chatterbox'),
     pythonRuntimeDirectory
   });
+  const remoteNeuralSpeech = new NeuralSpeechService({
+    runtimeDirectory: neuralSpeechService.runtimeDirectory,
+    workerPath: neuralSpeechService.workerPath,
+    pythonRuntimeDirectory
+  });
+  const remoteExpressiveSpeech = new ExpressiveSpeechService({
+    runtimeDirectory: expressiveSpeechService.runtimeDirectory,
+    pythonRuntimeDirectory
+  });
+  const remoteSpeechQueue = new RemoteSpeechQueue({ neural: remoteNeuralSpeech, expressive: remoteExpressiveSpeech });
   let vaultLocation;
   const registry = new AIProviderRegistry()
     .register('ollama', (config) => new OllamaProvider(config))
@@ -317,6 +331,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         { label: 'riconoscimento vocale', run: () => speechService.shutdown?.() ?? speechService.stop() },
         { label: 'voce neurale', run: () => neuralSpeechService.shutdown() },
         { label: 'voce espressiva', run: () => expressiveSpeechService.shutdown() },
+        { label: 'voce remota', run: () => remoteSpeechQueue.shutdown() },
         { label: 'sessione remota', run: () => remoteGatewayInstance?.stop() },
         { label: 'bridge presenza', run: async () => {
           if (headlessMode) publishActivity('idle');
@@ -432,6 +447,7 @@ function bootstrapElectron({ env = process.env } = {}) {
       // performance. Sarà abilitato di default dopo un runtime GPU verificato.
       expressiveSpeechService.enabled = hardwareProfile.tier === 'performance'
         && env.NEXUS_DISABLE_EXPRESSIVE_VOICE !== '1';
+      remoteExpressiveSpeech.enabled = expressiveSpeechService.enabled;
       managedRuntime.configureHardware(tuning);
       const profileId = recommendedProfile(hardwareProfile);
       const requiredModels = publicClientMode ? [] : profileModels(MODEL_PROFILES[profileId]);
@@ -562,10 +578,9 @@ function bootstrapElectron({ env = process.env } = {}) {
           language,
           timeoutSeconds
         }),
-        voiceSynthesizer: async ({ text, language, gender }) => {
-          try { return await neuralSpeechService.synthesize({ text, language, gender, delivery: 'warm' }); }
-          catch { return expressiveSpeechService.synthesize({ text, language, gender }); }
-        },
+        voiceSynthesizer: (request) => remoteSpeechQueue.synthesize({ ...request, delivery: 'warm' }),
+        voiceCapabilityProvider: () => !remoteSpeechQueue.disposed
+          && (remoteNeuralSpeech.capabilities().available || remoteExpressiveSpeech.capabilities().available),
         // Il listener headless può accettare health check immediatamente, ma
         // /readyz resta onesto finché il preload del modello rapido non termina.
         readinessProvider: () => !aiWarmupPolicy.requiresReadiness || ipcServices?.aiReadiness?.().ready === true,

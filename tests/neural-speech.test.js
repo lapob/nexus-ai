@@ -55,11 +55,33 @@ test('la voce neurale richiede runtime e preset locali completi', (t) => {
 });
 
 test('il worker Kokoro usa voce e fonemizzazione della lingua richiesta', () => {
-  const worker = fs.readFileSync(path.join(__dirname, '..', 'vendor', 'kokoro', 'worker.py'), 'utf8');
+  const worker = fs.readFileSync(path.join(__dirname, '..', 'src', 'voice', 'neural-worker.py'), 'utf8');
   for (const language of KOKORO_LANGUAGES) assert.match(worker, new RegExp(`"${language}"\\s*:`));
   assert.match(worker, /lang=profile\["lang"\]/u);
   assert.doesNotMatch(worker, /lang="it"/u);
   assert.ok(worker.includes('re.split(r"(?<=[.!?;:。！？；：])\\s+", text)'));
+});
+
+test('il worker valida lingua, dimensioni e destinazione senza importare il modello', (t) => {
+  const { spawnSync } = require('node:child_process');
+  const manifest = require('../config/python-runtime.json');
+  const python = path.join(__dirname, '..', manifest.runtimeDirectory, 'python.exe');
+  if (!fs.existsSync(python)) return t.skip('Python portabile non installato');
+  const worker = path.join(__dirname, '..', 'src', 'voice', 'neural-worker.py');
+  const code = `import runpy,sys,tempfile,pathlib,uuid
+module=runpy.run_path(sys.argv[1])
+identifier=str(uuid.uuid4())
+base={"id":identifier,"text":"Perché la qualità conta?","language":"it","gender":"female","output":str(pathlib.Path(tempfile.gettempdir())/f"nexus-tts-{identifier}.wav")}
+assert module["validate_request"](base)[2]["lang"] == "it"
+for invalid in [{**base,"text":"x"*521},{**base,"language":"../it"},{**base,"output":str(pathlib.Path(tempfile.gettempdir())/"unrelated.txt")}]:
+    try: module["validate_request"](invalid)
+    except ValueError: pass
+    else: raise AssertionError("unsafe request accepted")
+assert all(len(part)<=180 for part in module["text_segments"]("parola "*70))
+assert not pathlib.Path(base["output"]).exists()
+print("worker boundaries PASS")`;
+  const result = spawnSync(python, ['-I', '-c', code, worker], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('rimuove l’audio temporaneo quando il worker segnala un errore', async (t) => {

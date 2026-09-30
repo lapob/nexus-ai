@@ -43,7 +43,7 @@ if (!pythonRuntime || normalizedResource(pythonRuntime) !== pythonRuntimeManifes
   || !pythonRuntime.filter?.includes('!**/*.pdb')) {
   throw new Error('Runtime Python del pacchetto non coerente con il manifest verificato.');
 }
-const kokoroWorker = resources.find((entry) => normalizedResource(entry).endsWith('vendor/kokoro/worker.py'));
+const kokoroWorker = resources.find((entry) => normalizedResource(entry) === 'src/voice/neural-worker.py');
 const kokoroModels = resources.find((entry) => normalizedResource(entry).endsWith('vendor/kokoro/models'));
 const kokoroPackages = resources.find((entry) => normalizedResource(entry).endsWith('vendor/kokoro/.venv/Lib/site-packages'));
 const excludesDirectory = (patterns, directory) => {

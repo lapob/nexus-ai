@@ -235,7 +235,7 @@ test('il preflight è incrementale e non apre shell Windows secondarie', () => {
 
 test('l installer include soltanto il runtime Kokoro effettivamente usato', () => {
   const resources = pkg.build.extraResources;
-  assert.ok(resources.some((entry) => entry.from === 'vendor/kokoro/worker.py'));
+  assert.ok(resources.some((entry) => entry.from === 'src/voice/neural-worker.py' && entry.to === 'kokoro/worker.py'));
   assert.ok(resources.some((entry) => entry.from === 'vendor/kokoro/models'));
   const packages = resources.find((entry) => entry.from === 'vendor/kokoro/.venv/Lib/site-packages');
   assert.ok(packages);

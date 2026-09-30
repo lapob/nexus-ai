@@ -37,6 +37,22 @@ La rigenerazione dei build puo rioccupare spazio: distinguere byte rimossi e sal
 
 ## Valutazioni dei modelli
 
+La voce locale si ricostruisce con `scripts/provision-python-runtime.ps1`,
+poi `scripts/provision-neural-voice.ps1 -InstallerPython python` usando un
+Python di sviluppo con pip. L'installer pip resta esterno al runtime distribuito.
+`-CheckOnly` verifica Python, checksum dei modelli, tutte le versioni delle
+dipendenze e gli import senza scaricare o installare. I pin sono in
+`config/neural-voice-runtime.json`; `src/voice/neural-worker.py` e sorgente
+tracciato, copiato nelle risorse solo durante il packaging.
+`npm run voice:evaluate` verifica audio e latenza su sei frasi sintetiche:
+non sostituisce l'ascolto umano o il collaudo microfono/eco.
+
+La sintesi pubblica usa istanze distinte da quelle desktop, una coda di
+quattro richieste e una richiesta per sessione. Disconnessione, scadenza e
+arresto cancellano solo il lavoro posseduto; non attivano un fallback tardivo.
+Le capability della voce pubblica verificano la presenza del runtime,
+anziche dedurla dalla sola presenza della funzione nel server.
+
 Il valutatore usa un endpoint locale dedicato (default 127.0.0.1:11435),
 configurabile con NEXUS_EVALUATION_ENDPOINT. Rifiuta la porta del servizio attivo.
 Con il servizio attivo usa CPU e verifica la RAM rispetto alla dimensione dei modelli;

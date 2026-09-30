@@ -273,7 +273,7 @@
         ]
       },
       {
-        "from": "vendor/kokoro/worker.py",
+        "from": "src/voice/neural-worker.py",
         "to": "kokoro/worker.py"
       },
       {

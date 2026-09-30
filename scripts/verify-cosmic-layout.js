@@ -74,7 +74,11 @@ const assert = require('node:assert/strict');
       assert.ok(composer.y >= 0 && composer.y + composer.height <= height, 'Composer fits vertically');
       if (width <= 560) {
         const box = await page.locator('.composer-box').boundingBox();
-        assert.ok(box.width >= composer.width - 2, 'Mobile text field uses the whole composer width');
+        const content = await page.locator('.composer').evaluate(el => {
+          const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+          return { left: rect.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft), right: rect.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight) };
+        });
+        assert.ok(Math.abs(box.x - content.left) <= 1 && Math.abs(box.x + box.width - content.right) <= 1, 'Mobile text field fills the composer content width, respecting its padding');
         for (const id of ['attachment', 'keyboard', 'send']) {
           const control = await page.locator('#' + id).boundingBox();
           assert.ok(control.y >= box.y + box.height, 'Mobile controls stay below the text field');

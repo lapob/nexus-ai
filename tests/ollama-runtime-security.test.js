@@ -130,10 +130,45 @@ test('il provisioning preserva backend GPU firmati, aggiornamento esplicito e ro
   assert.match(source, /lib\\ollama\\cuda_v12\\ggml-cuda\.dll/);
   assert.match(source, /lib\\ollama\\vulkan\\ggml-vulkan\.dll/);
   assert.match(source, /Get-ChildItem -LiteralPath \$Root -Recurse -File/);
-  assert.match(source, /SignerCertificate\.Subject -notmatch '\\bOllama Inc\\b'/);
+  assert.match(source, /SignerCertificate\.Subject -match '\\bOllama Inc\\b'/);
   assert.match(source, /\.ollama-download-/);
   assert.match(source, /Move-Item -LiteralPath \$destinationFull -Destination \$backup/);
   assert.match(source, /Move-Item -LiteralPath \$staging -Destination \$destinationFull[\s\S]+Assert-OfficialRuntimeTree -Root \$destinationFull/);
   assert.match(source, /Move-Item -LiteralPath \$backup -Destination \$destinationFull/);
   assert.match(source, /if \(\$KeepBackup\)/);
+});
+
+test('il provisioning accetta solo redistributable Microsoft validi e rifiuta publisher o firme errati', { skip: process.platform !== 'win32' }, () => {
+  const script = `
+    $ErrorActionPreference = 'Stop'
+    $source = [IO.File]::ReadAllText('scripts/prepare-ollama-runtime.ps1')
+    $ast = [Management.Automation.Language.Parser]::ParseInput($source, [ref]$null, [ref]$null)
+    $definition = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Assert-OfficialRuntimeTree' }, $true)
+    . ([scriptblock]::Create($definition.Extent.Text))
+    function Test-Path { return $true }
+    function Get-ChildItem { return [pscustomobject]@{Name=$script:name;FullName=$script:name;Extension=[IO.Path]::GetExtension($script:name)} }
+    function Get-AuthenticodeSignature { return [pscustomobject]@{Status=$script:status;SignerCertificate=[pscustomobject]@{Subject=$script:subject}} }
+    $cases = @(
+      @('ollama.exe','Valid','CN=Ollama Inc., O=Ollama Inc.', $true),
+      @('msvcp140.dll','Valid','CN=Microsoft Corporation, O=Microsoft Corporation, C=US', $true),
+      @('vcruntime140.dll','Valid','O=Microsoft Corporation', $true),
+      @('vcruntime140_1.dll','Valid','O=Microsoft Corporation', $true),
+      @('ollama.exe','Valid','O=Microsoft Corporation', $false),
+      @('other.dll','Valid','O=Microsoft Corporation', $false),
+      @('msvcp140.dll','HashMismatch','O=Microsoft Corporation', $false),
+      @('msvcp140.dll','NotSigned','', $false),
+      @('msvcp140.dll','Valid','CN=Microsoft Corporation, O=Unknown', $false),
+      @('msvcp140.dll','Valid','O=Microsoft Corporation Impostor', $false)
+    )
+    foreach ($case in $cases) {
+      $script:name,$script:status,$script:subject,$expected = $case
+      $accepted = $true
+      try { Assert-OfficialRuntimeTree -Root 'C:\\runtime' } catch { $accepted = $false }
+      if ($accepted -ne $expected) { throw ('Unexpected signature acceptance: ' + $script:name + ' ' + $script:subject) }
+    }
+    Write-Output 'PASS signature acceptance matrix'
+  `;
+  const result = require('node:child_process').spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { cwd: path.join(__dirname, '..'), encoding: 'utf8', windowsHide: true, timeout: 30000 });
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  assert.match(result.stdout, /PASS signature acceptance matrix/);
 });
