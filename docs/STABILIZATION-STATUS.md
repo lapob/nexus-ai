@@ -26,11 +26,11 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   cancellazione HTTP e arresto. Due richieste reali completate; test mirati e
   revisione indipendente passati. Il servizio e stato aggiornato e una
   sintesi pubblica reale ha restituito un WAV valido in 2733 ms.
-- Suite finale: 940 passati, zero falliti, 2 saltati; controllo sorgenti e build
+- Suite finale: 943 passati, zero falliti, 2 saltati; controllo sorgenti e build
   renderer passati. Otto lingue producono WAV nel probe sintetico, senza
   certificazione umana della pronuncia.
   Doctor 10/10, smoke, shutdown, soak 250 cicli senza orfani e web offline
-  passati. Il servizio ha caricato la revisione 97f3c8c durante la manutenzione.
+  passati. Il servizio ha caricato la revisione 286cc4e durante la manutenzione.
 - Grafica web: 21 layout Core, 40 stati di interfaccia, pianeta ad alta densita
   nei quattro stati vocali, dock su 11 viewport e audit automatico di sei
   superfici passati. Corretta la verifica della larghezza mobile per rispettare
@@ -72,6 +72,10 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   Prova sintetica TTS→STT: frase italiana corretta, lingua `it`, 857 ms.
   Non misura WER umano, rumore o eco. Il pacchetto include il modello base
   necessario ed esclude archivio di download e file parziali.
+- Verifica pubblica dopo l'aggiornamento 286cc4e: health/readiness HTTP 200,
+  trascrizione italiana HTTP 200 in 1019 ms, sintesi WAV HTTP 200 in 2412 ms,
+  risposta chat semplice completata in 1027 ms. Misure su singole richieste,
+  senza equivalenza a un benchmark di qualita o disponibilita continuativa.
 
 Per ricostruire o verificare STT: `npm run voice:provision:whisper` e
 `npm run voice:check:whisper`. Download circa 156 MB, inferenza solo locale;
