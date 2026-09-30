@@ -8,6 +8,13 @@
 Il sito resta nel repository `.SITE`. Non spostare moduli per sola estetica:
 prima verificare import, script di build e percorsi di distribuzione.
 
+Riutilizzare questa struttura senza creare checkout o cartelle di lavoro
+parallele. `ios` contiene la base sperimentale del client Apple; richiede
+compilazione e prove con Xcode prima di una distribuzione. Pubblicare in
+`lapob/nexus-ai` soltanto sorgenti e documentazione pertinenti: dati personali,
+knowledge operative, credenziali, modelli, dipendenze e build restano esclusi.
+Le release binarie verificate usano gli asset GitHub Releases, non la storia Git.
+
 ## Fonti grafiche
 
 `config/nexus-design-tokens.json` e la fonte dei colori condivisi.

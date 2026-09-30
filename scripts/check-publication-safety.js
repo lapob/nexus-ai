@@ -17,7 +17,7 @@ const candidates = output.split('\0').filter(Boolean);
 const textExtensions = new Set([
   '.cjs', '.css', '.gradle', '.htm', '.html', '.hujson', '.js', '.json', '.jsx',
   '.kt', '.kts', '.md', '.mjs', '.ps1', '.properties', '.toml', '.ts', '.tsx',
-  '.txt', '.xml', '.yaml', '.yml'
+  '.txt', '.xml', '.yaml', '.yml', '.swift', '.strings', '.plist'
 ]);
 const alwaysText = new Set(['.env.example', '.gitattributes', '.gitignore']);
 

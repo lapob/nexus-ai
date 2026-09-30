@@ -1,0 +1,15 @@
+"connection.unavailable" = "Nexus is not reachable";
+"connection.detail" = "Check your connection and try again.";
+"connection.retry" = "Try again";
+"settings.title" = "Settings";
+"settings.device" = "Device";
+"settings.permissions" = "App permissions";
+"settings.device.detail" = "Native text size and transitions follow iOS accessibility preferences.";
+"settings.service" = "Connection";
+"settings.status" = "Service status";
+"settings.service.detail" = "AI responses require the NexusNXS service. This first client does not run a model on the iPhone.";
+"settings.privacy" = "Privacy";
+"settings.terms" = "Terms of use";
+"settings.about" = "About";
+"settings.version" = "Version";
+"settings.preview" = "Development preview. Not an App Store release.";

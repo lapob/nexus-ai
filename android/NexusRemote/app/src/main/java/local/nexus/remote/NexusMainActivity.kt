@@ -2803,6 +2803,8 @@ private fun JSONArray?.toTurns() = buildList {
     var menuPreferences by rememberSaveable { mutableStateOf(false) }
     var menuSection by rememberSaveable { mutableStateOf("") }
     var menuSearchOpen by rememberSaveable { mutableStateOf(false) }
+    val settingsScroll = rememberScrollState()
+    LaunchedEffect(menuSection, menuPreferences) { settingsScroll.scrollTo(0) }
     LaunchedEffect(settingsOpen, menuPreferences, menuSection) { menuSearchOpen = false }
     LaunchedEffect(settingsOpen) { if (!settingsOpen) { menuPreferences = false; menuSection = "" } }
     var remoteSettingsOpen by rememberSaveable { mutableStateOf(false) }
@@ -2825,6 +2827,16 @@ private fun JSONArray?.toTurns() = buildList {
     val focusRequester = remember { FocusRequester() }
     val coreConfiguration = LocalConfiguration.current
     val drawerWidth = minOf(coreConfiguration.screenWidthDp * .84f, 380f).dp
+    val menuWidth by animateDpAsState(
+        targetValue = if (menuPreferences) coreConfiguration.screenWidthDp.dp else drawerWidth,
+        animationSpec = tween(if (reduceMotion) 0 else 220, easing = NexusFlow.standard),
+        label = "settingsWidth"
+    )
+    val menuCorner by animateDpAsState(
+        targetValue = if (menuPreferences) 0.dp else 28.dp,
+        animationSpec = tween(if (reduceMotion) 0 else 220, easing = NexusFlow.standard),
+        label = "settingsCorner"
+    )
     val drawerWidthPx = with(LocalDensity.current) { drawerWidth.toPx() }
     var drawerDragging by remember { mutableStateOf(false) }
     var drawerDragFraction by remember { mutableFloatStateOf(0f) }
@@ -3165,10 +3177,13 @@ private fun JSONArray?.toTurns() = buildList {
         BackHandler(enabled = settingsOpen) { if (menuSearchOpen) { menuSearchOpen = false; keyboard?.hide() } else if (menuSection.isNotEmpty()) menuSection = "" else if (menuPreferences) menuPreferences = false else settingsOpen = false }
         if (drawerFraction > 0f || settingsOpen || drawerDragging) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f * drawerFraction)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
-            Surface(color = Ink, shape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp), modifier = Modifier.fillMaxHeight().width(drawerWidth)
+            Surface(color = Ink, shape = RoundedCornerShape(topEnd = menuCorner, bottomEnd = menuCorner), modifier = Modifier.fillMaxHeight().width(menuWidth)
                 .offset { IntOffset(((drawerFraction - 1f) * drawerWidthPx).toInt(), 0) }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                .pointerInput(drawerWidthPx) {
+                .pointerInput(drawerWidthPx, menuPreferences) {
+                    // Settings own the full screen; sliders and back navigation
+                    // must not start a conversation-drawer dismissal gesture.
+                    if (menuPreferences) return@pointerInput
                     detectHorizontalDragGestures(
                         onDragStart = { drawerDragFraction = currentDrawerFraction; drawerDragging = true },
                         onDragEnd = { settingsOpen = drawerDragFraction >= .65f; drawerDragging = false },
@@ -3198,8 +3213,8 @@ private fun JSONArray?.toTurns() = buildList {
                         voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
                         settingsOpen = false; typedSession = true; textMode = false
                     }
-                    IconButton(onClick = { menuPreferences = true }, modifier = Modifier.align(Alignment.Start)) { Icon(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings"), tint = Mist) }
-                    } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    IconButton(onClick = { keyboard?.hide(); focusManager.clearFocus(force = true); menuPreferences = true }, modifier = Modifier.align(Alignment.Start)) { Icon(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings"), tint = Mist) }
+                    } else Column(Modifier.weight(1f).align(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth().verticalScroll(settingsScroll), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (menuSection.isEmpty()) {
                         InstantSettingsNavigation(searchVisible = menuSearchOpen) { section ->
                             keyboard?.hide(); focusManager.clearFocus(force = true); menuSection = section
@@ -4116,10 +4131,20 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
         shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().focusRequester(searchFocus))
     if (matches.isEmpty()) Text(nexusCopy("Nessuna impostazione trovata", "No settings found"), color = Mist, style = MaterialTheme.typography.bodySmall)
-    else SettingsGroup {
-        matches.forEach { (id, title, detail) ->
-            val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
-            CompactSetting(icon, title, "", { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
+    else {
+        val groups = listOf(
+            nexusCopy("Esperienza", "Experience") to matches.filter { it.first in setOf("appearance", "voice") },
+            nexusCopy("Connessioni e dati", "Connections and data") to matches.filter { it.first in setOf("devices", "privacy") }
+        )
+        groups.filter { it.second.isNotEmpty() }.forEach { (heading, rows) ->
+            Text(heading, color = Mist, style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp))
+            SettingsGroup {
+                rows.forEach { (id, title, _) ->
+                    val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
+                    CompactSetting(icon, title, "", { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
+                }
+            }
         }
     }
 }

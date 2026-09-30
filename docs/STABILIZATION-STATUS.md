@@ -1,7 +1,29 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 28 settembre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 30 settembre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
+
+## Recupero e candidati del 30 settembre
+
+- Ripristinata la cronologia Git dalla revisione salvata `20f4c17`, dopo la
+  cancellazione del checkout principale. I sorgenti locali Android e iOS
+  sono stati conservati. Dipendenze npm ed Electron ricostruiti dalla cache.
+- Android pubblico 6.5.20: impostazioni a schermo intero, categorie raggruppate,
+  larghezza limitata sui tablet e gesture del drawer disattivata nelle
+  impostazioni. Build/lint e 48 contratti passati; la prima variante e stata
+  ispezionata sul Samsung, ma manca la matrice fisica della variante finale.
+- `ios` contiene una base SwiftUI/WKWebView localizzata, senza bridge
+  privilegiato. Compilazione Xcode e prove iPhone/iPad non eseguite.
+- Controlli sorgenti e build renderer passati. Suite dopo il recupero:
+  928 passati, 2 saltati, 1 fallito per `vendor/kokoro/worker.py` mancante.
+  Il worker era escluso da Git: la riproducibilita della voce va corretta,
+  conservando il codice necessario tra i sorgenti e separandolo dai modelli.
+- Ripristino del runtime AI ancora in corso. Gate esperienza interrotto,
+  nessuna nuova release distribuita. Questi candidati possono essere salvati
+  nel branch di sviluppo, ma non sono una release approvata.
+
+Le evidenze del 28 settembre sotto restano riferite a quella revisione e
+all'ambiente precedente; non certificano il runtime ricostruito.
 
 | Area | Verificato | Residuo |
 | --- | --- | --- |
