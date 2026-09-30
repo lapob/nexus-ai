@@ -18,9 +18,19 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   928 passati, 2 saltati, 1 fallito per `vendor/kokoro/worker.py` mancante.
   Il worker era escluso da Git: la riproducibilita della voce va corretta,
   conservando il codice necessario tra i sorgenti e separandolo dai modelli.
-- Ripristino del runtime AI ancora in corso. Gate esperienza interrotto,
-  nessuna nuova release distribuita. Questi candidati possono essere salvati
-  nel branch di sviluppo, ma non sono una release approvata.
+- Runtime Ollama 0.32.15 ripristinato dagli archivi ufficiali verificati;
+  controllate le firme di 83 binari. Riparato il database locale dello scanner.
+  Health e readiness tornati disponibili; una risposta pubblica breve completa
+  in 799 ms conferma il percorso chat, senza costituire un benchmark generale.
+- Web offline: bozza, allegati, tre profili, riconnessione senza invio e reload
+  anonimo passati. Impostazioni Android finali ispezionate sul Samsung in
+  verticale, a schermo intero e con gruppi leggibili. Matrice restante aperta.
+- Model Factory: nessun esempio autorizzato esportabile e nessuna preferenza
+  nel controllo corrente; training non pronto. Sono presenti 40 casi di
+  valutazione in 9 categorie, ancora da ampliare e revisionare.
+- Gate esperienza interrotto, nessuna nuova release distribuita. Questi
+  candidati sono salvati nel branch di sviluppo, ma non sono una release
+  approvata. La voce Kokoro resta da recuperare e collaudare.
 
 Le evidenze del 28 settembre sotto restano riferite a quella revisione e
 all'ambiente precedente; non certificano il runtime ricostruito.
