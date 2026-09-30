@@ -271,7 +271,8 @@ test('la chiusura ChatGPT passa automaticamente al fallback se WM_CLOSE viene ri
 test('Windows independent launch preserves literal arguments, cwd and environment', { skip: process.platform !== 'win32' }, async (t) => {
   const os = require('node:os');
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-launch-[literal] '));
-  t.after(() => fs.rmSync(temporaryRoot, { recursive: true, force: true }));
+  // The probe writes its result just before Windows releases its working directory.
+  t.after(() => fs.promises.rm(temporaryRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   const script = path.join(temporaryRoot, 'probe.js');
   const output = path.join(temporaryRoot, 'result.json');
   fs.writeFileSync(script, "require('node:fs').writeFileSync('result.json',JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),marker:process.env.NEXUS_LAUNCH_TEST_MARKER}))");

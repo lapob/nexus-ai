@@ -11,7 +11,9 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 - Android pubblico 6.5.20: impostazioni a schermo intero, categorie raggruppate,
   larghezza limitata sui tablet e gesture del drawer disattivata nelle
   impostazioni. Build/lint e 48 contratti passati; la prima variante e stata
-  ispezionata sul Samsung, ma manca la matrice fisica della variante finale.
+  ispezionata sul Samsung. Anche la matrice finale passa su cinque profili:
+  frame lenti 3.68%-8.41%, con ripristino del display originale. Non copre
+  ogni gesto o tutte le combinazioni di dispositivi.
 - `ios` contiene una base SwiftUI/WKWebView localizzata, senza bridge
   privilegiato. Compilazione Xcode e prove iPhone/iPad non eseguite.
 - Voce recuperata: worker versionato in `src/voice/neural-worker.py`, runtime
@@ -22,12 +24,13 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 - Riprodotta l'interruzione fra richieste TTS concorrenti. Il candidato usa
   motori remoti distinti dal desktop e una coda limitata, con proprietario,
   cancellazione HTTP e arresto. Due richieste reali completate; test mirati e
-  revisione indipendente passati. La verifica globale resta bloccata come sotto.
+  revisione indipendente passati. Il servizio e stato aggiornato e una
+  sintesi pubblica reale ha restituito un WAV valido in 2733 ms.
 - Suite finale: 940 passati, zero falliti, 2 saltati; controllo sorgenti e build
   renderer passati. Otto lingue producono WAV nel probe sintetico, senza
   certificazione umana della pronuncia.
   Doctor 10/10, smoke, shutdown, soak 250 cicli senza orfani e web offline
-  passati. Il servizio gia avviato non ha ancora caricato queste modifiche.
+  passati. Il servizio ha caricato la revisione 97f3c8c durante la manutenzione.
 - Grafica web: 21 layout Core, 40 stati di interfaccia, pianeta ad alta densita
   nei quattro stati vocali, dock su 11 viewport e audit automatico di sei
   superfici passati. Corretta la verifica della larghezza mobile per rispettare
@@ -39,21 +42,41 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   in 799 ms conferma il percorso chat, senza costituire un benchmark generale.
 - Web offline: bozza, allegati, tre profili, riconnessione senza invio e reload
   anonimo passati. Impostazioni Android finali ispezionate sul Samsung in
-  verticale, a schermo intero e con gruppi leggibili. Matrice restante aperta.
+  verticale, a schermo intero e con gruppi leggibili; matrice finale passata.
 - Model Factory: nessun esempio autorizzato esportabile e nessuna preferenza
   nel controllo corrente; training non pronto. Sono presenti 40 casi di
   valutazione in 9 categorie, ancora da ampliare e revisionare.
-- Gate esperienza fermato dal controllo risorse: servono 12.8 GiB di RAM,
-  circa 6.4 GiB disponibili. Nessun benchmark avviato sul servizio attivo;
-  finestra di manutenzione richiesta al proprietario. Nessuna nuova release
-  distribuita. Questi
-  candidati sono salvati nel branch di sviluppo, ma non sono una release
-  approvata. Collaudo vocale umano, matrice Android e build iOS restano aperti.
+- Gate esperienza superato dopo manutenzione del solo servizio: 8B 94%,
+  14B 100% su 18 casi ciascuno, mediane 3810/5716 ms, voce, smoke,
+  shutdown e soak 250 cicli senza orfani. Il runtime di valutazione era
+  dedicato; servizio riavviato, health e readiness pubbliche verificate.
+  Non e un confronto universale con prodotti commerciali. Collaudo vocale
+  umano e build iOS restano aperti; nessuna nuova release stabile.
 - Provisioning Ollama: accettate esclusivamente tre DLL redistributable
   Microsoft con firma valida e publisher Microsoft, oltre ai binari Ollama.
   Matrice di dieci casi positivi/negativi e verifica runtime esistente passate.
   Restano 45 rilievi High/Critical a granularita modulo: il gate permette solo
   sviluppo loopback, non distribuzione. Nessuna eccezione di release aggiunta.
+- Anche il candidato ufficiale Ollama 0.35.0 presenta 45 rilievi nel gate:
+  non e stato sostituito al runtime attivo e non risolve il blocco distribuzione.
+- Correzione revoca: le connessioni eventi/telemetria gia aperte vengono
+  chiuse prima dei messaggi di cancellazione, con controllo dell'identita
+  attuale su ogni invio e dopo elaborazioni asincrone. Due regressioni
+  riprodotte prima del fix e risolte; rotazione token e altro dispositivo
+  restano operativi. Revisione indipendente senza bypass concreto rilevato.
+  L'audit generale Codex Security resta parziale, anche per un limite di
+  utilizzo del revisore delle operazioni: non e una certificazione globale.
+- STT locale ricostruito: manifest con hash e script ripetibile per
+  whisper.cpp 1.9.2 CPU e modello base multilingue. Il controllo API distingue
+  disponibilita del microfono SAPI dalla trascrizione di file audio.
+  Prova sintetica TTS→STT: frase italiana corretta, lingua `it`, 857 ms.
+  Non misura WER umano, rumore o eco. Il pacchetto include il modello base
+  necessario ed esclude archivio di download e file parziali.
+
+Per ricostruire o verificare STT: `npm run voice:provision:whisper` e
+`npm run voice:check:whisper`. Download circa 156 MB, inferenza solo locale;
+binari e modelli restano esclusi da Git. Il controllo confronta ogni binario
+installato con l'archivio ufficiale verificato, senza sovrascrivere file diversi.
 
 Le evidenze del 28 settembre sotto restano riferite a quella revisione e
 all'ambiente precedente; non certificano il runtime ricostruito.

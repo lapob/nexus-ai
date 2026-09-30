@@ -579,6 +579,7 @@ function bootstrapElectron({ env = process.env } = {}) {
           timeoutSeconds
         }),
         voiceSynthesizer: (request) => remoteSpeechQueue.synthesize({ ...request, delivery: 'warm' }),
+        voiceInputCapabilityProvider: () => speechService.audioAvailable(),
         voiceCapabilityProvider: () => !remoteSpeechQueue.disposed
           && (remoteNeuralSpeech.capabilities().available || remoteExpressiveSpeech.capabilities().available),
         // Il listener headless può accettare health check immediatamente, ma

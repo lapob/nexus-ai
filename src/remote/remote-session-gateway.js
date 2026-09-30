@@ -647,7 +647,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -677,6 +677,7 @@ class RemoteSessionGateway {
     this.voiceTranscriber = typeof voiceTranscriber === 'function' ? voiceTranscriber : null;
     this.voiceSynthesizer = typeof voiceSynthesizer === 'function' ? voiceSynthesizer : null;
     this.voiceCapabilityProvider = typeof voiceCapabilityProvider === 'function' ? voiceCapabilityProvider : null;
+    this.voiceInputCapabilityProvider = typeof voiceInputCapabilityProvider === 'function' ? voiceInputCapabilityProvider : null;
     this.imageGenerationService = imageGenerationService && typeof imageGenerationService.generate === 'function'
       ? imageGenerationService
       : null;
@@ -1142,6 +1143,11 @@ class RemoteSessionGateway {
     catch { return false; }
   }
 
+  voiceInputAvailable() {
+    try { return Boolean(this.voiceTranscriber) && (!this.voiceInputCapabilityProvider || this.voiceInputCapabilityProvider() === true); }
+    catch { return false; }
+  }
+
   capabilityManifest({ publicIngress = false, device = null } = {}) {
     const privateScope = !publicIngress && this.hasScope(device, 'console');
     const workflowsAvailable = privateScope && [
@@ -1165,7 +1171,7 @@ class RemoteSessionGateway {
       features: {
         chat: Boolean(this.onMessage),
         attachments: true,
-        'voice-input': this.voiceTranscriber ? 'available' : 'degraded',
+        'voice-input': this.voiceInputAvailable() ? 'available' : 'degraded',
         'voice-output': this.voiceOutputAvailable() ? 'available' : 'degraded',
         'web-research': researchCapability,
         'image-generation': imageCapability,
@@ -1350,8 +1356,46 @@ class RemoteSessionGateway {
     for (const stream of [...this.eventStreams]) {
       if (!stream.scopes.has(audience)) continue;
       if (deviceId && stream.deviceId !== deviceId) continue;
-      try { stream.response.write(frame); } catch { this.eventStreams.delete(stream); }
+      this.writeDeviceStream(stream, frame, audience);
     }
+  }
+
+  closeDeviceStream(stream) {
+    if (stream.closed) return;
+    stream.closed = true;
+    clearInterval(stream.heartbeat);
+    clearInterval(stream.telemetry);
+    this.eventStreams.delete(stream);
+    this.telemetryStreams.delete(stream);
+    try { stream.response.end(); } catch {}
+  }
+
+  canWriteDeviceStream(stream, audience) {
+    const device = this.state.devices.find((entry) => entry.id === stream.deviceId);
+    const registered = this.eventStreams.has(stream) || this.telemetryStreams.has(stream);
+    const authorized = device && (audience
+      ? stream.scopes.has(audience) && this.hasScope(device, audience)
+      : [...stream.scopes].some((scope) => this.hasScope(device, scope)));
+    if (stream.closed || !registered || !authorized || stream.response.destroyed || stream.response.writableEnded) {
+      this.closeDeviceStream(stream);
+      return false;
+    }
+    return true;
+  }
+
+  writeDeviceStream(stream, frame, audience) {
+    if (!this.canWriteDeviceStream(stream, audience)) return false;
+    try { stream.response.write(frame); return true; }
+    catch { this.closeDeviceStream(stream); return false; }
+  }
+
+  watchDeviceStream(request, stream) {
+    const close = () => this.closeDeviceStream(stream);
+    request.once('close', close);
+    stream.response.once('close', close);
+    stream.response.once('error', close);
+    stream.heartbeat = setInterval(() => this.writeDeviceStream(stream, ': keepalive\n\n'), 20_000);
+    stream.heartbeat.unref?.();
   }
 
   async telemetrySnapshot() {
@@ -1388,17 +1432,11 @@ class RemoteSessionGateway {
       'X-Frame-Options': 'DENY',
       'X-Accel-Buffering': 'no'
     });
-    response.write(`data: ${JSON.stringify({ type: 'ready', at: Date.now() })}\n\n`);
     const scopes = new Set(scope === 'remote' ? ['chat', 'console'] : [scope]);
     const stream = { response, scopes, deviceId, heartbeat: null };
     this.eventStreams.add(stream);
-    const heartbeat = setInterval(() => response.write(': keepalive\n\n'), 20_000);
-    stream.heartbeat = heartbeat;
-    heartbeat.unref?.();
-    request.once('close', () => {
-      clearInterval(heartbeat);
-      this.eventStreams.delete(stream);
-    });
+    this.watchDeviceStream(request, stream);
+    this.writeDeviceStream(stream, `data: ${JSON.stringify({ type: 'ready', at: Date.now() })}\n\n`);
   }
 
   openTelemetryStream(request, response, deviceId) {
@@ -1413,30 +1451,22 @@ class RemoteSessionGateway {
       'X-Frame-Options': 'DENY',
       'X-Accel-Buffering': 'no'
     });
-    const stream = { response, deviceId, heartbeat: null, telemetry: null, inFlight: false };
+    const stream = { response, deviceId, scopes: new Set(['console']), heartbeat: null, telemetry: null, inFlight: false };
     this.telemetryStreams.add(stream);
+    this.watchDeviceStream(request, stream);
     const push = async () => {
-      if (stream.inFlight || response.destroyed || response.writableEnded) return;
+      if (!this.canWriteDeviceStream(stream, 'console') || stream.inFlight) return;
       stream.inFlight = true;
       try {
         const snapshot = await this.telemetrySnapshot();
-        if (!response.destroyed && !response.writableEnded) {
-          response.write(`data: ${JSON.stringify({ type: 'telemetry', snapshot })}\n\n`);
-        }
+        this.writeDeviceStream(stream, `data: ${JSON.stringify({ type: 'telemetry', snapshot })}\n\n`, 'console');
       } catch (error) {
         this.logger.warn?.('Telemetria live non disponibile.', { error: error?.message || String(error) });
       } finally { stream.inFlight = false; }
     };
-    void push();
     stream.telemetry = setInterval(push, 1_000);
     stream.telemetry.unref?.();
-    stream.heartbeat = setInterval(() => response.write(': keepalive\n\n'), 20_000);
-    stream.heartbeat.unref?.();
-    request.once('close', () => {
-      clearInterval(stream.heartbeat);
-      clearInterval(stream.telemetry);
-      this.telemetryStreams.delete(stream);
-    });
+    void push();
   }
 
   status() {
@@ -1507,6 +1537,9 @@ class RemoteSessionGateway {
     const before = this.state.devices.length;
     this.state.devices = this.state.devices.filter((device) => device.id !== String(id));
     if (before !== this.state.devices.length) {
+      for (const stream of [...this.eventStreams, ...this.telemetryStreams]) {
+        if (stream.deviceId === String(id)) this.closeDeviceStream(stream);
+      }
       this.cancelConsoleOperationsForDevice(String(id), 'Sessione del dispositivo revocata.');
       for (const [ticketId, ticket] of this.presenceTickets) {
         if (ticket.deviceId === String(id)) this.presenceTickets.delete(ticketId);
@@ -1578,17 +1611,7 @@ class RemoteSessionGateway {
     const publicServer = this.publicServer;
     this.server = null;
     this.publicServer = null;
-    for (const stream of this.eventStreams) {
-      clearInterval(stream.heartbeat);
-      try { stream.response.end(); } catch {}
-    }
-    this.eventStreams.clear();
-    for (const stream of this.telemetryStreams) {
-      clearInterval(stream.heartbeat);
-      clearInterval(stream.telemetry);
-      try { stream.response.end(); } catch {}
-    }
-    this.telemetryStreams.clear();
+    for (const stream of [...this.eventStreams, ...this.telemetryStreams]) this.closeDeviceStream(stream);
     this.telemetryCache = { expiresAt: 0, value: null };
     this.telemetryProbe = null;
     for (const queued of this.guestQueue.splice(0)) {
@@ -1977,7 +2000,7 @@ class RemoteSessionGateway {
       if (request.method === 'POST' && url.pathname === '/api/guest/voice/transcribe') {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
-        if (!this.voiceTranscriber) return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: 'VOICE_BACKEND_UNAVAILABLE' });
+        if (!this.voiceInputAvailable()) return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: 'VOICE_BACKEND_UNAVAILABLE' });
         const contentType = String(request.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
         if (contentType !== 'audio/wav') return this.json(response, 415, { error: 'Formato audio non supportato.', code: 'VOICE_FORMAT_UNSUPPORTED' });
         const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
@@ -2348,7 +2371,7 @@ class RemoteSessionGateway {
           error: 'Questo dispositivo deve essere associato nuovamente con una chiave protetta.',
           code: 'DEVICE_IDENTITY_ENROLLMENT_REQUIRED'
         });
-        if (!this.voiceTranscriber) return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: 'VOICE_BACKEND_UNAVAILABLE' });
+        if (!this.voiceInputAvailable()) return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: 'VOICE_BACKEND_UNAVAILABLE' });
         const contentType = String(request.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
         if (contentType !== 'audio/wav') return this.json(response, 415, { error: 'Formato audio non supportato.', code: 'VOICE_FORMAT_UNSUPPORTED' });
         await this.verifySensitiveDevice(device, 'voice-transcribe', {

@@ -169,6 +169,12 @@ class NativeSpeechService extends EventEmitter {
     };
   }
 
+  audioAvailable() {
+    return !this.disposed && this.platform === 'win32'
+      && fs.existsSync(path.join(this.whisperDirectory, 'whisper-cli.exe'))
+      && Boolean(findWhisperAudioModel(this.whisperDirectory));
+  }
+
   captureDevices() {
     if (this.disposed) return Promise.resolve([]);
     if (this.captureDeviceCache.length && Date.now() - this.captureDeviceCacheAt < 5000) {
@@ -456,7 +462,6 @@ class NativeSpeechService extends EventEmitter {
         '-sns',
         '-sow',
         '-nt',
-        '-np',
         '-otxt',
         '-of', outputBase
       ];

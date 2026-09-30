@@ -526,13 +526,26 @@ test('la voce non viene annunciata disponibile quando manca il runtime', async (
     conversationStore: { list: () => [] },
     voiceSynthesizer: async () => { throw new Error('must not synthesize'); },
     voiceCapabilityProvider: () => available,
+    voiceTranscriber: async () => { throw new Error('must not transcribe'); },
+    voiceInputCapabilityProvider: () => available,
     logger: { info() {}, warn() {} }
   });
   try {
     assert.equal(gateway.voiceOutputAvailable(), false);
+    assert.equal(gateway.voiceInputAvailable(), false);
     available = true; assert.equal(gateway.voiceOutputAvailable(), true);
+    assert.equal(gateway.voiceInputAvailable(), true);
     gateway.voiceCapabilityProvider = () => { throw new Error('probe unavailable'); };
     assert.equal(gateway.voiceOutputAvailable(), false);
+    gateway.voiceInputCapabilityProvider = () => { throw new Error('probe unavailable'); };
+    assert.equal(gateway.voiceInputAvailable(), false);
+    assert.equal(gateway.capabilityManifest({ publicIngress: true }).capabilities.find(c => c.id === 'voice-input').state, 'degraded');
+    await gateway.configure({ enabled: true, port: await freePort() });
+    const base = `http://127.0.0.1:${gateway.state.port}`;
+    const guest = await bootstrapGuest(base);
+    const result = await fetch(base + '/api/guest/voice/transcribe', { method: 'POST', headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'audio/wav' }, body: mono16kWave() });
+    assert.equal(result.status, 503);
+    assert.equal((await result.json()).code, 'VOICE_BACKEND_UNAVAILABLE');
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -1283,6 +1296,72 @@ test('la revoca rende immediatamente inutilizzabile il token del dispositivo', a
     gateway.revokeDevice(paired.device.id);
     const response = await fetch(`http://127.0.0.1:${port}/api/conversations`, { headers: { Authorization: `Bearer ${paired.token}` } });
     assert.equal(response.status, 401);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('la revoca chiude SSE gia aperti preservando gli altri dispositivi', async () => {
+  const { root, gateway } = fixture();
+  const controllers = [];
+  try {
+    await gateway.configure({ enabled: true, port: await freePort() });
+    const base = `http://127.0.0.1:${gateway.state.port}`;
+    const a = await pair(base, gateway.createPairingCode({ scope: 'remote' }).code, 'remote');
+    const b = await pair(base, gateway.createPairingCode({ scope: 'remote' }).code, 'remote');
+    const open = async (device, route) => {
+      const controller = new AbortController(); controllers.push(controller);
+      const response = await fetch(base + route, { headers: { Authorization: `Bearer ${device.token}` }, signal: controller.signal });
+      assert.equal(response.status, 200);
+      const reader = response.body.getReader();
+      assert.equal((await reader.read()).done, false);
+      return reader;
+    };
+    const aEvents = await open(a, '/api/events');
+    const aTelemetry = await open(a, '/api/system/telemetry/stream');
+    const bEvents = await open(b, '/api/events');
+    await open(b, '/api/system/telemetry/stream');
+    const revokedStreams = [...gateway.eventStreams, ...gateway.telemetryStreams].filter(s => s.deviceId === a.device.id);
+    const response = await fetch(`${base}/api/security/devices/${a.device.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${b.token}` } });
+    assert.equal(response.status, 200);
+    assert.equal(gateway.eventStreams.size, 1);
+    assert.equal(gateway.telemetryStreams.size, 1);
+    for (const stream of revokedStreams) assert.equal(stream.response.writableEnded, true);
+    for (const reader of [aEvents, aTelemetry]) {
+      const deadline = setTimeout(() => controllers.forEach(c => c.abort()), 2000);
+      try { assert.equal((await reader.read()).done, true); } finally { clearTimeout(deadline); }
+    }
+    gateway.rotateDeviceToken(gateway.state.devices.find(d => d.id === b.device.id));
+    gateway.broadcast({ type: 'activity', marker: 'after-revocation' });
+    assert.match(Buffer.from((await bEvents.read()).value).toString(), /after-revocation/);
+    assert.equal((await fetch(base + '/api/conversations', { headers: { Authorization: `Bearer ${a.token}` } })).status, 401);
+  } finally { controllers.forEach(c => c.abort()); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('la revoca e la rimozione identita bloccano snapshot tardivi e invii SSE', async () => {
+  const { EventEmitter } = require('node:events');
+  const { root, gateway } = fixture();
+  const response = () => Object.assign(new EventEmitter(), {
+    frames: [], destroyed: false, writableEnded: false,
+    writeHead() {}, write(frame) { this.frames.push(frame); return true; },
+    end() { this.writableEnded = true; this.emit('close'); }
+  });
+  try {
+    gateway.state.devices = [{ id: 'a', scope: 'remote' }, { id: 'b', scope: 'remote' }];
+    let release;
+    gateway.telemetrySnapshot = () => new Promise(resolve => { release = resolve; });
+    const late = response(); gateway.openTelemetryStream(new EventEmitter(), late, 'a');
+    gateway.revokeDevice('a');
+    release({ marker: 'must-not-leak' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(late.frames.length, 0);
+    assert.equal(late.writableEnded, true);
+    const events = response(); gateway.openEventStream(new EventEmitter(), events, 'remote', 'b');
+    const before = events.frames.length;
+    gateway.state.devices = []; // Same authorization transition as pairing-limit eviction.
+    gateway.broadcast({ type: 'activity', marker: 'must-not-leak' });
+    assert.equal(events.frames.length, before);
+    assert.equal(events.writableEnded, true);
+    assert.equal(gateway.eventStreams.size, 0);
+    assert.equal(gateway.telemetryStreams.size, 0);
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 

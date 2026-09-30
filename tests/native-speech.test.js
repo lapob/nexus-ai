@@ -61,6 +61,20 @@ test('preferisce il modello Whisper più accurato disponibile', (t) => {
   assert.match(findWhisperModel(directory), /ggml-large-v3-turbo-q5_0\.bin$/);
 });
 
+test('la trascrizione audio richiede CLI e modello, non basta il microfono SAPI', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-whisper-capability-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const service = new NativeSpeechService({ platform: 'win32', whisperDirectory: directory });
+  assert.equal(service.capabilities().available, true);
+  assert.equal(service.audioAvailable(), false);
+  fs.writeFileSync(path.join(directory, 'whisper-cli.exe'), 'fixture');
+  assert.equal(service.audioAvailable(), false);
+  fs.writeFileSync(path.join(directory, 'ggml-base.bin'), 'fixture');
+  assert.equal(service.audioAvailable(), true);
+  service.disposed = true;
+  assert.equal(service.audioAvailable(), false);
+});
+
 test('Whisper non propaga stderr diagnostico quando il processo fallisce', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-whisper-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

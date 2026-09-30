@@ -151,9 +151,11 @@
     "release:android:clean": "node scripts/clean-android-releases.js",
     "prepare:ollama": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-ollama-runtime.ps1",
     "python:provision": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/provision-python-runtime.ps1",
+    "voice:provision:whisper": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/provision-whisper-runtime.ps1",
+    "voice:check:whisper": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/provision-whisper-runtime.ps1 -CheckOnly",
     "check:python-runtime": "node scripts/check-python-runtime.js --require-installed",
     "check:python-runtime:production": "node scripts/check-python-runtime.js --require-installed --require-clean --production",
-    "prepare:package:win": "npm run check:python-runtime:production && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-windows-package.ps1",
+    "prepare:package:win": "npm run voice:check:whisper && npm run check:python-runtime:production && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-windows-package.ps1",
     "knowledge:plan": "node scripts/knowledge-pack-plan.js",
     "knowledge:courseify": "node scripts/courseify-knowledge.js",
     "knowledge:normalize": "node scripts/normalize-public-knowledge.js",
@@ -267,7 +269,8 @@
         "to": "whisper/windows-x64",
         "filter": [
           "**/*",
-          "!ggml-base.bin",
+          "!*.zip",
+          "!*.partial",
           "!ggml-large-v3-turbo*.bin",
           "!ggml-medium*.bin"
         ]
