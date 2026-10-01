@@ -4,6 +4,7 @@ export async function GET() {
   const status = await checkNexusNxsAi();
   return Response.json(
     { online: status.online, checkedAt: status.checkedAt.toISOString(), latencyMs: status.latencyMs },
-    { status: status.online ? 200 : 503, headers: { "Cache-Control": "no-store" } },
+    // This query succeeded even when AI is offline; readiness keeps its own 503.
+    { headers: { "Cache-Control": "no-store" } },
   );
 }
