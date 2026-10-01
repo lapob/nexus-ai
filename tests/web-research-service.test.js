@@ -153,6 +153,65 @@ test('non spaccia Wikipedia per ricerca in tempo reale', async () => {
   assert.match(calls[0], /api\.search\.brave\.com/);
 });
 
+test('una richiesta live supera il fallback in cache e usa il provider ripristinato', async () => {
+  let liveAvailable = false;
+  let liveCalls = 0;
+  let referenceCalls = 0;
+  const service = new WebResearchService({
+    provider: 'auto',
+    searxngEndpoint: 'http://127.0.0.1:8080/',
+    fetchImpl: async (url) => {
+      if (new URL(url).hostname === '127.0.0.1') {
+        liveCalls += 1;
+        return liveAvailable
+          ? jsonResponse({ results: [{ title: 'Fonte aggiornata', url: 'https://example.com/current', content: 'Dato verificato' }] })
+          : jsonResponse({}, 503);
+      }
+      referenceCalls += 1;
+      return jsonResponse({ query: { search: [{ title: 'Nexus', snippet: 'Riferimento enciclopedico' }] } });
+    }
+  });
+  assert.equal((await service.search('Nexus')).provider, 'wikipedia');
+  assert.equal((await service.search('Nexus')).cached, true);
+  liveAvailable = true;
+  const result = await service.search('Nexus', { freshOnly: true });
+  assert.equal(result.provider, 'searxng');
+  assert.equal(result.cached, false);
+  assert.equal(result.results[0].title, 'Fonte aggiornata');
+  assert.equal(liveCalls, 2);
+  assert.equal(referenceCalls, 1);
+  assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
+  const cachedLive = await service.search('Nexus', { freshOnly: true });
+  assert.equal(cachedLive.provider, 'searxng');
+  assert.equal(cachedLive.cached, true);
+  assert.equal(liveCalls, 2);
+});
+
+test('un fallback in cache non nasconde il guasto a una richiesta live', async () => {
+  let liveCalls = 0;
+  let referenceCalls = 0;
+  const service = new WebResearchService({
+    provider: 'auto',
+    searxngEndpoint: 'http://127.0.0.1:8080/',
+    fetchImpl: async (url) => {
+      if (new URL(url).hostname === '127.0.0.1') {
+        liveCalls += 1;
+        return jsonResponse({}, 503);
+      }
+      referenceCalls += 1;
+      return jsonResponse({ query: { search: [{ title: 'Nexus', snippet: 'Riferimento enciclopedico' }] } });
+    }
+  });
+  assert.equal((await service.search('Nexus')).provider, 'wikipedia');
+  await assert.rejects(() => service.search('Nexus', { freshOnly: true }), /503/);
+  assert.equal(liveCalls, 2);
+  assert.equal(referenceCalls, 1);
+  assert.deepEqual(service.capabilityState(), { state: 'degraded', mode: 'live-retrying' });
+  const reference = await service.search('Nexus');
+  assert.equal(reference.provider, 'wikipedia');
+  assert.equal(reference.cached, true);
+});
+
 test('rifiuta URL pubblici non HTTPS e risposte non JSON', async () => {
   assert.equal(safePublicUrl('http://127.0.0.1/private'), '');
   assert.equal(safePublicUrl('https://user:pass@example.com'), '');

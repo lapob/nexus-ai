@@ -1,5 +1,40 @@
 # Roadmap tecnica
 
+## Ricerca, personalizzazione e naturalezza — 1 ottobre 2026
+
+La ricerca pubblica risulta live nelle capability del servizio. Un probe sul
+SearXNG self-hosted ha restituito 20 risultati, inclusa la documentazione
+ufficiale corrente. Il backend gia gestisce fonti reali, cancellazione, cache
+breve e il rifiuto del fallback enciclopedico per domande temporali. Corretto
+anche il caso in cui quel fallback fosse gia nella cache: una richiesta live
+deve ritentare il provider e segnalare il guasto se non e disponibile. Questo
+probe non dimostra la correttezza di ogni risposta o la copertura di ogni motore.
+
+La personalizzazione attuale comprende nome, interessi dichiarati, istruzioni
+e stile conciso/naturale/dettagliato; esiste una memoria locale modificabile.
+Non equivalgono ancora a un profilo sincronizzato e verificato su ogni client.
+La voce espressiva ha un backend opzionale: la presenza del codice non prova
+la naturalezza percepita o la disponibilita del runtime su ogni installazione.
+
+| Ordine | Completamento proposto | Criterio verificabile |
+| --- | --- | --- |
+| 1 | Ricerca approfondita su piu fonti, data di consultazione visibile nel dettaglio, filtri temporali e conflitti espliciti | Casi revisionati su dati recenti, fonti discordanti, cache, errori e citazioni; nessuna fonte inventata o riferimento enciclopedico presentato come dato live |
+| 2 | Un solo profilo personale e per progetto, con tono, lingua, voce, dettaglio e preferenze di accessibilita | Stesse scelte sui client autorizzati; export/reset e chat temporanee senza memoria; nessun profilo condiviso fra utenti |
+| 3 | Risposte empatiche e prosodia espressiva coerente con il contenuto | Valutazioni umane autorizzate; tono modificabile, nessuna diagnosi o archivio di emozioni inferite; nessuna pretesa di sentimenti o coscienza |
+| 4 | Conversazione vocale continua con correzioni, pause, interruzioni ed eco | Microfoni, speaker/cuffie, rumore e lingue reali; accuratezza STT e latenza separate; silenzio dopo annullamento |
+| 5 | Obiettivi duraturi con progetti, piano breve, azioni verificate e ripresa | Stop/revoca e crash non duplicano effetti; permessi per integrazione e ricevute reali |
+| 6 | Routine n8n/MCP opzionali con agenda, documenti e operazioni digitali | Anteprima, budget, scadenza, registro e arresto; nessun invio esterno implicito; nodo sempre acceso configurato esplicitamente |
+| 7 | Valutazione dei modelli e qualita multimodale prima di ampliare la grafica | Almeno 100 compiti revisionati, test separati, corpus privato ripristinato e confronto con baseline; promozione manuale con rollback |
+
+Riutilizzare servizi, editor memoria, composer, runtime azioni e componenti
+esistenti. Nel prodotto usare icone accessibili e dettagli progressivi; il Core
+mostra soltanto stati effettivi (ascolto, ricerca, generazione, azione, errore).
+L'inferenza resta locale e il cloud disattivato. La ricerca sul web richiede
+comunque rete e invia query ai motori configurati: non inviare segreti o
+contesto privato come effetto della personalizzazione. Preferenze e voti non
+autorizzano training. Firme, audit integrale e prove fisiche restano gate
+separati prima della distribuzione stabile.
+
 ## Programma competitivo autorizzato il 28 settembre 2026
 
 L'implementazione segue l'ordine sotto. Una voce pianificata non e una

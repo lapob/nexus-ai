@@ -283,7 +283,11 @@ class WebResearchService {
     const boundedLimit = Math.max(1, Math.min(8, Number(limit) || 4));
     const key = this.cacheKey(provider, normalizedQuery, wikipediaLanguage(language), boundedLimit);
     const cached = this.readCache(key);
-    if (cached) return { provider: cached.provider || provider, cached: true, results: cached.results };
+    // Un fallback enciclopedico memorizzato non soddisfa una richiesta live:
+    // ritentare il provider configurato e conservare l'errore se resta offline.
+    if (cached && (!freshOnly || ['searxng', 'brave', 'openai'].includes(cached.provider))) {
+      return { provider: cached.provider || provider, cached: true, results: cached.results };
+    }
     let completedProvider = provider;
     let results;
     try {
