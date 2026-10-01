@@ -33,6 +33,15 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   e soak di 250 cicli con zero richieste orfane. Nessun modello addestrato
   o promosso. Publication safety PASS su 908 file; igiene PASS su 840 file
   e 281 moduli univoci. La copertura automatica non prova l'assenza di bug.
+- Revisione fc8e6b6 pubblicata su GitHub e caricata dal servizio. Health e
+  readiness pubbliche HTTP 200; risposta breve 1375 ms, STT italiano 2623 ms,
+  TTS WAV 1574 ms. Sono singole richieste sintetiche, non un collaudo umano.
+  Sito pubblicato e verificato su 14 rotte, versione Cloudflare
+  `dba3f714-2ea1-4c6d-88d5-39cbe8c12014`.
+- Nessun nuovo installer Windows o APK distribuito. Il collegamento desktop
+  punta al binario installato precedente: la protezione di autostart dei nuovi
+  sorgenti deve ancora essere inclusa nell'installer. I tre task di questo PC
+  sono disabilitati; ricontrollarli se viene riaperta una build precedente.
 
 Log locali: `../qa-artifacts/checkup-oct01-*`. Revisione attiva e pubblicazione
 sono registrate nel checkpoint; non confondere questi controlli con una Stable.
