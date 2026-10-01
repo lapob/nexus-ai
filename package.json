@@ -1,18 +1,18 @@
 {
   "name": "nexusnxs",
   "productName": "NexusNXS",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "private": true,
   "description": "Privacy-focused AI assistant for Windows with native Android clients, voice, projects and consent-based computer actions.",
   "author": "NexusNXS",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lapob/nexusnxs.git"
+    "url": "git+https://github.com/lapob/nexus-ai.git"
   },
   "homepage": "https://nexusnxs.com",
   "bugs": {
-    "url": "https://github.com/lapob/nexusnxs/issues"
+    "url": "https://github.com/lapob/nexus-ai/issues"
   },
   "main": "src/main.js",
   "scripts": {

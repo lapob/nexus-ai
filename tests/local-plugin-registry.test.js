@@ -5,6 +5,29 @@ const os = require('node:os');
 const path = require('node:path');
 const { LocalPluginRegistry } = require('../src/plugins/local-plugin-registry');
 
+test('una discovery fallita non conserva plugin o permessi parziali', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-plugins-atomic-'));
+  try {
+    for (const name of ['a-reader', 'z-invalid']) {
+      const directory = path.join(root, name); fs.mkdirSync(directory);
+      fs.writeFileSync(path.join(directory, 'index.js'), 'module.exports = {};');
+      fs.writeFileSync(path.join(directory, 'plugin.json'), JSON.stringify({ id: 'local.reader', entry: 'index.js', permissions: ['workspace:read'] }));
+    }
+    const registry = new LocalPluginRegistry(root);
+    assert.throws(() => registry.discover(), /duplicato/);
+    assert.deepEqual(registry.list(), []);
+    assert.equal(registry.authorize('local.reader', 'workspace:read'), false);
+    fs.rmSync(path.join(root, 'z-invalid'), { recursive: true, force: true });
+    registry.discover();
+    assert.equal(registry.authorize('local.reader', 'workspace:read'), true);
+    fs.mkdirSync(path.join(root, 'z-invalid'));
+    fs.writeFileSync(path.join(root, 'z-invalid', 'plugin.json'), '{invalid');
+    assert.throws(() => registry.discover(), SyntaxError);
+    assert.deepEqual(registry.list(), []);
+    assert.equal(registry.authorize('local.reader', 'workspace:read'), false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('registry carica plugin confinati e applica i permessi', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-plugins-'));
   const directory = path.join(root, 'reader'); fs.mkdirSync(directory);

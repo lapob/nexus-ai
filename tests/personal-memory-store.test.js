@@ -116,7 +116,7 @@ test('la revisione della memoria cambia soltanto con il contenuto attivo', () =>
   assert.equal(store.revision(), '0:0');
   const saved = store.remember({ content: 'Il progetto Boreale usa Go' });
   const populated = store.revision();
-  assert.match(populated, /^1:\d+$/);
+  assert.match(populated, /^1:\d+:[a-f0-9]+$/);
   store.forgetById(saved.id);
   assert.equal(store.revision(), '0:0');
   store.close();
@@ -136,4 +136,31 @@ test('una nuova preferenza esclusiva sostituisce la precedente senza cancellarne
   assert.equal(superseded[0].supersededBy, current.id);
   store.close();
   fs.rmSync(directory, { recursive: true, force: true });
+});
+
+test('la cache perde la revisione di un ricordo appena scaduto senza aprire la lista', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-expiry-cache-'));
+  const store = new PersonalMemoryStore({ filePath: path.join(directory, 'memory.sqlite3') });
+  t.after(() => { store.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  store.remember({ content: 'Evento di progetto temporaneo', expiresAt: Date.now() + 1000 });
+  const before = store.revision();
+  store.database.prepare('UPDATE memories SET expires_at=?').run(Date.now() - 1);
+  assert.notEqual(store.revision(), before);
+  assert.equal(store.revision(), '0:0');
+});
+
+test('due correzioni nello stesso millisecondo invalidano la cache ma il semplice utilizzo no', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-same-clock-'));
+  const store = new PersonalMemoryStore({ filePath: path.join(directory, 'memory.sqlite3') });
+  t.after(() => { store.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  t.mock.method(Date, 'now', () => 1800000000000);
+  const saved = store.remember({ content: 'Il progetto Aurora usa Java' });
+  const original = store.revision();
+  store.findRelevant('progetto Aurora');
+  assert.equal(store.revision(), original);
+  store.updateById(saved.id, 'Il progetto Aurora usa Rust');
+  const edited = store.revision();
+  assert.notEqual(edited, original);
+  store.updateById(saved.id, 'Il progetto Aurora usa Go');
+  assert.notEqual(store.revision(), edited);
 });

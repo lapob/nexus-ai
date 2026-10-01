@@ -37,15 +37,17 @@ class LocalPluginRegistry {
   discover() {
     this.plugins.clear();
     if (!fs.existsSync(this.root)) return [];
+    const discovered = new Map();
     for (const item of fs.readdirSync(this.root, { withFileTypes: true })) {
       if (!item.isDirectory() || item.name.startsWith('.')) continue;
       const directory = path.join(this.root, item.name);
       const manifestPath = path.join(directory, 'plugin.json');
       if (!fs.existsSync(manifestPath)) continue;
       const plugin = validateManifest(directory, JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
-      if (this.plugins.has(plugin.id)) throw new Error(`Plugin duplicato: ${plugin.id}.`);
-      this.plugins.set(plugin.id, plugin);
+      if (discovered.has(plugin.id)) throw new Error(`Plugin duplicato: ${plugin.id}.`);
+      discovered.set(plugin.id, plugin);
     }
+    this.plugins = discovered;
     return this.list();
   }
   list() { return [...this.plugins.values()]; }

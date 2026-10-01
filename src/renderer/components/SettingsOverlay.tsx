@@ -16,7 +16,7 @@ import type {
 } from '../types/nexus';
 import { DEFAULT_INTERFACE_PREFERENCES } from '../systems/InterfacePreferences';
 import { publicUiError } from '../systems/PublicError';
-import { uiCopy } from '../systems/Localization';
+import { resolvedUiLocale, uiCopy } from '../systems/Localization';
 import { VoiceRecognition } from '../systems/VoiceRecognition';
 import { modelDisplayName, uniquePresentedModels } from '../systems/ModelPresentation';
 import { NexusSelect } from './NexusSelect';
@@ -132,7 +132,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
   const [microphoneReport, setMicrophoneReport] = useState<MicrophoneReport | null>(null);
   const [trainingStats, setTrainingStats] = useState<{ examples: number; approved: number; quarantined: number; corrected: number; preferencePairs: number; domains: Record<string, number>; evaluationExamples: number; evaluationReady: boolean; nextMilestone: number; memories?: number } | null>(null);
   const [trainingEvaluation, setTrainingEvaluation] = useState<{ examples: number; readiness: number; diversity: number; correctionCoverage: number; averagePromptTokens: number; status: 'ready' | 'growing' | 'early' } | null>(null);
-  const [memories, setMemories] = useState<Array<{ id: number; type: string; content: string; updatedAt: number; expiresAt?: number | null }>>([]);
+  const [memories, setMemories] = useState<Awaited<ReturnType<Window['nexus']['listMemories']>>>([]);
   const [memoryEdit, setMemoryEdit] = useState<{ id: number; content: string } | null>(null);
   const [responseCache, setResponseCache] = useState<{ entries: number; hits: number }>({ entries: 0, hits: 0 });
   const [confirmTrainingClear, setConfirmTrainingClear] = useState(false);
@@ -1138,6 +1138,12 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     {memories.map((memory) => <article key={memory.id}>
                       <span><small>#{memory.id} · {memory.type === 'preference' ? 'Preferenza' : memory.type === 'project' ? 'Progetto' : memory.type === 'procedural' ? 'Procedura' : memory.type === 'episodic' ? 'Evento' : 'Informazione'}</small>
                         {memoryEdit?.id === memory.id ? <textarea aria-label={labels.memoryEdit} maxLength={2000} rows={3} autoFocus value={memoryEdit.content} disabled={busy} onChange={event => setMemoryEdit({ id: memory.id, content: event.target.value })} /> : <strong>{memory.content}</strong>}
+                        <details className="memory-provenance">
+                          <summary aria-label={labels.memoryDetails}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 11v6M12 7v1" /></svg></summary>
+                          {memory.sourceKind === 'explicit-user-statement' && <small>{labels.memorySource}</small>}
+                          <small>{labels.memoryUpdated}: <time dateTime={new Date(memory.updatedAt).toISOString()}>{new Date(memory.updatedAt).toLocaleDateString(resolvedUiLocale(preferences.locale))}</time></small>
+                          <small>{memory.expiresAt ? `${labels.memoryExpires}: ${new Date(memory.expiresAt).toLocaleDateString(resolvedUiLocale(preferences.locale))}` : labels.memoryNoExpiry}</small>
+                        </details>
                       </span>
                       {memoryEdit?.id === memory.id ? <div className="memory-edit-actions">
                         <button type="button" className="settings-quiet-action" disabled={busy || memoryEdit.content.trim().length < 3} onClick={async () => {
@@ -1147,16 +1153,17 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                           finally { setBusy(false); }
                         }}>{labels.memorySave}</button>
                         <button type="button" className="settings-quiet-action" disabled={busy} onClick={() => setMemoryEdit(null)}>{labels.memoryCancel}</button>
-                      </div> : <button type="button" className="settings-quiet-action" aria-label={labels.memoryEdit} title={labels.memoryEdit} disabled={busy} onClick={() => setMemoryEdit({ id: memory.id, content: memory.content })}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
-                      {memoryEdit?.id !== memory.id && <button type="button" className="settings-quiet-action" disabled={busy} onClick={async () => {
+                      </div> : <button type="button" className="settings-quiet-action" aria-label={labels.memoryEdit} disabled={busy} onClick={() => setMemoryEdit({ id: memory.id, content: memory.content })}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
+                      {memoryEdit?.id !== memory.id && <button type="button" className="settings-quiet-action" aria-label={labels.memoryForget} disabled={busy} onClick={async () => {
                         setBusy(true);
                         try {
                           await window.nexus.forgetMemory(memory.id);
                           setMemories(await window.nexus.listMemories());
                           setTrainingStats(await window.nexus.trainingStats());
-                          setMessage('Ricordo rimosso.');
-                        } finally { setBusy(false); }
-                      }}>Dimentica</button>}
+                          setMessage(labels.memoryForgotten);
+                        } catch { setMessage(labels.memoryFailed); }
+                        finally { setBusy(false); }
+                      }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5" /></svg></button>}
                     </article>)}
                   </div>}
                   {responseCache.entries > 0 && <div className="cache-maintenance settings-wide">

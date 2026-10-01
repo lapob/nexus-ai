@@ -4,6 +4,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { createHash } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { closeDatabase, configureDatabase } = require('./sqlite-durability');
 
@@ -224,8 +225,14 @@ class PersonalMemoryStore {
   }
 
   revision() {
+    this.expireStale();
     const row = this.database.prepare("SELECT COUNT(*) AS active, COALESCE(MAX(updated_at),0) AS updated_at FROM memories WHERE status='active'").get();
-    return `${Number(row.active || 0)}:${Number(row.updated_at || 0)}`;
+    if (!row.active) return '0:0';
+    // Wall-clock timestamps can coincide during edits. Usage counters must not
+    // invalidate answers, but content and expiry always must.
+    const records = this.database.prepare("SELECT id,type,content,expires_at FROM memories WHERE status='active' ORDER BY id").all();
+    const digest = createHash('sha256').update(JSON.stringify(records)).digest('hex');
+    return `${Number(row.active)}:${Number(row.updated_at)}:${digest}`;
   }
 
   close() { closeDatabase(this.database); }

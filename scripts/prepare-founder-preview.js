@@ -77,7 +77,7 @@ function testerGuide({ manifest, artifacts }) {
     '- stop e rigenerazione della risposta;',
     '- voce, se microfono e lingua sono supportati;',
     '- stato offline disattivando temporaneamente la rete, poi riconnessione.',
-    '- facoltativo: usa Migliora NexusNXS su una risposta verificata; il contributo entra soltanto in quarantena.',
+    '- facoltativo: usa le icone mi piace/non mi piace; il voto non autorizza training o invio della conversazione.',
     '',
     'SEGNALAZIONE',
     'Indica piattaforma, versione, ora approssimativa, passaggi, risultato atteso e risultato ottenuto.',

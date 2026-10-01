@@ -52,6 +52,12 @@ function validatedAudioPath(manifestPath, item, index) {
   const relative = path.relative(root, audioPath);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`Audio fuori dal dataset nel caso STT ${index + 1}.`);
   if (path.extname(audioPath).toLowerCase() !== '.wav') throw new Error(`Il caso STT ${index + 1} deve usare un file WAV.`);
+  const realRoot = fs.realpathSync(root);
+  const realAudio = fs.realpathSync(audioPath);
+  const realRelative = path.relative(realRoot, realAudio);
+  if (!realRelative || realRelative === '..' || realRelative.startsWith(`..${path.sep}`) || path.isAbsolute(realRelative)) {
+    throw new Error(`Audio fuori dal dataset nel caso STT ${index + 1}.`);
+  }
   const stat = fs.statSync(audioPath);
   if (!stat.isFile() || stat.size < 44 || stat.size > 100 * 1024 * 1024) throw new Error(`WAV non valido nel caso STT ${index + 1}.`);
   return {
@@ -82,17 +88,38 @@ function aggregateResults(results) {
   }));
   return {
     accuracy: Number((1 - averageWer).toFixed(4)),
+    speechCases: speech.length,
+    noiseCases: noise.length,
     averageWer: Number(averageWer.toFixed(4)),
     falseActivations: noise.filter((item) => item.falseActivation).length,
     falseActivationRate: noise.length
       ? Number((noise.filter((item) => item.falseActivation).length / noise.length).toFixed(4))
-      : 0,
+      : null,
     latencyP50Ms: percentile(results.map((item) => item.latencyMs), 0.5),
     latencyP95Ms: percentile(results.map((item) => item.latencyMs), 0.95),
     languages: by('language'),
     devices: by('device'),
     environments: by('environment')
   };
+}
+
+function validateThresholds({ minimumAccuracy, maximumFalsePositive, minimumLanguageCases }) {
+  if (![minimumAccuracy, maximumFalsePositive].every(value => Number.isFinite(value) && value >= 0 && value <= 100)
+    || !Number.isSafeInteger(minimumLanguageCases) || minimumLanguageCases < 1 || minimumLanguageCases > 100) {
+    throw new Error('Soglie STT non valide.');
+  }
+}
+
+function sttGateFailures(report, { minimumAccuracy, maximumFalsePositive }) {
+  const failures = [];
+  if (!report.speechCases) failures.push('speech-coverage');
+  if (!report.noiseCases) failures.push('noise-coverage');
+  if (report.accuracy * 100 < minimumAccuracy) failures.push('accuracy:all');
+  for (const [language, result] of Object.entries(report.languages)) {
+    if (result.speechCases && result.accuracy * 100 < minimumAccuracy) failures.push(`accuracy:${language}`);
+  }
+  if (report.falseActivationRate !== null && report.falseActivationRate * 100 > maximumFalsePositive) failures.push('false-activation');
+  return failures;
 }
 
 // #endregion
@@ -105,12 +132,15 @@ async function run() {
   const manifestPath = path.resolve(dataset);
   const cases = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   if (!Array.isArray(cases) || !cases.length) throw new Error('Il dataset STT deve contenere almeno un caso.');
-  const minimumAccuracy = Math.max(0, Math.min(100, Number(option('min-accuracy', '85'))));
-  const maximumFalsePositive = Math.max(0, Math.min(100, Number(option('max-false-positive', '5'))));
-  const minimumLanguageCases = Math.max(1, Math.min(100, Number(option('min-language-cases', '3')) || 3));
-  if (!Number.isFinite(minimumAccuracy)) throw new Error('Soglia STT non valida.');
+  const minimumAccuracy = Number(option('min-accuracy', '85'));
+  const maximumFalsePositive = Number(option('max-false-positive', '5'));
+  const minimumLanguageCases = Number(option('min-language-cases', '3'));
+  validateThresholds({ minimumAccuracy, maximumFalsePositive, minimumLanguageCases });
   const validatedCases = cases.map((item, index) => validatedAudioPath(manifestPath, item, index));
   const speechLanguages = [...new Set(validatedCases.filter((item) => item.kind === 'speech').map((item) => item.language))];
+  if (!speechLanguages.length || !validatedCases.some(item => item.kind === 'noise')) {
+    throw new Error('Il corpus STT deve includere voce e rumore per misurare accuratezza e falsi richiami.');
+  }
   const insufficient = speechLanguages.filter((language) => validatedCases.filter((item) => item.kind === 'speech' && item.language === language).length < minimumLanguageCases);
   if (insufficient.length) throw new Error(`Dataset STT insufficiente per: ${insufficient.join(', ')}. Servono almeno ${minimumLanguageCases} casi vocali per lingua.`);
   if (process.argv.includes('--validate-only')) {
@@ -132,7 +162,7 @@ async function run() {
       const actual = String(result.text || '').trim();
       results.push({
         file: path.basename(audioPath), kind, speaker, device, environment,
-        language: result.language || language, expected, actual, confidence: result.confidence,
+        language, detectedLanguage: result.language || null, expected, actual, confidence: result.confidence,
         wer: kind === 'speech' ? Number(wordErrorRate(expected, actual).toFixed(4)) : 0,
         falseActivation: kind === 'noise' && words(actual).length > 0,
         latencyMs: Math.round(performance.now() - startedAt)
@@ -140,13 +170,14 @@ async function run() {
     }
   } finally { service.shutdown(); }
   const aggregate = aggregateResults(results);
-  const report = { evaluatedAt: new Date().toISOString(), minimumAccuracy, maximumFalsePositive, minimumLanguageCases, cases: results.length, ...aggregate, results };
+  const failures = sttGateFailures(aggregate, { minimumAccuracy, maximumFalsePositive });
+  const report = { evaluatedAt: new Date().toISOString(), minimumAccuracy, maximumFalsePositive, minimumLanguageCases, gatePassed: failures.length === 0, failures, cases: results.length, ...aggregate, results };
   const target = path.join(__dirname, '..', 'qa-artifacts', 'local-stt-evaluation.json');
   fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`STT: ${results.length} casi · accuratezza ${(report.accuracy * 100).toFixed(1)}% · falsi richiami ${(report.falseActivationRate * 100).toFixed(1)}% · p95 ${report.latencyP95Ms} ms\n`);
-  if (report.accuracy * 100 < minimumAccuracy || report.falseActivationRate * 100 > maximumFalsePositive) process.exitCode = 2;
+  if (failures.length) process.exitCode = 2;
 }
 
 if (require.main === module) run().catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
-module.exports = { aggregateResults, percentile, validatedAudioPath, wordErrorRate, words };
+module.exports = { aggregateResults, percentile, sttGateFailures, validatedAudioPath, validateThresholds, wordErrorRate, words };
 // #endregion

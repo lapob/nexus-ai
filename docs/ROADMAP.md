@@ -31,11 +31,33 @@ di un profilo completo e per progetto resta distinta, non gia consegnata.
 La suite sintetica di valutazione contiene 100 compiti distinti in nove
 categorie, separati dal training. L'eval lab rifiuta il runtime attivo,
 richiede RAM disponibile e usa CPU mentre il servizio lavora. Il confronto
-misurato e bloccato: servono 12.8 GiB liberi per i candidati selezionati,
-contro circa 7.3 GiB disponibili nel controllo corrente. Nessun modello
-caricato, addestrato o promosso. Corpus privato e corpus vocale umano ancora
+misurato resta bloccato: nell'ultimo controllo erano disponibili circa 21 GiB,
+ma la revisione automatica ha rifiutato l'avvio del runtime dedicato con
+«blocked by policy». Il comando non e stato eseguito o aggirato. Nessun modello
+caricato per questa valutazione, addestrato o promosso. Corpus privato e
+corpus vocale umano ancora
 necessari; le prove automatiche della voce non misurano l'eco reale.
 n8n/MCP non sono dichiarati operativi: manca un nodo configurato autorizzato.
+
+### Verifica degli otto punti — 1 ottobre 2026
+
+Questa tabella distingue le correzioni provate dai requisiti ancora aperti.
+Non equivale a una certificazione di sicurezza o a una release Stable.
+
+| Area | Risultato verificato | Da completare |
+| --- | --- | --- |
+| Sicurezza e distribuzione | Revoca delle richieste in corso corretta; backup sintetico cifrato ripristinato; Preview con hash e rollback conservato | Audit completo (scan precedente: 59/916 file), firme di produzione, feed firmato, ripristino esterno e upgrade pulito |
+| Voce naturale | Sessione automatica su 4 larghezze: turni, interruzioni, permessi tardivi, uscita e bozza; valutatore STT separa rumore, lingue e accuratezza | Corpus vocale umano autorizzato, microfono/altoparlanti, eco e valutazione della naturalezza; utente ha chiesto di proseguire con le prove automatiche |
+| Conversazioni | Reset interrompe la richiesta e scarta frame tardivi; offline conserva la bozza senza inviarla alla riconnessione | Identita verificata e sincronizzazione opzionale cifrata tra dispositivi; nessuna identita ospite usata come account |
+| Qualita dei modelli | 100 casi della suite 1.4.0 validati; gate rifiuta fixture, report vuoti, hash obsoleti e casi incompleti, ricalcola i risultati | Confronto misurato su runtime separato; corpus privato revisionato. Dataset attuale: 0 esempi/0 preferenze, nessun training |
+| Memoria | Scadenza e modifiche ravvicinate invalidano la cache; dettagli di provenienza/scadenza, modifica e dimenticanza provati tramite IPC reale | Disattivazione per conversazione e profilo autenticato sincronizzato; dimenticanza attuale esclude il ricordo dalle risposte, non e una cancellazione forense |
+| Azioni e plugin | Permessi, cancellazione e ricevute nei test; discovery plugin atomica, nessun permesso parziale dopo un errore | Connettori esterni configurati, prove complete degli effetti e recupero su servizi reali; nodo n8n sempre acceso scelto dal proprietario |
+| Grafica e prestazioni | Contrasto e contenuti lunghi della memoria migliorati; font condiviso e componenti esistenti riutilizzati; matrice Android Online superata su 5 profili per entrambe le app | Controlli percettivi ulteriori; eco vocale e qualita percepita non derivano dai test di layout |
+| iOS e pilota commerciale | Fondazione iOS esistente e criteri del pilota documentati | Mac/Xcode e dispositivo iOS; pilota reale, utenti autorizzati e misure di successo/costo prima di proporre abbonamenti |
+
+Le prove automatiche usano dati sintetici. Non acquisiscono registrazioni,
+non riutilizzano chat per training e non attivano il cloud. I risultati
+aggiornati, revisioni e log operativi sono in CONTINUITA.md alla radice.
 
 | Ordine | Completamento proposto | Criterio verificabile |
 | --- | --- | --- |

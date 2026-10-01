@@ -10,8 +10,42 @@ const path = require('node:path');
 const { buildReport, evaluateArtifacts, evaluateReadiness } = require('../scripts/check-product-slo');
 const { inspectControls } = require('../scripts/check-asvs-controls');
 const { inspectPolicy, parseHujson } = require('../scripts/check-tailscale-policy');
+const { loadSuite, buildModelReport, buildReport: buildLabReport } = require('../scripts/run-ai-eval-lab');
 
 const root = path.resolve(__dirname, '..');
+
+function measuredLabReport() {
+  const { suite } = loadSuite(path.join(root, 'config/evals/nexusnxs-core-v1.json'));
+  const modelReport = buildModelReport({ suite, model: 'test-model', mode: 'deep', results: suite.cases.map(item => ({
+    caseId: item.id, category: item.category, mustPass: item.mustPass === true,
+    passed: true, durationMs: 10, execution: 'model', firstPassPassed: true
+  })) });
+  return buildLabReport({ suite, modelReports: [modelReport] });
+}
+
+test('gli SLO dei modelli rifiutano report vuoti, simulati, obsoleti e incompleti', () => {
+  const policy = JSON.parse(fs.readFileSync(path.join(root, 'config/product-slo.json'), 'utf8'));
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-slo-evidence-'));
+  const baseline = measuredLabReport();
+  try {
+    for (const change of [
+      report => { report.models = []; },
+      report => { report.models[0] = null; },
+      report => { report.models[0].mode = 'fixture'; },
+      report => { report.suite.hash = 'wrong-suite'; },
+      report => { report.generatedAt = '2000-01-01T00:00:00Z'; },
+      report => { report.models[0].results.pop(); },
+      report => { report.models[0].results[0] = null; },
+      report => { report.models[0].results.find(row => row.mustPass).passed = false; }
+    ]) {
+      const report = structuredClone(baseline); change(report);
+      fs.writeFileSync(path.join(fixture, 'ai-eval-lab-gate.json'), JSON.stringify(report));
+      const checks = evaluateArtifacts({ policy, artifactsRoot: fixture, projectRoot: fixture });
+      assert.equal(checks.find(check => check.id === 'ai-evaluation-gate').status, 'fail');
+      assert.equal(checks.find(check => check.id === 'ai-deep-quality').status, 'fail');
+    }
+  } finally { fs.rmSync(fixture, { recursive: true, force: true }); }
+});
 
 test('la policy SLO distingue prove conformi dalla disponibilita non misurata', () => {
   const policy = JSON.parse(fs.readFileSync(path.join(root, 'config/product-slo.json'), 'utf8'));
@@ -21,7 +55,7 @@ test('la policy SLO distingue prove conformi dalla disponibilita non misurata', 
   try {
     fs.mkdirSync(artifacts, { recursive: true });
     writeJson('local-model-evaluation.json', { report: [{ passRate: 94, p95FirstTokenLatencyMs: 420, p95LatencyMs: 1800 }] });
-    writeJson('ai-eval-lab-gate.json', { gatePassed: true, models: [{ model: 'fixture', summary: { passRate: 91, p95LatencyMs: 4200, mustPassFailures: [] } }] });
+    writeJson('ai-eval-lab-gate.json', measuredLabReport());
     writeJson('local-voice-evaluation.json', { backend: 'fixture', coldStartMs: 1200, warmMedianMs: 420 });
     writeJson('gateway-load-test.json', { clients: 20, p95LatencyMs: 180, passed: true });
     writeJson('desktop-motion-qa.json', { cores: [{ view: 'fixture', p95Ms: 8.4, slowFrameRatio: 0, failures: [] }] });

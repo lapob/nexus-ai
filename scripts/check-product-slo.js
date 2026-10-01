@@ -4,6 +4,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadSuite, suiteHash, buildModelReport } = require('./run-ai-eval-lab');
 
 const root = path.resolve(__dirname, '..');
 
@@ -15,6 +16,33 @@ function readJson(filePath) {
 
 function result(id, status, observed, target, releaseBlocking = true) {
   return { id, status, observed, target, releaseBlocking };
+}
+
+function measuredLabModels(lab, windowDays) {
+  if (!Array.isArray(lab?.models) || lab.models.length === 0) return [];
+  const { suite } = loadSuite(path.join(root, 'config/evals/nexusnxs-core-v1.json'));
+  const timestamp = Date.parse(lab.generatedAt);
+  if (!Number.isFinite(timestamp) || timestamp > Date.now() + 60_000
+    || timestamp < Date.now() - windowDays * 86_400_000
+    || lab.suite?.id !== suite.suiteId || lab.suite?.version !== suite.version
+    || lab.suite?.hash !== suiteHash(suite)) return [];
+  const models = [];
+  for (const entry of lab.models) {
+    if (!entry || !['quick', 'deep'].includes(entry.mode) || typeof entry.model !== 'string' || !entry.model.trim()
+      || !Array.isArray(entry.results) || entry.results.length !== suite.cases.length) return [];
+    if (entry.results.some(row => !row || typeof row.caseId !== 'string')) return [];
+    const rows = new Map(entry.results.map(row => [row.caseId, row]));
+    if (rows.size !== suite.cases.length || !entry.results.some(row => row.execution === 'model')) return [];
+    for (const item of suite.cases) {
+      const row = rows.get(item.id);
+      if (!row || row.category !== item.category || row.mustPass !== (item.mustPass === true)
+        || typeof row.passed !== 'boolean' || !['model', 'deterministic'].includes(row.execution)
+        || !Number.isFinite(row.durationMs) || row.durationMs < 0) return [];
+    }
+    // Ricalcolare dai casi: un riepilogo ottimistico non puo nascondere fallimenti.
+    models.push(buildModelReport({ suite, model: entry.model, mode: entry.mode, results: entry.results }));
+  }
+  return models;
 }
 
 function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifacts'), projectRoot = root }) {
@@ -48,14 +76,15 @@ function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifac
     : result('ai-quick-quality', 'not-measured', null, objectives.aiQuick));
 
   const lab = readJson(path.join(artifactsRoot, 'ai-eval-lab-gate.json'));
-  const labModels = Array.isArray(lab?.models) ? lab.models : [];
-  const labOk = lab?.gatePassed === true && labModels.every((entry) => Number(entry.summary?.passRate) >= objectives.aiLab.minimumPassRate
+  const labModels = measuredLabModels(lab, policy.windowDays);
+  const labOk = lab?.gatePassed === true && labModels.length > 0 && labModels.every((entry) => entry.summary.gatePassed === true && Number(entry.summary?.passRate) >= objectives.aiLab.minimumPassRate
     && (entry.summary?.mustPassFailures || []).length <= objectives.aiLab.maximumMustPassFailures);
   checks.push(lab
     ? result('ai-evaluation-gate', labOk ? 'pass' : 'fail', { gatePassed: lab.gatePassed, models: labModels.map((entry) => ({ passRate: entry.summary?.passRate, mustPassFailures: (entry.summary?.mustPassFailures || []).length })) }, objectives.aiLab)
     : result('ai-evaluation-gate', 'not-measured', null, objectives.aiLab));
 
   const deepCandidates = labModels
+    .filter(entry => entry.mode === 'deep' && entry.summary.gatePassed === true)
     .map((entry) => ({ model: entry.model, passRate: Number(entry.summary?.passRate), p95LatencyMs: Number(entry.summary?.p95LatencyMs), mustPassFailures: (entry.summary?.mustPassFailures || []).length }))
     .filter((entry) => entry.passRate >= objectives.aiDeep.minimumBestPassRate && entry.mustPassFailures === 0)
     .sort((left, right) => left.p95LatencyMs - right.p95LatencyMs);

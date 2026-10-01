@@ -313,7 +313,7 @@ export interface NexusBridge {
   trainingStats(): Promise<{ examples: number; approved: number; quarantined: number; corrected: number; preferencePairs: number; domains: Record<string, number>; evaluationExamples: number; evaluationReady: boolean; nextMilestone: number; memories?: number }>;
   trainingEvaluation(): Promise<{ examples: number; readiness: number; diversity: number; correctionCoverage: number; averagePromptTokens: number; status: 'ready' | 'growing' | 'early' }>;
   clearTrainingExamples(): Promise<{ removed: number }>;
-  listMemories(): Promise<Array<{ id: number; type: string; content: string; updatedAt: number; expiresAt?: number | null }>>;
+  listMemories(): Promise<Array<{ id: number; type: string; content: string; updatedAt: number; sourceKind?: string; expiresAt?: number | null }>>;
   forgetMemory(id: number): Promise<{ removed: number }>;
   updateMemory(id: number, content: string): Promise<{ updated: number }>;
   responseCacheStats(): Promise<{ entries: number; hits: number }>;
