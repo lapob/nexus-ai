@@ -26,6 +26,19 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   knowledge private, dati e modelli esclusi. Le due build Android ora usano
   un daemon a durata limitata: build, lint e firma terminano con exit 0 anche
   quando npm redirige i log. Non serve arrestare il servizio attivo.
+- Download web app aggiornati e verificati dal servizio `8f3f44c`; sito
+  `83339c6` pubblicato su Cloudflare `57c9c423-3e1e-44a8-b59e-b9d055388ca8`.
+  Gate sito ripetuto PASS, 14 rotte e health AI verificate dopo propagazione.
+- Validazione dei corpus retrieval aggiunta: casi vuoti, duplicati, percorsi
+  assoluti/traversal e flag malformati non producono misurazioni valide.
+  Suite successiva 966 PASS, 2 SKIP, zero FAIL; controllo sorgenti PASS.
+  Knowledge pubblica: 18/18, Hit@6 100%, MRR 1, citazioni e fonti 100% sul
+  set breve lessicale. Knowledge privata: 312 note, zero anomalie strutturali;
+  benchmark bloccato per corpus di casi locale assente. Non sono stati
+  inventati casi per attribuire un risultato alla knowledge privata.
+- Codex Security risulta disponibile ma non installato nella sessione corrente.
+  Il precedente audit parziale non e diventato completo. Firma editore,
+  runtime Ollama, collaudo umano voce/eco, iOS e corpus privato restano aperti.
 
 - Avvio Windows disattivato: task Server, Connectivity e Presence disabilitati,
   con XML di ripristino conservati fuori Git. Preferenza locale persistente:

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { NexusIndex } = require('../src/knowledge/rag');
+const { loadKnowledgeBenchmarkCases } = require('./lib/knowledge-benchmark-cases');
 
 // #region Configurazione del benchmark
 
@@ -20,7 +21,9 @@ const minimumCitationCoverage = Number(process.argv.find((arg) => arg.startsWith
 if (!fs.existsSync(vault)) throw new Error(`Knowledge ${profile} non trovata: ${vault}`);
 const casesPath = path.resolve(process.argv.find((arg) => arg.startsWith('--cases='))?.slice(8)
   || path.join(__dirname, '..', 'config', `${profile}-knowledge-benchmark.json`));
-const cases = JSON.parse(fs.readFileSync(casesPath, 'utf8'));
+let cases;
+try { cases = loadKnowledgeBenchmarkCases(casesPath); }
+catch (error) { process.stderr.write(`${error.message}\n`); process.exit(1); }
 
 // #endregion
 // #region Esecuzione e gate
