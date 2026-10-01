@@ -32,7 +32,16 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   candidati, circa 7.3 GiB liberi. Non sono risultati di qualita dei modelli.
 - GitHub `v0.3.19-preview.1` pubblicata dal commit `484c326`: otto asset
   con digest e dimensioni verificati lato GitHub; vecchia Preview conservata.
-  Collegamenti backend e sito in aggiornamento. Restano firme editore,
+  Servizio aggiornato da `6caf422`: health/ready 200, preferenza lingua
+  verificata su una richiesta pubblica reale e TTS locale 200. Prova singola
+  sintetica, non un benchmark generale. Ricerca reale SearXNG: quattro fonti,
+  filtro mensile e timestamp preservato in cache PASS. Offline mobile/desktop:
+  shell, font, bozza, reload e riconnessione PASS, API escluse dalla cache.
+- Windows 0.3.19 installato e smoke ripetuto sulla copia installata PASS.
+  Tre task Nexus disabilitati e StartupEnabled=0 dopo l'installazione.
+  Sito `4cb8443`: 37 test unitari, 26 E2E e 14 rotte PASS; metadati nuovi
+  pubblicati su Cloudflare `1ec4ec94-2ea8-46ce-9d2e-6c9d6038e5d6`.
+  Restano firme editore,
   audit integrale, corpus privato e vocale, sync autenticata e nodo n8n.
 
 ### Completamento installer e Preview 0.3.18
