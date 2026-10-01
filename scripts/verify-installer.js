@@ -7,11 +7,13 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const pythonRuntimeManifest = require('../config/python-runtime.json');
+const { verifyInstallerArtifacts } = require('./lib/installer-artifacts');
 
 // #region 01 — Contratto della build e delle risorse
 
 const root = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+verifyInstallerArtifacts({ root, version: pkg.version });
 let releaseConfig = {};
 try { releaseConfig = JSON.parse(fs.readFileSync(path.join(root, 'config', 'public-client.release.json'), 'utf8')); } catch {}
 const leanPublicPackage = releaseConfig.mode === 'public' && process.env.NEXUS_BUNDLE_OFFLINE_VOICE !== '1';

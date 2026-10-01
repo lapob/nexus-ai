@@ -5,6 +5,23 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Checkup del 1 ottobre
 
+### Completamento installer e Preview 0.3.18
+
+- Installer pubblico Windows 0.3.18 costruito con Electron 43.7.7, senza
+  runtime Ollama o modelli locali inclusi. Versione precedente installata
+  0.3.14 conservata in archivio di ripristino locale, senza dati del profilo.
+- Installazione reale completata; ASAR installato 0.3.18, preload/CSP/IPC e
+  renderer PASS. Il controllo automatico estratto dalla build installata
+  rispetta l'opt-out: task Windows disabilitati prima e dopo la chiamata.
+  Questo chiude il limite del precedente installer descritto sotto.
+- Verifica installer resa fail-closed per artefatti assenti/vuoti, ASAR di
+  versione diversa o codice di avvio obsoleto. Sedici test mirati PASS.
+  Suite finale 955 PASS, 2 SKIP, zero FAIL; check sorgenti e renderer PASS.
+- Android pubblico 6.5.20: build Preview ottimizzata, lint e firma APK
+  verificati. Nessuna nuova prova fisica: ADB non rileva dispositivi.
+- Preview con aggiornamento manuale: Windows senza firma editore, Android
+  con certificato Debug. Non e una release Stable o un bundle Play.
+
 - Avvio Windows disattivato: task Server, Connectivity e Presence disabilitati,
   con XML di ripristino conservati fuori Git. Preferenza locale persistente:
   la registrazione automatica rispetta la rinuncia; avvio e riavvio manuali

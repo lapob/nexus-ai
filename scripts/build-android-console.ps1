@@ -28,10 +28,10 @@ if (-not $gradle) {
 }
 $signedRelease = $env:NEXUS_ANDROID_KEYSTORE -and $env:NEXUS_ANDROID_STORE_PASSWORD -and $env:NEXUS_ANDROID_KEY_ALIAS -and $env:NEXUS_ANDROID_KEY_PASSWORD
 $variant = if ($signedRelease) { "Release" } else { "Preview" }
-& $gradle.FullName -p $androidProject --offline --console=plain "assemble$variant" "lint$variant"
+& $gradle.FullName -p $androidProject --no-daemon --offline --console=plain "assemble$variant" "lint$variant"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Dipendenza non presente nella cache: sincronizzazione sicura dai repository configurati..."
-    & $gradle.FullName -p $androidProject --console=plain "assemble$variant" "lint$variant"
+    & $gradle.FullName -p $androidProject --no-daemon --console=plain "assemble$variant" "lint$variant"
 }
 if ($LASTEXITCODE -ne 0) { throw "Compilazione NexusNXS Control non riuscita." }
 

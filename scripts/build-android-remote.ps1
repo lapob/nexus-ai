@@ -56,7 +56,8 @@ $env:NEXUS_FALLBACK_URL = ""
 $variant = if ($signedRelease) { "Release" } else { "Preview" }
 $gradleTasks = @("assemble$variant", "lint$variant")
 if ($signedRelease) { $gradleTasks += "bundle$variant" }
-& $gradle.FullName -p $androidProject --console=plain $gradleTasks
+# A persistent daemon can retain redirected npm handles after the build ends.
+& $gradle.FullName -p $androidProject --no-daemon --console=plain $gradleTasks
 if ($LASTEXITCODE -ne 0) { throw "Compilazione Android non riuscita." }
 
 $variantFolder = $variant.ToLowerInvariant()
