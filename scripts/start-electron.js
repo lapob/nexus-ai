@@ -7,6 +7,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { spawn, spawnSync } = require('node:child_process');
 const { isProcessAlive, readLock } = require('../src/infrastructure/electron/process-lock');
+const { selectManagedRuntimePort } = require('../src/ai/managed-ollama-runtime');
 
 const electronCli = path.join(__dirname, '..', 'node_modules', 'electron', 'cli.js');
 const projectRoot = path.resolve(__dirname, '..');
@@ -22,7 +23,7 @@ const reusableCoreRuntime = Boolean(coreDescriptor
   && isProcessAlive(coreDescriptor.pid)
   && process.env.NEXUS_REUSE_CORE_RUNTIME !== '0');
 const coreRuntimeBaseUrl = reusableCoreRuntime
-  ? `http://127.0.0.1:${12000 + (coreDescriptor.pid % 1000)}`
+  ? `http://127.0.0.1:${selectManagedRuntimePort(coreDescriptor.pid)}`
   : '';
 const CHROMIUM_WIDGETHOST_NOISE = /interface_endpoint_client\.cc:\d+.*Message \d+ rejected by interface blink\.mojom\.WidgetHost/i;
 let stderrBuffer = '';

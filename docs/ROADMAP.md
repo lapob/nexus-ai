@@ -41,12 +41,24 @@ n8n/MCP non sono dichiarati operativi: manca un nodo configurato autorizzato.
 
 ### Verifica degli otto punti — 1 ottobre 2026
 
+La revisione Codex Security di 9d9527d ha confermato due problemi medium,
+con copertura parziale di 37/916 file: chat privata dopo revoca e lettura
+non limitata dei metadati unsigned degli aggiornamenti. Le correzioni
+successive sono verificate da regressioni eseguibili: annullamento su
+revoca/disconnessione, controllo prima di memoria e cronologia, lettura
+incrementale con cancellazione dei flussi paralleli. Il report immutabile
+resta riferito alla revisione precedente, non certifica le modifiche.
+Il launcher ora usa lo stesso selettore di porta del Core, incluse le
+riserve Windows. Per la ricerca Brave/OpenAI occorre NEXUS_CLOUD_ENABLED=1;
+chiavi presenti nell'ambiente non costituiscono opt-in. SearXNG e il fallback
+enciclopedico restano distinti dalla generazione tramite modelli cloud.
+
 Questa tabella distingue le correzioni provate dai requisiti ancora aperti.
 Non equivale a una certificazione di sicurezza o a una release Stable.
 
 | Area | Risultato verificato | Da completare |
 | --- | --- | --- |
-| Sicurezza e distribuzione | Revoca delle richieste in corso corretta; backup sintetico cifrato ripristinato; Preview con hash e rollback conservato | Audit completo (scan precedente: 59/916 file), firme di produzione, feed firmato, ripristino esterno e upgrade pulito |
+| Sicurezza e distribuzione | Revoca delle richieste in corso corretta, inclusa chat privata; feed bounded prima della firma; backup sintetico cifrato ripristinato; Preview con hash e rollback conservato | Audit completo (ultima scan: 37/916 file; precedente 59/916 su altra revisione), firme di produzione, feed firmato, ripristino esterno e upgrade pulito |
 | Voce naturale | Sessione automatica su 4 larghezze: turni, interruzioni, permessi tardivi, uscita e bozza; valutatore STT separa rumore, lingue e accuratezza | Corpus vocale umano autorizzato, microfono/altoparlanti, eco e valutazione della naturalezza; utente ha chiesto di proseguire con le prove automatiche |
 | Conversazioni | Reset interrompe la richiesta e scarta frame tardivi; offline conserva la bozza senza inviarla alla riconnessione | Identita verificata e sincronizzazione opzionale cifrata tra dispositivi; nessuna identita ospite usata come account |
 | Qualita dei modelli | 100 casi della suite 1.4.0 validati; gate rifiuta fixture, report vuoti, hash obsoleti e casi incompleti, ricalcola i risultati | Confronto misurato su runtime separato; corpus privato revisionato. Dataset attuale: 0 esempi/0 preferenze, nessun training |

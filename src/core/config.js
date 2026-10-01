@@ -132,6 +132,7 @@ function loadRuntimeConfig(env = process.env) {
   if (!['auto', 'searxng', 'brave', 'openai', 'wikipedia'].includes(researchProvider)) throw new Error('NEXUS_WEB_SEARCH_PROVIDER deve essere auto, searxng, brave, openai o wikipedia.');
   const research = Object.freeze({
     enabled: env.NEXUS_WEB_SEARCH_MODE !== 'off',
+    cloudEnabled: env.NEXUS_CLOUD_ENABLED === '1',
     provider: researchProvider,
     searxngEndpoint: String(env.NEXUS_SEARXNG_URL || ''),
     braveApiKey: String(env.NEXUS_BRAVE_SEARCH_API_KEY || ''),

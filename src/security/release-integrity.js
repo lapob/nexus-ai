@@ -164,13 +164,31 @@ function remoteArtifactUrl(base, artifact) {
   return `${base}/${relative.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-async function boundedResponseText(response, maximumBytes, label) {
+async function boundedResponseText(response, maximumBytes, label, signal) {
   if (!response?.ok) throw new Error(`${label} non disponibile.`);
   const declaredLength = Number(response.headers?.get?.('content-length'));
   if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) throw new Error(`${label} troppo grande.`);
-  const text = await response.text();
-  if (Buffer.byteLength(text) > maximumBytes) throw new Error(`${label} troppo grande.`);
-  return text;
+  if (!response.body?.getReader) throw new Error(`${label} senza flusso leggibile.`);
+  const reader = response.body.getReader();
+  const cancel = () => { void reader.cancel().catch(() => {}); };
+  const chunks = []; let bytes = 0; let complete = false;
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const { done, value } = await reader.read();
+      signal?.throwIfAborted();
+      if (done) { complete = true; break; }
+      bytes += value.byteLength;
+      if (bytes > maximumBytes) throw new Error(`${label} troppo grande.`);
+      chunks.push(Buffer.from(value));
+    }
+    return new TextDecoder().decode(Buffer.concat(chunks, bytes));
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+    if (!complete) cancel();
+    reader.releaseLock();
+  }
 }
 
 function updateFeedRecords(manifest) {
@@ -227,8 +245,8 @@ async function verifyRemoteReleaseFeed({ updateUrl, publicKey, keyId, channel, f
       fetchImpl(`${base}/release-manifest.sig.json`, options)
     ]);
     const [manifestText, signatureText] = await Promise.all([
-      boundedResponseText(manifestResponse, MAX_REMOTE_MANIFEST_BYTES, 'Distinta aggiornamento'),
-      boundedResponseText(signatureResponse, 64 * 1024, 'Firma distinta aggiornamento')
+      boundedResponseText(manifestResponse, MAX_REMOTE_MANIFEST_BYTES, 'Distinta aggiornamento', controller.signal),
+      boundedResponseText(signatureResponse, 64 * 1024, 'Firma distinta aggiornamento', controller.signal)
     ]);
     let envelope;
     try { envelope = JSON.parse(signatureText); } catch { throw new Error('Firma distinta aggiornamento non valida.'); }
@@ -241,7 +259,7 @@ async function verifyRemoteReleaseFeed({ updateUrl, publicKey, keyId, channel, f
     const updateResponse = await fetchImpl(remoteArtifactUrl(base, updateManifest), {
       ...options, headers: { Accept: 'application/yaml, text/yaml, text/plain' }
     });
-    const updateText = await boundedResponseText(updateResponse, MAX_REMOTE_UPDATE_MANIFEST_BYTES, 'Manifest Electron');
+    const updateText = await boundedResponseText(updateResponse, MAX_REMOTE_UPDATE_MANIFEST_BYTES, 'Manifest Electron', controller.signal);
     if (Buffer.byteLength(updateText) !== updateManifest.bytes || sha256Bytes(Buffer.from(updateText)) !== String(updateManifest.sha256).toUpperCase()) {
       throw new Error('latest.yml non corrisponde alla distinta firmata.');
     }
@@ -252,6 +270,7 @@ async function verifyRemoteReleaseFeed({ updateUrl, publicKey, keyId, channel, f
       installerUrl: remoteArtifactUrl(base, verified.installer)
     };
   } finally {
+    controller.abort();
     clearTimeout(timeout);
   }
 }

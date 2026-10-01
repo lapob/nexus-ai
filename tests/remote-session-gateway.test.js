@@ -372,6 +372,73 @@ function fixture() {
   return { root, gateway, powerActions, serviceActions, requestedModels, conversationStore };
 }
 
+for (const cause of ['revocation', 'disconnect']) test(`la chat privata annulla il lavoro su ${cause}`, async () => {
+  const { root, gateway, conversationStore } = fixture();
+  let release; let entered; let input;
+  const waiting = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  let writes = 0;
+  gateway.onMessage = async (context) => {
+    input = context; entered(); await waiting;
+    context.assertAuthorized?.();
+    if (context.signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    writes += 1;
+    return conversationStore.save(context.conversation);
+  };
+  let pending;
+  try {
+    const port = await freePort(); await gateway.configure({ enabled: true, port });
+    const base = `http://127.0.0.1:${port}`;
+    const device = await pair(base, gateway.createPairingCode().code);
+    const controller = new AbortController();
+    pending = fetch(`${base}/api/conversations/chat-1/messages`, { method: 'POST', signal: controller.signal,
+      headers: { Authorization: `Bearer ${device.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Ricorda la preferenza di collaudo' }) }).catch(() => null);
+    await started;
+    if (cause === 'revocation') gateway.revokeDevice(device.device.id);
+    else controller.abort();
+    await pending;
+    for (let attempt = 0; attempt < 30 && !input.signal?.aborted; attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+    release();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(input.signal?.aborted, true);
+    assert.equal(typeof input.assertAuthorized, 'function');
+    assert.equal(writes, 0);
+  } finally { release?.(); await pending; await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('la preparazione non modifica memoria se la ricerca ignora un annullamento', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/application/register-ipc.js'), 'utf8');
+  const start = source.indexOf('  const prepare = async');
+  const end = source.indexOf('  const applyExplicitMemoryInstruction', start);
+  const controller = new AbortController(); let writes = 0;
+  const prepare = vm.runInNewContext(`${source.slice(start, end)}; prepare;`, {
+    readWorkspace: () => ({ active: false }), distributionMode: 'developer', runtimeConfig: { research: {} },
+    webResearchService: {}, researchLanguage: () => 'it', logger: { warn() {} },
+    researchQuestion: async () => { controller.abort(); return { unavailable: false, policy: {}, sources: [], citations: [] }; },
+    buildPublicResearchPrompt: () => '', applyExplicitMemoryInstruction: () => { writes++; throw new Error('memory mutated'); },
+    throwIfRequestAborted: signal => { if (signal?.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' }); }
+  });
+  await assert.rejects(prepare({ question: 'Ricorda questa prova', mode: 'fast', history: [], settings: {}, signal: controller.signal }), { name: 'AbortError' });
+  assert.equal(writes, 0);
+});
+
+test('la risposta istantanea ricontrolla l autorizzazione prima di salvare', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/application/register-ipc.js'), 'utf8');
+  const start = source.indexOf('  const remoteChat = async');
+  const end = source.indexOf('  const remoteActionPlan', start);
+  let authorized = true; let writes = 0;
+  const chat = vm.runInNewContext(`${source.slice(start, end)}; remoteChat;`, {
+    performance, throwIfRequestAborted() {}, parseChatRequest: () => ({ question: 'ciao', mode: 'fast', history: [] }),
+    normalizeConversationPreferences: () => ({ responseLanguage: 'auto' }), getSettings: () => ({}),
+    strictToolRoutingReply: () => 'Risposta sintetica', performanceStore: null,
+    conversationStore: { save: value => { writes++; return value; } }
+  });
+  await assert.rejects(chat({ conversation: { turns: [] }, text: 'ciao', mode: 'fast',
+    onToken: () => { authorized = false; }, assertAuthorized: () => { if (!authorized) throw new Error('revoked'); }
+  }), /revoked/);
+  assert.equal(writes, 0);
+});
+
 test('il canale QA richiede un segreto server-side e non disattiva i limiti pubblici', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-qa-'));
   const qaSecret = 'qa-private-browser-secret-0123456789abcdef';

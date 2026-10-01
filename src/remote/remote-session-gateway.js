@@ -1556,6 +1556,7 @@ class RemoteSessionGateway {
       }
       for (const [request, context] of this.activeDeviceRequests) {
         if (context.device.id === String(id)) {
+          context.controller.abort();
           context.response.destroy();
           request.destroy();
         }
@@ -1722,16 +1723,19 @@ class RemoteSessionGateway {
   }
 
   trackDeviceRequest(request, response, device) {
-    const context = { device, response, scope: device.scope, keyId: device.identity?.keyId };
+    const context = { device, response, scope: device.scope, keyId: device.identity?.keyId, controller: new AbortController() };
     this.deviceRequestContexts.set(request, context);
     this.activeDeviceRequests.set(request, context);
     const settled = () => {
+      context.controller.abort();
       this.activeDeviceRequests.delete(request);
+      request.off('aborted', settled);
       response.off('finish', settled);
       response.off('close', settled);
     };
     response.once('finish', settled);
     response.once('close', settled);
+    request.once('aborted', settled);
   }
 
   assertRequestAuthorized(request) {
@@ -2986,7 +2990,15 @@ class RemoteSessionGateway {
           const report = (message, phase = 'work') => this.reportActivity(record.id, message, phase);
           report('Comprendo la richiesta e preparo il contesto…');
           try {
-            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, report });
+            const { signal } = this.deviceRequestContexts.get(request).controller;
+            const assertAuthorized = () => {
+              signal.throwIfAborted();
+              this.assertServing();
+              this.assertRequestAuthorized(request);
+            };
+            assertAuthorized();
+            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, report, signal, assertAuthorized });
+            assertAuthorized();
             if (messageKey) {
               this.completedRemoteMessages.set(messageKey, Date.now());
               if (this.completedRemoteMessages.size > 2_000) {

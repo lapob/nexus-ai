@@ -4,11 +4,25 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
+const vm = require('node:vm');
 const {
   ManagedOllamaRuntime,
   parseExcludedTcpPortRanges,
   selectManagedRuntimePort
 } = require('../src/ai/managed-ollama-runtime');
+
+test('il launcher riusa la porta effettiva del Core anche con PID grande e riserve Windows', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../scripts/start-electron.js'), 'utf8');
+  const setup = source.slice(0, source.indexOf('const CHROMIUM_WIDGETHOST_NOISE'));
+  const pid = 2345;
+  const select = value => selectManagedRuntimePort(value, { platform: 'win32', runProcess: () => ({ status: 0, stdout: ' 14345 14350\n' }) });
+  const actual = vm.runInNewContext(`${setup}; coreRuntimeBaseUrl;`, {
+    __dirname: path.join(__dirname, '../scripts'), process: { argv: ['node', 'start'], env: {} },
+    require: name => name.endsWith('process-lock') ? { isProcessAlive: () => true, readLock: () => ({ pid }) }
+      : name.endsWith('managed-ollama-runtime') ? { selectManagedRuntimePort: select } : require(name)
+  });
+  assert.equal(actual, 'http://127.0.0.1:14351');
+});
 
 test('sceglie una porta runtime fuori dagli intervalli riservati da Windows', () => {
   const netsh = `\nProtocol tcp Port Exclusion Ranges\n\nStart Port    End Port\n----------    --------\n     12813       12912\n     12913       13012\n     50000       50059     *\n`;

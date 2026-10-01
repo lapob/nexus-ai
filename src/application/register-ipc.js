@@ -636,7 +636,9 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       return attachment.content;
     }).join('\n\n========\n\n');
   };
-  const prepare = async ({ question, mode, history, settings, signal, attachmentContext = '', publicGuest = false }) => {
+  const prepare = async ({ question, mode, history, settings, signal, attachmentContext = '', publicGuest = false, assertAuthorized = null }) => {
+    const assertActive = () => { throwIfRequestAborted(signal); assertAuthorized?.(); };
+    assertActive();
     const workspace = publicGuest ? { active: false } : readWorkspace();
     const research = await researchQuestion({
       question,
@@ -648,6 +650,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       service: webResearchService,
       signal
     });
+    assertActive();
     if (research.unavailable && research.policy.level === 'required') {
       logger.warn('Ricerca web richiesta ma non disponibile.', { provider: research.provider, reason: research.policy.reason });
     }
@@ -687,12 +690,14 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     if (shouldUseSemanticRetrieval({ question, mode, sources, embeddingModel: settings.embeddingModel, tier: runtimeTuning.tier })) {
       try {
         await ensureRuntime(settings);
+        assertActive();
         const candidates = getIndex().search(question, mode === 'deep' ? 20 : 14);
         const missing = candidates.filter((chunk) => !Array.isArray(chunk.embedding)).slice(0, mode === 'deep' ? 12 : 8);
         const embedded = await aiRuntime.embed([
           question,
           ...missing.map((chunk) => `${chunk.title}\n${chunk.heading}\n${chunk.text}`.slice(0, 12000))
         ], { model: settings.embeddingModel, signal });
+        assertActive();
         if (missing.length) {
           getIndex().setEmbeddings(missing.map((chunk, index) => ({
             relativePath: chunk.relativePath,
@@ -753,6 +758,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       ...memories.map((memory) => memory.content)
     ]);
     const dialogueDirective = conversationalGuidance(question, history);
+    assertActive();
     return {
       sources,
       publicSources: research.citations,
@@ -1844,9 +1850,10 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       if (senderRequests.get(event.sender.id) === requestId) senderRequests.delete(event.sender.id);
     }
   });
-  const remoteChat = async ({ conversation, text, mode, requestedModel = 'automatic', conversationPreferences = null, report = () => {}, onToken = () => {}, ephemeral = false, attachments = { context: '', images: [] }, signal: remoteSignal = null }) => {
+  const remoteChat = async ({ conversation, text, mode, requestedModel = 'automatic', conversationPreferences = null, report = () => {}, onToken = () => {}, ephemeral = false, attachments = { context: '', images: [] }, signal: remoteSignal = null, assertAuthorized = null }) => {
+    const assertRemoteActive = () => { throwIfRequestAborted(remoteSignal); assertAuthorized?.(); };
+    assertRemoteActive();
     const remoteStartedAt = performance.now();
-    if (remoteSignal?.aborted) throw Object.assign(new Error('Richiesta remota annullata.'), { name: 'AbortError', code: 'ABORT_ERR' });
     report('Comprendo la richiesta e preparo il contesto…');
     const parsed = parseChatRequest({ question: text, mode, history: conversation.turns });
     const instantReply = parsed.mode !== 'deep' && normalizeConversationPreferences(conversationPreferences, ephemeral ? {} : getSettings().personalization).responseLanguage === 'auto'
@@ -1864,6 +1871,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         { role: 'user', content: parsed.question, createdAt: now },
         { role: 'assistant', content: answer, createdAt: now }
       ] };
+      assertRemoteActive();
       return ephemeral ? completed : conversationStore.save(completed);
     }
     const remoteAttachmentCount = (attachments.images?.length || 0) + (attachments.context ? 1 : 0);
@@ -1897,6 +1905,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       }); } catch (error) { logger.warn('Metrica sessione remota non salvata.', { error }); }
     };
     const publishRemoteToken = (token) => {
+      throwIfRequestAborted(controller.signal);
+      assertRemoteActive();
       if (!remoteFirstTokenAt) remoteFirstTokenAt = performance.now();
       onToken(token);
     };
@@ -1910,8 +1920,11 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       const preferences = normalizeConversationPreferences(conversationPreferences, ephemeral ? {} : settings.personalization);
       settings = { ...settings, personalization: { ...(ephemeral ? {} : settings.personalization), ...preferences } };
       throwIfRequestAborted(controller.signal);
+      assertRemoteActive();
       report('Raccolgo le informazioni utili…');
-      const prepared = await prepare({ question: parsed.question, mode: resolvedMode, history: parsed.history, settings, signal: controller.signal, attachmentContext: attachments.context || '', publicGuest: ephemeral });
+      const prepared = await prepare({ question: parsed.question, mode: resolvedMode, history: parsed.history, settings, signal: controller.signal, attachmentContext: attachments.context || '', publicGuest: ephemeral, assertAuthorized });
+      throwIfRequestAborted(controller.signal);
+      assertRemoteActive();
       remotePreparedAt = performance.now();
       const bufferModelOutput = prepared.security.promptInjection || prepared.security.sensitiveLiterals.length > 0 || prepared.publicSources.length > 0 || hasStrictOutputConstraint(parsed.question);
       if (prepared.research?.searched) {
@@ -1932,6 +1945,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
             { role: 'assistant', content: answer, createdAt: now }
           ]
         };
+        throwIfRequestAborted(controller.signal);
+        assertRemoteActive();
         const updated = ephemeral ? completed : conversationStore.save(completed);
         recordRemotePerformance(true);
         return updated;
@@ -2058,6 +2073,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
           }
         ]
       };
+      throwIfRequestAborted(controller.signal);
+      assertRemoteActive();
       const updated = ephemeral ? completed : conversationStore.save(completed);
       logger.info('Messaggio sessione remota completato.', { requestId, mode: resolvedMode, conversationId: conversation.id });
       recordRemotePerformance(true);

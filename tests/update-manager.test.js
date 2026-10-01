@@ -82,7 +82,7 @@ async function withOfflineUpdater(feed, callback) {
     globalThis.fetch = async (url, options) => {
       assert.equal(options.redirect, 'error', 'signed metadata may not redirect');
       const content = responseText(url);
-      return { ok: true, headers: { get: () => null }, text: async () => content };
+      return new Response(content);
     };
     manager = exports.createUpdateManager({ updateUrl: 'https://updates.example.test', channel: feed.channel || 'stable',
       manifestPublicKey: feed.publicKey, manifestKeyId: 'test-key', trustedRendererUrl: 'nexus://app/index.html',

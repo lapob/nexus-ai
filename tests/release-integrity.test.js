@@ -104,11 +104,7 @@ test('il preflight remoto accetta soltanto distinta firmata del canale richiesto
   });
   const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
   const envelope = signatureEnvelope(Buffer.from(manifestText), { privateKey: keys.privateKey, keyId: 'beta-key' });
-  const fetchImpl = async (url) => ({
-    ok: true,
-    headers: { get: () => null },
-    text: async () => url.endsWith('.sig.json') ? JSON.stringify(envelope) : url.endsWith('/latest.yml') ? latestText : manifestText
-  });
+  const fetchImpl = async (url) => new Response(url.endsWith('.sig.json') ? JSON.stringify(envelope) : url.endsWith('/latest.yml') ? latestText : manifestText);
   const verified = await verifyRemoteReleaseManifest({
     updateUrl: 'https://updates.example.test/beta',
     publicKey: publicKeyDerBase64(keys.publicKey), keyId: 'beta-key', channel: 'beta', fetchImpl
@@ -121,11 +117,7 @@ test('il preflight remoto accetta soltanto distinta firmata del canale richiesto
     }),
     /canale/
   );
-  const tamperedFeed = async (url) => ({
-    ok: true,
-    headers: { get: () => null },
-    text: async () => url.endsWith('.sig.json') ? JSON.stringify(envelope) : url.endsWith('/latest.yml') ? latestText.replace('2.0.0', '9.9.9') : manifestText
-  });
+  const tamperedFeed = async (url) => new Response(url.endsWith('.sig.json') ? JSON.stringify(envelope) : url.endsWith('/latest.yml') ? latestText.replace('2.0.0', '9.9.9') : manifestText);
   await assert.rejects(
     verifyRemoteReleaseManifest({
       updateUrl: 'https://updates.example.test/beta',
@@ -133,4 +125,36 @@ test('il preflight remoto accetta soltanto distinta firmata del canale richiesto
     }),
     /non corrisponde/
   );
+});
+
+test('il feed senza Content-Length interrompe la lettura prima di accumulare tutto il corpo', async () => {
+  let chunks = 0; let cancelled = false;
+  const oversized = new ReadableStream({
+    pull(controller) {
+      if (++chunks <= 100) controller.enqueue(new Uint8Array(64 * 1024));
+      else controller.close();
+    },
+    cancel() { cancelled = true; }
+  });
+  await assert.rejects(verifyRemoteReleaseManifest({
+    updateUrl: 'https://updates.example.test/beta', keyId: 'test', publicKey: '', channel: 'beta',
+    fetchImpl: async (url) => new Response(url.endsWith('.sig.json') ? '{}' : oversized)
+  }), /troppo grande/);
+  assert.equal(cancelled, true);
+  assert.ok(chunks < 100, 'non deve leggere tutto il payload unsigned');
+});
+
+test('il fallimento di una risposta annulla anche la lettura parallela', async () => {
+  let siblingSignal;
+  await assert.rejects(verifyRemoteReleaseManifest({
+    updateUrl: 'https://updates.example.test/beta', keyId: 'test', publicKey: '', channel: 'beta',
+    fetchImpl: async (url, { signal }) => {
+      if (!url.endsWith('.sig.json')) return new Response('', { headers: { 'content-length': '999999999' } });
+      siblingSignal = signal;
+      return new Response(new ReadableStream({ start(controller) {
+        signal.addEventListener('abort', () => controller.error(new Error('aborted')), { once: true });
+      } }));
+    }
+  }), /troppo grande/);
+  assert.equal(siblingSignal.aborted, true, 'il finally deve annullare le operazioni rimaste');
 });

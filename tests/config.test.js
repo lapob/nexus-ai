@@ -9,6 +9,8 @@ test('carica default locali e valida la temperatura', () => {
   assert.equal(config.ai.chatModel, null);
   assert.equal(config.llm.temperature, 0.3);
   assert.equal(config.research.enabled, true);
+  assert.equal(config.research.cloudEnabled, false);
+  assert.equal(loadRuntimeConfig({ NEXUS_CLOUD_ENABLED: '1' }).research.cloudEnabled, true);
   assert.equal(config.research.provider, 'auto');
   assert.throws(() => validateSettings({ baseUrl: config.ai.ollama.baseUrl, model: 'x', temperature: 2 }), /tra 0 e 1/);
 });

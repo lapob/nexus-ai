@@ -69,15 +69,15 @@ function linkAbortSignal(controller, signal) {
 // #region 02 — Provider server-side
 
 class WebResearchService {
-  constructor({ enabled = true, provider = 'auto', searxngEndpoint = '', braveApiKey = '', openAiApiKey = '', openAiModel = '', openAiEndpoint = DEFAULT_OPENAI_RESPONSES_URL, timeoutMs = 6000, cacheTtlMs = 300_000, fetchImpl = globalThis.fetch, logger = null, now = () => Date.now() } = {}) {
+  constructor({ enabled = true, cloudEnabled = false, provider = 'auto', searxngEndpoint = '', braveApiKey = '', openAiApiKey = '', openAiModel = '', openAiEndpoint = DEFAULT_OPENAI_RESPONSES_URL, timeoutMs = 6000, cacheTtlMs = 300_000, fetchImpl = globalThis.fetch, logger = null, now = () => Date.now() } = {}) {
     const normalizedProvider = String(provider || 'auto').toLowerCase();
     if (!PROVIDERS.has(normalizedProvider)) throw new Error('Provider di ricerca web non consentito.');
     if (typeof fetchImpl !== 'function') throw new Error('Runtime fetch non disponibile per la ricerca web.');
     this.enabled = enabled !== false;
     this.provider = normalizedProvider;
     this.searxngEndpoint = safeSelfHostedEndpoint(searxngEndpoint);
-    this.braveApiKey = String(braveApiKey || '').trim();
-    this.openAiApiKey = String(openAiApiKey || '').trim();
+    this.braveApiKey = cloudEnabled === true ? String(braveApiKey || '').trim() : '';
+    this.openAiApiKey = cloudEnabled === true ? String(openAiApiKey || '').trim() : '';
     this.openAiModel = String(openAiModel || '').trim().slice(0, 160);
     this.openAiEndpoint = safeProviderEndpoint(openAiEndpoint, DEFAULT_OPENAI_RESPONSES_URL);
     this.timeoutMs = Math.max(800, Math.min(15_000, Number(timeoutMs) || 6000));

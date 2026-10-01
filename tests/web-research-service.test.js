@@ -11,6 +11,20 @@ function jsonResponse(payload, status = 200) {
   };
 }
 
+test('le chiavi configurate non attivano provider cloud senza consenso esplicito', async () => {
+  let calls = 0;
+  const settings = { braveApiKey: 'synthetic-key', openAiApiKey: 'synthetic-key', openAiModel: 'search-model',
+    fetchImpl: async () => { calls++; throw new Error('cloud not allowed'); } };
+  assert.equal(new WebResearchService(settings).activeProvider(), 'wikipedia');
+  assert.equal(new WebResearchService({ ...settings, searxngEndpoint: 'http://127.0.0.1:8080/' }).activeProvider(), 'searxng');
+  for (const provider of ['brave', 'openai']) {
+    const service = new WebResearchService({ ...settings, provider });
+    assert.equal(service.activeProvider(), 'unavailable');
+    await assert.rejects(service.search('query sintetica'));
+  }
+  assert.equal(calls, 0);
+});
+
 test('normalizza Wikipedia come fallback senza chiavi client', async () => {
   const calls = [];
   const service = new WebResearchService({
@@ -37,7 +51,7 @@ test('usa Brave soltanto lato server e non restituisce la credenziale', async ()
   let token = '';
   const service = new WebResearchService({
     provider: 'brave',
-    braveApiKey: 'server-secret',
+    cloudEnabled: true, braveApiKey: 'server-secret',
     fetchImpl: async (_url, options) => {
       token = options.headers['X-Subscription-Token'];
       return jsonResponse({ web: { results: [{ title: 'Documentazione', url: 'https://example.com/docs', description: 'Risultato verificabile' }] } });
@@ -76,7 +90,7 @@ test('usa OpenAI Responses come ricerca live senza esporre la credenziale', asyn
   let request;
   const service = new WebResearchService({
     provider: 'openai',
-    openAiApiKey: 'server-secret',
+    cloudEnabled: true, openAiApiKey: 'server-secret',
     openAiModel: 'search-model',
     fetchImpl: async (url, options) => {
       request = { url: String(url), options };
@@ -102,7 +116,7 @@ test('usa OpenAI Responses come ricerca live senza esporre la credenziale', asyn
 });
 
 test('auto seleziona OpenAI quando Brave non è configurato', () => {
-  const service = new WebResearchService({ provider: 'auto', openAiApiKey: 'server-secret', openAiModel: 'search-model' });
+  const service = new WebResearchService({ provider: 'auto', cloudEnabled: true, openAiApiKey: 'server-secret', openAiModel: 'search-model' });
   assert.equal(service.activeProvider(), 'openai');
   assert.deepEqual(service.capabilityState(), { state: 'available', mode: 'live' });
 });
@@ -111,7 +125,7 @@ test('in modalita auto ripiega su Wikipedia se Brave non risponde', async () => 
   const calls = [];
   const service = new WebResearchService({
     provider: 'auto',
-    braveApiKey: 'server-secret',
+    cloudEnabled: true, braveApiKey: 'server-secret',
     fetchImpl: async (url) => {
       calls.push(String(url));
       if (String(url).includes('api.search.brave.com')) return jsonResponse({}, 401);
@@ -138,7 +152,7 @@ test('non spaccia Wikipedia per ricerca in tempo reale', async () => {
   const calls = [];
   const failingLiveProvider = new WebResearchService({
     provider: 'auto',
-    braveApiKey: 'server-secret',
+    cloudEnabled: true, braveApiKey: 'server-secret',
     fetchImpl: async (url) => {
       calls.push(String(url));
       return jsonResponse({}, 503);
