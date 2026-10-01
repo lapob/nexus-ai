@@ -21,6 +21,11 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   verificati. Nessuna nuova prova fisica: ADB non rileva dispositivi.
 - Preview con aggiornamento manuale: Windows senza firma editore, Android
   con certificato Debug. Non e una release Stable o un bundle Play.
+- GitHub `v0.3.18-preview.1` pubblicata dal commit `317cc4e`: otto asset
+  pubblici, digest SHA256 e dimensioni verificati lato GitHub. Control,
+  knowledge private, dati e modelli esclusi. Le due build Android ora usano
+  un daemon a durata limitata: build, lint e firma terminano con exit 0 anche
+  quando npm redirige i log. Non serve arrestare il servizio attivo.
 
 - Avvio Windows disattivato: task Server, Connectivity e Presence disabilitati,
   con XML di ripristino conservati fuori Git. Preferenza locale persistente:

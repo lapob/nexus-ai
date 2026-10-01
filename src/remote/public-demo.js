@@ -7,8 +7,8 @@ const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../shared/desktop-recipes');
 const { createPublicVoiceSession } = require('./public-voice-session');
 const { colors: designColors } = require('../../config/nexus-design-tokens.json');
-const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.17-preview.1/NexusNXS-0.3.17-Setup.exe';
-const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.17-preview.1/NexusNXS-Android.apk';
+const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.18-preview.1/NexusNXS-0.3.18-Setup.exe';
+const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.18-preview.1/NexusNXS-Android.apk';
 
 const EXPERIENCE_STYLE = `<style>
 /* Icon actions use light, not tooltips or pointer focus rectangles. */
