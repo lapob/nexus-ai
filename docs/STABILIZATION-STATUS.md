@@ -30,7 +30,9 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
   servizio attivo, controllo RAM e scaricamento del modello al termine.
   Confronto reale bloccato prima del caricamento: 12.8 GiB richiesti per i
   candidati, circa 7.3 GiB liberi. Non sono risultati di qualita dei modelli.
-- Pubblicazione candidata ancora da verificare. Restano firme editore,
+- GitHub `v0.3.19-preview.1` pubblicata dal commit `484c326`: otto asset
+  con digest e dimensioni verificati lato GitHub; vecchia Preview conservata.
+  Collegamenti backend e sito in aggiornamento. Restano firme editore,
   audit integrale, corpus privato e vocale, sync autenticata e nodo n8n.
 
 ### Completamento installer e Preview 0.3.18
