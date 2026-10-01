@@ -5,6 +5,7 @@
 param(
   [ValidateSet('Control', 'Public')][string]$App = 'Control',
   [ValidateSet('Online', 'Offline')][string]$ControlState = 'Online',
+  [ValidateSet('Online', 'Offline')][string]$PublicState = 'Online',
   [string]$ApkPath = "",
   [string]$OutputDirectory = "",
   [ValidateRange(1, 100)][double]$MaxJankyPercent = 18,
@@ -105,6 +106,11 @@ try {
       if (($ControlState -eq 'Online' -and -not $dashboard) -or ($ControlState -eq 'Offline' -and -not $offline)) {
         throw "Control $($profile.Name): atteso stato $ControlState. La schermata di connessione non dimostra il layout della dashboard."
       }
+    } else {
+      $connection = $capturedXml.SelectSingleNode("//node[@package='$package' and @text='$PublicState']")
+      if (-not $connection) {
+        throw "Public $($profile.Name): atteso stato $PublicState. Una schermata offline non dimostra il percorso online."
+      }
     }
     $capturedPng = [IO.File]::ReadAllBytes((Join-Path $OutputDirectory "$($profile.Name).png"))
     if ($capturedPng.Length -lt 24 -or [BitConverter]::ToString($capturedPng, 0, 8) -ne '89-50-4E-47-0D-0A-1A-0A') {
@@ -138,6 +144,7 @@ try {
     ApkSha256 = $apkSha256
     App = $App
     ExpectedControlState = if ($App -eq 'Control') { $ControlState } else { $null }
+    ExpectedPublicState = if ($App -eq 'Public') { $PublicState } else { $null }
     Package = $package
     CapturedAt = (Get-Date).ToString('o')
     Profiles = @($profiles.Name)
@@ -154,7 +161,7 @@ try {
     if ($emptyLayouts.Count) { throw "Layout Control non acquisito: $($emptyLayouts.Name -join ', ')" }
     Write-Output "Android visual/layout matrix $ControlState`: PASS ($($profiles.Count) profili in $OutputDirectory)."
   } else {
-    Write-Output "Android visual matrix: PASS ($($profiles.Count) profili in $OutputDirectory)."
+    Write-Output "Android visual matrix $PublicState`: PASS ($($profiles.Count) profili in $OutputDirectory)."
   }
   $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'manifest.json') -Encoding utf8
 }

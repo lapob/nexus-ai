@@ -5,6 +5,43 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Checkup del 1 ottobre
 
+### Revoca dei dispositivi e collaudo Android
+
+- Corretto il mantenimento dell'autorizzazione dopo revoca durante lettura del
+  corpo HTTP, verifica firmata o attese di pianificazione. Il gateway ricontrolla
+  la sessione prima di nuove operazioni, interrompe le richieste del dispositivo
+  revocato e invalida i suoi ticket. Le operazioni gia iniziate conservano la
+  verifica locale e la ricevuta finale. Restano compatibili i dispositivi
+  autorizzati e il periodo previsto per la rotazione del token.
+- Due regressioni HTTP riproducevano HTTP 200 sul codice precedente, usando
+  esclusivamente esecutori simulati. Quattordici test di identita ora PASS,
+  inclusi upload vocale, prova asincrona, pianificazione e ricevuta post-effetto.
+  Revisione indipendente e controlli sorgenti PASS; suite completa 987 PASS,
+  2 SKIP, zero FAIL. Non sono stati eseguiti spegnimenti o riavvii del PC.
+- Codex Security installato: scansione standard completata sul commit
+  `1710f99`, con un finding medio ora corretto. Copertura esplicitamente
+  PARZIALE: 59 dei 916 file revisionati interamente, 857 percorsi differiti.
+  Il report originale resta conservato nello stato locale del plugin;
+  questa correzione non completa l'audit dell'intero repository.
+- Samsung: 22 test nativi SQLite/Keystore/Activity PASS nella sandbox QA.
+  Public 6.5.21: menu tramite gesto, impostazioni fullscreen, tastiera,
+  allegati e annullamento del selettore Documenti verificati senza crash.
+  La bozza sintetica resta dopo menu e impostazioni; rimossa senza invio.
+  Control 1.19.8: cinque profili online PASS, scroll lungo Sistema verificato;
+  titolo e schede restano fissi e il cambio sezione torna all'inizio.
+- Il controllo della matrice pubblica distingue ora Online e Offline;
+  i gate rifiutano metadati mancanti e prove offline. La prima matrice
+  pubblica online si e interrotta sul blocco schermo del Samsung. Il nuovo
+  tentativo e passato su cinque profili, compresi landscape, tablet e font
+  al 200%; frame lenti 3.29%-12.57% nel budget corrente del 18%.
+  Display, font, rotazione e timeout schermo ripristinati dopo la prova.
+- Igiene e sovrapposizioni PASS; audit dipendenze runtime senza vulnerabilita
+  note. Eliminato solo l'APK obsoleto 6.5.19, conservando versione attuale
+  e rollback. Nessuna cancellazione di dati o knowledge personali.
+- Nessun nuovo installer prodotto in questo blocco. Windows 0.3.19 e APK
+  attuali restano Preview; firme, audit integrale, collaudo voce umana e
+  criteri operativi indicati sotto sono ancora necessari per la Stable.
+
 ### Ricerca, preferenze comuni e valutazione isolata: candidato 0.3.19
 
 - Ricerca deep su due query, filtri temporali compatibili con il provider,

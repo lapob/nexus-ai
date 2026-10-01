@@ -47,8 +47,8 @@ test('la Preview tecnica non finge che firma e dispositivi reali siano gia pront
 test('la Founder Beta richiede insieme prove automatiche firma dispositivi e responsabilita', () => {
   const item = fixture();
   try {
-    const matrix = { apkSha256: crypto.createHash('sha256').update('synthetic APK').digest('hex'), capturedAt: new Date(item.now).toISOString(), profiles: [1, 2, 3, 4, 5], frameMetrics: Array.from({ length: 5 }, (_, i) => ({ profile: i + 1, totalFrames: 120, jankyPercent: 2 })) };
-    item.write('qa-artifacts/android-control-matrix/manifest.json', matrix);
+    const matrix = { App: 'Public', ExpectedPublicState: 'Online', apkSha256: crypto.createHash('sha256').update('synthetic APK').digest('hex'), capturedAt: new Date(item.now).toISOString(), profiles: [1, 2, 3, 4, 5], frameMetrics: Array.from({ length: 5 }, (_, i) => ({ profile: i + 1, totalFrames: 120, jankyPercent: 2 })) };
+    item.write('qa-artifacts/android-control-matrix/manifest.json', { ...matrix, App: 'Control', ExpectedPublicState: null, ExpectedControlState: 'Online' });
     item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
     const environment = {
       CSC_LINK: 'certificate', CSC_KEY_PASSWORD: 'secret',
@@ -71,12 +71,13 @@ test('accetta il timestamp PowerShell dei report Android fisici', () => {
   const item = fixture();
   try {
     const matrix = {
+      App: 'Public', ExpectedPublicState: 'Online',
       ApkSha256: crypto.createHash('sha256').update('synthetic APK').digest('hex'),
       CapturedAt: new Date(item.now).toISOString(),
       Profiles: [1, 2, 3, 4, 5],
       FrameMetrics: Array.from({ length: 5 }, (_, i) => ({ Profile: i + 1, TotalFrames: 120, JankyPercent: 2 }))
     };
-    item.write('qa-artifacts/android-control-matrix/manifest.json', matrix);
+    item.write('qa-artifacts/android-control-matrix/manifest.json', { ...matrix, App: 'Control', ExpectedPublicState: null, ExpectedControlState: 'Online' });
     item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
     const report = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
     assert.equal(report.checks.find((entry) => entry.id === 'android-control-device').status, 'pass');

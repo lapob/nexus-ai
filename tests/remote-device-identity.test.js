@@ -278,3 +278,187 @@ test('la migrazione legacy conserva i controlli precedenti senza fingere una ide
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+function pausedUpload(url, token, payload, headers = {}) {
+  let request;
+  const bytes = Buffer.isBuffer(payload) ? payload : Buffer.from(JSON.stringify(payload));
+  const result = new Promise((resolve) => {
+    request = http.request(url, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json', 'Content-Length': bytes.length, ...headers }
+    }, (response) => {
+      response.resume();
+      response.once('end', () => resolve({ status: response.statusCode }));
+    });
+    request.once('error', () => resolve({ disconnected: true }));
+    request.setTimeout(5000, () => request.destroy());
+    request.write(bytes.subarray(0, 1));
+  });
+  return { result, finish: () => request.end(bytes.subarray(1)), destroy: () => request.destroy() };
+}
+
+for (const operation of ['action', 'power']) {
+  test(`la revoca blocca una richiesta legacy ${operation} ancora in ricezione`, async () => {
+    const { root, gateway } = gatewayFixture();
+    let executions = 0;
+    let upload;
+    try {
+      gateway.onActionExecute = async () => { executions += 1; return {}; };
+      gateway.powerExecutor = async () => { executions += 1; return {}; };
+      await gateway.configure({ enabled: true, port: await freePort() });
+      const base = `http://127.0.0.1:${gateway.state.port}`;
+      const paired = await pairConsole(base, gateway);
+      const route = operation === 'action' ? '/api/actions' : '/api/system/power';
+      const planned = await (await fetch(`${base}${route}/plan`, {
+        method: 'POST', headers: { Authorization: `Bearer ${paired.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(operation === 'action' ? { instruction: 'Controllo simulato' } : { action: 'restart' })
+      })).json();
+      const originalBody = gateway.body.bind(gateway);
+      let entered;
+      const receiving = new Promise(resolve => { entered = resolve; });
+      gateway.body = (request) => {
+        if (request.url === `${route}/execute`) entered();
+        return originalBody(request);
+      };
+      upload = pausedUpload(`${base}${route}/execute`, paired.token, { ticketId: planned.proposal.id, approved: true });
+      await receiving;
+      gateway.revokeDevice(paired.device.id);
+      upload.finish();
+      const outcome = await upload.result;
+      assert.ok(outcome.disconnected || outcome.status === 401, JSON.stringify(outcome));
+      assert.equal(executions, 0);
+    } finally { upload?.destroy(); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+test('la revoca durante upload vocale firmato impedisce la trascrizione', async () => {
+  const { root, gateway } = gatewayFixture();
+  let upload;
+  let transcriptions = 0;
+  try {
+    gateway.voiceTranscriber = async () => { transcriptions += 1; return { text: 'simulato' }; };
+    await gateway.configure({ enabled: true, port: await freePort() });
+    const base = `http://127.0.0.1:${gateway.state.port}`;
+    const paired = await pairConsole(base, gateway, deviceKey());
+    const signed = await proof(base, paired, 'voice-transcribe');
+    const audio = Buffer.alloc(8044);
+    audio.write('RIFF'); audio.writeUInt32LE(8036, 4); audio.write('WAVEfmt ', 8);
+    audio.writeUInt32LE(16, 16); audio.writeUInt16LE(1, 20); audio.writeUInt16LE(1, 22);
+    audio.writeUInt32LE(16000, 24); audio.writeUInt32LE(32000, 28);
+    audio.writeUInt16LE(2, 32); audio.writeUInt16LE(16, 34);
+    audio.write('data', 36); audio.writeUInt32LE(8000, 40);
+    let entered;
+    const receiving = new Promise(resolve => { entered = resolve; });
+    const original = gateway.rawBody.bind(gateway);
+    gateway.rawBody = (request, limit) => { entered(); return original(request, limit); };
+    upload = pausedUpload(`${base}/api/voice/transcribe`, paired.token, audio, {
+      'Content-Type': 'audio/wav', 'X-Nexus-Device-Challenge': signed.deviceProof.challengeId,
+      'X-Nexus-Device-Signature': signed.deviceProof.signature
+    });
+    await receiving;
+    gateway.revokeDevice(paired.device.id);
+    upload.finish();
+    const outcome = await upload.result;
+    assert.ok(outcome.disconnected || outcome.status === 401);
+    assert.equal(transcriptions, 0);
+  } finally { upload?.destroy(); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const boundary of ['proof', 'presence', 'planning']) {
+  test(`la revoca durante attesa ${boundary} non avvia operazioni o ricrea ticket`, async () => {
+    const { root, gateway } = gatewayFixture();
+    let release;
+    const waiting = new Promise(resolve => { release = resolve; });
+    let entered;
+    const arrived = new Promise(resolve => { entered = resolve; });
+    let executions = 0;
+    try {
+      gateway.onActionExecute = async () => { executions += 1; return {}; };
+      gateway.presenceStatusProvider = async () => ({ available: true, nucleusVisible: false, allowedActions: ['show-nucleus'] });
+      gateway.presenceActionExecutor = async () => { executions += 1; };
+      await gateway.configure({ enabled: true, port: await freePort() });
+      const base = `http://127.0.0.1:${gateway.state.port}`;
+      const paired = await pairConsole(base, gateway, boundary === 'proof' ? deviceKey() : null);
+      const headers = { Authorization: `Bearer ${paired.token}`, 'Content-Type': 'application/json' };
+      const route = boundary === 'presence' ? '/api/presence' : '/api/actions';
+      let payload = { instruction: 'Piano simulato' };
+      let purpose = 'action-plan';
+      if (boundary === 'presence') {
+        const plan = await (await fetch(`${base}${route}/plan`, { method: 'POST', headers,
+          body: JSON.stringify({ action: 'show-nucleus' }) })).json();
+        payload = { ticketId: plan.proposal.id, approved: true };
+        gateway.presenceStatusProvider = async () => { entered(); await waiting;
+          return { available: true, nucleusVisible: false, allowedActions: ['show-nucleus'] }; };
+      } else if (boundary === 'proof') {
+        payload.deviceProof = (await proof(base, paired, purpose)).deviceProof;
+        const original = gateway.deviceChallenges.verify.bind(gateway.deviceChallenges);
+        gateway.deviceChallenges.verify = async input => { const identity = await original(input);
+          entered(); await waiting; return identity; };
+      } else {
+        gateway.onActionPlan = async () => { entered(); await waiting;
+          return { proposal: { id: 'late-ticket', expiresAt: Date.now() + 60000 } }; };
+      }
+      const pending = fetch(`${base}${route}/${boundary === 'presence' ? 'execute' : 'plan'}`, {
+        method: 'POST', headers, body: JSON.stringify(payload)
+      }).then(response => ({ status: response.status }), () => ({ disconnected: true }));
+      await arrived;
+      gateway.revokeDevice(paired.device.id);
+      release();
+      const outcome = await pending;
+      await new Promise(setImmediate);
+      assert.ok(outcome.disconnected || outcome.status === 401, JSON.stringify(outcome));
+      assert.equal(executions, 0);
+      assert.equal(gateway.privateActionTickets.size, 0);
+      assert.equal(gateway.presenceTickets.size, 0);
+    } finally { release(); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+test('una rotazione valida conserva la richiesta in ricezione e il device non revocato', async () => {
+  const { root, gateway } = gatewayFixture();
+  let upload;
+  try {
+    await gateway.configure({ enabled: true, port: await freePort() });
+    const base = `http://127.0.0.1:${gateway.state.port}`;
+    const paired = await pairConsole(base, gateway);
+    let entered;
+    const receiving = new Promise(resolve => { entered = resolve; });
+    const original = gateway.body.bind(gateway);
+    gateway.body = (request) => { entered(); return original(request); };
+    upload = pausedUpload(`${base}/api/actions/plan`, paired.token, { instruction: 'Rotazione valida' });
+    await receiving;
+    gateway.rotateDeviceToken(gateway.state.devices.find(device => device.id === paired.device.id));
+    upload.finish();
+    assert.equal((await upload.result).status, 200);
+    assert.equal(gateway.privateActionTickets.size, 1);
+    await new Promise(setImmediate);
+    assert.equal(gateway.activeDeviceRequests.size, 0);
+  } finally { upload?.destroy(); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('una revoca dopo effetto presenza conserva la ricevuta finale locale', async () => {
+  const { root, gateway } = gatewayFixture();
+  let applied = false;
+  let paired;
+  try {
+    gateway.presenceStatusProvider = async () => {
+      if (applied) gateway.revokeDevice(paired.device.id);
+      return { available: true, nucleusVisible: applied, allowedActions: ['show-nucleus'] };
+    };
+    gateway.presenceActionExecutor = async () => { applied = true; };
+    await gateway.configure({ enabled: true, port: await freePort() });
+    const base = `http://127.0.0.1:${gateway.state.port}`;
+    paired = await pairConsole(base, gateway);
+    const headers = { Authorization: `Bearer ${paired.token}`, 'Content-Type': 'application/json' };
+    const plan = await (await fetch(`${base}/api/presence/plan`, { method: 'POST', headers,
+      body: JSON.stringify({ action: 'show-nucleus' }) })).json();
+    await fetch(`${base}/api/presence/execute`, { method: 'POST', headers,
+      body: JSON.stringify({ ticketId: plan.proposal.id, approved: true }) }).catch(() => null);
+    await new Promise(setImmediate);
+    assert.equal(applied, true);
+    const lines = fs.readFileSync(gateway.remoteReceiptPath, 'utf8').trim().split('\n').map(JSON.parse);
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].outcome, 'completed');
+    assert.equal(lines[0].tool, 'desktop_presence');
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});

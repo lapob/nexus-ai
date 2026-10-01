@@ -6,6 +6,9 @@ const crypto = require('node:crypto');
 
 // #region Validation
 function validAndroidMatrix(artifact, policy, apkPath) {
+  const app = artifact.App ?? artifact.app;
+  const connection = app === 'Public' ? artifact.ExpectedPublicState : artifact.ExpectedControlState;
+  if (!['Public', 'Control'].includes(app) || connection !== 'Online') return false;
   if (apkPath) {
     try {
       const hash = crypto.createHash('sha256').update(fs.readFileSync(apkPath)).digest('hex');

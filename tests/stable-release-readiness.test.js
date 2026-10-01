@@ -19,7 +19,7 @@ test('la matrice Android deve provare esattamente APK della release', () => {
   const file = path.join(temporary, 'matrix.json');
   const apk = path.join(temporary, 'release.apk');
   const profiles = ['small', 'compact', 'font', 'landscape', 'tablet'];
-  const data = { CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
+  const data = { App: 'Public', ExpectedPublicState: 'Online', CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
     FrameMetrics: profiles.map(Profile => ({ Profile, TotalFrames: 100, JankyPercent: 2 })) };
   const check = () => { fs.writeFileSync(file, JSON.stringify(data)); return androidMatrixCheck('device', file, apk).status; };
   try {
@@ -38,11 +38,16 @@ test('la matrice rifiuta metriche mancanti negative o profili duplicati', () => 
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-matrix-'));
   const file = path.join(temporary, 'matrix.json');
   const profiles = ['small', 'compact', 'font', 'landscape', 'tablet'];
-  const base = () => ({ CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
+  const base = () => ({ App: 'Control', ExpectedControlState: 'Online', CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
     FrameMetrics: profiles.map(Profile => ({ Profile, TotalFrames: 100, JankyPercent: 2 })) });
   const check = data => { fs.writeFileSync(file, JSON.stringify(data)); return androidMatrixCheck('device', file).status; };
   try {
     assert.equal(check(base()), 'pass');
+    for (const app of ['Control', 'Public']) {
+      for (const state of [undefined, 'Offline']) {
+        assert.equal(check({ ...base(), App: app, ExpectedControlState: state, ExpectedPublicState: state }), 'blocked');
+      }
+    }
     for (const value of [null, '', -1, '2']) {
       const data = base(); data.FrameMetrics[0].JankyPercent = value;
       assert.equal(check(data), 'blocked');

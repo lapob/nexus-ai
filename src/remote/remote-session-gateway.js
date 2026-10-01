@@ -716,6 +716,8 @@ class RemoteSessionGateway {
     this.activeGuestExecutions = new Map();
     this.activeVoiceRequests = new Set();
     this.activeConsoleOperations = new Map();
+    this.deviceRequestContexts = new WeakMap();
+    this.activeDeviceRequests = new Map();
     this.state = readState(statePath);
     this.deviceChallenges = deviceChallengeStore || new DeviceIdentityChallengeStore({
       verifySignature: ({ deviceId, keyId, payload, signature }) => {
@@ -1189,7 +1191,7 @@ class RemoteSessionGateway {
     });
   }
 
-  async desktopPresenceStatus(device) {
+  async desktopPresenceStatus(device, request) {
     if (!this.presenceStatusProvider) {
       return normalizeDesktopPresenceStatus({ available: false }, { mutationsAvailable: false });
     }
@@ -1197,18 +1199,19 @@ class RemoteSessionGateway {
       version: PRESENCE_PROTOCOL_VERSION,
       device: Object.freeze({ id: String(device?.id || ''), scope: String(device?.scope || '') })
     });
+    let value;
     try {
-      const value = await this.presenceStatusProvider(context);
-      return normalizeDesktopPresenceStatus(value, {
-        mutationsAvailable: Boolean(this.presenceActionExecutor)
-      });
+      value = await this.presenceStatusProvider(context);
     } catch (error) {
       this.logger.warn?.('Presenza desktop non raggiungibile.', { error });
       return normalizeDesktopPresenceStatus({ available: false }, { mutationsAvailable: false });
     }
+    if (request) this.assertRequestAuthorized(request);
+    return normalizeDesktopPresenceStatus(value, { mutationsAvailable: Boolean(this.presenceActionExecutor) });
   }
 
   rememberPresenceTicket(request, device, identity) {
+    this.assertDeviceAuthorized(device);
     const now = Date.now();
     for (const [ticketId, ticket] of this.presenceTickets) {
       if (ticket.expiresAt <= now) this.presenceTickets.delete(ticketId);
@@ -1248,7 +1251,9 @@ class RemoteSessionGateway {
     return { ticket, binding };
   }
 
-  async verifySensitiveDevice(device, purpose, proof) {
+  async verifySensitiveDevice(device, purpose, proof, request) {
+    this.assertDeviceAuthorized(device);
+    if (request) this.assertRequestAuthorized(request);
     if (!SENSITIVE_DEVICE_PURPOSES.has(purpose)) {
       throw deviceIdentityFailure('Scopo della prova dispositivo non consentito.', 'DEVICE_CHALLENGE_PURPOSE_INVALID');
     }
@@ -1262,20 +1267,15 @@ class RemoteSessionGateway {
     if (!proof || typeof proof !== 'object' || Array.isArray(proof)) {
       throw deviceIdentityFailure('Serve una prova firmata del dispositivo.', 'DEVICE_IDENTITY_PROOF_REQUIRED', 401);
     }
+    let identity;
     try {
-      const identity = await this.deviceChallenges.verify({
+      identity = await this.deviceChallenges.verify({
         challengeId: proof.challengeId,
         deviceId: device.id,
         keyId: device.identity.keyId,
         purpose,
         signature: proof.signature
       });
-      this.securityEvents.append('device.identity.verified', {
-        deviceId: device.id,
-        deviceName: device.name,
-        detail: purpose
-      });
-      return identity;
     } catch (error) {
       this.securityEvents.append('device.identity.denied', {
         severity: 'critical',
@@ -1285,9 +1285,14 @@ class RemoteSessionGateway {
       });
       throw deviceIdentityFailure('La prova firmata del dispositivo non e valida o e scaduta.', error?.code || 'DEVICE_SIGNATURE_INVALID', 401);
     }
+    this.assertDeviceAuthorized(device);
+    if (request) this.assertRequestAuthorized(request);
+    this.securityEvents.append('device.identity.verified', { deviceId: device.id, deviceName: device.name, detail: purpose });
+    return identity;
   }
 
   rememberPrivateActionTicket(proposal, device, identity) {
+    this.assertDeviceAuthorized(device);
     const id = String(proposal?.id || '').trim();
     if (!id || id.length > 128) return;
     const now = Date.now();
@@ -1544,8 +1549,16 @@ class RemoteSessionGateway {
         if (stream.deviceId === String(id)) this.closeDeviceStream(stream);
       }
       this.cancelConsoleOperationsForDevice(String(id), 'Sessione del dispositivo revocata.');
-      for (const [ticketId, ticket] of this.presenceTickets) {
-        if (ticket.deviceId === String(id)) this.presenceTickets.delete(ticketId);
+      for (const tickets of [this.presenceTickets, this.privateActionTickets, this.adminTickets]) {
+        for (const [ticketId, ticket] of tickets) {
+          if (ticket.deviceId === String(id)) tickets.delete(ticketId);
+        }
+      }
+      for (const [request, context] of this.activeDeviceRequests) {
+        if (context.device.id === String(id)) {
+          context.response.destroy();
+          request.destroy();
+        }
       }
       this.persist();
       this.securityEvents.append('device.revoked', { severity: 'warning', deviceId: revoked?.id, deviceName: revoked?.name });
@@ -1669,30 +1682,66 @@ class RemoteSessionGateway {
 
   async body(request) {
     this.assertServing();
+    this.assertRequestAuthorized(request);
     const chunks = [];
     let size = 0;
     for await (const chunk of request) {
       this.assertServing();
+      this.assertRequestAuthorized(request);
       size += chunk.length;
       if (size > MAX_BODY_BYTES) throw new Error('Richiesta troppo grande.');
       chunks.push(chunk);
     }
     this.assertServing();
+    this.assertRequestAuthorized(request);
     return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
   }
 
   async rawBody(request, maximumBytes = MAX_BODY_BYTES) {
     this.assertServing();
+    this.assertRequestAuthorized(request);
     const chunks = [];
     let size = 0;
     for await (const chunk of request) {
       this.assertServing();
+      this.assertRequestAuthorized(request);
       size += chunk.length;
       if (size > maximumBytes) throw requestFailure('Richiesta troppo grande.', 'REQUEST_TOO_LARGE', 413);
       chunks.push(chunk);
     }
     this.assertServing();
+    this.assertRequestAuthorized(request);
     return Buffer.concat(chunks);
+  }
+
+  assertDeviceAuthorized(device) {
+    // Object membership also rejects an evicted/replaced record with the same id.
+    if (!device || !this.state.devices.includes(device)) {
+      throw requestFailure('Sessione del dispositivo revocata.', 'DEVICE_SESSION_REVOKED', 401);
+    }
+  }
+
+  trackDeviceRequest(request, response, device) {
+    const context = { device, response, scope: device.scope, keyId: device.identity?.keyId };
+    this.deviceRequestContexts.set(request, context);
+    this.activeDeviceRequests.set(request, context);
+    const settled = () => {
+      this.activeDeviceRequests.delete(request);
+      response.off('finish', settled);
+      response.off('close', settled);
+    };
+    response.once('finish', settled);
+    response.once('close', settled);
+  }
+
+  assertRequestAuthorized(request) {
+    const context = this.deviceRequestContexts.get(request);
+    if (!context) return; // Pairing and guest requests have separate authority.
+    this.assertDeviceAuthorized(context.device);
+    if (context.scope !== context.device.scope || context.keyId !== context.device.identity?.keyId
+      || this.authenticate(request) !== context.device) {
+      throw requestFailure('La sessione del dispositivo non e piu valida.', 'DEVICE_SESSION_REVOKED', 401);
+    }
   }
 
   authenticate(request) {
@@ -2015,6 +2064,7 @@ class RemoteSessionGateway {
           return this.json(response, 429, { error: 'Limite voce raggiunto. Riprova più tardi.' });
         }
         const audio = await this.rawBody(request, MAX_PRIVATE_VOICE_BYTES);
+        this.assertRequestAuthorized(request);
         privateVoiceWaveInfo(audio);
         const controller = new AbortController();
         const cancel = () => { if (!response.writableEnded) controller.abort(); };
@@ -2320,6 +2370,7 @@ class RemoteSessionGateway {
         this.securityEvents.append('authentication.denied', { severity: 'warning', address: requestAddress(request), detail: url.pathname });
         return this.json(response, 401, { error: 'Dispositivo non associato.' });
       }
+      this.trackDeviceRequest(request, response, device);
       if (publicIngress && device.scope !== 'chat') {
         this.securityEvents.append('scope.ingress_denied', {
           severity: 'critical', address: requestAddress(request), deviceId: device.id,
@@ -2348,7 +2399,7 @@ class RemoteSessionGateway {
       }
       if (request.method === 'GET' && url.pathname === '/api/presence/status') {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
-        return this.json(response, 200, await this.desktopPresenceStatus(device));
+        return this.json(response, 200, await this.desktopPresenceStatus(device, request));
       }
       if (request.method === 'POST' && url.pathname === '/api/device/challenge') {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
@@ -2391,8 +2442,9 @@ class RemoteSessionGateway {
         await this.verifySensitiveDevice(device, 'voice-transcribe', {
           challengeId: request.headers['x-nexus-device-challenge'],
           signature: request.headers['x-nexus-device-signature']
-        });
+        }, request);
         const audio = await this.rawBody(request, MAX_PRIVATE_VOICE_BYTES);
+        this.assertRequestAuthorized(request);
         privateVoiceWaveInfo(audio);
         const controller = new AbortController();
         const cancel = () => controller.abort(Object.assign(new Error('Trascrizione annullata.'), { name: 'AbortError', code: 'VOICE_CANCELLED' }));
@@ -2472,7 +2524,8 @@ class RemoteSessionGateway {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
         if (!this.serviceControlExecutor) return this.json(response, 503, { error: 'Controllo servizio non disponibile.' });
         const body = await this.body(request);
-        const identity = await this.verifySensitiveDevice(device, 'service-plan', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'service-plan', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const binding = deviceActionBinding(device, identity);
         const action = String(body.action || '');
         if (action !== 'stop') return this.json(response, 400, { error: 'Azione servizio non consentita.' });
@@ -2497,7 +2550,8 @@ class RemoteSessionGateway {
         const body = await this.body(request);
         this.assertServing();
         if (body.approved !== true) return this.json(response, 400, { error: 'Conferma esplicita richiesta.' });
-        const identity = await this.verifySensitiveDevice(device, 'service-execute', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'service-execute', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const binding = deviceActionBinding(device, identity);
         const ticket = this.adminTickets.get(String(body.ticketId || ''));
         this.adminTickets.delete(String(body.ticketId || ''));
@@ -2549,9 +2603,10 @@ class RemoteSessionGateway {
         }
         const body = await this.body(request);
         this.assertServing();
-        const identity = await this.verifySensitiveDevice(device, 'presence-plan', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'presence-plan', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const presenceRequest = normalizePresenceAction(body);
-        const status = await this.desktopPresenceStatus(device);
+        const status = await this.desktopPresenceStatus(device, request);
         if (!presenceActionChangesState(status, presenceRequest)) {
           return this.json(response, 200, {
             changed: false,
@@ -2582,7 +2637,8 @@ class RemoteSessionGateway {
         const body = await this.body(request);
         this.assertServing();
         if (body.approved !== true) return this.json(response, 400, { error: 'Autorizzazione esplicita richiesta.' });
-        const identity = await this.verifySensitiveDevice(device, 'presence-execute', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'presence-execute', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const { ticket, binding } = this.consumePresenceTicket(body.ticketId, device, identity);
         const presenceRequest = Object.freeze({
           version: PRESENCE_PROTOCOL_VERSION,
@@ -2590,7 +2646,8 @@ class RemoteSessionGateway {
           ...(ticket.displayId ? { displayId: ticket.displayId } : {}),
           ...(ticket.applicationId ? { applicationId: ticket.applicationId } : {})
         });
-        const before = await this.desktopPresenceStatus(device);
+        const before = await this.desktopPresenceStatus(device, request);
+        this.assertRequestAuthorized(request);
         assertPresenceActionAuthorized(before, presenceRequest);
         const receiptInput = (outcome, verification, completedAt = Date.now()) => ({
           actionId: ticket.id,
@@ -2632,6 +2689,8 @@ class RemoteSessionGateway {
             ...receipt
           });
         }
+        // Once the effect started, finish its local verification and receipt even
+        // if revocation closes the client. This grants no new dispatch authority.
         let after = await this.desktopPresenceStatus(device);
         // Le app Windows moderne possono creare un processo broker prima della
         // finestra finale. Verifichiamo per un intervallo bounded anziche
@@ -2661,7 +2720,8 @@ class RemoteSessionGateway {
       if (request.method === 'POST' && url.pathname === '/api/system/power/plan') {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
         const body = await this.body(request);
-        const identity = await this.verifySensitiveDevice(device, 'power-plan', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'power-plan', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const binding = deviceActionBinding(device, identity);
         const action = String(body.action || '');
         if (!['shutdown', 'restart'].includes(action)) return this.json(response, 400, { error: 'Azione di alimentazione non consentita.' });
@@ -2680,7 +2740,8 @@ class RemoteSessionGateway {
         const body = await this.body(request);
         this.assertServing();
         if (body.approved !== true) return this.json(response, 400, { error: 'Conferma esplicita richiesta.' });
-        const identity = await this.verifySensitiveDevice(device, 'power-execute', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'power-execute', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const binding = deviceActionBinding(device, identity);
         const ticket = this.adminTickets.get(String(body.ticketId || ''));
         this.adminTickets.delete(String(body.ticketId || ''));
@@ -2712,7 +2773,8 @@ class RemoteSessionGateway {
         if (!this.onWorkflowCreate) return this.json(response, 503, { error: 'I workflow non sono pronti.' });
         const body = await this.body(request);
         this.assertServing();
-        const identity = await this.verifySensitiveDevice(device, 'workflow-create', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'workflow-create', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const result = await this.onWorkflowCreate({
           summary: body.summary,
           steps: body.steps,
@@ -2739,7 +2801,8 @@ class RemoteSessionGateway {
         const body = await this.body(request);
         this.assertServing();
         const purpose = `workflow-${operation}`;
-        const identity = await this.verifySensitiveDevice(device, purpose, body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, purpose, body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         if (operation === 'decide' && typeof body.approved !== 'boolean') {
           return this.json(response, 400, { error: 'Decisione esplicita richiesta.' });
         }
@@ -2772,10 +2835,12 @@ class RemoteSessionGateway {
         if (!this.onActionPlan) return this.json(response, 503, { error: 'Il controllo operativo non è pronto.' });
         const body = await this.body(request);
         this.assertServing();
-        const identity = await this.verifySensitiveDevice(device, 'action-plan', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'action-plan', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         const instruction = String(body.instruction || '').trim();
         if (!instruction || instruction.length > 4_000) return this.json(response, 400, { error: 'Operazione non valida.' });
         const result = await this.toolBus.invoke('device-action-plan', { instruction, device: { id: device.id, name: device.name }, deviceIdentity: identity });
+        this.assertRequestAuthorized(request);
         if (result?.proposal) this.rememberPrivateActionTicket(result.proposal, device, identity);
         return this.json(response, 200, result);
       }
@@ -2785,7 +2850,8 @@ class RemoteSessionGateway {
         const body = await this.body(request);
         this.assertServing();
         if (body.approved !== true) return this.json(response, 400, { error: 'Autorizzazione esplicita richiesta.' });
-        const identity = await this.verifySensitiveDevice(device, 'action-execute', body.deviceProof);
+        const identity = await this.verifySensitiveDevice(device, 'action-execute', body.deviceProof, request);
+        this.assertRequestAuthorized(request);
         this.consumePrivateActionTicket(body.ticketId, device, identity);
         let operationId;
         try { operationId = operationIdentifier(body.operationId); }

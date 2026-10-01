@@ -24,7 +24,7 @@ access and private workstation operations.
   security telemetry, restart, and shutdown. Sensitive actions always require
   explicit confirmation.
 - **NexusNXS Server** — a windowless Windows process that starts only the local
-  model runtime, encrypted stores, security audit, and remote gateway. It does
+  model runtime, local stores, security audit, and remote gateway. It does
   not launch the desktop interface, microphone, visualizer, or voice warm-up.
 
 ## Security boundary
@@ -33,7 +33,7 @@ The public and private paths are intentionally different:
 
 | Surface | Network | Data and capabilities |
 | --- | --- | --- |
-| Public guest AI | Tailscale Funnel on an isolated listener | Ephemeral guest context and public knowledge only |
+| Public guest AI | Hardened public proxy on an isolated listener | Guest context separated from owner data; bounded response replay retention |
 | Personal AI sync | Paired device session | Owner conversations and synchronized preferences |
 | NexusNXS per PC | Tailscale private network | Telemetry and explicitly approved workstation actions |
 | Model runtime | Loopback only | Never exposed directly to LAN or Internet |
@@ -41,6 +41,13 @@ The public and private paths are intentionally different:
 Do not publish `.env` files, pairing state, device tokens, private knowledge,
 models, runtime binaries, logs, databases, APKs, installers, or signing keys.
 The repository ignore rules enforce these boundaries for normal Git workflows.
+
+Windows conversation and memory databases use native SQLite without application-level
+database encryption. Their protection depends on the host account and storage controls;
+encrypted export archives and Android encrypted conversation fields are separate features.
+Public guest turns bypass the owner's conversation store, but generated responses are
+retained in a separate plaintext retry ledger for up to 24 hours by default. Guest mode
+does not mean zero server-side content retention.
 
 Web-grounded answers are orchestrated on the NexusNXS server. Search runs only
 for explicit research or time-sensitive questions, uses bounded HTTPS
