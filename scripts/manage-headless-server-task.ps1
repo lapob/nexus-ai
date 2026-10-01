@@ -218,11 +218,6 @@ if ($Action -eq 'remove') {
 if ($Action -in @('start', 'stop', 'restart')) {
   $installedTaskName = Get-InstalledTaskName
   $task = if ($installedTaskName) { Get-ScheduledTask -TaskName $installedTaskName -ErrorAction SilentlyContinue } else { $null }
-  if (-not $task -and $Action -in @('start', 'restart')) {
-    Install-ServerTask
-    $installedTaskName = Get-InstalledTaskName
-    $task = Get-ScheduledTask -TaskName $installedTaskName -ErrorAction Stop
-  }
   if ($Action -in @('stop', 'restart')) {
     Stop-HeadlessServer -InstalledTaskName $installedTaskName
     if (-not (Wait-ForGateway $false)) {
@@ -231,7 +226,12 @@ if ($Action -in @('start', 'stop', 'restart')) {
   }
   if ($Action -in @('start', 'restart')) {
     if (-not (Wait-ForGateway $true 1)) {
-      Start-ScheduledTask -TaskName $installedTaskName
+      if ($task -and $task.Settings.Enabled) {
+        Start-ScheduledTask -TaskName $installedTaskName
+      } else {
+        # A manual start must preserve the owner's disabled Windows autostart.
+        Start-Process -FilePath $pwshPath -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', ('"' + $runnerPath + '"')) -WorkingDirectory $env:SystemRoot -WindowStyle Hidden | Out-Null
+      }
     }
     # Il primo avvio dopo un aggiornamento può includere la verifica del runtime
     # AI sull'SSD e la scansione antivirus del binario. Il gateway resta nascosto

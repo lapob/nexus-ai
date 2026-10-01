@@ -420,8 +420,8 @@ class NativeSpeechService extends EventEmitter {
     });
   }
 
-  transcribeAudio({ audio, language = 'auto', timeoutSeconds = 30 } = {}) {
-    if (this.disposed) {
+  transcribeAudio({ audio, language = 'auto', timeoutSeconds = 30, signal } = {}) {
+    if (this.disposed || signal?.aborted) {
       return Promise.reject(speechError('VOICE_CANCELLED', 'Il servizio vocale è stato arrestato.'));
     }
     if (this.platform !== 'win32') {
@@ -484,6 +484,7 @@ class NativeSpeechService extends EventEmitter {
       let settled = false;
       const cleanup = () => {
         clearTimeout(timer);
+        signal?.removeEventListener('abort', child.nexusCancel);
         if (this.active === child) this.active = null;
         try { fs.unlinkSync(inputPath); } catch {}
         try { fs.unlinkSync(outputPath); } catch {}
@@ -499,6 +500,7 @@ class NativeSpeechService extends EventEmitter {
         finish(reject, speechError('VOICE_TIMEOUT', 'La trascrizione vocale ha impiegato troppo tempo.'));
       }, Math.max(10, Math.min(60, Number(timeoutSeconds) || 30)) * 1000);
       child.nexusCancel = () => {
+        if (settled) return;
         child.nexusCancelled = true;
         this.terminateProcess(child);
         finish(reject, speechError('VOICE_CANCELLED', 'Trascrizione annullata.'));
@@ -529,6 +531,8 @@ class NativeSpeechService extends EventEmitter {
           ? speechError('VOICE_NO_SPEECH', 'Nessuna voce rilevata.')
           : speechError('VOICE_CAPTURE_FAILED', 'La trascrizione vocale locale non è riuscita.', stderr));
       });
+      signal?.addEventListener('abort', child.nexusCancel, { once: true });
+      if (signal?.aborted) child.nexusCancel();
     });
   }
 

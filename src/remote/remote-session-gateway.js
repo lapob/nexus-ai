@@ -2013,8 +2013,14 @@ class RemoteSessionGateway {
         }
         const audio = await this.rawBody(request, MAX_PRIVATE_VOICE_BYTES);
         privateVoiceWaveInfo(audio);
+        const controller = new AbortController();
+        const cancel = () => { if (!response.writableEnded) controller.abort(); };
+        response.once('close', cancel);
+        this.activeVoiceRequests.add(controller);
         try {
-          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 55 });
+          if (response.destroyed || this.stopping || this.disposed) { controller.abort(); return; }
+          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 55, owner: guest.id, signal: controller.signal });
+          if (controller.signal.aborted || response.destroyed || this.stopping || this.disposed) return;
           this.assertServing();
           const text = String(result?.text || '').trim().slice(0, 4_000);
           if (!text) return this.json(response, 422, { error: 'Nessuna frase riconosciuta.', code: 'VOICE_NO_SPEECH' });
@@ -2024,10 +2030,14 @@ class RemoteSessionGateway {
             confidence: Number.isFinite(Number(result?.confidence)) ? Math.max(0, Math.min(1, Number(result.confidence))) : null
           });
         } catch (error) {
+          if (controller.signal.aborted || response.destroyed) return;
           if (error?.code === 'VOICE_NO_SPEECH') return this.json(response, 422, { error: 'Nessuna frase riconosciuta.', code: error.code });
           if (error?.code === 'VOICE_BUSY') return this.json(response, 409, { error: 'Il riconoscimento vocale è già in uso.', code: error.code });
           if (error?.code === 'VOICE_BACKEND_UNAVAILABLE') return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: error.code });
           throw error;
+        } finally {
+          response.off('close', cancel);
+          this.activeVoiceRequests.delete(controller);
         }
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/voice/synthesize') {
@@ -2384,7 +2394,9 @@ class RemoteSessionGateway {
         const cancel = () => controller.abort(Object.assign(new Error('Trascrizione annullata.'), { name: 'AbortError', code: 'VOICE_CANCELLED' }));
         request.once('aborted', cancel);
         response.once('close', cancel);
+        this.activeVoiceRequests.add(controller);
         try {
+          if (response.destroyed || this.stopping || this.disposed) { controller.abort(); return; }
           const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 55, signal: controller.signal });
           this.assertServing();
           if (controller.signal.aborted || response.destroyed) return;
@@ -2407,6 +2419,7 @@ class RemoteSessionGateway {
         } finally {
           request.off('aborted', cancel);
           response.off('close', cancel);
+          this.activeVoiceRequests.delete(controller);
         }
       }
       if (request.method === 'POST' && url.pathname === '/api/session/rotate') {

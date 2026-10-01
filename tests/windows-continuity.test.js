@@ -53,6 +53,23 @@ test('la configurazione del watchdog usa il runner posseduto dalla UI', async ()
   assert.equal(calls[0][2].signal, signal);
 });
 
+test('la registrazione automatica rispetta la rinuncia all avvio Windows', async () => {
+  const result = await configureContinuityTask({
+    platform: 'win32', automatic: true,
+    runCommand: async (_file, args) => {
+      const script = Buffer.from(args.at(-1), 'base64').toString('utf16le');
+      assert.ok(script.indexOf("StartupEnabled -eq 0") < script.indexOf('Register-ScheduledTask'));
+      assert.match(script, /'disabled';exit 0/);
+      assert.doesNotMatch(script, /New-ItemProperty/);
+      return { stdout: 'disabled\r\n' };
+    }
+  });
+  assert.equal(result.enabled, false);
+  const explicit = continuityTaskScript('C:\\NexusNXS.exe', true);
+  assert.match(explicit, /StartupEnabled -Value 1/);
+  assert.match(continuityTaskScript('ignored', false), /StartupEnabled -Value 0/);
+});
+
 test('il runner rimuove i comandi completati dal registro', async () => {
   let complete;
   const runner = createTrackedExecFileRunner({

@@ -254,6 +254,7 @@ function bootstrapElectron({ env = process.env } = {}) {
     ? path.join(process.resourcesPath, 'whisper', 'windows-x64')
     : path.join(appRoot, 'vendor', 'whisper', 'windows-x64');
   const speechService = new NativeSpeechService({ whisperDirectory });
+  const remoteTranscriptionService = new NativeSpeechService({ whisperDirectory });
   const pythonRuntimeDirectory = app.isPackaged
     ? path.join(process.resourcesPath, 'python', 'windows-x64')
     : path.join(appRoot, ...pythonRuntimeManifest.runtimeDirectory.split('/'));
@@ -329,6 +330,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         { label: 'richieste e comandi', run: () => ipcServices?.shutdown()
           || Promise.allSettled([workflowRuntime?.shutdown?.(), actionRuntime?.shutdown?.(), aiRuntime.shutdown()]) },
         { label: 'riconoscimento vocale', run: () => speechService.shutdown?.() ?? speechService.stop() },
+        { label: 'trascrizione remota', run: () => remoteTranscriptionService.shutdown() },
         { label: 'voce neurale', run: () => neuralSpeechService.shutdown() },
         { label: 'voce espressiva', run: () => expressiveSpeechService.shutdown() },
         { label: 'voce remota', run: () => remoteSpeechQueue.shutdown() },
@@ -573,13 +575,14 @@ function bootstrapElectron({ env = process.env } = {}) {
         imageCapabilityProvider: () => imageGenerationService.capabilityState(),
         researchAvailable: webResearchService?.enabled !== false,
         researchCapabilityProvider: () => webResearchService.capabilityState(),
-        voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 55 }) => speechService.transcribeAudio({
+        voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 55, signal }) => remoteTranscriptionService.transcribeAudio({
           audio,
           language,
-          timeoutSeconds
+          timeoutSeconds,
+          signal
         }),
         voiceSynthesizer: (request) => remoteSpeechQueue.synthesize({ ...request, delivery: 'warm' }),
-        voiceInputCapabilityProvider: () => speechService.audioAvailable(),
+        voiceInputCapabilityProvider: () => remoteTranscriptionService.audioAvailable(),
         voiceCapabilityProvider: () => !remoteSpeechQueue.disposed
           && (remoteNeuralSpeech.capabilities().available || remoteExpressiveSpeech.capabilities().available),
         // Il listener headless può accettare health check immediatamente, ma
@@ -718,7 +721,7 @@ function bootstrapElectron({ env = process.env } = {}) {
           // Migra dal vecchio LoginItem alla coppia di task Core + presenza:
           // un solo proprietario per ruolo, nessun secondo avvio al login.
           app.setLoginItemSettings({ openAtLogin: false, path: process.execPath, name: 'NexusNXS' });
-          configureContinuityTask({ executable: process.execPath, enabled: true, userDataRoot: sharedDataRoot })
+          configureContinuityTask({ executable: process.execPath, enabled: true, automatic: true, userDataRoot: sharedDataRoot })
             .catch((error) => logger.warn('Watchdog NexusNXS non registrato; resta attivo l’avvio con Windows.', { error }));
         }
         if (headlessMode) {

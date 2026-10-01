@@ -1,7 +1,41 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 30 settembre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 1 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
+
+## Checkup del 1 ottobre
+
+- Avvio Windows disattivato: task Server, Connectivity e Presence disabilitati,
+  con XML di ripristino conservati fuori Git. Preferenza locale persistente:
+  la registrazione automatica rispetta la rinuncia; avvio e riavvio manuali
+  del servizio non installano o riabilitano il task. Otto test mirati passati.
+- Trascrizione remota separata dal microfono desktop. Disconnessione HTTP e
+  arresto annullano la propria trascrizione; risultati tardivi scartati.
+  Quattro regressioni HTTP coprono sintesi/trascrizione e disconnessione/stop;
+  il test del processo STT controlla abort, file temporaneo e richiesta successiva.
+- Electron aggiornato a 43.7.7 e dipendenze vulnerabili corrette senza cambio
+  di major. Audit npm completo di app e sito: zero vulnerabilita note.
+  Il risultato non annulla il blocco separato del runtime Ollama.
+- Controllo sorgenti PASS; suite 946 PASS, 2 SKIP, zero FAIL. Un primo worker
+  della suite era fallito senza diagnostica: test mirato e ripetizione completa
+  passati. Non e stata attribuita una causa non dimostrata.
+- Web: offline PASS, cancellazione cronologia PASS (abort della richiesta,
+  cancellazione server e scarto dei frammenti tardivi), 21 layout e 40 stati
+  PASS. Le acquisizioni ora attendono la formazione del Core. Audit automatico
+  di sei superfici passato; restano prove fisiche e accessibilita manuale.
+- Sito c76e26b: query informativa di stato restituisce JSON HTTP 200 anche
+  quando AI offline; readiness reale conserva il proprio errore. Gate completo
+  passato: 37 test, 26 prove browser, firma dipendenze, build e dry-run.
+- ADB non rileva dispositivi nel check corrente: nessun nuovo collaudo Android
+  fisico dichiarato. iOS richiede ancora compilazione e prova con Xcode.
+- Gate esperienza finale PASS su runtime dedicato, senza servizio attivo:
+  valutazione dei due modelli esistenti, sintesi, smoke Electron, chiusura
+  e soak di 250 cicli con zero richieste orfane. Nessun modello addestrato
+  o promosso. Publication safety PASS su 908 file; igiene PASS su 840 file
+  e 281 moduli univoci. La copertura automatica non prova l'assenza di bug.
+
+Log locali: `../qa-artifacts/checkup-oct01-*`. Revisione attiva e pubblicazione
+sono registrate nel checkpoint; non confondere questi controlli con una Stable.
 
 ## Recupero e candidati del 30 settembre
 

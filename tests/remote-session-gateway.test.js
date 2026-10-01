@@ -550,19 +550,22 @@ test('la voce non viene annunciata disponibile quando manca il runtime', async (
 });
 
 for (const mode of ['disconnect', 'stop']) {
-  test(`la sintesi guest riceve ownership e cancellazione su ${mode}`, { timeout: 8000 }, async () => {
+ for (const kind of ['synthesize', 'transcribe']) {
+  test(`la voce guest ${kind} riceve ownership e cancellazione su ${mode}`, { timeout: 8000 }, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-voice-cancel-'));
     let started, cancelled;
     const entered = new Promise((resolve) => { started = resolve; });
     const aborted = new Promise((resolve) => { cancelled = resolve; });
+    const handler = ({ owner, signal }) => new Promise((resolve) => {
+      assert.equal(typeof owner, 'string'); assert.ok(owner.length);
+      signal.addEventListener('abort', () => { cancelled(); resolve({ audio: Buffer.from('late-wave'), text: 'late transcript' }); }, { once: true });
+      started();
+    });
     const gateway = new RemoteSessionGateway({
       statePath: path.join(root, 'remote-access.json'),
       conversationStore: { list: () => [], save: (record) => record },
-      voiceSynthesizer: ({ owner, signal }) => new Promise((resolve) => {
-        assert.equal(typeof owner, 'string'); assert.ok(owner.length);
-        signal.addEventListener('abort', () => { cancelled(); resolve({ audio: Buffer.from('late-wave') }); }, { once: true });
-        started();
-      }),
+      voiceSynthesizer: kind === 'synthesize' ? handler : null,
+      voiceTranscriber: kind === 'transcribe' ? handler : null,
       logger: { info() {}, warn() {} }
     });
     try {
@@ -571,10 +574,10 @@ for (const mode of ['disconnect', 'stop']) {
       const base = `http://127.0.0.1:${port}`;
       const guest = await bootstrapGuest(base);
       const controller = new AbortController();
-      const response = fetch(`${base}/api/guest/voice/synthesize`, {
+      const response = fetch(`${base}/api/guest/voice/${kind}`, {
         method: 'POST', signal: controller.signal,
-        headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: 'Prova sintetica', language: 'it-IT' })
+        headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': kind === 'synthesize' ? 'application/json' : 'audio/wav' },
+        body: kind === 'synthesize' ? JSON.stringify({ text: 'Prova sintetica', language: 'it-IT' }) : mono16kWave()
       }).catch((error) => error);
       await entered;
       if (mode === 'disconnect') controller.abort();
@@ -583,6 +586,7 @@ for (const mode of ['disconnect', 'stop']) {
       assert.equal(gateway.activeVoiceRequests.size, 0);
     } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
   });
+ }
 }
 
 test('la generazione immagini pubblica resta server-side, autenticata e fail-closed', async () => {

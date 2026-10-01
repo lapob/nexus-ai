@@ -104,13 +104,16 @@ function createTrackedExecFileRunner({ launch = execFile, terminate = terminateO
 
 // #region Attivita di continuita Windows
 
-function continuityTaskScript(executable, enabled, userDataRoot = '') {
+function continuityTaskScript(executable, enabled, userDataRoot = '', automatic = false) {
   const encodedExecutable = Buffer.from(String(executable || ''), 'utf8').toString('base64');
   const encodedUserData = Buffer.from(String(userDataRoot || ''), 'utf8').toString('base64');
-  if (!enabled) return [TASK_NAME, PRESENCE_TASK_NAME]
+  const preference = automatic
+    ? `if((Get-ItemProperty -LiteralPath 'HKCU:\\Software\\NexusNXS' -Name StartupEnabled -ErrorAction SilentlyContinue).StartupEnabled -eq 0){'disabled';exit 0};`
+    : `New-Item -Path 'HKCU:\\Software\\NexusNXS' -Force | Out-Null;New-ItemProperty -LiteralPath 'HKCU:\\Software\\NexusNXS' -Name StartupEnabled -Value ${enabled ? 1 : 0} -PropertyType DWord -Force | Out-Null;`;
+  if (!enabled) return preference + [TASK_NAME, PRESENCE_TASK_NAME]
     .map((name) => `Unregister-ScheduledTask -TaskName '${name}' -Confirm:$false -ErrorAction SilentlyContinue`)
     .join(';');
-  return [
+  return preference + [
     `$exe=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedExecutable}'))`,
     `$data=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedUserData}'))`,
     `$suffix=if($data){' --user-data-root="'+$data.Replace('"','')+'"'}else{''}`,
@@ -124,8 +127,9 @@ function continuityTaskScript(executable, enabled, userDataRoot = '') {
 }
 
 function continuityTaskStatusScript() {
-  return `$core=Get-ScheduledTask -TaskName '${TASK_NAME}' -ErrorAction SilentlyContinue;`+
-    `$presence=Get-ScheduledTask -TaskName '${PRESENCE_TASK_NAME}' -ErrorAction SilentlyContinue;`+
+  return `if((Get-ItemProperty -LiteralPath 'HKCU:\\Software\\NexusNXS' -Name StartupEnabled -ErrorAction SilentlyContinue).StartupEnabled -eq 0){'disabled';exit 0};`+
+    `$core=Get-ScheduledTask -TaskName '${TASK_NAME}' -ErrorAction SilentlyContinue | Where-Object {$_.Settings.Enabled};`+
+    `$presence=Get-ScheduledTask -TaskName '${PRESENCE_TASK_NAME}' -ErrorAction SilentlyContinue | Where-Object {$_.Settings.Enabled};`+
     `if($core -and $presence){'enabled'}elseif($core -or $presence){'partial'}else{'disabled'}`;
 }
 
@@ -145,15 +149,15 @@ async function continuityTaskStatus({ platform = process.platform, runCommand = 
   }
 }
 
-async function configureContinuityTask({ executable = process.execPath, enabled = true, platform = process.platform, userDataRoot = '', runCommand = execFileAsync, signal } = {}) {
+async function configureContinuityTask({ executable = process.execPath, enabled = true, automatic = false, platform = process.platform, userDataRoot = '', runCommand = execFileAsync, signal } = {}) {
   if (platform !== 'win32') return { available: false, enabled: false };
-  const encoded = Buffer.from(continuityTaskScript(executable, enabled, userDataRoot), 'utf16le').toString('base64');
-  await runCommand('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+  const encoded = Buffer.from(continuityTaskScript(executable, enabled, userDataRoot, automatic), 'utf16le').toString('base64');
+  const result = await runCommand('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
     windowsHide: true,
     timeout: 30_000,
     ...(signal ? { signal } : {})
   });
-  return { available: true, enabled: Boolean(enabled), taskName: TASK_NAME };
+  return { available: true, enabled: Boolean(enabled) && String(result?.stdout || '').trim() !== 'disabled', taskName: TASK_NAME };
 }
 
 module.exports = { TASK_NAME, PRESENCE_TASK_NAME, configureContinuityTask, continuityTaskScript, continuityTaskStatus, continuityTaskStatusScript, createTrackedExecFileRunner, terminateOwnedCommandTree };

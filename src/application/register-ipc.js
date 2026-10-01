@@ -883,6 +883,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       await configureContinuityTask({
         executable: process.execPath,
         enabled: status.enabled,
+        automatic: true,
         userDataRoot: app.getPath('userData'),
         runCommand: runUiCommand
       });

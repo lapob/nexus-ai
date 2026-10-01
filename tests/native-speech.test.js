@@ -280,6 +280,36 @@ test('whisper-cli pulisce la registrazione anche se il processo non può partire
   assert.equal(fs.existsSync(inputPath), false);
 });
 
+test('lo stop del chiamante annulla soltanto la propria trascrizione', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-whisper-abort-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const name of ['whisper-cli.exe', 'ggml-base.bin']) fs.writeFileSync(path.join(directory, name), 'fixture');
+  const children = [];
+  const inputs = [];
+  const service = new NativeSpeechService({ platform: 'win32', whisperDirectory: directory,
+    terminateProcess: child => { child.killed = true; },
+    spawnProcess: (_file, args) => {
+      const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() });
+      children.push(child); inputs.push(args[args.indexOf('-f') + 1]); return child;
+    }
+  });
+  t.after(() => service.shutdown());
+  const audio = Buffer.alloc(64); audio.write('RIFF'); audio.write('WAVE', 8);
+  const first = new AbortController();
+  const pending = service.transcribeAudio({ audio, signal: first.signal }).catch(e => e.code);
+  first.abort();
+  assert.equal(await Promise.race([pending, new Promise(resolve => setTimeout(() => resolve('not-cancelled'), 150))]), 'VOICE_CANCELLED');
+  assert.equal(children[0].killed, true);
+  assert.equal(fs.existsSync(inputs[0]), false);
+  const next = new AbortController();
+  const second = service.transcribeAudio({ audio, signal: next.signal }).catch(e => e.code);
+  first.signal.dispatchEvent(new Event('abort'));
+  assert.equal(children[1].killed, undefined);
+  next.abort(); assert.equal(await second, 'VOICE_CANCELLED');
+  await assert.rejects(service.transcribeAudio({ audio, signal: first.signal }), e => e.code === 'VOICE_CANCELLED');
+  assert.equal(children.length, 2);
+});
+
 test('propaga la lingua rilevata automaticamente da Whisper', () => {
   assert.equal(detectedWhisperLanguage('whisper: auto-detected language: fr (p = 0.94)'), 'fr');
   assert.equal(detectedWhisperLanguage('nessuna diagnostica', 'de-DE'), 'de');

@@ -27,6 +27,7 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   });
   await page.goto('https://ai.nexusnxs.com/');
   if(font!==100)await page.addStyleTag({content:`html{font-size:${font}%!important}`});
+  await page.waitForFunction(()=>globalThis.nexusCosmicMetrics?.renderer().arrival===1);
   const capture=async state=>{await page.waitForTimeout(600);report.push({width,height,font,state,...await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,controls:[...document.querySelectorAll('button')].filter(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'&&Number(s.opacity)>.1}).map(el=>({id:el.id,rect:el.getBoundingClientRect().toJSON()}))}))});await page.screenshot({path:path.join(output,`web-state-${width}-${font}-${state}.png`)});};
   await capture('idle');
   await page.evaluate(()=>document.body.classList.add('voice-session'));
