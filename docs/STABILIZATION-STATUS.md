@@ -38,8 +38,15 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 - Igiene e sovrapposizioni PASS; audit dipendenze runtime senza vulnerabilita
   note. Eliminato solo l'APK obsoleto 6.5.19, conservando versione attuale
   e rollback. Nessuna cancellazione di dati o knowledge personali.
-- Nessun nuovo installer prodotto in questo blocco. Windows 0.3.19 e APK
-  attuali restano Preview; firme, audit integrale, collaudo voce umana e
+- Windows 0.3.20 Preview costruito, installer verificato e installato;
+  smoke della build e della copia installata PASS, ASAR identici. Il fix
+  del gateway e incluso anche nell'installer. Autostart ancora disattivato.
+  Bundle di sei artefatti verificato e otto file pubblicati su GitHub
+  `v0.3.20-preview.1`, con digest e dimensioni confermati lato GitHub.
+  APK pubblico 6.5.21 e Control 1.19.8 invariati; rollback 0.3.19 conservato.
+  Ventuno test del rilascio PASS. Il publisher ora verifica anche gli asset
+  del feed e la SBOM prima di rendere pubblica una nuova release.
+- La release resta Preview: firme, audit integrale, collaudo voce umana e
   criteri operativi indicati sotto sono ancora necessari per la Stable.
 
 ### Ricerca, preferenze comuni e valutazione isolata: candidato 0.3.19
