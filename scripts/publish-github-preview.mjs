@@ -18,7 +18,11 @@ if (!androidVersion) throw new Error('Versione Android pubblica non rilevata.');
 const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || `v${packageJson.version}-preview.2`;
 const assets = [
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), type: 'application/vnd.microsoft.portable-executable' },
+  { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe.blockmap`), type: 'application/octet-stream' },
+  { path: resolve(root, 'release', 'latest.yml'), type: 'text/yaml; charset=utf-8' },
   { path: resolve(root, 'release-android', 'NexusNXS-Android.apk'), type: 'application/vnd.android.package-archive' },
+  { path: resolve(root, 'release', 'nexus-sbom.cdx.json'), type: 'application/json' },
+  { path: resolve(root, 'release', 'nexus-sbom.cdx.json.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'CHECKSUMS.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'release-manifest.preview.json'), type: 'application/json' },
 ];
@@ -104,6 +108,17 @@ for (const asset of prepared) {
     body: asset.buffer,
   });
   process.stdout.write(`Pubblicato ${asset.name} (${asset.size} byte, SHA-256 ${asset.sha256})\n`);
+}
+
+// Keep a new release in draft until GitHub confirms every uploaded artifact.
+const uploaded = await request(`${apiRoot}/releases/${release.id}`, token);
+for (const asset of prepared) {
+  const remote = uploaded.assets.find(current => current.name === asset.name);
+  if (!remote || remote.size !== asset.size
+    || String(remote.digest || '').toLowerCase() !== `sha256:${asset.sha256.toLowerCase()}`) {
+    throw new Error(`Verifica remota fallita: ${asset.name}. La release non viene promossa.`);
+  }
+  process.stdout.write(`Verificato lato GitHub: ${asset.name}\n`);
 }
 
 const releaseBody = [
