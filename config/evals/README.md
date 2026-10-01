@@ -17,6 +17,18 @@ quando la media complessiva è sufficiente.
 
 ## Comandi
 
+La suite 1.4.0 contiene 100 compiti sintetici: i 40 casi precedenti e 60
+nuovi casi su lingua, codice, documenti, ragionamento, autorizzazioni,
+citazioni, cache, continuita e correzioni. Le risposte attese sono oracoli
+di scoring, non esempi di training. Validare il dataset o le fixture non
+dimostra che un modello reale superi questi compiti.
+
+L'eval lab usa solo un endpoint loopback dedicato (11435 per default),
+mai il servizio attivo o un fallback sul suo endpoint. Prima dell'inferenza
+verifica disponibilita, dimensioni e RAM; mentre il servizio e attivo usa
+CPU e scarica dal runtime dedicato i modelli caricati dopo ciascun confronto.
+Nessuna valutazione avvia o modifica automaticamente il servizio di produzione.
+
 ```powershell
 npm run ai:eval:lab:validate
 npm run ai:eval:lab:gate -- qwen3:8b qwen3:14b

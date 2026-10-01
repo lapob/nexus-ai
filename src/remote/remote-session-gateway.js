@@ -34,6 +34,7 @@ const { interactionClientContract } = require('../core/interaction-state-protoco
 const { createCapabilityManifest } = require('../core/capability-registry');
 const { ToolBus } = require('../agents/tool-bus');
 const { normalizeArtifacts } = require('../application/artifact-stream');
+const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 const { deviceGraph } = require('./device-graph');
 const { enhancePublicAiHtml, publicAiCosmicCoreScript } = require('./public-demo');
 
@@ -943,10 +944,11 @@ class RemoteSessionGateway {
     const mode = body.mode === 'deep' ? 'deep' : 'fast';
     const requestedModel = /^[a-z0-9._:/-]{1,128}$/i.test(String(body.model || '')) ? String(body.model) : 'automatic';
     const attachmentDigest = crypto.createHash('sha256').update(JSON.stringify(Array.isArray(body.attachments) ? body.attachments : [])).digest('hex');
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ text, history, mode, requestedModel, attachmentDigest })).digest('hex');
+    const conversationPreferences = normalizeConversationPreferences(body.conversationPreferences);
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ text, history, mode, requestedModel, attachmentDigest, conversationPreferences })).digest('hex');
     const logicalId = clientMessageId || crypto.randomUUID();
     const key = crypto.createHash('sha256').update(`${guest.installationHash}:${logicalId}`).digest('hex');
-    return { key, fingerprint, clientMessageId, text, history, mode, requestedModel };
+    return { key, fingerprint, clientMessageId, text, history, mode, requestedModel, conversationPreferences };
   }
 
   prepareGuestExecution(guest, body) {
@@ -1013,6 +1015,7 @@ class RemoteSessionGateway {
           conversation,
           text: descriptor.text,
           mode: descriptor.mode,
+          conversationPreferences: descriptor.conversationPreferences,
           requestedModel: await this.resolvePublicModel(descriptor.requestedModel),
           ephemeral: true,
           signal: controller.signal,
@@ -2062,7 +2065,8 @@ class RemoteSessionGateway {
         this.activeVoiceRequests.add(controller);
         try {
           if (response.destroyed || this.stopping || this.disposed) { controller.abort(); return; }
-          const result = await this.voiceSynthesizer({ text, language, gender: body.gender === 'female' ? 'female' : 'male', owner: guest.id, signal: controller.signal });
+          const delivery = ['neutral', 'warm', 'calm', 'serious', 'energetic'].includes(body.delivery) ? body.delivery : 'warm';
+          const result = await this.voiceSynthesizer({ text, language, delivery, gender: body.gender === 'female' ? 'female' : 'male', owner: guest.id, signal: controller.signal });
           if (controller.signal.aborted || response.destroyed || this.stopping || this.disposed) return;
           const audio = Buffer.from(result?.audio || []);
           if (!audio.length || audio.length > 16 * 1024 * 1024) throw new Error('Audio non valido.');

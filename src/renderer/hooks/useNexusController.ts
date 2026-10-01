@@ -514,7 +514,7 @@ export function useNexusController() {
           gender: interfacePreferencesRef.current.voiceGender,
           language: outputLanguage,
           engine: expressive ? 'expressive' : 'neural',
-          delivery: inferVoiceDelivery(clean)
+          delivery: settingsRef.current?.personalization?.tone === 'warm' ? 'warm' : settingsRef.current?.personalization?.tone === 'direct' ? 'serious' : inferVoiceDelivery(clean)
         });
         if (session !== speechSession.current) return;
         const audioBuffer = new ArrayBuffer(result.audio.byteLength);

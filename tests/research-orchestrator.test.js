@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { deduplicateSources, deriveResearchQueries, enforcePublicCitationUrls, ensurePublicCitation, publicQuerySeed, researchLanguage, researchQuestion } = require('../src/research/research-orchestrator');
+const { deduplicateSources, deriveResearchQueries, enforcePublicCitationUrls, ensurePublicCitation, publicQuerySeed, researchLanguage, researchTimeRange, researchQuestion } = require('../src/research/research-orchestrator');
 
 test('deduplica le fonti e pubblica solo riferimenti esterni', () => {
   const merged = deduplicateSources([[{
@@ -36,6 +36,22 @@ test('mantiene query e lingua deterministiche', () => {
   assert.equal(publicQuerySeed('Cerca sul web le ultime informazioni stabili su Node.js, spiegale in breve e cita le fonti.'), 'Node.js');
   assert.equal(researchLanguage('Qual è la versione attuale?'), 'it');
   assert.equal(researchLanguage('What is the current version?'), 'en');
+});
+
+test('ricerca approfondita esegue due query e conserva data e filtro delle citazioni', async () => {
+  const calls = [];
+  const result = await researchQuestion({ question: 'Cerca le notizie delle ultime 24 ore', mode: 'deep', service: { search: async (query, options) => {
+    calls.push({ query, options });
+    return { provider: 'searxng', results: [{ title: query, url: `https://example.com/${calls.length}`, snippet: 'Dato', sourceKind: 'web', retrievedAt: '2026-10-01T12:00:00.000Z', timeRange: options.timeRange }] };
+  } } });
+  assert.equal(calls.length, 2);
+  assert.notEqual(calls[0].query, calls[1].query);
+  assert.equal(calls[0].options.timeRange, 'day');
+  assert.equal(result.citations[0].retrievedAt, '2026-10-01T12:00:00.000Z');
+  assert.equal(result.citations[0].timeRange, 'day');
+  assert.equal(researchTimeRange('versione corrente oggi'), '');
+  assert.equal(researchTimeRange('past month'), 'month');
+  assert.equal(researchTimeRange('ultimo anno'), 'year');
 });
 
 test('mantiene soltanto URL realmente restituiti dal provider', () => {

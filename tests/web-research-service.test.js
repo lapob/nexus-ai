@@ -226,3 +226,34 @@ test('rifiuta URL pubblici non HTTPS e risposte non JSON', async () => {
   });
   await assert.rejects(() => service.search('Nexus'), /JSON/);
 });
+
+test('filtro temporale e cache mantengono la data reale di consultazione', async () => {
+  let now = Date.parse('2026-10-01T12:00:00Z');
+  const calls = [];
+  const service = new WebResearchService({ provider: 'searxng', searxngEndpoint: 'http://127.0.0.1:8080/', now: () => now,
+    fetchImpl: async url => { calls.push(new URL(url)); return jsonResponse({ results: [{ title: 'Fonte', url: 'https://example.com/a', content: 'Dato' }] }); }
+  });
+  const first = await service.search('notizie', { timeRange: 'month' });
+  assert.equal(calls[0].searchParams.get('time_range'), 'month');
+  assert.equal(first.results[0].timeRange, 'month');
+  assert.equal(first.retrievedAt, '2026-10-01T12:00:00.000Z');
+  now += 1000;
+  const cached = await service.search('notizie', { timeRange: 'month' });
+  assert.equal(cached.cached, true);
+  assert.equal(cached.retrievedAt, first.retrievedAt);
+  assert.equal(cached.results[0].retrievedAt, first.retrievedAt);
+  await service.search('notizie', { timeRange: 'day' });
+  assert.equal(calls.length, 2);
+  now += 300_000;
+  const refreshed = await service.search('notizie', { timeRange: 'month' });
+  assert.equal(refreshed.cached, false);
+  assert.notEqual(refreshed.retrievedAt, first.retrievedAt);
+});
+
+test('il filtro temporale non viene ignorato o sostituito da un fallback', async () => {
+  const service = new WebResearchService({ provider: 'auto', searxngEndpoint: 'http://127.0.0.1:8080/', fetchImpl: async () => jsonResponse({}, 503) });
+  await assert.rejects(() => service.search('notizie', { timeRange: 'month' }), /503/);
+  await assert.rejects(() => service.search('notizie', { timeRange: 'week' }), /settimanale nativo/);
+  await assert.rejects(() => service.search('notizie', { timeRange: 'invalid' }), /Filtro temporale/);
+  await assert.rejects(() => new WebResearchService({ provider: 'wikipedia' }).search('notizie', { timeRange: 'week' }), /non supporta/);
+});

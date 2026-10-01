@@ -581,7 +581,7 @@ function bootstrapElectron({ env = process.env } = {}) {
           timeoutSeconds,
           signal
         }),
-        voiceSynthesizer: (request) => remoteSpeechQueue.synthesize({ ...request, delivery: 'warm' }),
+        voiceSynthesizer: (request) => remoteSpeechQueue.synthesize({ ...request, delivery: request.delivery || 'warm' }),
         voiceInputCapabilityProvider: () => remoteTranscriptionService.audioAvailable(),
         voiceCapabilityProvider: () => !remoteSpeechQueue.disposed
           && (remoteNeuralSpeech.capabilities().available || remoteExpressiveSpeech.capabilities().available),

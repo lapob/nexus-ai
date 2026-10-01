@@ -5,6 +5,34 @@ Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice d
 
 ## Checkup del 1 ottobre
 
+### Ricerca, preferenze comuni e valutazione isolata: candidato 0.3.19
+
+- Ricerca deep su due query, filtri temporali compatibili con il provider,
+  data di consultazione nelle fonti e in cache; istruzioni per conflitti fra
+  fonti. Nessun fallback enciclopedico spacciato per ricerca live.
+- Contratto comune di tono, lingua e dettaglio su web, desktop e Android
+  pubblico. Editor web a icona, impostazioni native Android; solo queste tre
+  scelte vengono inviate, senza nome o istruzioni private. Persistenza locale
+  per dispositivo, nessuna pretesa di sincronizzazione account gia completa.
+- Tono collegato alla sintesi vocale. Nove regressioni della sessione voce
+  PASS; quattro profili browser con media sintetici PASS. Eco e accuratezza
+  STT su voce umana richiedono ancora un collaudo fisico autorizzato.
+- Quaranta stati web e quattro dimensioni della personalizzazione PASS:
+  persistenza, reset, storage indisponibile, focus e payload. Corretta la
+  sovrapposizione delle icone in intestazione su schermi piccoli.
+- Controllo sorgenti, tipi, budget iniziale, igiene e sovrapposizioni PASS.
+  Suite finale 979 PASS, 2 SKIP, zero FAIL. Windows 0.3.19: build, verifica
+  installer e smoke del pacchetto PASS; firma editore ancora assente.
+  Android 6.5.21/code111: build Preview, lint e verifica APK PASS; certificato
+  Debug. ADB non rileva dispositivi: nessuna nuova prova fisica dichiarata.
+- Suite eval estesa a 100 compiti sintetici valutazione-only; validazione
+  PASS, senza dati personali o consenso derivato dai voti. Lab isolato dal
+  servizio attivo, controllo RAM e scaricamento del modello al termine.
+  Confronto reale bloccato prima del caricamento: 12.8 GiB richiesti per i
+  candidati, circa 7.3 GiB liberi. Non sono risultati di qualita dei modelli.
+- Pubblicazione candidata ancora da verificare. Restano firme editore,
+  audit integrale, corpus privato e vocale, sync autenticata e nodo n8n.
+
 ### Completamento installer e Preview 0.3.18
 
 - Installer pubblico Windows 0.3.18 costruito con Electron 43.7.7, senza

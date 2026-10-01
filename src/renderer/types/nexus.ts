@@ -105,6 +105,8 @@ export interface PersonalizationSettings {
   occupation: string;
   interests: string;
   responseStyle: 'concise' | 'natural' | 'detailed';
+  tone?: 'neutral' | 'warm' | 'direct';
+  responseLanguage?: 'auto' | 'it' | 'en' | 'es' | 'fr' | 'de';
   customInstructions: string;
   attentiveFollowUp?: boolean;
 }

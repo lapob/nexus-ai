@@ -5,6 +5,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
+const { evaluationPlan } = require('./lib/evaluation-isolation');
+const { selectManagedRuntimePort } = require('../src/ai/managed-ollama-runtime');
 const { deterministicSecurityReply } = require('../src/application/prompt-security');
 const { deterministicCodeOutputReply } = require('../src/application/simple-code-output');
 const { deterministicArithmeticReply } = require('../src/application/simple-arithmetic');
@@ -124,7 +127,7 @@ function composeSystemPrompt(suite, item) {
   ].filter(Boolean).join('\n');
 }
 
-function buildInferencePayload({ suite, item, model, deep }) {
+function buildInferencePayload({ suite, item, model, deep, inferenceOptions = {} }) {
   const inference = suite?.inference || {};
   const payload = {
     model,
@@ -147,6 +150,7 @@ function buildInferencePayload({ suite, item, model, deep }) {
       num_predict: deep
         ? (Number.isFinite(inference.deepOutputTokens) ? inference.deepOutputTokens : 768)
         : (Number.isFinite(inference.quickOutputTokens) ? inference.quickOutputTokens : 256),
+      ...inferenceOptions,
     },
   };
   if (item.outputSchema) payload.format = item.outputSchema;
@@ -323,29 +327,35 @@ function activeManagedEndpoint() {
     const pid = Number(descriptor?.pid);
     if (!Number.isInteger(pid) || pid <= 0) return '';
     process.kill(pid, 0);
-    return `http://127.0.0.1:${12000 + (pid % 1000)}`;
+    return `http://127.0.0.1:${selectManagedRuntimePort(pid)}`;
   } catch {}
   return '';
 }
 
-async function resolveEvaluationEndpoint(requested = '') {
-  const candidates = [...new Set([
-    requested,
-    process.env.NEXUS_OLLAMA_BASE_URL,
-    activeManagedEndpoint(),
-    'http://127.0.0.1:11435',
-    persistedPrivateEndpoint(),
-  ].map((candidate) => String(candidate || '').replace(/\/$/, '')).filter(Boolean))];
-  for (const candidate of candidates) {
-    try {
-      const response = await fetch(`${candidate}/api/version`, { signal: AbortSignal.timeout(2_500) });
-      if (response.ok) return candidate;
-    } catch {}
+async function resolveEvaluationEndpoint(requested = '', { fetchImpl = fetch, activeEndpoint = activeManagedEndpoint(), privateEndpoint = persistedPrivateEndpoint(), freeBytes = os.freemem() } = {}) {
+  const candidate = requested || process.env.NEXUS_EVALUATION_ENDPOINT || 'http://127.0.0.1:11435';
+  const plan = evaluationPlan({ endpoint: candidate, activeEndpoint, freeBytes, modelBytes: 0 });
+  if (new URL(candidate).port === '11434' || (privateEndpoint && new URL(candidate).port === new URL(privateEndpoint).port)) {
+    throw new Error('Valutazione rifiutata: endpoint riservato al servizio.');
   }
-  throw new Error('Runtime AI locale non raggiungibile sugli endpoint NexusNXS consentiti.');
+  try {
+    const response = await fetchImpl(`${plan.endpoint}/api/version`, { signal: AbortSignal.timeout(2_500) });
+    if (response.ok) return plan.endpoint;
+  } catch { /* No fallback to the active service. */ }
+  throw new Error('Runtime dedicato di valutazione non raggiungibile; il servizio attivo non viene utilizzato.');
 }
 
-async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs }) {
+async function prepareEvaluation(endpoint, models, { fetchImpl = fetch, activeEndpoint = activeManagedEndpoint(), freeBytes = os.freemem() } = {}) {
+  evaluationPlan({ endpoint, activeEndpoint, freeBytes, modelBytes: 0 });
+  const response = await fetchImpl(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(5_000) });
+  if (!response.ok) throw new Error('Catalogo del runtime dedicato non disponibile.');
+  const installed = (await response.json()).models || [];
+  const selected = models.map(model => installed.find(item => (item.name || item.model) === model));
+  if (selected.some(item => !item || !(Number(item.size) > 0))) throw new Error('Modelli o dimensioni non disponibili sul runtime dedicato.');
+  return evaluationPlan({ endpoint, activeEndpoint, freeBytes, modelBytes: Math.max(...selected.map(item => Number(item.size))) });
+}
+
+async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs, inferenceOptions = {} }) {
   const results = [];
   for (const item of suite.cases) {
     const startedAt = performance.now();
@@ -358,7 +368,7 @@ async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs }) {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       signal: AbortSignal.timeout(timeoutMs),
-      body: JSON.stringify(buildInferencePayload({ suite, item, model, deep })),
+      body: JSON.stringify(buildInferencePayload({ suite, item, model, deep, inferenceOptions })),
     });
     if (!response.ok) throw new Error(`${model}/${item.id}: HTTP ${response.status}`);
     const payload = await response.json();
@@ -369,7 +379,7 @@ async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs }) {
     // osservabile fallisce. Il gate deve misurare quel prodotto completo, non
     // fermarsi alla prima decodifica grezza del provider.
     if (!scored.passed) {
-      const repairPayload = buildInferencePayload({ suite, item, model, deep });
+      const repairPayload = buildInferencePayload({ suite, item, model, deep, inferenceOptions });
       const exactWords = strictWordCountSchema(casePrompt(item));
       if (exactWords && scored.assertions.some((assertion) => !assertion.passed && assertion.type === 'wordCount')) {
         repairPayload.format = exactWords;
@@ -433,8 +443,15 @@ async function main(argv = process.argv.slice(2)) {
   } else {
     const endpoint = await resolveEvaluationEndpoint(options.endpoint);
     const models = options.models.length ? options.models : ['qwen3:8b', 'qwen3:14b'];
+    const plan = await prepareEvaluation(endpoint, models);
     modelReports = [];
-    for (const model of models) modelReports.push(await evaluateLiveModel({ suite, model, endpoint, deep: options.deep, timeoutMs: options.timeoutMs }));
+    for (const model of models) {
+      try { modelReports.push(await evaluateLiveModel({ suite, model, endpoint, deep: options.deep, timeoutMs: options.timeoutMs, inferenceOptions: plan.options })); }
+      finally {
+        const released = await fetch(`${endpoint}/api/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10_000), body: JSON.stringify({ model, stream: false, keep_alive: 0 }) });
+        if (!released.ok) throw new Error('Il modello di valutazione non e stato scaricato dal runtime dedicato.');
+      }
+    }
   }
 
   const report = buildReport({ suite, modelReports });
@@ -462,6 +479,8 @@ module.exports = {
   evaluateFixture,
   extractAnswer,
   loadSuite,
+  prepareEvaluation,
+  resolveEvaluationEndpoint,
   normalizeText,
   parseCli,
   productionFastPathReply,

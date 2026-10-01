@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { createPublicVoiceSession } = require('../src/remote/public-voice-session');
 
-function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null) {
+function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null, tone = 'neutral') {
   let frames=0, recordings=0, transcriptions=0, paused=0, stopped=0, speaking=false, busy=false, cancelled=0, audioStarts=0, synthesisAborted=false, instance;
   const element=()=>({hidden:false,value:'',className:'',textContent:'',inert:false,classList:{contains:()=>false,add(){},remove(){}},setAttribute(){},getAttribute(){return '';},append(){},focus(){},blur(){},dispatchEvent(){}});
   const prompt=element(),core=element();
@@ -26,7 +26,9 @@ function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, i
   const sandbox={document,navigator:{language:'it-IT',mediaDevices:{getUserMedia:async()=>stream}},AudioContext:Context,MediaRecorder:Recorder,Audio,AbortController,Blob,Event,URL:{createObjectURL:()=> 'blob:qa',revokeObjectURL(){}},performance:{now:()=>frames*80},requestAnimationFrame:callback=>setImmediate(()=>{frames++;if(frames>200)throw Error('capture did not settle');callback(frames*80);}),cancelAnimationFrame:clearImmediate,setTimeout,clearTimeout,addEventListener(){}};
   const factory=vm.runInNewContext(`(${createPublicVoiceSession.toString()})`,sandbox);
   const runtime={};
+  const deliveries=[];
   const synthesize=async options=>{
+    deliveries.push(JSON.parse(options.body).delivery);
     if(synthesisInterruption){
       if(synthesisInterruption==='leave') instance.leave(); else instance.interact();
       synthesisAborted=options.signal.aborted;
@@ -34,9 +36,16 @@ function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, i
     }
     return {ok:true,blob:async()=>new Blob(['speech'])};
   };
-  instance=factory({core,prompt,runtime,duplex,session:async()=>{},fetchAudio:async (path,options)=>path.endsWith('synthesize')?await synthesize(options):{ok:true,json:async()=>({text:`phrase ${++transcriptions}`})},ask:async()=>{if(transcriptions===1){if(interruptGeneration){busy=true;instance.interact();busy=false;}else await instance.speak('response');}else instance.leave();},encodeWav:()=>new Uint8Array(4),spokenLanguage:()=> 'it',setState:s=>{runtime.voiceState=s;},setPhase(){},isBusy:()=>busy,cancelResponse:()=>{cancelled++;},showText(){}});
-  return {instance,run:()=>instance.start(),stats:()=>({recordings,transcriptions,paused,stopped,speaking,cancelled,audioStarts,synthesisAborted})};
+  instance=factory({core,prompt,runtime,duplex,getPreferences:()=>({tone}),session:async()=>{},fetchAudio:async (path,options)=>path.endsWith('synthesize')?await synthesize(options):{ok:true,json:async()=>({text:`phrase ${++transcriptions}`})},ask:async()=>{if(transcriptions===1){if(interruptGeneration){busy=true;instance.interact();busy=false;}else await instance.speak('response');}else instance.leave();},encodeWav:()=>new Uint8Array(4),spokenLanguage:()=> 'it',setState:s=>{runtime.voiceState=s;},setPhase(){},isBusy:()=>busy,cancelResponse:()=>{cancelled++;},showText(){}});
+  return {instance,run:()=>instance.start(),stats:()=>({recordings,transcriptions,paused,stopped,speaking,cancelled,audioStarts,synthesisAborted,deliveries})};
 }
+
+test('il tono esplicito della conversazione accompagna la sintesi vocale', async () => {
+  for (const [tone, delivery] of [['neutral', 'neutral'], ['warm', 'warm'], ['direct', 'serious'], ['invalid', 'neutral']]) {
+    const h=harness(false,true,false,false,null,tone); await h.run();
+    assert.deepEqual(h.stats().deliveries,[delivery]);
+  }
+});
 
 test('duplex captures a complete interruption during playback and releases the microphone',async()=>{
   const h=harness(true);await h.run();const s=h.stats();

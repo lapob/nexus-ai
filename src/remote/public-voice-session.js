@@ -1,6 +1,6 @@
 /** @module remote/public-voice-session Shared chat history and cancellable browser media. */
 // #region Session controls and capture
-function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, duplex = false }) {
+function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, getPreferences = () => ({}), duplex = false }) {
   const copy = (it, en) => /^it\b/i.test(navigator.language) ? it : en;
   let active = false, epoch = 0, stream = null, recorder = null;
   let controller = null, finishCapture = null, finishPlayback = null;
@@ -101,7 +101,9 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     try {
       const canDuplex = duplex && stream?.getAudioTracks()[0]?.getSettings().echoCancellation === true;
       state('thinking', copy('Preparo la voce · tocca il Core per interrompere', 'Preparing audio · tap the Core to interrupt'));
-      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: spokenLanguage(text) }) });
+      const tone = getPreferences().tone;
+      const delivery = tone === 'warm' ? 'warm' : tone === 'direct' ? 'serious' : 'neutral';
+      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: spokenLanguage(text), delivery }) });
       if (!valid(id) || synthesis.signal.aborted) return;
       if (!response.ok) throw new Error(copy('Audio non disponibile. La risposta resta nella chat.', 'Audio unavailable. Your answer remains in chat.'));
       const blob = await response.blob(); if (!valid(id) || synthesis.signal.aborted) return;

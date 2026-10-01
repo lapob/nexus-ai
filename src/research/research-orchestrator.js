@@ -36,6 +36,16 @@ function researchLanguage(question = '') {
   return /\b(?:il|lo|la|gli|le|che|come|cosa|perch[eé]|quale|quando|dove|cerca|ricerca|oggi|ultimo|ultima)\b/iu.test(text) ? 'it' : 'en';
 }
 
+function researchTimeRange(question = '') {
+  const text = String(question || '');
+  if (/\b(?:ultime\s+24\s+ore|ultim[oa]\s+giorno|last\s+24\s+hours|past\s+day)\b/iu.test(text)) return 'day';
+  // SearXNG documenta solo day/month/year. Le altre finestre restano nella
+  // query e richiedono verifica sulle date delle fonti, senza filtro simulato.
+  if (/\b(?:ultimo\s+mese|ultimi\s+30\s+giorni|past\s+month|last\s+month)\b/iu.test(text)) return 'month';
+  if (/\b(?:ultimo\s+anno|ultimi\s+12\s+mesi|past\s+year|last\s+year)\b/iu.test(text)) return 'year';
+  return '';
+}
+
 function deriveResearchQueries(question, maxQueries = 1) {
   const original = publicQuerySeed(question);
   if (!original) return [];
@@ -44,6 +54,7 @@ function deriveResearchQueries(question, maxQueries = 1) {
     const withoutRequestWords = normalizedQuery(original
       .replace(/\b(?:cerca(?:mi)?|ricerca|verifica|controlla|consulta|approfondisci|confronta|sul\s+web|su\s+internet|con\s+fonti)\b/giu, ' '));
     if (withoutRequestWords && withoutRequestWords.toLowerCase() !== original.toLowerCase()) queries.push(withoutRequestWords);
+    if (queries.length === 1) queries.push(normalizedQuery(`${original} ${researchLanguage(question) === 'it' ? 'fonti ufficiali' : 'official sources'}`));
   }
   return [...new Set(queries)].slice(0, Math.max(1, maxQueries));
 }
@@ -62,7 +73,7 @@ function deduplicateSources(groups, limit) {
       seen.add(key);
       merged.push({
         ...source,
-        text: `Titolo pubblico: ${source.title}\nURL pubblico: ${source.url}\nEstratto: ${source.snippet}`
+        text: `Titolo pubblico: ${source.title}\nURL pubblico: ${source.url}\n${source.retrievedAt ? `Consultato: ${source.retrievedAt}\n` : ''}Estratto: ${source.snippet}`
       });
       if (merged.length >= limit) return merged;
     }
@@ -77,7 +88,9 @@ function publicCitations(sources) {
     snippet: source.snippet,
     sourceKind: 'web',
     status: 'external',
-    provider: source.provider
+    provider: source.provider,
+    ...(source.retrievedAt ? { retrievedAt: source.retrievedAt } : {}),
+    ...(source.timeRange ? { timeRange: source.timeRange } : {})
   }));
 }
 
@@ -168,7 +181,8 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
       limit: Math.max(2, Math.ceil(policy.maxResults / queries.length)),
       language,
       signal,
-      freshOnly: policy.reason === 'time-sensitive'
+      freshOnly: policy.reason === 'time-sensitive',
+      timeRange: researchTimeRange(question)
     })));
     const sources = deduplicateSources(batches.map((batch) => batch.results), policy.maxResults);
     return {
@@ -188,4 +202,4 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
 
 // #endregion
 
-module.exports = { canonicalCitationUrl, deduplicateSources, deriveResearchQueries, enforcePublicCitationUrls, ensurePublicCitation, publicCitations, publicQuerySeed, researchLanguage, researchQuestion };
+module.exports = { canonicalCitationUrl, deduplicateSources, deriveResearchQueries, enforcePublicCitationUrls, ensurePublicCitation, publicCitations, publicQuerySeed, researchLanguage, researchTimeRange, researchQuestion };

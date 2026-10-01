@@ -16,6 +16,27 @@ Non equivalgono ancora a un profilo sincronizzato e verificato su ogni client.
 La voce espressiva ha un backend opzionale: la presenza del codice non prova
 la naturalezza percepita o la disponibilita del runtime su ogni installazione.
 
+Implementazione del programma, 1 ottobre: la ricerca deep usa due query entro
+il budget esistente; le citazioni portano la data reale di consultazione,
+conservata anche in cache. I filtri richiesti esplicitamente usano soltanto
+le finestre supportate dal provider; non viene simulato un filtro non disponibile.
+Il prompt richiede di indicare fonti discordanti, senza inventare un consenso.
+Tono, lingua e dettaglio hanno ora un contratto comune validato su web,
+desktop e Android: editor a icona sul web, sezione nativa Android e selettori
+desktop esistenti. Le tre scelte accompagnano testo e tono della voce;
+nome, interessi e istruzioni private non entrano nel payload pubblico.
+Queste preferenze restano per dispositivo: la sincronizzazione autenticata
+di un profilo completo e per progetto resta distinta, non gia consegnata.
+
+La suite sintetica di valutazione contiene 100 compiti distinti in nove
+categorie, separati dal training. L'eval lab rifiuta il runtime attivo,
+richiede RAM disponibile e usa CPU mentre il servizio lavora. Il confronto
+misurato e bloccato: servono 12.8 GiB liberi per i candidati selezionati,
+contro circa 7.3 GiB disponibili nel controllo corrente. Nessun modello
+caricato, addestrato o promosso. Corpus privato e corpus vocale umano ancora
+necessari; le prove automatiche della voce non misurano l'eco reale.
+n8n/MCP non sono dichiarati operativi: manca un nodo configurato autorizzato.
+
 | Ordine | Completamento proposto | Criterio verificabile |
 | --- | --- | --- |
 | 1 | Ricerca approfondita su piu fonti, data di consultazione visibile nel dettaglio, filtri temporali e conflitti espliciti | Casi revisionati su dati recenti, fonti discordanti, cache, errori e citazioni; nessuna fonte inventata o riferimento enciclopedico presentato come dato live |

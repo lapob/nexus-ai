@@ -18,6 +18,8 @@ const {
   evaluateFixture,
   extractAnswer,
   loadSuite,
+  prepareEvaluation,
+  resolveEvaluationEndpoint,
   productionFastPathReply,
   scoreCase,
   validateSuite,
@@ -25,6 +27,28 @@ const {
 
 const root = path.resolve(__dirname, '..');
 const suitePath = path.join(root, 'config', 'evals', 'nexusnxs-core-v1.json');
+
+test('l eval lab rifiuta il servizio attivo prima di qualunque accesso di rete', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls++; throw new Error('offline'); };
+  await assert.rejects(() => resolveEvaluationEndpoint('http://127.0.0.1:12345', { fetchImpl, activeEndpoint: 'http://127.0.0.1:12345', privateEndpoint: '', freeBytes: 20 * 2 ** 30 }), /endpoint del servizio attivo/);
+  await assert.rejects(() => resolveEvaluationEndpoint('http://127.0.0.1:11434', { fetchImpl, activeEndpoint: '', privateEndpoint: '', freeBytes: 20 * 2 ** 30 }), /riservato al servizio/);
+  assert.equal(calls, 0);
+  await assert.rejects(() => resolveEvaluationEndpoint('http://127.0.0.1:11435', { fetchImpl, activeEndpoint: 'http://127.0.0.1:12345', privateEndpoint: '', freeBytes: 20 * 2 ** 30 }), /non viene utilizzato/);
+  assert.equal(calls, 1);
+});
+
+test('il piano misura RAM e forza CPU mentre il servizio resta attivo', async () => {
+  const options = { activeEndpoint: 'http://127.0.0.1:12345', freeBytes: 20 * 2 ** 30,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ models: [{ name: 'test:8b', size: 5 * 2 ** 30 }] }) }) };
+  const plan = await prepareEvaluation('http://127.0.0.1:11435', ['test:8b'], options);
+  assert.equal(plan.cpuOnly, true);
+  const { suite } = loadSuite(suitePath);
+  const payload = buildInferencePayload({ suite, item: suite.cases[0], model: 'test:8b', inferenceOptions: plan.options });
+  assert.equal(payload.options.num_gpu, 0);
+  await assert.rejects(() => prepareEvaluation('http://127.0.0.1:11435', ['test:8b'], { ...options, freeBytes: 3 * 2 ** 30 }), /RAM insufficiente/);
+  await assert.rejects(() => prepareEvaluation('http://127.0.0.1:11435', ['missing'], options), /Modelli o dimensioni/);
+});
 
 test('separa qualita al primo tentativo, revisioni e risposte deterministiche', () => {
   const suite = { gate: { minimumPassRate: 80, categoryMinimums: { reasoning: 80 } } };
@@ -47,6 +71,7 @@ test('separa qualita al primo tentativo, revisioni e risposte deterministiche', 
 
 function passingAnswers(suite) {
   return {
+    ...Object.fromEntries(suite.cases.filter(item => item.id.startsWith('cap-oct01-')).map(item => [item.id, item.assertions[0].value])),
     'it-accenti-01': 'Perché la qualità della città è importante.',
     'it-concisione-02': 'Per verificare recuperi funzionanti.',
     'it-registro-03': 'Un aggiornamento di sicurezza corregge vulnerabilità e protegge il dispositivo.',
@@ -92,10 +117,10 @@ function passingAnswers(suite) {
 
 test('la suite v1 è versionata, sintetica e copre tutte le aree critiche', () => {
   const { suite } = loadSuite(suitePath);
-  assert.equal(suite.version, '1.3.0');
+  assert.equal(suite.version, '1.4.0');
   assert.equal(suite.provenance.containsRealUserData, false);
   assert.equal(suite.provenance.trainingUse, 'evaluation-only');
-  assert.equal(suite.cases.length, 40);
+  assert.equal(suite.cases.length, 100);
   assert.deepEqual(new Set(suite.cases.map((item) => item.category)), new Set([
     'italiano', 'matematica', 'codice', 'ragionamento', 'rag', 'prompt-security', 'tool-routing', 'web-research', 'multi-turn',
   ]));
@@ -227,7 +252,7 @@ test('il comando validate-only è offline e non richiede modelli', () => {
   assert.equal(child.status, 0, child.stderr);
   const payload = JSON.parse(child.stdout);
   assert.equal(payload.valid, true);
-  assert.equal(payload.cases, 40);
+  assert.equal(payload.cases, 100);
 });
 
 test('il comando fixture produce un report JSON privacy-safe e supera il gate', () => {

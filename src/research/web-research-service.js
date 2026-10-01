@@ -111,8 +111,8 @@ class WebResearchService {
     return { state: 'available', mode: 'live' };
   }
 
-  cacheKey(provider, query, language, limit) {
-    return createHash('sha256').update(`${provider}\n${language}\n${limit}\n${query}`).digest('hex');
+  cacheKey(provider, query, language, limit, timeRange = '') {
+    return createHash('sha256').update(`${provider}\n${language}\n${limit}\n${timeRange}\n${query}`).digest('hex');
   }
 
   readCache(key) {
@@ -121,12 +121,12 @@ class WebResearchService {
       this.cache.delete(key);
       return null;
     }
-    return { provider: cached.provider, results: cached.results.map((item) => ({ ...item })) };
+    return { provider: cached.provider, retrievedAt: cached.retrievedAt, results: cached.results.map((item) => ({ ...item })) };
   }
 
-  writeCache(key, results, provider = '') {
+  writeCache(key, results, provider = '', retrievedAt = '') {
     if (this.cache.size >= 128) this.cache.delete(this.cache.keys().next().value);
-    this.cache.set(key, { expiresAt: this.now() + this.cacheTtlMs, provider, results: results.map((item) => ({ ...item })) });
+    this.cache.set(key, { expiresAt: this.now() + this.cacheTtlMs, provider, retrievedAt, results: results.map((item) => ({ ...item })) });
   }
 
   async requestJson(url, { method = 'GET', headers = {}, body, signal } = {}) {
@@ -160,13 +160,14 @@ class WebResearchService {
     }
   }
 
-  async searchBrave(query, { limit, signal }) {
+  async searchBrave(query, { limit, signal, timeRange }) {
     const url = new URL('https://api.search.brave.com/res/v1/web/search');
     url.searchParams.set('q', query);
     url.searchParams.set('count', String(limit));
     url.searchParams.set('safesearch', 'moderate');
     url.searchParams.set('text_decorations', 'false');
     url.searchParams.set('spellcheck', 'true');
+    if (timeRange) url.searchParams.set('freshness', { day: 'pd', week: 'pw', month: 'pm', year: 'py' }[timeRange]);
     const payload = await this.requestJson(url, {
       headers: { 'X-Subscription-Token': this.braveApiKey },
       signal
@@ -182,13 +183,15 @@ class WebResearchService {
     })).filter((item) => item.title && item.url && item.snippet);
   }
 
-  async searchSearxng(query, { limit, language, signal }) {
+  async searchSearxng(query, { limit, language, signal, timeRange }) {
+    if (timeRange === 'week') throw new Error('SearXNG non supporta il filtro settimanale nativo.');
     const url = new URL('search', `${this.searxngEndpoint.replace(/\/+$/, '')}/`);
     url.searchParams.set('q', query);
     url.searchParams.set('format', 'json');
     url.searchParams.set('language', wikipediaLanguage(language));
     url.searchParams.set('safesearch', '1');
     url.searchParams.set('categories', 'general');
+    if (timeRange) url.searchParams.set('time_range', timeRange);
     const payload = await this.requestJson(url, { signal });
     return (payload?.results || []).slice(0, limit).map((item, index) => ({
       title: cleanText(item.title, 220),
@@ -272,29 +275,32 @@ class WebResearchService {
     }).filter((item) => item.title && item.url && item.snippet);
   }
 
-  async search(query, { limit = 4, language = 'it', signal, freshOnly = false } = {}) {
+  async search(query, { limit = 4, language = 'it', signal, freshOnly = false, timeRange = '' } = {}) {
     const normalizedQuery = cleanText(query, 500);
     if (!this.enabled || normalizedQuery.length < 2) return { provider: 'off', results: [] };
     const provider = this.activeProvider();
+    if (!['', 'day', 'week', 'month', 'year'].includes(timeRange)) throw new Error('Filtro temporale di ricerca non valido.');
+    // Solo questi provider applicano un filtro temporale documentato.
+    if (timeRange && !['searxng', 'brave'].includes(provider)) throw new Error('Il provider non supporta il filtro temporale richiesto.');
     if (provider === 'unavailable') throw new Error('Il provider di ricerca live non dispone di credenziale e modello server-side completi.');
     if (freshOnly && !['searxng', 'brave', 'openai'].includes(provider)) {
       throw new Error('La ricerca web in tempo reale richiede un provider live configurato sul server.');
     }
     const boundedLimit = Math.max(1, Math.min(8, Number(limit) || 4));
-    const key = this.cacheKey(provider, normalizedQuery, wikipediaLanguage(language), boundedLimit);
+    const key = this.cacheKey(provider, normalizedQuery, wikipediaLanguage(language), boundedLimit, timeRange);
     const cached = this.readCache(key);
     // Un fallback enciclopedico memorizzato non soddisfa una richiesta live:
     // ritentare il provider configurato e conservare l'errore se resta offline.
     if (cached && (!freshOnly || ['searxng', 'brave', 'openai'].includes(cached.provider))) {
-      return { provider: cached.provider || provider, cached: true, results: cached.results };
+      return { provider: cached.provider || provider, cached: true, retrievedAt: cached.retrievedAt, results: cached.results };
     }
     let completedProvider = provider;
     let results;
     try {
       results = provider === 'searxng'
-        ? await this.searchSearxng(normalizedQuery, { limit: boundedLimit, language, signal })
+        ? await this.searchSearxng(normalizedQuery, { limit: boundedLimit, language, signal, timeRange })
         : provider === 'brave'
-          ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal })
+          ? await this.searchBrave(normalizedQuery, { limit: boundedLimit, signal, timeRange })
           : provider === 'openai'
             ? await this.searchOpenAI(normalizedQuery, { limit: boundedLimit, signal })
             : await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
@@ -304,14 +310,16 @@ class WebResearchService {
       // In modalita auto il guasto temporaneo di un provider live non deve
       // disattivare tutta la ricerca pubblica. Wikipedia resta un fallback
       // dichiarato; la modalita esplicita conserva invece l'errore.
-      if (freshOnly || this.provider !== 'auto' || !['searxng', 'brave', 'openai'].includes(provider) || signal?.aborted) throw error;
+      if (freshOnly || timeRange || this.provider !== 'auto' || !['searxng', 'brave', 'openai'].includes(provider) || signal?.aborted) throw error;
       this.logger?.warn?.('Provider live non disponibile; uso il fallback Wikipedia.', { error });
       completedProvider = 'wikipedia';
       results = await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
     }
-    this.writeCache(key, results, completedProvider);
+    const retrievedAt = new Date(this.now()).toISOString();
+    results = results.map(source => ({ ...source, retrievedAt, ...(timeRange ? { timeRange } : {}) }));
+    this.writeCache(key, results, completedProvider, retrievedAt);
     this.logger?.info?.('Ricerca web completata.', { provider: completedProvider, results: results.length });
-    return { provider: completedProvider, cached: false, results };
+    return { provider: completedProvider, cached: false, retrievedAt, results };
   }
 }
 

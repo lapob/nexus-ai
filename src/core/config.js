@@ -3,6 +3,7 @@
  * @description Primitiva condivisa del dominio, priva di dipendenze grafiche.
  */
 const { assertOllamaUrl } = require('./security');
+const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 
 // #region 01 — Default e primitive di normalizzazione
 
@@ -25,6 +26,8 @@ const DEFAULTS = Object.freeze({
       occupation: '',
       interests: '',
       responseStyle: 'natural',
+      tone: 'neutral',
+      responseLanguage: 'auto',
       customInstructions: '',
       attentiveFollowUp: true
     })
@@ -93,7 +96,7 @@ function validateSettings(input = {}, fallback = DEFAULTS.ai) {
     assistantName: personalText(personalInput.assistantName, personalFallback.assistantName || 'NEXUSNXS', 80) || 'NEXUSNXS',
     occupation: personalText(personalInput.occupation, personalFallback.occupation, 160),
     interests: personalText(personalInput.interests, personalFallback.interests, 500),
-    responseStyle,
+    ...normalizeConversationPreferences({ ...personalInput, responseStyle }, personalFallback),
     customInstructions: personalText(personalInput.customInstructions, personalFallback.customInstructions, 2000),
     attentiveFollowUp: personalInput.attentiveFollowUp === undefined
       ? personalFallback.attentiveFollowUp !== false

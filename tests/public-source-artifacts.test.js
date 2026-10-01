@@ -30,3 +30,12 @@ test('le card pubbliche hanno un limite stretto e testo confinato', () => {
   assert.equal(artifacts.length, 6);
   assert.ok(artifacts.every((artifact) => artifact.content.length <= 240));
 });
+
+test('la data di consultazione valida rimane distinta dal contenuto e le date malformate sono escluse', () => {
+  const artifacts = publicSourceArtifacts([
+    { title: 'Fonte live', url: 'https://example.com/live', snippet: 'x'.repeat(400), retrievedAt: '2026-10-01T12:00:00Z' },
+    { title: 'Fonte senza data', url: 'https://example.com/invalid', snippet: 'Contenuto.', retrievedAt: 'data inventata' }
+  ]);
+  assert.equal(artifacts[0].content, 'x'.repeat(240) + '\nConsultato: 2026-10-01T12:00:00.000Z');
+  assert.equal(artifacts[1].content, 'Contenuto.');
+});

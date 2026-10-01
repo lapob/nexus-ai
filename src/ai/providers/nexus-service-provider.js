@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const { AIError, AI_ERROR_CODES, normalizeAIError } = require('../ai-errors');
 const { validateChatRequest } = require('../ai-provider');
 const { CircuitBreaker } = require('../circuit-breaker');
+const { normalizeConversationPreferences } = require('../../shared/conversation-preferences');
 
 // #region Configurazione e trasporto HTTPS pubblico
 
@@ -31,6 +32,7 @@ function publicActivityText(event) {
 class NexusServiceProvider {
   constructor(config = {}) {
     this.name = 'nexus-service';
+    this.conversationPreferences = normalizeConversationPreferences(config.personalization);
     this.baseUrl = publicServiceUrl(config.service?.baseUrl);
     this.fallbackUrls = (config.service?.fallbackUrls || []).map(publicServiceUrl).filter(Boolean).filter((url) => url !== this.baseUrl);
     this.activeBaseUrl = this.baseUrl;
@@ -45,6 +47,7 @@ class NexusServiceProvider {
   }
 
   async initialize(config = {}) {
+    this.conversationPreferences = normalizeConversationPreferences(config.personalization, this.conversationPreferences);
     if (this.lifecycleController.signal.aborted) this.lifecycleController = new AbortController();
     this.baseUrl = publicServiceUrl(config.service?.baseUrl ?? this.baseUrl);
     this.fallbackUrls = (config.service?.fallbackUrls || this.fallbackUrls || []).map(publicServiceUrl).filter(Boolean).filter((url) => url !== this.baseUrl);
@@ -183,6 +186,7 @@ class NexusServiceProvider {
       history: messages.slice(0, -1).slice(-24),
       mode: request.mode === 'deep' ? 'deep' : 'fast',
       model: String(request.model || this.currentModel || 'automatic').slice(0, 128),
+      conversationPreferences: this.conversationPreferences,
       clientMessageId: crypto.createHash('sha256').update(request.requestId).digest('hex').slice(0, 40)
     };
   }

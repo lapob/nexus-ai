@@ -446,6 +446,9 @@ private class NexusHttpException(val statusCode: Int, message: String) : Illegal
     val devices: List<DeviceRow> = emptyList(),
     val profileUri: String = "",
     val reduceMotion: Boolean = false,
+    val responseStyle: String = "natural",
+    val conversationTone: String = "neutral",
+    val responseLanguage: String = "auto",
     val pendingCount: Int = 0,
     val workTicketId: String = "",
     val workPreview: String = "",
@@ -990,7 +993,10 @@ open class NexusMainActivity : ComponentActivity() {
         // Work resta chiuso finché il server autenticato non pubblica una
         // capability esplicita. Una preferenza salvata non può riattivarlo da sola.
         val startAsAssistant = savedInstanceState?.getBoolean("nexusAssistantOverlay") ?: (intent?.action == Intent.ACTION_ASSIST)
-        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = startAsAssistant, slashCommands = loadCustomSlashCommands())
+        state = state.copy(model = savedModel, work = false, profileUri = prefs.getString("profileUri", "").orEmpty(), reduceMotion = prefs.getBoolean("reduceMotion", false) || powerSaver, conversationId = initialConversationId, pendingCount = store.pendingCount(), privacyMode = privacyMode, hapticsEnabled = prefs.getBoolean("hapticsEnabled", true), workTicketId = "", workPreview = "", workRisk = "", assistantOverlay = startAsAssistant, slashCommands = loadCustomSlashCommands(),
+            responseStyle = prefs.getString("responseStyle", "natural").takeIf { it in listOf("concise", "natural", "detailed") } ?: "natural",
+            conversationTone = prefs.getString("conversationTone", "neutral").takeIf { it in listOf("neutral", "warm", "direct") } ?: "neutral",
+            responseLanguage = prefs.getString("responseLanguage", "auto").takeIf { it in listOf("auto", "it", "en", "es", "fr", "de") } ?: "auto")
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
                 NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(),
@@ -1105,6 +1111,10 @@ open class NexusMainActivity : ComponentActivity() {
             "attach" -> selectComposerAttachment(value)
             "profilePhoto" -> { prefs.edit { putString("profileUri", value) }; state = state.copy(profileUri = value) }
             "reduceMotion" -> { val enabled = !state.reduceMotion; prefs.edit { putBoolean("reduceMotion", enabled) }; state = state.copy(reduceMotion = enabled) }
+            "responseStyle" -> if (value in listOf("concise", "natural", "detailed")) { prefs.edit { putString("responseStyle", value) }; state = state.copy(responseStyle = value) }
+            "conversationTone" -> if (value in listOf("neutral", "warm", "direct")) { prefs.edit { putString("conversationTone", value) }; state = state.copy(conversationTone = value) }
+            "responseLanguage" -> if (value in listOf("auto", "it", "en", "es", "fr", "de")) { prefs.edit { putString("responseLanguage", value) }; state = state.copy(responseLanguage = value) }
+            "resetConversationPreferences" -> { prefs.edit { remove("responseStyle"); remove("conversationTone"); remove("responseLanguage") }; state = state.copy(responseStyle = "natural", conversationTone = "neutral", responseLanguage = "auto") }
             "haptics" -> { val enabled = !state.hapticsEnabled; prefs.edit { putBoolean("hapticsEnabled", enabled) }; state = state.copy(hapticsEnabled = enabled) }
             "privacyMode" -> { val enabled = !state.privacyMode; prefs.edit { putBoolean("privacyMode", enabled) }; applyWindowPrivacy(state.temporary, enabled); state = state.copy(privacyMode = enabled) }
             "exportBackup" -> backupExporter.launch("NexusNXS-backup-${System.currentTimeMillis()}.nexus")
@@ -1885,7 +1895,8 @@ open class NexusMainActivity : ComponentActivity() {
                 connection.setRequestProperty("Accept", "audio/wav")
                 connection.setRequestProperty("Authorization", "Bearer $token")
                 val language = spokenLocale(text, resources.configuration.locales[0]).toLanguageTag().ifBlank { "it" }
-                val payload = JSONObject().put("text", text.take(4_000)).put("language", language).put("gender", "male")
+                val delivery = when (state.conversationTone) { "warm" -> "warm"; "direct" -> "serious"; else -> "neutral" }
+                val payload = JSONObject().put("text", text.take(4_000)).put("language", language).put("gender", "male").put("delivery", delivery)
                 connection.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
                 if (connection.responseCode !in 200..299) throw IllegalStateException("Voce server non disponibile")
                 val output = ByteArrayOutputStream(256 * 1024)
@@ -2026,7 +2037,7 @@ open class NexusMainActivity : ComponentActivity() {
     ): String {
         val requestStartedAt = SystemClock.elapsedRealtime()
         val history = JSONArray().also { a -> contextTurns.takeLast(20).forEach { a.put(JSONObject().put("role", it.role).put("content", it.content)) } }
-        val body = JSONObject().put("text", text).put("history", history).put("mode", routedMode(text, model)).put("model", publicModelId(model)).put("clientMessageId", clientMessageId).also { if (attachment != null) it.put("attachments", JSONArray().put(attachment)) }
+        val body = JSONObject().put("text", text).put("history", history).put("mode", routedMode(text, model)).put("model", publicModelId(model)).put("clientMessageId", clientMessageId).put("conversationPreferences", conversationPreferenceBody()).also { if (attachment != null) it.put("attachments", JSONArray().put(attachment)) }
         var failure: Exception? = null
         var token = secureTokens.read("guestToken")
         var tokenEndpoint = prefs.getString("guestTokenEndpoint", "").orEmpty()
@@ -2193,6 +2204,9 @@ open class NexusMainActivity : ComponentActivity() {
         }
     }
 
+    private fun conversationPreferenceBody(): JSONObject = JSONObject()
+        .put("responseStyle", state.responseStyle).put("tone", state.conversationTone).put("responseLanguage", state.responseLanguage)
+
     private fun routedMode(text: String, model: String): String {
         if (state.deepReasoning) return "deep"
         val sensitive = Regex("(?i)\\b(password|segreto|credenzial|token|api.?key|prompt.?injection|sicurezza|privacy|permess|elimina|cancella|sposta|rinomina|esegui|installa|disinstalla|registro|firewall|rete)\\b")
@@ -2311,7 +2325,7 @@ open class NexusMainActivity : ComponentActivity() {
             secureTokens.write("guestToken", token)
         }
         val history = JSONArray().also { a -> state.turns.takeLast(20).forEach { a.put(JSONObject().put("role", it.role).put("content", it.content)) } }
-        val body = JSONObject().put("text", text).put("history", history).put("mode", routedMode(text, model)).put("model", publicModelId(model))
+        val body = JSONObject().put("text", text).put("history", history).put("mode", routedMode(text, model)).put("model", publicModelId(model)).put("conversationPreferences", conversationPreferenceBody())
         var result = http("/api/guest/messages", body, token)
         if (result.optString("error").contains("scaduta", true)) {
             prefs.edit { remove("guestToken") }
@@ -3198,6 +3212,7 @@ private fun JSONArray?.toTurns() = buildList {
                         if (menuPreferences) IconButton({ if (menuSection.isNotEmpty()) menuSection = "" else menuPreferences = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
                         Text(when (menuSection) {
                             "appearance" -> nexusCopy("Aspetto", "Appearance")
+                            "personalization" -> nexusCopy("Personalizzazione", "Personalization")
                             "devices" -> nexusCopy("Dispositivi", "Devices")
                             "voice" -> nexusCopy("Voce e assistente", "Voice and assistant")
                             "privacy" -> nexusCopy("Privacy e dati", "Privacy and data")
@@ -3220,6 +3235,7 @@ private fun JSONArray?.toTurns() = buildList {
                             keyboard?.hide(); focusManager.clearFocus(force = true); menuSection = section
                         }
                     }
+                    if (menuSection == "personalization") ConversationPreferencesSettings(state, dispatch)
                     if (menuSection == "appearance") SettingsGroup {
             CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
             CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
@@ -4112,12 +4128,33 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }
 }
 
+@Composable private fun ConversationPreferenceChoice(title: String, value: String, options: List<Pair<String, String>>, select: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxWidth()) {
+        CompactSetting(Icons.Rounded.Tune, title, options.firstOrNull { it.first == value }?.second.orEmpty(), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { expanded = true }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = Surface) {
+            options.forEach { (id, label) -> DropdownMenuItem(text = { Text(label, color = if (id == value) Cyan else Ice) }, onClick = { expanded = false; select(id) }) }
+        }
+    }
+}
+
+@Composable private fun ConversationPreferencesSettings(state: NexusUiState, dispatch: (String, String) -> Unit) {
+    SettingsGroup {
+        ConversationPreferenceChoice(nexusCopy("Dettaglio", "Detail"), state.responseStyle, listOf("concise" to nexusCopy("Conciso", "Concise"), "natural" to nexusCopy("Naturale", "Natural"), "detailed" to nexusCopy("Approfondito", "Detailed"))) { dispatch("responseStyle", it) }
+        ConversationPreferenceChoice(nexusCopy("Tono", "Tone"), state.conversationTone, listOf("neutral" to nexusCopy("Equilibrato", "Balanced"), "warm" to nexusCopy("Caloroso", "Warm"), "direct" to nexusCopy("Diretto", "Direct"))) { dispatch("conversationTone", it) }
+        ConversationPreferenceChoice(nexusCopy("Lingua delle risposte", "Response language"), state.responseLanguage, listOf("auto" to nexusCopy("Automatico", "Automatic"), "it" to "Italiano", "en" to "English", "es" to "Español", "fr" to "Français", "de" to "Deutsch")) { dispatch("responseLanguage", it) }
+        CompactSetting(Icons.Rounded.Restore, nexusCopy("Ripristina preferenze", "Reset preferences"), "", {}) { dispatch("resetConversationPreferences", "") }
+    }
+    Text(nexusCopy("Salvate su questo dispositivo. Solo queste scelte accompagnano le richieste al servizio NexusNXS.", "Saved on this device. Only these choices accompany requests to the NexusNXS service."), color = Mist, style = MaterialTheme.typography.bodySmall)
+}
+
 @Composable private fun InstantSettingsNavigation(searchVisible: Boolean, open: (String) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     val searchFocus = remember { FocusRequester() }
     LaunchedEffect(searchVisible) { if (searchVisible) searchFocus.requestFocus() else query = "" }
     val sections = listOf(
         Triple("appearance", nexusCopy("Aspetto", "Appearance"), nexusCopy("Movimento, animazioni e feedback aptico", "Motion, animations and haptic feedback")),
+        Triple("personalization", nexusCopy("Personalizzazione", "Personalization"), nexusCopy("Tono, lingua e dettaglio delle risposte", "Tone, language and response detail")),
         Triple("voice", nexusCopy("Voce e assistente", "Voice and assistant"), nexusCopy("Richiamo, microfono e tasto laterale", "Activation, microphone and side button")),
         Triple("devices", nexusCopy("Dispositivi", "Devices"), nexusCopy("Connessioni, associazione e controllo remoto", "Connections, pairing and remote control")),
         Triple("privacy", nexusCopy("Privacy e dati", "Privacy and data"), nexusCopy("Cronologia, chat temporanea, backup e ripristino", "History, temporary chat, backup and restore"))
@@ -4133,7 +4170,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     if (matches.isEmpty()) Text(nexusCopy("Nessuna impostazione trovata", "No settings found"), color = Mist, style = MaterialTheme.typography.bodySmall)
     else {
         val groups = listOf(
-            nexusCopy("Esperienza", "Experience") to matches.filter { it.first in setOf("appearance", "voice") },
+            nexusCopy("Esperienza", "Experience") to matches.filter { it.first in setOf("appearance", "voice", "personalization") },
             nexusCopy("Connessioni e dati", "Connections and data") to matches.filter { it.first in setOf("devices", "privacy") }
         )
         groups.filter { it.second.isNotEmpty() }.forEach { (heading, rows) ->
@@ -4141,7 +4178,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp))
             SettingsGroup {
                 rows.forEach { (id, title, _) ->
-                    val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
+                    val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "personalization" -> Icons.Rounded.Tune; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
                     CompactSetting(icon, title, "", { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
                 }
             }

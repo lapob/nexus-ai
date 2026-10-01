@@ -36,7 +36,7 @@ function detectResponseLanguage(question) {
 // #endregion
 // #region 02 — Direttiva del modello
 
-function responseLanguageDirective(question) {
+function responseLanguageDirective(question, preferred = 'auto') {
   const directives = {
     italiano: 'LINGUA DELLA RISPOSTA: italiano. Rispondi interamente in italiano naturale. I nomi tecnici, il codice e i titoli originali possono restare nella loro lingua, ma non cambiare lingua per questo motivo.',
     inglese: 'RESPONSE LANGUAGE: English. Reply in natural English unless the user explicitly asks for another language.',
@@ -52,7 +52,10 @@ function responseLanguageDirective(question) {
     coreano: '응답 언어: 한국어. 자연스러운 한국어로만 답하고 코드와 기술 고유명사만 원문으로 유지하세요.',
     arabo: 'لغة الإجابة: العربية. أجب بالكامل بلغة عربية طبيعية، واترك الشفرة والأسماء التقنية فقط بلغتها الأصلية.'
   };
-  return directives[detectResponseLanguage(question)] || 'RESPONSE LANGUAGE: detect the language of the latest user message and answer entirely in that same language. Preserve its regional vocabulary and writing system. Do not default to Italian or English merely because technical terms appear in them.';
+  const languageNames = { it: 'italiano', en: 'inglese', es: 'spagnolo', fr: 'francese', de: 'tedesco' };
+  const explicit = String(question || '').match(/\b(?:in|into|en)\s+(italiano|italian|inglese|english|spagnolo|spanish|español|francese|french|français|tedesco|german|deutsch)\b/iu)?.[1]?.toLowerCase();
+  const explicitLanguage = { italiano: 'italiano', italian: 'italiano', inglese: 'inglese', english: 'inglese', spagnolo: 'spagnolo', spanish: 'spagnolo', español: 'spagnolo', francese: 'francese', french: 'francese', français: 'francese', tedesco: 'tedesco', german: 'tedesco', deutsch: 'tedesco' }[explicit];
+  return directives[explicitLanguage || languageNames[preferred] || detectResponseLanguage(question)] || 'RESPONSE LANGUAGE: detect the language of the latest user message and answer entirely in that same language. Preserve its regional vocabulary and writing system. Do not default to Italian or English merely because technical terms appear in them.';
 }
 
 module.exports = { detectResponseLanguage, responseLanguageDirective };

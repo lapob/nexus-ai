@@ -6,6 +6,8 @@
 const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../shared/desktop-recipes');
 const { createPublicVoiceSession } = require('./public-voice-session');
+const { createPublicConversationPreferences } = require('./public-conversation-preferences');
+const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 const { colors: designColors } = require('../../config/nexus-design-tokens.json');
 const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.18-preview.1/NexusNXS-0.3.18-Setup.exe';
 const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.18-preview.1/NexusNXS-Android.apk';
@@ -190,11 +192,12 @@ syncKeyboardViewport();
 
 const KEYBOARD_VIEWPORT_STYLE = `<style>
 @media(max-width:560px){
-  .shell .identity{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:center}
+  .shell .identity{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px;align-items:center}
   .identity .brand-lockup{grid-column:1;grid-row:1;justify-self:start;max-width:100%}
   .identity .wordmark{overflow-wrap:anywhere;text-align:left}
   .identity .identity-actions{display:contents}
-  .identity .download-trigger{grid-column:2;grid-row:1}
+  .identity .download-trigger{grid-column:3;grid-row:1}
+  .identity .profile-trigger{grid-column:2;grid-row:1}
   .shell .identity .state{grid-column:1/-1;grid-row:2;position:static;justify-self:end}
   body:not(.request-active):not(.conversation-active):not([data-service-readiness="offline"]):not([data-service-readiness="warming"]) .identity .state{display:none}
 }
@@ -724,7 +727,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("pendingAnswer='';", "pendingAnswer='',rawAnswer='',followStream=true,lastAnswerScroll=0,lastStreamRender=0,lastStreamValue='',requestAbort=null,requestMessageId='',stopRequested=false,historyGeneration=0;")
     .replace("function flushAnswer(){rafFlush=0;if(pendingAnswer){answer.textContent+=pendingAnswer;pendingAnswer=''}}", "function flushAnswer(){rafFlush=0;if(pendingAnswer){rawAnswer+=pendingAnswer;pendingAnswer=''}const now=performance.now();if(busy&&now-lastStreamRender<48){rafFlush=requestAnimationFrame(flushAnswer);return}if(rawAnswer!==lastStreamValue){lastStreamRender=now;lastStreamValue=rawAnswer;formatAnswer(rawAnswer,{streaming:true});followAnswer()}}")
     .replace("answer.textContent=recentAnswer.content;setPhase", "rawAnswer=recentAnswer.content;answer.textContent=recentAnswer.content;setPhase")
-    .replace("const runtime={voiceState:'idle'}", "const runtime={voiceState:'idle',capabilities:{}}")
+    .replace("const runtime={voiceState:'idle'}", `const runtime={voiceState:'idle',capabilities:{}};const conversationProfile=(${createPublicConversationPreferences.toString()})(${normalizeConversationPreferences.toString()})`)
     .replace(/async function memoryRead\(\)\{[\s\S]*?(?=async function memoryWrite)/, "")
     .replace(/async function memoryWrite\(\)\{[\s\S]*?(?=async function memoryReset)/, "async function memoryWrite(){turns=turns.slice(-24).map(turn=>({role:turn.role==='assistant'?'assistant':'user',content:String(turn.content||'').slice(0,4000),...(turn.image?{image:turn.image}:{}),...(turn.requestId?{requestId:turn.requestId,rating:turn.rating||0}:{})}));releaseUnusedImages()} ")
     .replace("async function memoryReset(){", "async function memoryReset(silent=false){imageResult.hidden=true;for(const url of generatedImageUrls)URL.revokeObjectURL(url);generatedImageUrls.clear();imageObjectUrl='';")
@@ -750,7 +753,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace('if(!text||busy||attachmentLoading)return;busy=true;', "if(!text||busy||attachmentLoading)return;busy=true;if(globalThis.nexusCheckReadiness&&!await globalThis.nexusCheckReadiness()){busy=false;prompt.value=text;document.body.classList.add('keyboard-open');setPhase('Il servizio non è ancora pronto. La richiesta è conservata: riprova tra poco.',true);setSendMode(false);return;}")
     .replace("setSendMode(true);document.body.classList.remove('keyboard-open');prompt.blur();", "setSendMode(true);enterRequestLayout(voice);prompt.blur();")
     .replace("const credential=await session();const response=await fetch('/api/guest/messages/stream'", "await session();if(isImageRequest(text)){if(requestAttachments.length)throw new Error(composerCopy('La modifica di immagini allegate non è ancora disponibile. Rimuovi gli allegati per creare una nuova immagine.','Editing attached images is not available yet. Remove attachments to create a new image.'));const responseText=await generateImage(text);turns.push({role:'user',content:text},{role:'assistant',content:responseText,image:{url:imageObjectUrl,alt:text,filename:byId('imageDownload').download}});await memoryWrite();answer.classList.remove('streaming');return}const response=await authenticatedFetch('/api/guest/messages/stream'")
-    .replace("headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:JSON.stringify({text,history:previous", "headers:{'Content-Type':'application/json'},body:JSON.stringify({text,history:previous")
+    .replace("headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:JSON.stringify({text,history:previous", "headers:{'Content-Type':'application/json'},body:JSON.stringify({text,conversationPreferences:conversationProfile.value(),history:previous")
     .replace("clientMessageId:globalThis.crypto?.randomUUID?.()", "clientMessageId:requestMessageId,attachments:requestAttachments")
     .replace("authenticatedFetch('/api/guest/messages/stream',{method:'POST'", "authenticatedFetch('/api/guest/messages/stream',{method:'POST',signal:requestAbort.signal")
     .replace("const responseText=answer.textContent.trim();turns.push({role:'user',content:text},{role:'assistant',content:responseText,requestId:requestMessageId});await memoryWrite();answer.classList.remove('streaming')", "resetAttachments();const responseText=(rawAnswer||answer.textContent).trim();turns.push({role:'user',content:text},{role:'assistant',content:responseText,requestId:requestMessageId});await memoryWrite();formatAnswer(responseText);showFeedback();answer.classList.remove('streaming')")
@@ -801,7 +804,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace(/async function speak\(text\)\{[\s\S]*?currentAudio=null;setVoiceState\('ready'\)\}\}/, 'async function speak(text){await voiceSession.speak(text)}')
     .replace(/async function transcribe\(blob\)\{[\s\S]*?(?=function toggleKeyboard\()/, 'function toggleVoice(){return voiceSession.interact()}')
     .replace('function toggleKeyboard(){', 'function toggleKeyboard(){if(voiceSession.active){voiceSession.leave();return;}')
-    .replace("core.addEventListener('click',event=>", `const voiceSession=(${createPublicVoiceSession.toString()})({core,prompt,runtime,session,duplex:['127.0.0.1','localhost','[::1]'].includes(location.hostname)&&new URLSearchParams(location.search).get('voiceDuplex')==='1',fetchAudio:authenticatedFetch,ask:text=>ask(text,{voice:true}),encodeWav,spokenLanguage,setState:setVoiceState,setPhase,isBusy:()=>busy,cancelResponse:stopGeneration,showText:focus=>{voicePresentation=false;document.body.classList.remove('composer-collapsed');document.body.classList.add('conversation-active','keyboard-open');setViewportMetrics();if(focus)prompt.focus({preventScroll:true})}});const voiceStart=document.createElement('button');voiceStart.id='voiceStart';voiceStart.type='button';voiceStart.setAttribute('aria-label',composerCopy('Avvia conversazione vocale','Start voice conversation'));voiceStart.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3"/></svg>';send.before(voiceStart);voiceStart.onclick=()=>voiceSession.start();core.addEventListener('click',event=>`)
+    .replace("core.addEventListener('click',event=>", `const voiceSession=(${createPublicVoiceSession.toString()})({core,prompt,runtime,session,duplex:['127.0.0.1','localhost','[::1]'].includes(location.hostname)&&new URLSearchParams(location.search).get('voiceDuplex')==='1',fetchAudio:authenticatedFetch,ask:text=>ask(text,{voice:true}),encodeWav,spokenLanguage,setState:setVoiceState,setPhase,isBusy:()=>busy,cancelResponse:stopGeneration,getPreferences:()=>conversationProfile.value(),showText:focus=>{voicePresentation=false;document.body.classList.remove('composer-collapsed');document.body.classList.add('conversation-active','keyboard-open');setViewportMetrics();if(focus)prompt.focus({preventScroll:true})}});const voiceStart=document.createElement('button');voiceStart.id='voiceStart';voiceStart.type='button';voiceStart.setAttribute('aria-label',composerCopy('Avvia conversazione vocale','Start voice conversation'));voiceStart.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3"/></svg>';send.before(voiceStart);voiceStart.onclick=()=>voiceSession.start();core.addEventListener('click',event=>`)
     .replace("core.animate([{transform:'scale(1)'},{transform:'scale(.965)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.2,0,0,1)'});", '');
 }
 
