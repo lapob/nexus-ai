@@ -6,7 +6,10 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $workspaceRoot = Split-Path $projectRoot -Parent
 $launcher = Join-Path $projectRoot 'scripts\start-electron.js'
-$node = (Get-Command node.exe -ErrorAction Stop).Source
+$node = if ($env:NEXUS_NODE_EXECUTABLE) {
+  if (-not (Test-Path -LiteralPath $env:NEXUS_NODE_EXECUTABLE -PathType Leaf)) { throw 'Runtime Node configurato non disponibile.' }
+  $env:NEXUS_NODE_EXECUTABLE
+} else { (Get-Command node.exe -ErrorAction Stop).Source }
 $env:NEXUS_PUBLIC_PORT = '32147'
 $env:NEXUS_PUBLIC_URL = 'https://ai.nexusnxs.com'
 $env:NEXUS_WEB_SEARCH_PROVIDER = 'auto'
@@ -61,7 +64,10 @@ Start-OptionalService $imageManager
 #region Headless gateway
 
 Set-Location -LiteralPath $projectRoot
-& $node $launcher --server
+$launcherLogDirectory = Join-Path $dataRoot 'logs'
+[IO.Directory]::CreateDirectory($launcherLogDirectory) | Out-Null
+# Keep bootstrap failures visible even before the application's logger starts.
+& $node $launcher --server *>&1 | Out-File -LiteralPath (Join-Path $launcherLogDirectory 'headless-launcher.log') -Append -Encoding utf8
 exit $LASTEXITCODE
 
 #endregion

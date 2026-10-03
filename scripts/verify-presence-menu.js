@@ -24,7 +24,8 @@ if (!process.versions.electron) {
   process.exitCode = result.status ?? 1;
  } else {
   const { app, BrowserWindow, Menu, protocol, ipcMain } = require('electron');
-  const { createSystemPresenceManager } = require('../src/infrastructure/electron/companion-window');
+  const artifactRoot = process.env.NEXUS_PRESENCE_QA_ROOT || root;
+  const { createSystemPresenceManager } = require(path.join(artifactRoot, 'src/infrastructure/electron/companion-window'));
   const { registerRendererProtocol } = require('../src/infrastructure/electron/renderer-protocol');
   app.setPath('userData', process.env.NEXUS_PRESENCE_QA_PROFILE);
   protocol.registerSchemesAsPrivileged([{ scheme: 'nexus', privileges: { standard: true, secure: true, stream: true } }]);
@@ -35,10 +36,18 @@ if (!process.versions.electron) {
   app.whenReady().then(async () => {
     registerRendererProtocol(path.join(root, 'renderer-dist'));
     const actions = [];
-    const manager = createSystemPresenceManager({ defaultSystemPresence: true,
+    let trayMenu;
+    const manager = createSystemPresenceManager({ defaultSystemPresence: true, startHidden: true,
+      onStatusChange: status => { trayMenu = Menu.buildFromTemplate([{label:'Show pet',type:'checkbox',checked:status.nucleusVisible}]); },
       openPrimaryWindow: () => actions.push('open'), closePrimaryWindow: () => actions.push('minimize'),
       quitApplication: () => actions.push('quit'), activateVoice: () => actions.push('voice') });
     manager.startSystemPresence();
+    assert.equal(BrowserWindow.getAllWindows().length, 0, 'Server bridge must start without a pet window');
+    assert.equal(manager.getSystemPresenceStatus().nucleusVisible, false);
+    manager.updateState('executing');
+    assert.equal(BrowserWindow.getAllWindows().length, 0, 'Background activity must not reveal the pet');
+    manager.setSystemPresenceEnabled(true);
+    assert.equal(trayMenu.items[0].checked, true);
     const window = BrowserWindow.getAllWindows()[0];
     while (window.webContents.isLoadingMainFrame()) await delay(50);
     const run = source => window.webContents.executeJavaScript(source, true);
@@ -49,7 +58,8 @@ if (!process.versions.electron) {
       await run(`(()=>{const box=document.querySelector('.drag-ring').getBoundingClientRect();
         dispatchEvent(new MouseEvent('mousemove',{clientX:box.left+box.width/2,clientY:box.top+box.height/2}));return true})()`);
       await delay(50);
-      await run("dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));true");
+      await run(`(()=>{const box=document.querySelector('.drag-ring').getBoundingClientRect();
+        dispatchEvent(new MouseEvent('contextmenu',{clientX:box.left+box.width/2,clientY:box.top+box.height/2,bubbles:true,cancelable:true}));return true})()`);
       await delay(100);
       assert.equal(calls, 1);
       assert.equal(nativeMenu.items.length, 6);
@@ -73,6 +83,26 @@ if (!process.versions.electron) {
         dispatchEvent(new MouseEvent('mousemove',{clientX:box.left+box.width/2,clientY:box.top+box.height/2}));return true})()`);
       await delay(50);
       assert.equal(pointerUpdates.at(-1), true, 'Pet must regain input without leaving the hotspot');
+      const hitboxCases = [];
+      for (const pet of ['orb', 'robot', 'fox']) {
+        manager.selectPet(pet);
+        await delay(50);
+        for (const scale of [0.75, 1, 1.5, 2]) {
+          await run(`document.documentElement.style.setProperty('--presence-scale','${scale}');true`);
+          for (const point of [[0,0],[.5,.5],[1,1]]) {
+            await run(`(()=>{const box=document.querySelector('.pet').getBoundingClientRect();
+              dispatchEvent(new MouseEvent('mousemove',{clientX:box.left+box.width*${point[0]},clientY:box.top+box.height*${point[1]}}));return true})()`);
+            await delay(30);
+            const expected = point[0] === .5;
+            assert.equal(pointerUpdates.at(-1), expected, pet+' hitbox at scale '+scale+' point '+point);
+            hitboxCases.push({pet,scale,point,interactive:expected});
+          }
+        }
+      }
+      await run("document.documentElement.style.setProperty('--presence-scale','1');true");
+      await run("dispatchEvent(new MouseEvent('contextmenu',{clientX:0,clientY:0,bubbles:true,cancelable:true}));true");
+      await delay(50);
+      assert.equal(calls, 1, 'Transparent margins must not open a menu');
       ipcMain.removeListener('nexus:system-presence-pointer', trackPointer);
       const untrusted = new BrowserWindow({ show: false, webPreferences: {
         preload: path.join(root, 'src/infrastructure/electron/system-presence-preload.js'), contextIsolation: true, sandbox: true } });
@@ -92,7 +122,8 @@ if (!process.versions.electron) {
       nativeMenu.items[3].click();
       await delay(50);
       assert.equal(manager.getSystemPresenceStatus().nucleusVisible, false);
-      const report = { passed: true, platform: process.platform, nativeMenu: true, trustedIpc: true, actions };
+      assert.equal(trayMenu.items[0].checked, false, 'Hide pet must clear the tray checkbox immediately');
+      const report = { passed: true, platform: process.platform, nativeMenu: true, trustedIpc: true, hiddenStartup:true, traySynced:true, hitboxCases, actions };
       fs.writeFileSync(path.join(output, 'presence-menu-verification.json'), JSON.stringify(report, null, 2));
       console.log(JSON.stringify(report));
     } finally { Menu.prototype.popup = originalPopup; manager.dispose(); }

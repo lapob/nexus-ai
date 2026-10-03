@@ -1,8 +1,22 @@
 /** @module remote/public-conversation-preferences Minimal client-owned profile, shared by text and voice. */
+// Present at response generation so the gateway adds its style-src nonce.
+// Dynamically appended inline styles are rejected by the public CSP.
+const PUBLIC_PROFILE_STYLE = `<style>
+#profileSheet{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;color-scheme:dark}
+.identity .profile-trigger{width:44px;height:44px;padding:0;display:grid;place-items:center;flex:0 0 44px}
+.identity .profile-trigger svg{display:block;width:20px;height:20px}
+#profileTitle{font-size:1.05rem;font-weight:650}
+.profile-fields{display:grid;gap:20px;margin-block:24px}
+.profile-fields label{display:grid;gap:8px;font-size:.85rem;font-weight:600;color:#c4d9d9}
+.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:10px 14px;border:1px solid #345457;border-radius:14px;background:#102124;color:#e5f3f3;font:inherit;color-scheme:dark}
+.profile-fields select:focus-visible{outline:2px solid #78deda;outline-offset:3px}
+.profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:16px}
+.profile-note{font-size:.8rem!important;color:#a6bbbb!important;line-height:1.6;overflow-wrap:anywhere}
+</style>`;
 // #region Browser profile editor
 function createPublicConversationPreferences(normalize) {
   const namespace = 'nexusnxs.conversation.preferences.v1';
-  const copy = (it, en) => /^it\b/i.test(navigator.language) ? it : en;
+  const copy = (it, en) => /^it\b/i.test(document.documentElement.lang || navigator.language) ? it : en;
   let profile;
   try { profile = normalize(JSON.parse(localStorage.getItem(namespace) || '{}')); }
   catch { profile = normalize({}); }
@@ -11,9 +25,6 @@ function createPublicConversationPreferences(normalize) {
   trigger.setAttribute('aria-label', copy('Personalizza NexusNXS', 'Personalize NexusNXS'));
   trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-.6 2.4-2 .9L5 5.7 3 9.2l1.8 1.7v2.2L3 14.8 5 18.3l2.4-.6 2 .9L10 21h4l.6-2.4 2-.9 2.4.6 2-3.5-1.8-1.7v-2.2L21 9.2 19 5.7l-2.4.6-2-.9L14 3Z"/><circle cx="12" cy="12" r="3"/></svg>';
   document.querySelector('.identity-actions')?.prepend(trigger);
-  const style = document.createElement('style');
-  style.textContent = '#profileSheet{max-height:calc(100dvh - 24px);overflow-y:auto}.profile-trigger{width:44px;padding:0;display:grid;place-items:center}.profile-trigger svg{display:block}.profile-fields{display:grid;gap:20px;margin-block:22px}.profile-fields label{display:grid;gap:8px;font-weight:600}.profile-fields select{width:100%;min-height:46px;padding:10px 12px;border:1px solid #345457;border-radius:14px;background:#102124;color:#e5f3f3;font:inherit;color-scheme:dark}.profile-fields select:focus-visible{outline:2px solid #78deda;outline-offset:3px}.profile-actions{display:flex;gap:12px;justify-content:flex-end}.profile-note{font-size:.8rem!important;color:#a6bbbb!important}';
-  document.head.append(style);
   const dialog = document.createElement('dialog');
   dialog.id = 'profileSheet'; dialog.className = 'download-sheet';
   dialog.setAttribute('aria-labelledby', 'profileTitle');
@@ -54,4 +65,4 @@ function createPublicConversationPreferences(normalize) {
   return { value: () => normalize(profile) };
 }
 // #endregion
-module.exports = { createPublicConversationPreferences };
+module.exports = { createPublicConversationPreferences, PUBLIC_PROFILE_STYLE };

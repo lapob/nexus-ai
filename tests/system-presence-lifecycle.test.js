@@ -39,6 +39,14 @@ test('Core, presenza e UI hanno ruoli non sovrapposti', () => {
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: false, activationTicket: 'not-valid' }), ['--ui']);
 });
 
+test('hidden owner bridge reports no visible tray while retaining desktop access', () => {
+  const status = presenceCapabilities({ platform: 'win32', trayVisible: false });
+  assert.equal(status.tray, false);
+  assert.equal(status.ownsAiRuntime, false);
+  assert.equal(status.ownsRemoteGateway, false);
+  assert.equal(status.opensFullUiOnDemand, true);
+});
+
 test('la UI avvia la Presence in un processo nascosto privo di runtime AI', async () => {
   const calls = [];
   const result = await launchSystemPresence({
@@ -118,6 +126,8 @@ test('la workstation avvia automaticamente solo il Server headless', () => {
   assert.match(taskManager, /Unregister-ScheduledTask -TaskName \$deviceCoreTaskName/);
   assert.match(taskManager, /Unregister-ScheduledTask -TaskName \$presenceTaskName/);
   assert.doesNotMatch(taskManager, /Register-ScheduledTask\s+`\s*\n\s*-TaskName \$presenceTaskName/);
+  assert.match(taskManager, /desktopBridgeTaskName\s*=\s*'NexusNXS Desktop Bridge'/);
+  assert.match(taskManager, /run-presence\.ps1'\) -Interactive/);
 });
 
 test('i profili Chromium Core e presenza sono isolati dai dati condivisi', () => {

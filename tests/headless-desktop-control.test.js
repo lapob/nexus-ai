@@ -6,6 +6,32 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHeadlessDesktopControl } = require('../src/application/headless-desktop-control');
 
+test('a boot server refuses invisible desktop operations when the owner bridge is absent', async () => {
+  let probes = 0, launches = 0;
+  const control = createHeadlessDesktopControl({ appRoot: 'C:\\Nexus', sharedDataRoot: 'C:\\NexusData',
+    env: { NEXUS_WINDOWS_NONINTERACTIVE: '1' }, bridgeClient: { status: async () => null },
+    applicationStatus: async () => { ++probes; return []; },
+    launchApplication: async () => { ++launches; }, launchDesktop: async () => { ++launches; } });
+  const status = await control.status();
+  assert.equal(status.available, false);
+  assert.deepEqual(status.allowedActions, []);
+  await assert.rejects(control.execute({ action: 'open-application', applicationId: 'notepad' }), { code: 'DESKTOP_SESSION_UNAVAILABLE' });
+  await assert.rejects(control.execute({ action: 'open-full-app' }), { code: 'DESKTOP_SESSION_UNAVAILABLE' });
+  assert.equal(probes, 0); assert.equal(launches, 0);
+});
+
+test('a boot server routes visible application actions through the authenticated owner bridge', async () => {
+  const calls = [];
+  const owner = { available: true, allowedActions: ['open-application'] };
+  const control = createHeadlessDesktopControl({ appRoot: 'C:\\Nexus', sharedDataRoot: 'C:\\NexusData',
+    env: { NEXUS_WINDOWS_NONINTERACTIVE: '1' }, bridgeClient: {
+      status: async () => owner, execute: async command => { calls.push(command); return owner; }
+    }, launchApplication: async () => { throw new Error('Invisible launch forbidden'); } });
+  assert.equal(await control.status(), owner);
+  assert.equal(await control.execute({ action: 'open-application', applicationId: 'notepad' }), owner);
+  assert.deepEqual(calls, [{ action: 'open-application', applicationId: 'notepad' }]);
+});
+
 test('il Core headless espone solo controlli applicativi espliciti senza Presence', async () => {
   const control = createHeadlessDesktopControl({
     appRoot: 'Z:\\NexusNXS\\.AI',

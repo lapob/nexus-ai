@@ -23,6 +23,7 @@ const {
 const BRIDGE_PROTOCOL_VERSION = 1;
 const MAX_FRAME_BYTES = 16 * 1024;
 const DEFAULT_TIMEOUT_MS = 1_500;
+const ACTION_TIMEOUT_MS = 12_000;
 const REQUEST_CLOCK_SKEW_MS = 30_000;
 const REPLAY_TTL_MS = 60_000;
 const IDEMPOTENCY_TTL_MS = 2 * 60_000;
@@ -278,7 +279,7 @@ function createLocalPresenceBridgeServer({
     return encodeActivationTicket({ ...ticket, mac: activationSignature(secret, ticket) });
   }
 
-  async function dispatch(request) {
+  async function dispatch(request, allowActionTime = () => {}) {
     const currentTime = now();
     if (!request || request.version !== BRIDGE_PROTOCOL_VERSION || !REQUEST_ID.test(String(request.requestId || ''))
       || !Number.isFinite(Number(request.timestamp)) || Math.abs(currentTime - Number(request.timestamp)) > REQUEST_CLOCK_SKEW_MS
@@ -298,6 +299,7 @@ function createLocalPresenceBridgeServer({
           message: 'RequestId gia usato per un comando diverso.'
         });
       }
+      if (request.operation === 'action') allowActionTime();
       return known.response;
     }
     if (nonces.has(request.nonce)) {
@@ -307,6 +309,11 @@ function createLocalPresenceBridgeServer({
     }
     nonces.set(request.nonce, { expiresAt: currentTime + REPLAY_TTL_MS });
 
+    // Reserve before awaiting the executor so concurrent authenticated retries
+    // share one result instead of launching the same application twice.
+    let settlePending;
+    const pendingResponse = new Promise(resolve => { settlePending = resolve; });
+    requests.set(request.requestId, { fingerprint, response: pendingResponse, expiresAt: currentTime + IDEMPOTENCY_TTL_MS });
     let response;
     try {
       if (request.operation === 'status') {
@@ -317,6 +324,7 @@ function createLocalPresenceBridgeServer({
         response = signedResponse(request.requestId, true, sanitizeStatus(await statusProvider(), { mutationsAvailable: true }));
       } else if (request.operation === 'action') {
         const action = normalizePresenceAction(request.payload);
+        allowActionTime();
         const command = Object.freeze({ ...action, requestId: request.requestId });
         await actionExecutor(command, Object.freeze({
           protocol: BRIDGE_PROTOCOL_VERSION,
@@ -343,6 +351,7 @@ function createLocalPresenceBridgeServer({
       });
     }
     requests.set(request.requestId, { fingerprint, response, expiresAt: currentTime + IDEMPOTENCY_TTL_MS });
+    settlePending(response);
     return response;
   }
 
@@ -361,7 +370,7 @@ function createLocalPresenceBridgeServer({
       try { request = JSON.parse(buffer.slice(0, boundary)); }
       catch { socket.destroy(); return; }
       try {
-        const response = await dispatch(request);
+        const response = await dispatch(request, () => socket.setTimeout(ACTION_TIMEOUT_MS));
         if (!socket.destroyed) socket.end(`${JSON.stringify(response)}\n`);
       } catch {
         // Le richieste non autenticate vengono chiuse senza un oracle di errore.
@@ -445,6 +454,7 @@ function createLocalPresenceBridgeClient({
   logger = console,
   platform = process.platform,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  actionTimeoutMs = ACTION_TIMEOUT_MS,
   unprotectSecret,
   now = Date.now
 } = {}) {
@@ -507,7 +517,10 @@ function createLocalPresenceBridgeClient({
       const socket = net.createConnection(paths.endpoint);
       sockets.add(socket);
       socket.setEncoding('utf8');
-      const timer = setTimeout(() => complete(bridgeError('Shell Presence non risponde.', 'PRESENCE_BRIDGE_TIMEOUT')), Math.max(100, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
+      const requestTimeout = operation === 'action'
+        ? Math.min(ACTION_TIMEOUT_MS, Math.max(100, Number(actionTimeoutMs) || ACTION_TIMEOUT_MS))
+        : Math.max(100, Number(timeoutMs) || DEFAULT_TIMEOUT_MS);
+      const timer = setTimeout(() => complete(bridgeError('Shell Presence non risponde.', 'PRESENCE_BRIDGE_TIMEOUT')), requestTimeout);
       timer.unref?.();
       const complete = (error, value) => {
         if (settled) return;

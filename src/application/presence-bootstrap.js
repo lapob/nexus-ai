@@ -26,7 +26,7 @@ const execFileAsync = promisify(execFile);
 
 // #region 01 — Contratto presenza
 
-function presenceCapabilities({ platform = process.platform, shortcutRegistered = false } = {}) {
+function presenceCapabilities({ platform = process.platform, shortcutRegistered = false, trayVisible = platform === 'win32' } = {}) {
   return Object.freeze({
     mode: 'system-presence',
     lightweight: true,
@@ -34,7 +34,7 @@ function presenceCapabilities({ platform = process.platform, shortcutRegistered 
     ownsRemoteGateway: false,
     multiDisplay: true,
     opensFullUiOnDemand: true,
-    tray: platform === 'win32',
+    tray: trayVisible,
     shortcut: shortcutRegistered ? 'CommandOrControl+Shift+Space' : null,
     visibilityShortcut: shortcutRegistered ? 'CommandOrControl+Alt+Space' : null
   });
@@ -142,6 +142,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
 
   let manager = null;
   let tray = null;
+  const bridgeOnly = env.NEXUS_DESKTOP_BRIDGE_ONLY === '1';
+  let refreshTrayMenu = () => {};
   let presenceBridge = null;
   let wakeWordListener = null;
   let stateTimer = null;
@@ -237,6 +239,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
       openFullUi,
       waitForFullUi
     }),
+    startHidden: bridgeOnly,
+    onStatusChange: status => { if (status.nucleusVisible) ensureTray(); refreshTrayMenu(); },
     defaultSystemPresence: true
   });
   wakeWordListener = createWakeWordListener({
@@ -275,7 +279,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
         return;
       }
       manager.setSystemPresenceConfiguration(snapshot);
-      await wakeWordListener.configure(wakeWordConfiguration());
+      if (!bridgeOnly || processLockState(uiLockPath).running) await wakeWordListener.configure(wakeWordConfiguration());
     },
     actionExecutor: async (command) => {
       if (command.action === 'show-nucleus') {
@@ -365,14 +369,15 @@ async function bootstrapPresence({ env = process.env } = {}) {
     protectSecret: bridgeSecretProtection.protectSecret
   });
   await presenceBridge.start();
-  await wakeWordListener.configure(wakeWordConfiguration());
+  if (!bridgeOnly) await wakeWordListener.configure(wakeWordConfiguration());
 
   const iconPath = path.join(appRoot, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
-  if (process.platform === 'win32') {
+  const ensureTray = () => {
+    if (tray || process.platform !== 'win32') return;
     const italian = /^it(?:-|$)/i.test(String(app.getLocale?.() || ''));
     tray = new Tray(iconPath);
     tray.setToolTip('NexusNXS');
-    const refreshTrayMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
+    refreshTrayMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
       { label: italian ? 'Apri NexusNXS' : 'Open NexusNXS', click: activateFullUi },
       { label: italian ? 'Riduci al tray' : 'Minimize to tray', click: closeFullUi },
       { type: 'separator' },
@@ -392,7 +397,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
     refreshTrayMenu();
     tray.on('right-click', refreshTrayMenu);
     tray.on('click', activateFullUi);
-  }
+  };
+  if (!bridgeOnly) ensureTray();
   const openShortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', activateFullUi);
   const visibilityShortcutRegistered = globalShortcut.register('CommandOrControl+Alt+Space', () => {
     const visible = manager.getSystemPresenceStatus().nucleusVisible;
@@ -405,6 +411,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
     const state = processLockState(uiLockPath);
     if (uiWasRunning && !state.running) manager.updateState?.(backgroundActivity);
     uiWasRunning = state.running;
+    if (state.running) ensureTray();
     manager.setApplicationVisible?.(state.running);
   };
   syncVisibility();
@@ -428,7 +435,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
   }
   stateTimer = setInterval(syncVisibility, 5_000);
   stateTimer.unref?.();
-  logger.info('Presenza NexusNXS avviata.', presenceCapabilities({ shortcutRegistered }));
+  logger.info('Presenza NexusNXS avviata.', presenceCapabilities({ shortcutRegistered, trayVisible: Boolean(tray) }));
 }
 
 module.exports = {

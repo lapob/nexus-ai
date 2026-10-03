@@ -196,7 +196,35 @@ const bridge=window.nexusPresence;
 const root=document.querySelector('.presence');
 const core=document.querySelector('.core');
 const ring=document.querySelector('.drag-ring');
+const pet=document.querySelector('.pet');
 if(!bridge)return;
+const mask=document.createElement('canvas');
+mask.width=300;mask.height=100;
+const maskContext=mask.getContext('2d',{willReadFrequently:true});
+const sprite=new Image();
+let pixels=null;
+sprite.onload=()=>{maskContext.drawImage(sprite,0,0,300,100);pixels=maskContext.getImageData(0,0,300,100).data;};
+sprite.src=getComputedStyle(pet).backgroundImage.slice(5,-2);
+const hitPet=(x,y)=>{
+  if(!pixels)return false;
+  const box=ring.getBoundingClientRect();
+  let matrix=new DOMMatrix();
+  for(let element=pet;element!==ring;element=element.parentElement){
+    const style=getComputedStyle(element),origin=style.transformOrigin.split(' ').map(parseFloat);
+    const transform=new DOMMatrix(style.transform==='none'?undefined:style.transform);
+    const around=new DOMMatrix().translate(origin[0],origin[1]).multiply(transform).translate(-origin[0],-origin[1]);
+    matrix=around.multiply(matrix);
+  }
+  const local=new DOMPoint((x-box.left)/box.width*pet.offsetWidth,(y-box.top)/box.height*pet.offsetHeight).matrixTransform(matrix.inverse());
+  const px=Math.floor(local.x/pet.offsetWidth*100),py=Math.floor(local.y/pet.offsetHeight*100);
+  const frame=['orb','robot','fox'].indexOf(root.dataset.pet);
+  // Small edge tolerance, confined to painted pixels; transparent margins pass through.
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+    const sx=px+dx,sy=py+dy;
+    if(sx>=0&&sx<100&&sy>=0&&sy<100&&pixels[(sy*300+frame*100+sx)*4+3]>32)return true;
+  }
+  return false;
+};
 let active=false;
 let clickTimer=null;
 let suppressCoreClickUntil=0;
@@ -226,16 +254,16 @@ bridge.onConfiguration((value)=>{
 if(core.dataset.interactive==='true'){
   const update=(event)=>{
     if(root.dataset.menuOpen==='true')return;
-    const box=ring.getBoundingClientRect();
-    const dx=event.clientX-(box.left+box.width/2),dy=event.clientY-(box.top+box.height/2);
-    const inside=Math.hypot(dx,dy)<=box.width*.58;
+    const inside=hitPet(event.clientX,event.clientY)||document.activeElement===core;
     if(inside!==active){active=inside;bridge.setInteractive(inside)}
   };
   addEventListener('mousemove',update,{passive:true});
   addEventListener('mouseleave',()=>{
     if(root.dataset.menuOpen!=='true'){active=false;bridge.setInteractive(false)}
   });
-  addEventListener('contextmenu',(event)=>{event.preventDefault();openMenu()});
+  addEventListener('contextmenu',(event)=>{event.preventDefault();if(hitPet(event.clientX,event.clientY))openMenu()});
+  core.addEventListener('focus',()=>{active=true;bridge.setInteractive(true)});
+  core.addEventListener('blur',()=>{active=false;bridge.setInteractive(false)});
   addEventListener('keydown',(event)=>{
     if(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10')){
       event.preventDefault();openMenu();
@@ -257,7 +285,7 @@ if(core.dataset.interactive==='true'){
 // #endregion
 // #region 03 - Ciclo di vita deterministico della Presence
 
-function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWindow, quitApplication, activateVoice, defaultSystemPresence = false }) {
+function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWindow, quitApplication, activateVoice, onStatusChange, startHidden = false, defaultSystemPresence = false }) {
   const presenceStatePath = path.join(app.getPath('userData'), 'system-presence.json');
   const presencePreload = path.join(__dirname, 'system-presence-preload.js');
   let displayListenersAttached = false;
@@ -266,6 +294,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
   let systemPresenceEnabled = typeof presenceState.enabled === 'boolean'
     ? presenceState.enabled
     : defaultSystemPresence === true;
+  let startupHidden = startHidden === true;
   let presenceConfiguration = normalizePresenceConfiguration({
     pet: presenceState.pet,
     appearance: presenceState.appearance,
@@ -561,7 +590,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
   }
 
   function syncDisplays() {
-    if (!systemPresenceEnabled) return;
+    if (!systemPresenceEnabled || startupHidden) return;
     const descriptors = displayDescriptors();
     const automaticLogicalDisplayId = automaticPresenceDisplayId(descriptors);
     const previousLogicalDisplayId = selectedLogicalDisplayId;
@@ -605,6 +634,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
   }
 
   function setSystemPresenceEnabled(enabled) {
+    startupHidden = false;
     systemPresenceEnabled = enabled === true;
     persistPresenceState('Preferenza Presence non salvata.');
     if (systemPresenceEnabled) {
@@ -614,6 +644,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
       for (const displayId of [...presenceWindows.keys()]) closePresenceWindow(displayId);
       detachDisplayListeners();
     }
+    onStatusChange?.(getSystemPresenceStatus());
     return { enabled: systemPresenceEnabled, displays: presenceWindows.size };
   }
 
@@ -679,7 +710,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
   }
 
   function startSystemPresence() {
-    if (systemPresenceEnabled) {
+    if (systemPresenceEnabled && !startupHidden) {
       attachDisplayListeners();
       syncDisplays();
     }
@@ -696,7 +727,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
         : automaticDisplayId;
     return {
       available: true,
-      nucleusVisible: systemPresenceEnabled && presenceWindows.size > 0,
+      nucleusVisible: !startupHidden && systemPresenceEnabled && presenceWindows.size > 0,
       fullAppOpen: applicationVisible,
       selectedDisplayId: selected,
       displaySelectionMode,
@@ -738,6 +769,11 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
   }
 
   function setApplicationVisible(visible) {
+    if (visible === true && startupHidden) {
+      startupHidden = false;
+      startSystemPresence();
+      onStatusChange?.(getSystemPresenceStatus());
+    }
     if (applicationVisible === (visible === true)) return { visible: applicationVisible };
     applicationVisible = visible === true;
     for (const entry of presenceWindows.values()) entry.detached = false;
@@ -773,6 +809,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
       for (const entry of presenceWindows.values()) {
         if (!entry.window.isDestroyed()) entry.window.webContents.send(PRESENCE_CONFIG_CHANNEL, presenceConfiguration);
       }
+      onStatusChange?.(getSystemPresenceStatus());
       return true;
     },
     setSystemPresenceConfiguration,

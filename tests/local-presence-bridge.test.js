@@ -12,7 +12,7 @@ const {
   normalizePresenceSync
 } = require('../src/remote/local-presence-bridge');
 
-function fixture({ protectedToken = false } = {}) {
+function fixture({ protectedToken = false, actionDelayMs = 0 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-presence-bridge-'));
   const state = {
     available: true,
@@ -44,6 +44,7 @@ function fixture({ protectedToken = false } = {}) {
     logger: { warn() {} },
     statusProvider: async () => state,
     actionExecutor: async (command) => {
+      if (actionDelayMs) await new Promise(resolve => setTimeout(resolve, actionDelayMs));
       actions.push(command);
       if (command.action === 'show-nucleus') state.nucleusVisible = true;
       if (command.action === 'hide-nucleus') state.nucleusVisible = false;
@@ -60,6 +61,24 @@ function fixture({ protectedToken = false } = {}) {
   });
   return { root, state, actions, snapshots, server, client, getUnprotectCalls: () => unprotectCalls };
 }
+
+test('slow visible launches acknowledge once even with simultaneous authenticated retries', async () => {
+  const { root, server, client, actions } = fixture({ actionDelayMs: 1700 });
+  try {
+    await server.start();
+    const requestId = require('node:crypto').randomUUID();
+    const [first, second] = await Promise.all([
+      client.execute({ action: 'open-full-app', requestId }),
+      client.execute({ action: 'open-full-app', requestId })
+    ]);
+    assert.equal(first.fullAppOpen, true);
+    assert.deepEqual(second, first);
+    assert.equal(actions.length, 1);
+    await assert.rejects(client.execute({ action: 'hide-nucleus', requestId }), { code: 'PRESENCE_BRIDGE_IDEMPOTENCY_CONFLICT' });
+  } finally {
+    client.close(); await server.stop(); fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('il bridge usa solo IPC locale e percorsi distinti per profilo', () => {
   assert.throws(() => bridgePaths(''), { code: 'PRESENCE_BRIDGE_ROOT_MISSING' });

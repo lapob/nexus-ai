@@ -44,16 +44,42 @@ that fail local health checks, but never changes accounts, models, Funnel,
 personal data or user preferences. The lower-level `server:*` commands remain
 available for diagnosis and automation.
 
-The single automatic task starts at user sign-in, retries transient failures,
-rejects duplicate instances, and has no execution time limit. It starts only
+`npm run server:install` registers a boot trigger with the current owner's
+S4U identity and limited privileges. Registration requires Windows administrative
+permission; a failed registration preserves the previous tasks. It stores no
+Windows password and never runs the Core as SYSTEM. Run the command from an
+elevated terminal belonging to the same owner, not a different administrator.
+For an explicitly interactive installation, use
+`npm run server:install -- -StartupMode Logon`; this starts only after sign-in.
+
+The single automatic task retries transient failures, rejects duplicate
+instances, and has no execution time limit. It starts only
 the headless Core, model runtime and protected gateways. The desktop interface
-and system Presence are never started by this workstation task; open them with
+is never started by this workstation task; open it with
 `npm start`, `npm run nexus:start`, or an approved action from NexusNXS Control.
-If the SSD is absent at sign-in, reconnect it and run the task manually from
-Windows Task Scheduler.
-The manager allows up to 120 seconds for a cold start because Windows may scan
+Boot mode also registers `NexusNXS Desktop Bridge` at owner sign-in. It reuses
+the lightweight authenticated tray/pet process with no AI or gateway ownership.
+This routes Control's application actions into the visible owner session;
+Session 0 launches would otherwise appear successful while showing no window.
+Without a live owner bridge, the boot Core exposes no desktop actions and
+rejects direct launches instead of creating invisible windows.
+The bootstrap locates the SSD by volume identity, waits up to 120 seconds for
+the volume and script, and propagates the runner's exit code so Task Scheduler
+can retry. A different drive mounted at the old letter is never executed.
+It captures the Node executable at installation, rather than relying on the
+noninteractive user's PATH. If the SSD remains unavailable, reconnect it and
+start the task manually from Windows Task Scheduler.
+The manager allows up to 360 seconds for a cold start because Windows may scan
 the portable AI runtime after an update; readiness, rather than process age, is
-the success condition.
+the success condition. A successful task registration alone is not proof of
+boot readiness: test owner secrets, private pairing and public readiness under
+the task's noninteractive identity. Docker Desktop requires an interactive
+Windows session, so self-hosted search is not guaranteed before sign-in with
+the current Docker Desktop deployment. S4U cannot access EFS files or network
+credentials; encrypted owner data must remain readable without weakening its
+protection. If these dependencies fail, provision an appropriate Windows
+service or a password-logon task through Windows' secure UI; never send a
+Windows password in chat or silently replace the owner profile.
 `npm run server` starts only the hidden background task. The optional dashboard
 opens visibly in PowerShell 7 and shows health latency, active gateway clients,
 remote IP addresses, Tailscale devices, peer ping, processes, storage, and recent
@@ -168,3 +194,16 @@ separate from the portable SSD, test an appropriately sized UPS for workstation
 and router, and prove a second Internet path. Record dates and outcomes outside
 the repository. `npm run release:stable:gate` accepts those confirmations only
 as explicit release-environment inputs and still requires the automated checks.
+# Desktop e collegamento locale
+
+Il task Desktop Bridge parte al login senza finestra, pet, tray o ascolto del
+microfono. Mantiene soltanto il collegamento autenticato ai comandi della
+sessione proprietario. Aprire esplicitamente l'app ripristina il tray e il pet
+secondo la preferenza salvata. Il Core al boot non apre finestre in sessione 0.
+
+Il collegamento dell'app usa `--ui` e resta distinto dal servizio. Configurare
+una volta `scripts/refresh-desktop-shortcut.ps1 -Destination <cartella esistente>`:
+la destinazione resta in `.nexus-data/desktop-shortcut.json`, esclusa dal repository.
+Dopo ogni installazione o aggiornamento locale eseguire `npm run shortcut:refresh`.
+Il comando aggiorna soltanto `NexusNXS.lnk`, verifica destinazione e argomenti e
+non avvia l'app. Non inserire il percorso personale nei sorgenti pubblici.

@@ -4,12 +4,15 @@
 #>
 param(
   [ValidateSet('install', 'remove', 'start', 'stop', 'restart', 'status')]
-  [string]$Action = 'status'
+  [string]$Action = 'status',
+  [ValidateSet('Boot', 'Logon')]
+  [string]$StartupMode = 'Boot'
 )
 
 $ErrorActionPreference = 'Stop'
 $taskName = 'NexusNXS Server'
 $presenceTaskName = 'NexusNXS Presence'
+$desktopBridgeTaskName = 'NexusNXS Desktop Bridge'
 $deviceCoreTaskName = 'NexusNXS Connectivity'
 $legacyTaskName = 'Nexus AI Server'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -115,11 +118,15 @@ function Stop-PresenceProcess {
   if ($requested) {
     $deadline = (Get-Date).AddSeconds(8)
     do {
-      if (-not (Test-Path -LiteralPath $presenceLockPath)) { return }
+      if (-not (Test-Path -LiteralPath $presenceLockPath)) {
+        Stop-ScheduledTask -TaskName $desktopBridgeTaskName -ErrorAction SilentlyContinue
+        return
+      }
       Start-Sleep -Milliseconds 250
     } while ((Get-Date) -lt $deadline)
   }
   Stop-ScheduledTask -TaskName $presenceTaskName -ErrorAction SilentlyContinue
+  Stop-ScheduledTask -TaskName $desktopBridgeTaskName -ErrorAction SilentlyContinue
 }
 
 function Stop-HeadlessServer([string]$InstalledTaskName) {
@@ -142,7 +149,7 @@ function Stop-HeadlessServer([string]$InstalledTaskName) {
   Stop-HeadlessProcessesForced
 }
 
-function Get-PortableTaskArguments([Parameter(Mandatory)][string]$EntryPoint) {
+function Get-PortableTaskArguments([Parameter(Mandatory)][string]$EntryPoint, [switch]$Interactive) {
   $volumeRoot = [IO.Path]::GetPathRoot($projectRoot)
   $driveLetter = $volumeRoot.TrimEnd('\').TrimEnd(':')
   $volume = Get-Volume -DriveLetter $driveLetter -ErrorAction Stop
@@ -155,12 +162,27 @@ function Get-PortableTaskArguments([Parameter(Mandatory)][string]$EntryPoint) {
 
   $uniqueId = ([string]$volume.UniqueId).Replace("'", "''")
   $relative = $relativeEntryPoint.Replace("'", "''")
+  $nodeExecutable = $nodePath.Replace("'", "''")
+  $nonInteractive = if ($StartupMode -eq 'Boot' -and -not $Interactive) { '1' } else { '0' }
+  $bridgeOnly = if ($Interactive) { '1' } else { '0' }
   $command = @"
-`$volume = Get-Volume | Where-Object { `$_.UniqueId -eq '$uniqueId' } | Select-Object -First 1
+`$ErrorActionPreference = 'Stop'
+`$deadline = [DateTime]::UtcNow.AddSeconds(120)
+do {
+  `$volume = Get-Volume -ErrorAction SilentlyContinue | Where-Object { `$_.UniqueId -eq '$uniqueId' } | Select-Object -First 1
+  if (`$volume -and `$volume.DriveLetter) {
+    `$entryPoint = Join-Path (([string]`$volume.DriveLetter) + ':\') '$relative'
+    if (Test-Path -LiteralPath `$entryPoint -PathType Leaf) { break }
+  }
+  Start-Sleep -Seconds 2
+} while ([DateTime]::UtcNow -lt `$deadline)
 if (-not `$volume -or -not `$volume.DriveLetter) { exit 20 }
-`$entryPoint = Join-Path (([string]`$volume.DriveLetter) + ':\') '$relative'
-if (-not (Test-Path -LiteralPath `$entryPoint -PathType Leaf)) { exit 21 }
+if (-not `$entryPoint -or -not (Test-Path -LiteralPath `$entryPoint -PathType Leaf)) { exit 21 }
+`$env:NEXUS_NODE_EXECUTABLE = '$nodeExecutable'
+`$env:NEXUS_WINDOWS_NONINTERACTIVE = '$nonInteractive'
+`$env:NEXUS_DESKTOP_BRIDGE_ONLY = '$bridgeOnly'
 & `$entryPoint
+exit `$LASTEXITCODE
 "@
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
   return "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encoded"
@@ -172,15 +194,24 @@ function Install-ServerTask {
   # introdurrebbe una race al login. Anche la vecchia Presence automatica viene
   # rimossa: al login deve partire soltanto l'infrastruttura headless, mentre
   # l'assistente visibile resta un'applicazione esplicitamente on-demand.
-  Unregister-ScheduledTask -TaskName $deviceCoreTaskName -Confirm:$false -ErrorAction SilentlyContinue
-  Stop-PresenceProcess
-  Unregister-ScheduledTask -TaskName $presenceTaskName -Confirm:$false -ErrorAction SilentlyContinue
   $arguments = Get-PortableTaskArguments -EntryPoint $runnerPath
   $taskAction = New-ScheduledTaskAction -Execute $pwshPath -Argument $arguments -WorkingDirectory $env:SystemRoot
-  $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  if ($StartupMode -eq 'Boot') {
+    # S4U keeps the existing owner's profile without storing a Windows password
+    # or granting SYSTEM privileges. Dependencies requiring interactive logon
+    # (Docker Desktop, DPAPI) must be verified separately on this workstation.
+    $trigger = New-ScheduledTaskTrigger -AtStartup
+    $principal = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType S4U -RunLevel Limited
+  } else {
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $ownerSid
+    $principal = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
+  }
   $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
-    -RestartCount 10 `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -RestartCount 999 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit ([TimeSpan]::Zero) `
     -MultipleInstances IgnoreNew
@@ -189,14 +220,35 @@ function Install-ServerTask {
     -TaskName $taskName `
     -Action $taskAction `
     -Trigger $trigger `
+    -Principal $principal `
     -Settings $settings `
-    -Description 'Runs only the headless NexusNXS gateway and local model runtime from the external SSD.' `
+    -Description "NexusNXS headless server ($StartupMode); waits for its external SSD; no desktop UI." `
     -Force | Out-Null
 
+  if ($StartupMode -eq 'Boot') {
+    # Session 0 cannot display windows or inspect the owner's foreground app.
+    # Reuse the authenticated, lightweight bridge in the interactive session;
+    # it owns neither the AI runtime nor either remote gateway.
+    $bridgeArguments = Get-PortableTaskArguments -EntryPoint (Join-Path $projectRoot 'scripts\run-presence.ps1') -Interactive
+    $bridgeAction = New-ScheduledTaskAction -Execute $pwshPath -Argument $bridgeArguments -WorkingDirectory $env:SystemRoot
+    $bridgeTrigger = New-ScheduledTaskTrigger -AtLogOn -User $ownerSid
+    $bridgePrincipal = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
+    Register-ScheduledTask -TaskName $desktopBridgeTaskName -Action $bridgeAction -Trigger $bridgeTrigger `
+      -Principal $bridgePrincipal -Settings $settings `
+      -Description 'Owner-session desktop controls and tray; no AI runtime or public gateway.' -Force | Out-Null
+  }
+
+  # Do not alter existing tasks if primary registration fails (e.g. access denied).
+  Unregister-ScheduledTask -TaskName $deviceCoreTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Stop-PresenceProcess
+  Unregister-ScheduledTask -TaskName $presenceTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  if ($StartupMode -eq 'Logon') {
+    Unregister-ScheduledTask -TaskName $desktopBridgeTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  }
   if ($legacyTaskName -ne $taskName) {
     Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false -ErrorAction SilentlyContinue
   }
-  Write-Output "NexusNXS Server autostart installed from $projectRoot."
+  Write-Output "NexusNXS Server autostart installed ($StartupMode) from $projectRoot."
 }
 
 if ($Action -eq 'remove') {
@@ -211,6 +263,7 @@ if ($Action -eq 'remove') {
     Unregister-ScheduledTask -TaskName $candidate -Confirm:$false -ErrorAction SilentlyContinue
   }
   Unregister-ScheduledTask -TaskName $presenceTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $desktopBridgeTaskName -Confirm:$false -ErrorAction SilentlyContinue
   Write-Output 'NexusNXS Server autostart removed.'
   exit 0
 }
@@ -274,7 +327,7 @@ if ($Action -eq 'status') {
   $publicListener = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
     Where-Object LocalPort -eq 32147 | Select-Object -First 1
   $health = Get-GatewayReadiness -Port 32145
-  $tailscaleService = Get-Service Tailscale -ErrorAction SilentlyContinue
+  $tailscaleService = Get-CimInstance Win32_Service -Filter "Name='Tailscale'" -ErrorAction SilentlyContinue
   $serveStatus = if (Get-Command tailscale.exe -ErrorAction SilentlyContinue) {
     (tailscale serve status 2>$null) -join [Environment]::NewLine
   } else { 'not installed' }
@@ -286,6 +339,8 @@ if ($Action -eq 'status') {
   [pscustomobject]@{
     TaskName = $installedTaskName
     TaskState = $task.State
+    StartupTriggers = ($task.Triggers.CimClass.CimClassName -join ', ')
+    StartupLogonType = $task.Principal.LogonType
     AssistantAutostart = 'disabled'
     LastRunTime = $info.LastRunTime
     LastTaskResult = $info.LastTaskResult
@@ -295,7 +350,7 @@ if ($Action -eq 'status') {
     ServerProcessIds = ($processIds -join ', ')
     AssistantProcessIds = (@($presenceProcesses.ProcessId | Where-Object { [int]$_ -gt 0 }) -join ', ')
     RuntimeProcesses = (@($runtimeProcesses.Name | Sort-Object -Unique) -join ', ')
-    Tailscale = if ($tailscaleService) { "$($tailscaleService.Status) / $($tailscaleService.StartType)" } else { 'not installed' }
+    Tailscale = if ($tailscaleService) { "$($tailscaleService.State) / $($tailscaleService.StartMode)" } else { 'not installed' }
     TailscaleServe = $serveStatus
     ExternalDriveFreeGB = [math]::Round($drive.Free / 1GB, 1)
     ProjectRoot = $projectRoot

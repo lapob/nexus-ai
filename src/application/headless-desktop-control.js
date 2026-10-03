@@ -57,6 +57,11 @@ function createHeadlessDesktopControl({
   let cachedApplications = [];
 
   async function directStatus() {
+    if (env.NEXUS_WINDOWS_NONINTERACTIVE === '1') {
+      return Object.freeze({ available: false, fullAppOpen: false, chatGptOpen: false,
+        applications: [], allowedActions: Object.freeze([]), foregroundApplicationId: '',
+        logicalDisplays: Object.freeze([]), selectedDisplayId: '', nucleusVisible: null });
+    }
     if (now() - statusCheckedAt >= STATUS_CACHE_MS) {
       [cachedChatGptOpen, cachedApplications] = await Promise.all([
         chatGptState(),
@@ -95,6 +100,9 @@ function createHeadlessDesktopControl({
     const currentBridge = await bridgeStatus();
     if (currentBridge?.allowedActions?.includes(action)) {
       return bridgeClient.execute(command);
+    }
+    if (env.NEXUS_WINDOWS_NONINTERACTIVE === '1') {
+      throw controlError('Accedi a Windows per controllare le applicazioni del desktop.', 'DESKTOP_SESSION_UNAVAILABLE');
     }
     if (!DIRECT_ACTIONS.includes(action)) {
       throw controlError('Avvia manualmente la Presence per usare questa azione.', 'PRESENCE_UNAVAILABLE');

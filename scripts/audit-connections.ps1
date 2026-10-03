@@ -45,7 +45,7 @@ function Get-DnsState {
 
 function Get-NexusListeners {
   @(Get-NetTCPConnection -State Listen |
-    Where-Object { $_.LocalPort -in @($gatewayPort, 32146) } |
+    Where-Object { $_.LocalPort -in @($gatewayPort, 32146, 32147) } |
     ForEach-Object {
       $process = Get-Process -Id $_.OwningProcess
       [pscustomobject]@{
@@ -86,6 +86,20 @@ function Get-FirewallState {
 #endregion
 #region 02 — Report e gate rigoroso
 
+function Test-AuditReady($Report) {
+  $publicReady = $Report.Public.Count -gt 0 -and
+    @($Report.Public | Where-Object { $_.Status -ge 200 -and $_.Status -lt 300 }).Count -eq $Report.Public.Count
+  $localReady = $Report.LocalGateway.Status -ge 200 -and $Report.LocalGateway.Status -lt 300
+  $privateReady = $Report.Tailscale.Installed -and $Report.Tailscale.State -eq 'Running'
+  $listenersReady = @($Report.Listeners | Where-Object { $_.Exposure -eq 'network' }).Count -eq 0
+  foreach ($requiredPort in @(32145, 32147)) {
+    if (@($Report.Listeners | Where-Object { $_.Port -eq $requiredPort -and $_.Exposure -eq 'localhost' }).Count -eq 0) {
+      $listenersReady = $false
+    }
+  }
+  return $publicReady -and $localReady -and $privateReady -and $listenersReady
+}
+
 $report = [ordered]@{
   GeneratedAt = (Get-Date).ToString('o')
   ProjectRoot = $projectRoot
@@ -101,10 +115,7 @@ $report = [ordered]@{
 if ($Json) {
   $report | ConvertTo-Json -Depth 6
   if ($Strict) {
-    $publicReady = @($report.Public | Where-Object { $_.Status -ge 200 -and $_.Status -lt 300 }).Count -eq $report.Public.Count
-    $localReady = $report.LocalGateway.Status -ge 200 -and $report.LocalGateway.Status -lt 300
-    $privateReady = -not $report.Tailscale.Installed -or $report.Tailscale.State -eq 'Running'
-    if (-not ($publicReady -and $localReady -and $privateReady)) { exit 2 }
+    if (-not (Test-AuditReady $report)) { exit 2 }
   }
   exit 0
 }
@@ -125,10 +136,7 @@ Write-Host 'WINDOWS FIREWALL' -ForegroundColor Cyan
 $report.Firewall | Format-Table -AutoSize
 
 if ($Strict) {
-  $publicReady = @($report.Public | Where-Object { $_.Status -ge 200 -and $_.Status -lt 300 }).Count -eq $report.Public.Count
-  $localReady = $report.LocalGateway.Status -ge 200 -and $report.LocalGateway.Status -lt 300
-  $privateReady = -not $report.Tailscale.Installed -or $report.Tailscale.State -eq 'Running'
-  if (-not ($publicReady -and $localReady -and $privateReady)) {
+  if (-not (Test-AuditReady $report)) {
     Write-Error 'Una o più superfici NexusNXS non sono raggiungibili.'
     exit 2
   }

@@ -37,7 +37,7 @@ function fixture(confirm = async () => false) {
     // Windows puo rilasciare l'ultimo handle del processo appena terminato
     // qualche millisecondo dopo taskkill. Il retry evita un falso negativo
     // senza nascondere directory davvero occupate.
-    cleanup: () => fs.rmSync(root, { recursive: true, force: true, maxRetries: 6, retryDelay: 60 })
+    cleanup: () => fs.rmSync(root, { recursive: true, force: true, maxRetries: 12, retryDelay: 100 })
   };
 }
 
