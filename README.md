@@ -9,9 +9,9 @@ access and private workstation operations.
 
 > **Project status:** Founder Preview, not a commercially certified Stable release. The public guest API is not intended
 > to be exposed directly to the Internet. Put an authenticated, rate-limited
-> audited public edge in front of it before deployment. The current development
-> profile uses a separate Tailscale Funnel listener and never publishes the
-> administrative gateway.
+> audited public edge in front of it before deployment. The configured server
+> profile uses a separate public listener behind Cloudflare Tunnel and keeps
+> the administrative gateway private on Tailscale.
 
 ## Product surfaces
 

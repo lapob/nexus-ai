@@ -4,6 +4,23 @@ Aggiornamento: 3 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
 
+## Consegna del 3 ottobre: Preview 0.3.25
+
+Release v0.3.25-preview.1 pubblicata con otto asset verificati; Windows installato,
+ASAR identica, smoke e collegamento privato verificati. Android 6.5.22/code112
+pubblicato con prova fisica rinviata. CI completa su Windows/Ubuntu PASS per
+00c083e; suite locale 1024 PASS, 2 SKIP, nessun FAIL. Audit runtime/tooling senza
+vulnerabilita note dopo rimozione della catena HTTP cache del downloader.
+
+Il controllo live della precedente 0.3.24 ha individuato il download ancora alla
+0.3.23: il contratto comune ora deriva URL/tag dalla versione e rifiuta sostituzioni
+nelle release pubblicate. Non sovrascrivere gli asset della 0.3.24. Controllare
+sempre le URL effettive dopo il restart del solo servizio.
+
+Offline, reset cronologia e profilo CSP/quattro viewport PASS. Le misure del bridge
+(286 ms prima richiesta, 1–2 ms successive) riguardano IPC autenticato, senza azioni.
+La promozione del sito resta bloccata dalle dipendenze; firme, prove voce umana,
+auditing integrale e risorse del pilota restano aperti. Seguono le evidenze precedenti.
 ## Blocco del 3 ottobre: sorgenti cloud e candidata Preview 0.3.24
 
 - Stato Control: campionamento asincrono condiviso, risposte immediate durante
