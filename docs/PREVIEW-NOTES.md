@@ -5,10 +5,13 @@
 - Attivita compatta con fasi reali espandibili, movimento ridotto rispettato.
 - Android 6.5.22: sfondo sottostante oscurato, blur quando supportato, fondo sfumato e Core leggibile; due icone per testo e allegati nella stessa conversazione.
 - Sorgenti predisposti per Node 24 e Codex Cloud, senza modelli, knowledge privata o credenziali del server. Il sito usa il branch separato `website`.
+- Compilazione: downloader Electron aggiornato senza la catena HTTP cache vulnerabile; 49 dipendenze rimosse, audit runtime e tooling senza vulnerabilita note. Verificati download sintetico e rifiuto del checksum errato.
 
 ### Prove e limiti
 
-Windows: 1016 test PASS, 2 SKIP. Linux: 1001 PASS, 17 SKIP; nessun FAIL.
+Windows: 1021 test PASS, 2 SKIP dopo la correzione del downloader. La precedente
+suite Linux locale: 1001 PASS, 17 SKIP; nessun FAIL. I controlli su checkout
+puliti GitHub Windows/Ubuntu completano la verifica dei sorgenti.
 Installer e smoke del pacchetto PASS. Download Electron dei contenuti esatti,
 hitbox e recupero del focus verificati a scala 100% e 200%. Android: build,
 lint e firma Preview verificati. La nuova prova fisica e stata rinviata dal

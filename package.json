@@ -364,6 +364,9 @@
     "qrcode": "^1.5.4"
   },
   "overrides": {
-    "js-yaml": "4.3.2"
+    "js-yaml": "4.3.2",
+    "app-builder-lib": {
+      "@electron/get": "5.1.0"
+    }
   }
 }
