@@ -2,7 +2,7 @@
 
 Updated 3 October 2026. Source collaboration branch: `website` in `lapob/nexus-ai`. Application/server/Android source uses `main`; these are separate trees.
 
-The public website remains on its previously verified production version. Local source includes links for Windows Preview 0.3.24 and Android 6.5.22, but production promotion is blocked by the dependency security gate for GHSA-vfj7-8cjw-p6xm in braces. Do not bypass the gate, fabricate a patched version or claim these links are deployed.
+The public website remains on its previously verified production version. Local source includes links for Windows Preview 0.3.25 and Android 6.5.22, but production promotion is blocked by the dependency security gate for GHSA-vfj7-8cjw-p6xm in braces. Do not bypass the gate, fabricate a patched version or claim these links are deployed.
 
 Clean-source build, performance and 37 tests pass locally and on GitHub (ad8a1ac); registry signatures and secret scanning pass. The complete release gate still correctly rejects the dependency finding. No production version was changed.
 

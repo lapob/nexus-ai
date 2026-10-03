@@ -1,16 +1,16 @@
 {
-  "tag": "v0.3.24-preview.1",
+  "tag": "v0.3.25-preview.1",
   "date": "2026-10-03",
   "windows": {
-    "version": "0.3.24",
-    "bytes": 111803881,
-    "sha256": "C0C95D0BFD0D4131D6BA444F7318FA28DD2A1BE2F087D2E28571FC97CAB81B43",
-    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.24-preview.1/NexusNXS-0.3.24-Setup.exe"
+    "version": "0.3.25",
+    "bytes": 111803779,
+    "sha256": "80A18EF09BFF7D783DE7B583CD1061063D64A55F4F818BEC549AB27973924F8C",
+    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.25-preview.1/NexusNXS-0.3.25-Setup.exe"
   },
   "android": {
     "version": "6.5.22",
     "bytes": 1982443,
     "sha256": "473D15BF750270DB811F4A069B5B258EF1155564D223D7E2E01535D8E7C1890E",
-    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.24-preview.1/NexusNXS-Android.apk"
+    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.25-preview.1/NexusNXS-Android.apk"
   }
 }
