@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { publicReleaseTarget, assertPublishedReleaseMatches } from '../src/shared/public-release.js';
 
 const repository = process.env.NEXUS_GITHUB_REPOSITORY || 'lapob/nexus-ai';
 const root = resolve(import.meta.dirname, '..');
@@ -15,7 +16,7 @@ const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'ut
 const androidGradle = await readFile(resolve(root, 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
 const androidVersion = androidGradle.match(/versionName\s*(?:=\s*)?["']([^"']+)["']/)?.[1];
 if (!androidVersion) throw new Error('Versione Android pubblica non rilevata.');
-const tag = process.env.NEXUS_GITHUB_RELEASE_TAG || `v${packageJson.version}-preview.2`;
+const { tag } = publicReleaseTarget({ version: packageJson.version, repository, tag: process.env.NEXUS_GITHUB_RELEASE_TAG });
 const assets = [
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), type: 'application/vnd.microsoft.portable-executable' },
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe.blockmap`), type: 'application/octet-stream' },
@@ -82,6 +83,11 @@ const token = githubCredential();
 const prepared = await Promise.all(assets.map(inspectAsset));
 const apiRoot = `https://api.github.com/repos/${repository}`;
 let release = await request(`${apiRoot}/releases/tags/${encodeURIComponent(tag)}`, token, { allowNotFound: true });
+if (release && !release.draft) {
+  assertPublishedReleaseMatches(release, prepared);
+  process.stdout.write(`Release ${tag} gia pubblicata: hash e dimensioni identici, nessun asset modificato.\n`);
+  process.exit(0);
+}
 if (!release) {
   release = await request(`${apiRoot}/releases`, token, {
     method: 'POST',

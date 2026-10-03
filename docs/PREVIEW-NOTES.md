@@ -1,4 +1,9 @@
-### Novita 0.3.24
+### Novita 0.3.25
+
+- Download della web app derivati dalla stessa versione/tag del publisher; eliminato il riferimento obsoleto alla 0.3.23 trovato nel controllo live.
+- Le release gia pubblicate restano immutabili: un retry verifica gli hash, una sostituzione richiede una nuova versione.
+
+### Miglioramenti inclusi dalla 0.3.24
 
 - Control risponde senza attendere i probe dei programmi Windows; osservazioni condivise, refresh asincrono e protezione contro risultati precedenti a un'azione.
 - Artefatti aperti esplicitamente, con download di risultato, originale e diff; icone accessibili, focus recuperato e hitbox separate.
@@ -9,7 +14,7 @@
 
 ### Prove e limiti
 
-Windows: 1021 test PASS, 2 SKIP dopo la correzione del downloader. La precedente
+Windows: 1024 test PASS, 2 SKIP dopo le correzioni di download e distribuzione. La precedente
 suite Linux locale: 1001 PASS, 17 SKIP; nessun FAIL. I controlli su checkout
 puliti GitHub Windows/Ubuntu completano la verifica dei sorgenti.
 Installer e smoke del pacchetto PASS. Download Electron dei contenuti esatti,

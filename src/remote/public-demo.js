@@ -9,8 +9,11 @@ const { createPublicVoiceSession } = require('./public-voice-session');
 const { createPublicConversationPreferences, PUBLIC_PROFILE_STYLE } = require('./public-conversation-preferences');
 const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 const { colors: designColors } = require('../../config/nexus-design-tokens.json');
-const WINDOWS_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.23-preview.1/NexusNXS-0.3.23-Setup.exe';
-const ANDROID_DOWNLOAD = 'https://github.com/lapob/nexus-ai/releases/download/v0.3.23-preview.1/NexusNXS-Android.apk';
+const { publicReleaseTarget } = require('../shared/public-release');
+const { windowsDownload: WINDOWS_DOWNLOAD, androidDownload: ANDROID_DOWNLOAD } = publicReleaseTarget({
+  version: require('../../package.json').version,
+  tag: process.env.NEXUS_GITHUB_RELEASE_TAG,
+});
 
 const EXPERIENCE_STYLE = `<style>
 /* Icon actions use light, not tooltips or pointer focus rectangles. */

@@ -4,7 +4,7 @@ Updated 3 October 2026. This file is safe for source collaboration. Private oper
 
 ## Baseline
 
-Windows 0.3.23 Founder Preview is published; 0.3.24 is the current candidate. Android public 6.5.22/code112 is built and linted, with physical testing explicitly deferred by the owner. Control 1.19.8 is unchanged. Earlier device tests apply to their exact earlier revisions. Preview is not certified as Stable or ready for commercial sale. The private workstation checkpoint holds installed hashes and deployment receipts.
+Windows 0.3.24 Founder Preview is published and installed; 0.3.25 is the current candidate. Android public 6.5.22/code112 is built and linted, with physical testing explicitly deferred by the owner. Control 1.19.8 is unchanged. Earlier device tests apply to their exact earlier revisions. Preview is not certified as Stable or ready for commercial sale. The private workstation checkpoint holds installed hashes and deployment receipts.
 
 ## Current work
 
@@ -14,7 +14,7 @@ Windows 0.3.23 Founder Preview is published; 0.3.24 is the current candidate. An
 - Reuse the existing artifact surface for explicit opening, safe text export, original content and diff.
 - Clean only identified, reproducible outputs; preserve the current release, rollback, personal data and operational runtimes.
 
-Source checks pass. GitHub clean Windows/Ubuntu source suites passed on a50df0b, but the tooling audit then found GHSA-ch52-4w7c-c8xp. The scoped builder downloader update removes the vulnerable HTTP cache chain: both audits and registry signatures pass locally; valid/invalid checksum regressions pass. A new installer must be built and verified before publication. Latest full Windows suite: 1021 PASS / 2 SKIP, no failures. Previous local Linux suite: 1001 PASS / 17 SKIP, no failures. The Linux distribution lacks integrated TypeScript; the generator check remains mandatory on official Node 24 in CI. Native artifact downloads preserve exact result/original content; non-overlapping action hitboxes and keyboard focus recovery pass at 100% and 200%. Nine recoverable old Windows artifacts were removed after matching GitHub hashes/sizes, freeing 554921279 bytes; both Git histories are backed up before branch consolidation.
+Source checks pass. GitHub clean Windows/Ubuntu source suites passed on a50df0b, but the tooling audit then found GHSA-ch52-4w7c-c8xp. The scoped builder downloader update removes the vulnerable HTTP cache chain: both audits and registry signatures pass locally; valid/invalid checksum regressions pass. Preview 0.3.24 passed the complete Windows/Ubuntu CI and installer checks. Its live web download still pointed to 0.3.23: candidate 0.3.25 derives URLs and publisher tags from one version contract and rejects replacing published assets. Build, publication and live verification of that candidate remain the next step. Latest full Windows suite: 1024 PASS / 2 SKIP, no failures. Previous local Linux suite: 1001 PASS / 17 SKIP, no failures. The Linux distribution lacks integrated TypeScript; the generator check remains mandatory on official Node 24 in CI. Native artifact downloads preserve exact result/original content; non-overlapping action hitboxes and keyboard focus recovery pass at 100% and 200%. Nine recoverable old Windows artifacts were removed after matching GitHub hashes/sizes, freeing 554921279 bytes; both Git histories are backed up before branch consolidation.
 
 ## Work requiring additional evidence or resources
 
