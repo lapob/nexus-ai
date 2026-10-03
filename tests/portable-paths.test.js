@@ -32,9 +32,17 @@ test('risolve una configurazione relativa alla cartella applicativa', (t) => {
   assert.equal(result.source, 'portable-config');
 });
 
-test('la configurazione portabile del progetto seleziona la knowledge pubblica', () => {
-  const appRoot = path.resolve(__dirname, '..');
+test('la configurazione portabile del progetto seleziona la knowledge pubblica', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-project-config-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const appRoot = path.join(root, '.AI');
+  const configSource = path.resolve(__dirname, '..', 'config', 'portable.json');
+  const config = JSON.parse(fs.readFileSync(configSource, 'utf8'));
+  assert.equal(config.vaultRelativePath, '../.knowledge-public');
+  fs.mkdirSync(path.join(appRoot, 'config'), { recursive: true });
+  fs.copyFileSync(configSource, path.join(appRoot, 'config', 'portable.json'));
   const expectedVault = path.resolve(appRoot, '..', '.knowledge-public');
+  fs.mkdirSync(path.join(expectedVault, '.obsidian'), { recursive: true });
   const result = resolveVaultPath({ appRoot, env: {} });
   assert.equal(result.vaultPath, fs.realpathSync(expectedVault));
   assert.equal(result.source, 'portable-config');
