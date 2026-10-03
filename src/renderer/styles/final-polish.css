@@ -260,7 +260,9 @@
 
 .task-panel ol { margin-top: 0.4rem; gap: 0.22rem; }
 .task-panel li { min-height: 1.35rem; font-size: 0.68rem; }
-.task-panel li[data-status="complete"] { display: none; }
+.task-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.task-panel-heading > button { flex: 0 0 36px; width: 36px; height: 36px; }
+.task-panel ol[hidden] { display: none; }
 
 @keyframes nexus-phase-breathe {
   50% { opacity: 0.58; box-shadow: 0 0 0.35rem rgba(75, 209, 207, 0.12); }

@@ -1,7 +1,40 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 1 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
-Il checkpoint operativo, commit e hash sono in `../CONTINUITA.md` dalla radice del repository.
+Aggiornamento: 3 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
+Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
+operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
+
+## Blocco del 3 ottobre: sorgenti cloud e candidata Preview 0.3.24
+
+- Stato Control: campionamento asincrono condiviso, risposte immediate durante
+  probe lenti, osservazioni scadute aggiornate senza bloccare il bridge e
+  invalidazione dopo azioni. Cinque regressioni Windows/Linux superate.
+- Repository: istruzioni pubbliche e gate `cloud:check` senza dati privati,
+  modelli o servizio attivo. CI prevista su Windows e Linux con Node 24.
+  Suite locale Windows: 1016 PASS, 2 SKIP; Linux: 1001 PASS, 17 SKIP.
+  Nessun FAIL. Linux usa il Node di sistema senza TypeScript integrato:
+  il test di generazione dei visualizer e esplicitamente saltato li e
+  rimane obbligatorio con la distribuzione ufficiale Node 24 usata in CI.
+- Artefatti: apertura esplicita, icone per esportare risultato, originale e
+  diff, recupero focus; header adattabile e hitbox separate. Il pannello
+  attivita mostra la fase corrente e offre le altre fasi tramite un'icona.
+- Android 6.5.22/code112: contesto oscurato dal sistema, blur dove disponibile,
+  fondo sfumato leggibile e un solo renderer del Core. Due icone per allegati
+  e testo conservano la conversazione. Build e lint PASS, APK Preview con
+  firma Debug verificata. Il proprietario ha rinviato le nuove prove fisiche;
+  non attribuire i collaudi della precedente versione alla nuova build.
+- Pulizia: 554921279 byte rimossi da nove vecchi artefatti Windows dopo
+  verifica digest/dimensioni con GitHub. Versione corrente, rollback, dati
+  e runtime conservati. Backup Git completo verificato prima di consolidare
+  i branch; nessuna riscrittura della storia autorizzata implicitamente.
+- Sito: lint, TypeScript e 37 test PASS. Controllo di 544 oggetti storici
+  testo senza segreti o percorsi privati rilevati dalle regole di pubblicazione.
+  La promozione resta bloccata dal gate dipendenze, non dalla pubblicazione
+  dei sorgenti. L'audit di sicurezza completo resta una verifica distinta.
+
+Versioni installate, pubblicazione della candidata e riscontri remoti devono
+essere verificati nel checkpoint successivo prima di dichiarare aggiornato
+il servizio. Restano aperti i requisiti reali indicati sotto.
 
 ## Checkup del 1 ottobre
 

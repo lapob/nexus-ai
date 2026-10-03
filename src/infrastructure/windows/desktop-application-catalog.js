@@ -4,7 +4,7 @@
  * Espone soltanto stato e identificatori pubblici: mai percorsi, argomenti o processi grezzi.
  */
 const fs = require('node:fs');
-const path = require('node:path');
+const path = require('node:path').win32;
 const { execFile, spawn } = require('node:child_process');
 const { promisify } = require('node:util');
 

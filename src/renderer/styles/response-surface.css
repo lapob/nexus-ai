@@ -571,8 +571,11 @@
   box-shadow: 0 1.5rem 5rem rgba(0, 0, 0, 0.72), 0 0 2rem rgba(48, 189, 192, 0.05);
   backdrop-filter: blur(20px);
 }
-.artifact-popover-meta { display: flex; padding: 0.72rem 0.9rem; align-items: center; justify-content: space-between; color: rgba(218, 241, 242, 0.8); font-size: 0.75rem; }
-.artifact-popover-meta button { border: 0; border-radius: 0.45rem; padding: 0.35rem 0.48rem; background: transparent; color: rgba(172, 208, 210, 0.58); cursor: pointer; }
+.artifact-popover-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.72rem 0.9rem; align-items: center; justify-content: space-between; color: rgba(218, 241, 242, 0.8); font-size: 0.75rem; }
+.artifact-popover-meta > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.artifact-popover-meta > span:last-child { display: flex; flex-wrap: wrap; gap: 0.15rem; align-items: center; }
+.artifact-popover-meta .quiet-close { position: relative; inset: auto; flex: 0 0 36px; width: 36px; height: 36px; }
+.artifact-popover-meta button { min-height: 36px; border: 0; border-radius: 0.45rem; padding: 0.35rem 0.48rem; background: transparent; color: rgba(192, 220, 222, 0.86); cursor: pointer; }
 .artifact-popover-meta button:hover { background: rgba(111, 202, 205, 0.08); color: rgba(232, 250, 251, 0.9); }
 .artifact-popover-meta button[data-active="true"] { background: rgba(78, 205, 208, 0.12); color: rgba(218, 248, 249, 0.92); }
 .artifact-popover pre { max-height: calc(min(58vh, 34rem) - 3rem); margin: 0; padding: 0.9rem 0; overflow: auto; color: rgba(220, 243, 244, 0.84); font: 0.78rem/1.62 var(--font-mono); text-align: left; }

@@ -44,14 +44,19 @@ class NexusAssistantActivity : NexusMainActivity() {
             NexusSystemBars.apply(window)
             return
         }
-        // Opaque cosmic backdrop keeps the Core readable over bright apps and wallpapers.
-        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND or WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        // Android dims the actual app underneath; the Core retains its own dark backdrop.
+        // Dimming remains effective when cross-window blur is unavailable or disabled.
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        window.attributes = window.attributes.apply { dimAmount = .78f }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             window.setBackgroundBlurRadius(0)
-            window.attributes = window.attributes.apply { blurBehindRadius = 0 }
+            val blurEnabled = (getSystemService(Context.WINDOW_SERVICE) as WindowManager).isCrossWindowBlurEnabled
+            if (blurEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.apply { blurBehindRadius = if (blurEnabled) 32 else 0 }
         }
-        window.setBackgroundDrawable(ColorDrawable(Color.rgb(2, 4, 5)))
-        window.decorView.setBackgroundColor(Color.rgb(2, 4, 5))
+        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        window.decorView.setBackgroundColor(Color.TRANSPARENT)
         NexusSystemBars.apply(window)
     }
 }

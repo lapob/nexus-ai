@@ -17,6 +17,7 @@ const { closeDesktopApplication, desktopApplicationStatus, foregroundDesktopAppl
 const { createLocalPresenceBridgeServer } = require('../remote/local-presence-bridge');
 const { createWakeWordListener } = require('../infrastructure/windows/wake-word-listener');
 const { createLogger } = require('../services/logger');
+const { createDesktopStatusSampler } = require('./desktop-status-sampler');
 
 const PRESENCE_LOCK = 'system-presence.lock';
 const UI_LOCK = 'desktop-ui.lock';
@@ -151,9 +152,19 @@ async function bootstrapPresence({ env = process.env } = {}) {
   let syncQueued = false;
   let shortcutRegistered = false;
   let stopping = false;
-  let chatGptOpen = false;
-  let chatGptCheckedAt = 0;
+  let chatGptOpen = null;
   let applications = [];
+  const desktopStatus = createDesktopStatusSampler({
+    initial: { chatGptOpen: null, applications: [], foregroundApplicationId: '' },
+    load: async () => {
+      const [chatGptOpen, applications, foreground] = await Promise.all([
+        isChatGptDesktopRunning(), desktopApplicationStatus({ env }), foregroundDesktopApplication({ env })
+      ]);
+      return { chatGptOpen, applications, foregroundApplicationId: foreground?.id || '' };
+    },
+    onUpdate: value => { chatGptOpen = value.chatGptOpen; applications = value.applications; },
+    onError: error => logger.debug?.('Desktop status refresh unavailable.', { code: error?.code })
+  });
   let backgroundActivity = 'idle';
   const uiLockPath = path.join(sharedDataRoot, UI_LOCK);
   const openFullUi = async ({ activationTicket = '' } = {}) => {
@@ -206,6 +217,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
     app.quit();
   };
   const shutdown = async () => {
+    desktopStatus.dispose();
     if (stopping) return;
     stopping = true;
     if (stateTimer) clearInterval(stateTimer);
@@ -261,17 +273,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
   presenceBridge = createLocalPresenceBridgeServer({
     sharedDataRoot,
     logger,
-    statusProvider: async () => {
-      if (Date.now() - chatGptCheckedAt > 1_500) {
-        [chatGptOpen, applications] = await Promise.all([
-          isChatGptDesktopRunning(),
-          desktopApplicationStatus({ env })
-        ]);
-        chatGptCheckedAt = Date.now();
-      }
-      const foregroundApplication = await foregroundDesktopApplication({ env });
-      return { ...manager.getSystemPresenceStatus(), chatGptOpen, applications, foregroundApplicationId: foregroundApplication?.id || '' };
-    },
+    statusProvider: () => ({ ...manager.getSystemPresenceStatus(), ...desktopStatus.read() }),
     stateSynchronizer: async (snapshot) => {
       if (snapshot.activityOnly === true) {
         backgroundActivity = snapshot.state;
@@ -282,6 +284,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
       if (!bridgeOnly || processLockState(uiLockPath).running) await wakeWordListener.configure(wakeWordConfiguration());
     },
     actionExecutor: async (command) => {
+      try {
       if (command.action === 'show-nucleus') {
         manager.setSystemPresenceEnabled(true);
         return;
@@ -315,7 +318,6 @@ async function bootstrapPresence({ env = process.env } = {}) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         } while (Date.now() < deadline);
         if (!chatGptOpen) throw Object.assign(new Error('ChatGPT non si e aperta in tempo.'), { code: 'CHATGPT_START_TIMEOUT' });
-        chatGptCheckedAt = Date.now();
         return;
       }
       if (command.action === 'close-chatgpt') {
@@ -339,7 +341,6 @@ async function bootstrapPresence({ env = process.env } = {}) {
           } while (Date.now() < deadline);
         }
         if (chatGptOpen) throw Object.assign(new Error('ChatGPT non si e chiusa in tempo.'), { code: 'CHATGPT_STOP_TIMEOUT' });
-        chatGptCheckedAt = Date.now();
         return;
       }
       if (command.action === 'open-application') {
@@ -350,7 +351,6 @@ async function bootstrapPresence({ env = process.env } = {}) {
           if (applications.some((entry) => entry.id === command.applicationId && entry.open)) break;
           await new Promise((resolve) => setTimeout(resolve, 100));
         } while (Date.now() < deadline);
-        chatGptCheckedAt = Date.now();
         return;
       }
       if (command.action === 'close-application') {
@@ -361,14 +361,15 @@ async function bootstrapPresence({ env = process.env } = {}) {
           if (applications.some((entry) => entry.id === command.applicationId && !entry.open)) break;
           await new Promise((resolve) => setTimeout(resolve, 100));
         } while (Date.now() < deadline);
-        chatGptCheckedAt = Date.now();
         return;
       }
       throw Object.assign(new Error('Azione Presence non consentita.'), { code: 'PRESENCE_ACTION_NOT_ALLOWED' });
+      } finally { desktopStatus.patch({ chatGptOpen, applications }); }
     },
     protectSecret: bridgeSecretProtection.protectSecret
   });
   await presenceBridge.start();
+  void desktopStatus.refresh();
   if (!bridgeOnly) await wakeWordListener.configure(wakeWordConfiguration());
 
   const iconPath = path.join(appRoot, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');

@@ -4,11 +4,16 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const testsDirectory = path.join(root, 'tests');
-const temporaryRoot = path.join(root, 'qa-artifacts', 'test-tmp');
+// Unix domain sockets need a short path on a filesystem that supports sockets.
+// The exclusive suite directory remains the only cleanup target on every OS.
+const temporaryRoot = process.platform === 'win32'
+  ? path.join(root, 'qa-artifacts', 'test-tmp')
+  : path.join(os.tmpdir(), 'nexus-test-tmp');
 
 // #region 01 — Confine temporaneo della singola suite
 

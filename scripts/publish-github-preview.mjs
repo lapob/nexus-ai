@@ -77,6 +77,7 @@ async function inspectAsset(asset) {
   };
 }
 
+const previewNotes = (await readFile(resolve(root, 'docs', 'PREVIEW-NOTES.md'), 'utf8')).trim();
 const token = githubCredential();
 const prepared = await Promise.all(assets.map(inspectAsset));
 const apiRoot = `https://api.github.com/repos/${repository}`;
@@ -124,7 +125,7 @@ for (const asset of prepared) {
 const releaseBody = [
   '## NexusNXS Founder Preview',
   '',
-  'Build pubbliche per la prova controllata con amici. I client usano i servizi NexusNXS e non distribuiscono modelli o knowledge private.',
+  'Build sperimentali per revisione tecnica. I client usano i servizi NexusNXS e non distribuiscono modelli o knowledge private. Non e una Beta approvata per inviti commerciali o una Stable.',
   '',
   `- Windows 11 x64: NexusNXS ${packageJson.version} Preview (non firmata Authenticode)`,
   `- Android 8+: NexusNXS ${androidVersion} Preview (firma Android Debug, non Play Store)`,
@@ -133,6 +134,8 @@ const releaseBody = [
   '- Manifest pubblico: `release-manifest.preview.json`',
   '',
   'Verifica le impronte nel file CHECKSUMS.sha256 allegato a questa stessa release prima dell’installazione.',
+  '',
+  previewNotes,
   '',
   `_Asset aggiornati il ${new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'Europe/Rome' }).format(new Date())}._`,
 ].join('\n');

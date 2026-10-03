@@ -3357,7 +3357,7 @@ private fun JSONArray?.toTurns() = buildList {
     )
 }
 
-/** Superficie traslucida invocata dal tasto laterale: nessuna apertura della UI completa. */
+/** Superficie vocale invocata dal tasto laterale: contesto Android oscurato e Core leggibile. */
 @Composable private fun NexusAssistantOverlay(state: NexusUiState, dispatch: (String, String) -> Unit) {
     var voiceMode by remember { mutableStateOf(true) }
     var inlineVoiceListening by remember { mutableStateOf(false) }
@@ -3376,10 +3376,9 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
     Box(
-        Modifier.fillMaxSize().background(Ink)
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ink.copy(alpha = .82f), Ink)))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { dispatch("assistantClose", "") }
     ) {
-        CosmicScene(Modifier.fillMaxSize())
         Column(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 6.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -3388,7 +3387,7 @@ private fun JSONArray?.toTurns() = buildList {
                 NexusInstantCore(
                     active = voiceMode || state.busy, offline = !online, reduceMotion = reduceMotion,
                     energy = if (voiceMode) inlineVoiceEnergy else 0f,
-                    diameter = minOf(maxWidth, maxHeight, 1200.dp), fullScene = true,
+                    diameter = minOf(maxWidth, maxHeight, 1200.dp), fullScene = false,
                     phaseState = when { !online -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" }
                 ) {
                     if (online) {

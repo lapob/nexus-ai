@@ -148,12 +148,17 @@ function artifactLanguage(filePath = '') {
 
 function outputDiagnostics(output, root) {
   const diagnostics = [];
+  const windowsRoot = /^[A-Za-z]:[\\/]/.test(root);
+  const paths = windowsRoot ? path.win32 : path;
+  const workspace = paths.resolve(root);
   for (const line of String(output || '').split(/\r?\n/)) {
     const match = line.match(/((?:[A-Za-z]:)?[^()\s:]+\.(?:js|mjs|cjs|jsx|ts|tsx|json|css|scss|py|ps1|sh)):(\d+)(?::(\d+))?/i);
     if (!match) continue;
-    const target = path.resolve(root, match[1]);
-    if (target !== root && !isInside(root, target)) continue;
-    diagnostics.push({ file: path.relative(root, target), line: Number(match[2]), column: Number(match[3]) || 0, message: line.replace(match[0], '').replace(/^\s*[-:]?\s*/, '').slice(0, 300) || 'Controlla questa posizione.' });
+    if (!windowsRoot && /^[A-Za-z]:/.test(match[1])) continue;
+    const target = paths.resolve(workspace, match[1].replaceAll('\\', paths.sep));
+    const relative = paths.relative(workspace, target);
+    if (relative === '..' || relative.startsWith(`..${paths.sep}`) || paths.isAbsolute(relative)) continue;
+    diagnostics.push({ file: relative.replaceAll('\\', path.sep), line: Number(match[2]), column: Number(match[3]) || 0, message: line.replace(match[0], '').replace(/^\s*[-:]?\s*/, '').slice(0, 300) || 'Controlla questa posizione.' });
     if (diagnostics.length >= 12) break;
   }
   return diagnostics;

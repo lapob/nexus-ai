@@ -8,14 +8,15 @@ const path = require('node:path');
 
 // #region 01 — Candidate files
 
-const root = path.resolve(__dirname, '..');
+const requestedRoot = process.argv.find(argument => argument.startsWith('--root='));
+const root = requestedRoot ? path.resolve(requestedRoot.slice('--root='.length)) : path.resolve(__dirname, '..');
 const output = execFileSync('git', [
   '-c', `safe.directory=${root.replaceAll('\\', '/')}`,
   'ls-files', '--cached', '--others', '--exclude-standard', '-z'
 ], { cwd: root, encoding: 'utf8' });
 const candidates = output.split('\0').filter(Boolean);
 const textExtensions = new Set([
-  '.cjs', '.css', '.gradle', '.htm', '.html', '.hujson', '.js', '.json', '.jsx',
+  '.cjs', '.css', '.gradle', '.htm', '.html', '.hujson', '.js', '.json', '.jsonc', '.jsx',
   '.kt', '.kts', '.md', '.mjs', '.ps1', '.properties', '.toml', '.ts', '.tsx',
   '.txt', '.xml', '.yaml', '.yml', '.swift', '.strings', '.plist', '.py'
 ]);

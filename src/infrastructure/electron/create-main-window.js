@@ -204,6 +204,43 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
           if (smokeView === 'artifacts') {
             await win.webContents.executeJavaScript("document.querySelector('.artifact-item > button')?.click()");
             await new Promise((resolve) => setTimeout(resolve, 260));
+            if (process.env.NEXUS_VERIFY_ARTIFACT_ACTIONS === '1') {
+              for (const [label, expected] of [
+                ['Scarica risultato', 'const status = "ready";\nexport { status };\n'],
+                ['Scarica originale', 'const status = "old";\n']
+              ]) {
+                const target = path.join(app.getPath('userData'), label === 'Scarica originale' ? 'original.txt' : 'result.txt');
+                await new Promise((resolve, reject) => {
+                  const timer = setTimeout(() => { win.webContents.session.removeListener('will-download', download); reject(new Error('Artifact download timeout')); }, 5_000);
+                  const download = (_event, item, sender) => {
+                    if (sender !== win.webContents) return;
+                    win.webContents.session.removeListener('will-download', download);
+                    item.setSavePath(target);
+                    item.once('done', (_event, state) => {
+                      clearTimeout(timer);
+                      if (state !== 'completed' || fs.readFileSync(target, 'utf8') !== expected) reject(new Error('Artifact download content mismatch'));
+                      else resolve();
+                    });
+                  };
+                  win.webContents.session.on('will-download', download);
+                  win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(`[aria-label="${label}"]`)})?.click()`).catch(reject);
+                });
+              }
+              const checks = await win.webContents.executeJavaScript(`(() => {
+                const buttons = [...document.querySelectorAll('.artifact-popover-meta button')];
+                const rects = buttons.map(button => button.getBoundingClientRect());
+                for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+                  const a = rects[i], b = rects[j];
+                  if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) throw new Error('Artifact action hitboxes overlap');
+                }
+                document.querySelector('[aria-label="Chiudi dettaglio"]').click();
+                return { downloads: 2, hitboxes: buttons.length, focusReturned: document.activeElement.matches('.artifact-item > button') };
+              })()`);
+              if (!checks.focusReturned) throw new Error('Artifact close lost keyboard focus');
+              logger.info('Artifact interaction QA passed.', checks);
+              await win.webContents.executeJavaScript("document.querySelector('.artifact-item > button')?.click()");
+              await new Promise(resolve => setTimeout(resolve, 260));
+            }
           }
         }
         if (smokeView === 'settings-ai' || smokeView === 'settings-data' || smokeView === 'settings-connections' || smokeView === 'settings-activity' || smokeView === 'settings-shortcuts' || smokeView === 'settings-pets' || smokeView === 'remote-pairing') {

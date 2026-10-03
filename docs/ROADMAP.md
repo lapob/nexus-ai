@@ -1,5 +1,15 @@
 # Roadmap tecnica
 
+## Ripresa e pubblicazione sorgenti — 3 ottobre 2026
+
+Il programma corrente e i criteri ancora aperti sono in
+[PROGRAMMA-PRODOTTO.md](PROGRAMMA-PRODOTTO.md). Leggere anche il checkpoint
+pubblico nella radice. Il gate `cloud:check` verifica i sorgenti senza dati
+privati o runtime AI; non sostituisce le prove di produzione, voce o dispositivi.
+Le correzioni della candidata 0.3.24 sono descritte nel documento di
+stabilizzazione. Non dichiarare operative integrazioni o automazioni soltanto
+perche esistono un manifest o una voce nella roadmap.
+
 ## Ricerca, personalizzazione e naturalezza — 1 ottobre 2026
 
 La ricerca pubblica risulta live nelle capability del servizio. Un probe sul

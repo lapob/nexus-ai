@@ -7,7 +7,7 @@ is reserved for the maintainer/server profile. The architecture is built around
 explicit consent, portable storage, and strict separation between public AI
 access and private workstation operations.
 
-> **Project status:** release candidate. The public guest API is not intended
+> **Project status:** Founder Preview, not a commercially certified Stable release. The public guest API is not intended
 > to be exposed directly to the Internet. Put an authenticated, rate-limited
 > audited public edge in front of it before deployment. The current development
 > profile uses a separate Tailscale Funnel listener and never publishes the
@@ -58,7 +58,7 @@ operational phases and the streamed final answer.
 ## Requirements
 
 - Windows 11 x64
-- Node.js 22 or newer
+- Node.js 24 for reproducible source checks
 - PowerShell 7 recommended
 - A compatible local Ollama model library
 - Android Studio only when building the Android clients
@@ -77,6 +77,22 @@ environment variables only in the local build environment. Never commit real
 tailnet hostnames, LAN addresses, pairing links, or signing credentials.
 
 ## Development
+
+For isolated source work, including Codex Cloud, read [AGENTS.md](AGENTS.md)
+and [the cloud guide](docs/CODEX-CLOUD.md). Use the `main` branch for this
+application and `website` for the public site. Neither source setup nor tests
+require production credentials, private knowledge or a model download.
+
+```sh
+npm ci
+npm run cloud:check
+npm test
+```
+
+These commands verify source with fixtures; native device, voice and signed
+release checks remain separate. The [public checkpoint](CONTINUITA.md)
+and [product program](docs/PROGRAMMA-PRODOTTO.md) record actual progress and
+prerequisites. Source collaboration does not enable cloud inference.
 
 The public desktop build is a thin HTTPS client. It never bundles or downloads
 Ollama models; local provisioning remains a maintainer/server capability.

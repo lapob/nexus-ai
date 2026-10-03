@@ -65,8 +65,8 @@ test('il worker Kokoro usa voce e fonemizzazione della lingua richiesta', () => 
 test('il worker valida lingua, dimensioni e destinazione senza importare il modello', (t) => {
   const { spawnSync } = require('node:child_process');
   const manifest = require('../config/python-runtime.json');
-  const python = path.join(__dirname, '..', manifest.runtimeDirectory, 'python.exe');
-  if (!fs.existsSync(python)) return t.skip('Python portabile non installato');
+  const python = process.platform === 'win32' ? path.join(__dirname, '..', manifest.runtimeDirectory, 'python.exe') : 'python3';
+  if (process.platform === 'win32' && !fs.existsSync(python)) return t.skip('Python portabile non installato');
   const worker = path.join(__dirname, '..', 'src', 'voice', 'neural-worker.py');
   const code = `import runpy,sys,tempfile,pathlib,uuid
 module=runpy.run_path(sys.argv[1])
@@ -81,6 +81,7 @@ assert all(len(part)<=180 for part in module["text_segments"]("parola "*70))
 assert not pathlib.Path(base["output"]).exists()
 print("worker boundaries PASS")`;
   const result = spawnSync(python, ['-I', '-c', code, worker], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
+  if (result.error?.code === 'ENOENT') return t.skip('Python 3 non installato');
   assert.equal(result.status, 0, result.stderr);
 });
 

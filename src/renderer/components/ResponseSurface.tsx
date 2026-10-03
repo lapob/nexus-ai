@@ -14,6 +14,26 @@ function CopyGlyph({ state = 'idle' }: { state?: 'idle' | 'copied' | 'error' }) 
   </svg>;
 }
 
+function DownloadGlyph({ original = false }: { original?: boolean }) {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {original ? <><path d="M3 11a9 9 0 1 1 3 8M3 4v7h7" /><path d="M12 7v5l3 2" /></> : <><path d="M12 3v12m-4-4 4 4 4-4M5 17v4h14v-4" /></>}
+  </svg>;
+}
+
+function downloadArtifact(artifact: OperationalArtifact, version: 'current' | 'original' | 'diff') {
+  const extensions: Record<string, string> = { javascript: 'js', typescript: 'ts', python: 'py', json: 'json', markdown: 'md', css: 'css', sql: 'sql', yaml: 'yaml', shell: 'sh', powershell: 'ps1' };
+  const stem = artifact.title.split(/[\\/]/).pop()?.replace(/[<>:"|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '').slice(0, 100) || 'NexusNXS';
+  const name = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(stem) ? `NexusNXS-${stem}` : stem;
+  const content = version === 'original' ? artifact.previousContent || '' : version === 'diff' ? artifact.diff || '' : artifact.content || '';
+  const suffix = version === 'original' ? '.original.txt' : version === 'diff' ? '.diff' : /\.[a-z0-9]{1,8}$/i.test(name) ? '' : `.${extensions[artifact.language || ''] || 'txt'}`;
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${name}${suffix}`;
+  document.body.appendChild(link);
+  try { link.click(); } finally { link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1_000); }
+}
+
 // #region 01 — Markdown leggero e sicuro
 
 interface ResponseSurfaceProps {
@@ -329,9 +349,12 @@ function CodeBlock({ language, content }: { language: string; content: string })
 export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] }) {
   const [openId, setOpenId] = useState('');
   const [viewMode, setViewMode] = useState<'result' | 'diff' | 'split'>('result');
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const closeDetail = () => { setOpenId(''); trigger.current?.focus(); };
   useEffect(() => {
     if (!openId) return;
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpenId(''); };
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') closeDetail(); };
     window.addEventListener('keydown', close);
     return () => window.removeEventListener('keydown', close);
   }, [openId]);
@@ -349,7 +372,7 @@ export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] 
       <div className="artifact-items">
         {artifacts.map((artifact) => (
           <div className="artifact-item" data-open={openId === artifact.id} key={artifact.id}>
-            <button type="button" aria-expanded={openId === artifact.id} onMouseEnter={() => { setOpenId(artifact.id); setViewMode('result'); }} onFocus={() => { setOpenId(artifact.id); setViewMode('result'); }} onClick={() => { setViewMode('result'); setOpenId(artifact.id); }}>
+            <button type="button" aria-expanded={openId === artifact.id} onClick={(event) => { trigger.current = event.currentTarget; setCopyState('idle'); setViewMode('result'); setOpenId(artifact.id); }}>
               <span>{artifact.title}</span><small>{artifact.subtitle || 'Dettaglio'}</small>
             </button>
             {openId === artifact.id && createPortal((
@@ -362,8 +385,10 @@ export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] 
                         <button type="button" data-active={viewMode === 'diff'} onClick={() => setViewMode('diff')}>Modifiche</button>
                         <button type="button" data-active={viewMode === 'split'} onClick={() => setViewMode('split')}>Prima / dopo</button>
                       </>}
-                      <button className="response-icon-action" type="button" aria-label="Copia contenuto" onClick={() => void window.nexus.copyText(artifact.content || '')}><CopyGlyph /></button>
-                      <button type="button" onClick={() => setOpenId('')} aria-label="Chiudi dettaglio">Chiudi</button>
+                      <button className="response-icon-action" type="button" aria-label={copyState === 'error' ? 'Copia non riuscita: riprova' : copyState === 'copied' ? 'Contenuto copiato' : 'Copia contenuto'} onClick={() => void window.nexus.copyText(viewMode === 'diff' ? artifact.diff || '' : artifact.content || '').then(() => setCopyState('copied')).catch(() => setCopyState('error'))}><CopyGlyph state={copyState} /></button>
+                      <button className="response-icon-action" type="button" aria-label={viewMode === 'diff' ? 'Scarica modifiche' : 'Scarica risultato'} onClick={() => downloadArtifact(artifact, viewMode === 'diff' ? 'diff' : 'current')}><DownloadGlyph /></button>
+                      {artifact.previousContent !== undefined && <button className="response-icon-action" type="button" aria-label="Scarica originale" onClick={() => downloadArtifact(artifact, 'original')}><DownloadGlyph original /></button>}
+                      <QuietClose onClick={closeDetail} label="Chiudi dettaglio" />
                     </span>
                   </div>
                   {viewMode === 'split' && artifact.previousContent !== undefined

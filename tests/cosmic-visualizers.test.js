@@ -17,7 +17,7 @@ function fixture(extra={}){
   const renderer=sandbox.module.exports.createCosmicVisualizers(canvas,{random:()=>.1,...extra},createDesktopRecipes);
   return {renderer,canvas,media,document,frames,listeners,tick(n=1,interval=1000/60){for(let i=0;i<n;i++){time+=interval;const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(time));}}};
 }
-test('generated GPU recipes and Android asset exactly match current desktop source',()=>{
+test('generated GPU recipes and Android asset exactly match current desktop source', { skip: !process.features.typescript && 'Node build without TypeScript support; official Node 24 required' },()=>{
   execFileSync(process.execPath,['scripts/generate-cosmic-visualizers.js','--check'],{cwd:root,stdio:'pipe'});
   const r=createDesktopRecipes();
   for(const data of [r.neural.build(1200),r.reactor(1200,'rings'),r.saturn.planet(1200),r.saturn.orbit(1200)]){

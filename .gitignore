@@ -61,7 +61,6 @@ android/**/build/
 android/**/local.properties
 
 # Maintainer-only material and workstation metadata.
-AGENTS.md
 README_FILE_INDEX.md
 config/private-knowledge-benchmark.json
 config/portable.local.json

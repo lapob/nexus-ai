@@ -15,6 +15,7 @@ test('il runner isola TEMP e non elimina directory create da altre verifiche', (
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-runner-'));
   const fixture = path.join(temporary, 'app');
   const foreign = path.join(temporary, 'nexus-motion-concurrent');
+  const suiteRoot = process.platform === 'win32' ? path.join(fixture, 'qa-artifacts/test-tmp') : path.join(temporary, 'nexus-test-tmp');
   fs.mkdirSync(path.join(fixture, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(fixture, 'tests'));
   fs.copyFileSync(path.resolve(__dirname, '../scripts/run-tests.js'), path.join(fixture, 'scripts/run-tests.js'));
@@ -25,7 +26,7 @@ test('il runner isola TEMP e non elimina directory create da altre verifiche', (
     require('node:test')('temporary ownership', () => {
       fs.mkdirSync(${JSON.stringify(foreign)});
       fs.writeFileSync(path.join(${JSON.stringify(foreign)}, 'keep.txt'), 'other check');
-      require('node:assert/strict').equal(path.dirname(os.tmpdir()), ${JSON.stringify(path.join(fixture, 'qa-artifacts/test-tmp'))});
+      require('node:assert/strict').equal(path.dirname(os.tmpdir()), ${JSON.stringify(suiteRoot)});
       fs.writeFileSync(path.join(os.tmpdir(), 'owned.txt'), 'own check');
     });
   `);
@@ -38,7 +39,7 @@ test('il runner isola TEMP e non elimina directory create da altre verifiche', (
     });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(fs.readFileSync(path.join(foreign, 'keep.txt'), 'utf8'), 'other check');
-    assert.deepEqual(fs.readdirSync(path.join(fixture, 'qa-artifacts/test-tmp')), []);
+    assert.deepEqual(fs.readdirSync(suiteRoot), []);
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 });
 

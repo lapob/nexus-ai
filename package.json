@@ -1,7 +1,7 @@
 {
   "name": "nexusnxs",
   "productName": "NexusNXS",
-  "version": "0.3.23",
+  "version": "0.3.24",
   "private": true,
   "description": "Privacy-focused AI assistant for Windows with native Android clients, voice, projects and consent-based computer actions.",
   "author": "NexusNXS",
@@ -16,6 +16,7 @@
   },
   "main": "src/main.js",
   "scripts": {
+    "cloud:check": "node scripts/check-publication-safety.js && npm run check:hygiene && npm run check:sections && npm run typecheck && npm run build:renderer && npm run check:startup",
     "nexus:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-nexus.ps1 -Action start",
     "nexus:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-nexus.ps1 -Action stop",
     "nexus:restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-nexus.ps1 -Action restart",
