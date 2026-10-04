@@ -48,15 +48,24 @@ export class VoiceRecognition {
       },
       video: false as const
     });
+    let acquired: MediaStream;
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia(constraints(deviceId));
+      acquired = await navigator.mediaDevices.getUserMedia(constraints(deviceId));
     } catch (error) {
       // Le periferiche USB e Bluetooth cambiano spesso identificatore. Se la
       // preferenza non è più valida, il dispositivo di sistema evita un errore
       // permanente e potrà essere riselezionato dalle impostazioni.
       if (!deviceId || !/notfound|overconstrained|requested device/i.test(String(error))) throw error;
-      this.stream = await navigator.mediaDevices.getUserMedia(constraints());
+      if (generation !== this.generation) return;
+      acquired = await navigator.mediaDevices.getUserMedia(constraints());
     }
+    // A permission/device request can resolve after Stop or a newer activation.
+    // Release that stale stream before it can replace the current microphone.
+    if (generation !== this.generation) {
+      acquired.getTracks().forEach(track => track.stop());
+      return;
+    }
+    this.stream = acquired;
     try {
       this.context = new AudioContext({ latencyHint: 'interactive' });
       this.analyser = this.context.createAnalyser();
@@ -91,6 +100,7 @@ export class VoiceRecognition {
       if (generation !== this.generation) return;
       this.sample(generation);
     } catch (error) {
+      if (generation !== this.generation) return;
       // Se WebAudio fallisce dopo il consenso, libera subito il device:
       // altrimenti le attivazioni successive vedrebbero uno stream fantasma.
       this.stream.getTracks().forEach((track) => track.stop());

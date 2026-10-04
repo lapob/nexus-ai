@@ -47,7 +47,10 @@ async function collectAvailabilitySample({ endpoints = [], fetchImpl = globalThi
     const startedAt = now();
     try {
       const response = await fetchImpl(value, { redirect: 'follow', signal: AbortSignal.timeout(timeoutMs) });
-      return normalizeSample({ at: capturedAt, endpoint, ok: response.ok, status: response.status, latencyMs: now() - startedAt });
+      const sample = normalizeSample({ at: capturedAt, endpoint, ok: response.ok, status: response.status, latencyMs: now() - startedAt });
+      // The monitor needs headers only; release connections without retaining bodies.
+      try { await response.body?.cancel(); } catch { /* Header result remains authoritative. */ }
+      return sample;
     } catch {
       return normalizeSample({ at: capturedAt, endpoint, ok: false, status: 0, latencyMs: now() - startedAt });
     }
@@ -65,18 +68,28 @@ function readAvailabilitySamples(filePath, { now = Date.now(), windowDays = 30 }
   });
 }
 
-function availabilitySummary(samples = [], { targetPercent = 99.5, windowDays = 30, minimumSamples = 1_000, minimumCoveragePercent = 95, now = Date.now() } = {}) {
-  const normalized = samples.map(normalizeSample).filter(Boolean);
+function availabilitySummary(samples = [], { targetPercent = 99.5, windowDays = 30, minimumSamples = 1_000, minimumCoveragePercent = 95, sampleIntervalMs = 60_000, expectedEndpoints = [], now = Date.now() } = {}) {
+  const windowMs = Math.max(1, Number(windowDays) || 30) * DAY_MS;
+  const interval = Math.max(1, Number(sampleIntervalMs) || 60_000);
+  const normalized = samples.map(normalizeSample).filter(sample => sample && sample.at >= now - windowMs && sample.at <= now);
   const byEndpoint = new Map();
   for (const sample of normalized) {
     const rows = byEndpoint.get(sample.endpoint) || [];
     rows.push(sample);
     byEndpoint.set(sample.endpoint, rows);
   }
-  const requiredCoverageMs = Math.max(1, Number(windowDays) || 30) * DAY_MS * Math.max(0.5, Math.min(1, Number(minimumCoveragePercent) / 100 || 0.95));
+  const requiredCoverageMs = windowMs * Math.max(0.5, Math.min(1, Number(minimumCoveragePercent) / 100 || 0.95));
   const endpoints = [...byEndpoint.entries()].map(([endpoint, rows]) => {
-    const ordered = rows.sort((left, right) => left.at - right.at);
+    const unique = new Map();
+    for (const row of rows) {
+      const previous = unique.get(row.at);
+      // Duplicate observations cannot increase coverage or erase an outage.
+      unique.set(row.at, previous ? { ...row, ok: previous.ok && row.ok, latencyMs: Math.max(previous.latencyMs, row.latencyMs) } : row);
+    }
+    const ordered = [...unique.values()].sort((left, right) => left.at - right.at);
     const successful = ordered.filter((row) => row.ok);
+    const coverageMs = ordered.reduce((total, row, index) => index === 0 ? total
+      : total + Math.min(interval, row.at - ordered[index - 1].at), 0);
     return {
       endpoint,
       samples: ordered.length,
@@ -84,16 +97,23 @@ function availabilitySummary(samples = [], { targetPercent = 99.5, windowDays = 
       p95LatencyMs: percentile(successful.map((row) => row.latencyMs), 0.95),
       firstSampleAt: ordered[0]?.at || 0,
       lastSampleAt: ordered.at(-1)?.at || 0,
-      coverageMs: ordered.length > 1 ? ordered.at(-1).at - ordered[0].at : 0
+      coverageMs,
+      spanMs: ordered.length > 1 ? ordered.at(-1).at - ordered[0].at : 0,
+      coveragePercent: Number((coverageMs / windowMs * 100).toFixed(4))
     };
   });
-  const measured = endpoints.length > 0 && endpoints.every((entry) => entry.samples >= minimumSamples && entry.coverageMs >= requiredCoverageMs);
+  const measured = endpoints.length > 0
+    && expectedEndpoints.every(value => endpoints.some(entry => entry.endpoint === endpointId(value)))
+    && endpoints.every(entry => entry.samples >= minimumSamples && entry.coverageMs >= requiredCoverageMs
+      && now - entry.lastSampleAt <= interval * 2);
   const availabilityPercent = endpoints.length ? Math.min(...endpoints.map((entry) => entry.availabilityPercent)) : 0;
   const allowedErrorPercent = Math.max(0.0001, 100 - Number(targetPercent));
   const actualErrorPercent = Math.max(0, 100 - availabilityPercent);
   const consumedPercent = Math.max(0, actualErrorPercent / allowedErrorPercent * 100);
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
+    coverageMethod: 'bounded-sample-intervals',
+    sampleIntervalMs: interval,
     generatedAt: new Date(now).toISOString(),
     windowDays,
     targetPercent,
@@ -147,7 +167,8 @@ function createAvailabilityMonitor({
     inFlight = collectAvailabilitySample({ endpoints, timeoutMs, fetchImpl })
       .then((samples) => {
         const history = persistAvailability(historyPath, samples);
-        const report = availabilitySummary(history, { targetPercent, windowDays, minimumSamples, minimumCoveragePercent });
+        const report = availabilitySummary(history, { targetPercent, windowDays, minimumSamples, minimumCoveragePercent,
+          sampleIntervalMs: Math.max(30_000, Number(intervalMs) || 60_000), expectedEndpoints: endpoints });
         fs.mkdirSync(path.dirname(reportPath), { recursive: true });
         fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
         const state = samples.every((sample) => sample?.ok) ? 'online' : 'degraded';

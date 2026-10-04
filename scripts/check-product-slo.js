@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadSuite, suiteHash, buildModelReport } = require('./run-ai-eval-lab');
+const { availabilitySummary, readAvailabilitySamples } = require('../src/infrastructure/storage/availability-monitor');
 
 const root = path.resolve(__dirname, '..');
 
@@ -121,9 +122,15 @@ function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifac
   checks.push(result('android-baseline-profiles', baselineObserved.every((entry) => entry.present) ? 'pass' : 'fail', baselineObserved, { requiredForBothClients: true }));
 
   const availability = [
-    readJson(path.join(artifactsRoot, 'availability-report.json')),
-    readJson(path.join(path.dirname(projectRoot), '.nexus-data', 'metrics', 'availability-report.json'))
-  ].filter(Boolean).sort((left, right) => {
+    path.join(artifactsRoot, 'availability-samples.ndjson'),
+    path.join(path.dirname(projectRoot), '.nexus-data', 'metrics', 'availability-samples.ndjson')
+  ].filter(file => fs.existsSync(file)).map(file => availabilitySummary(readAvailabilitySamples(file, { windowDays: policy.windowDays }), {
+    targetPercent: objectives.availabilityTargetPercent, windowDays: policy.windowDays,
+    minimumSamples: objectives.availability.minimumSamplesPerEndpoint,
+    minimumCoveragePercent: objectives.availability.minimumCoveragePercent,
+    sampleIntervalMs: objectives.availability.sampleIntervalMs || 60_000,
+    expectedEndpoints: objectives.readiness.endpoints
+  })).sort((left, right) => {
     if (Boolean(left.measured) !== Boolean(right.measured)) return Number(right.measured) - Number(left.measured);
     const coverage = (report) => Math.max(0, ...(report.endpoints || []).map((entry) => Number(entry.coverageMs) || 0));
     const samples = (report) => (report.endpoints || []).reduce((total, entry) => total + (Number(entry.samples) || 0), 0);

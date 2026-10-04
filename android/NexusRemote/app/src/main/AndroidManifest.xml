@@ -73,6 +73,7 @@
         </activity>
         <activity
             android:name=".NexusAssistantActivity"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|smallestScreenSize|uiMode"
             android:excludeFromRecents="true"
             android:exported="true"

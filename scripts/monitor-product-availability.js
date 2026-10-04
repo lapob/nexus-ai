@@ -28,7 +28,9 @@ async function sample() {
     targetPercent: policy.objectives.availabilityTargetPercent,
     windowDays: policy.windowDays,
     minimumSamples: availability.minimumSamplesPerEndpoint,
-    minimumCoveragePercent: availability.minimumCoveragePercent
+    minimumCoveragePercent: availability.minimumCoveragePercent,
+    sampleIntervalMs: intervalMs,
+    expectedEndpoints: readiness.endpoints
   });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   console.log(`Disponibilita NexusNXS: ${report.status}; budget consumato ${report.errorBudget.consumedPercent}%; ${report.endpoints.map((entry) => `${entry.endpoint} ${entry.availabilityPercent}%`).join(', ')}`);

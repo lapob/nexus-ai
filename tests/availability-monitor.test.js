@@ -24,6 +24,16 @@ test('il monitor conserva solo endpoint pubblico, esito e latenza', async () => 
   assert.doesNotMatch(JSON.stringify(rows), /prompt|answer|ip|authorization/i);
 });
 
+test('rilascia il corpo delle risposte anche quando il cleanup fallisce', async () => {
+  let cancelled = 0;
+  const rows = await collectAvailabilitySample({
+    endpoints: ['https://nexusnxs.com/'],
+    fetchImpl: async () => ({ ok: true, status: 200, body: { cancel: async () => { cancelled++; throw new Error('already closed'); } } })
+  });
+  assert.equal(cancelled, 1);
+  assert.equal(rows[0].ok, true);
+});
+
 test('il monitor residente evita campioni concorrenti e si arresta in modo pulito', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-availability-service-'));
   try {
@@ -82,7 +92,7 @@ test('la finestra diventa misurata soltanto con campioni e copertura sufficienti
     at: now - 9 * DAY_MS + index * DAY_MS,
     endpoint: 'ai.nexusnxs.com/readyz', ok: index !== 0, status: index === 0 ? 503 : 200, latencyMs: 120
   }));
-  const passing = availabilitySummary(healthy, { now, windowDays: 10, minimumSamples: 10, minimumCoveragePercent: 90, targetPercent: 80 });
+  const passing = availabilitySummary(healthy, { now, windowDays: 10, minimumSamples: 10, minimumCoveragePercent: 90, sampleIntervalMs: DAY_MS, targetPercent: 80 });
   assert.equal(passing.status, 'pass');
   assert.equal(passing.errorBudget.allowedErrorPercent, 20);
   assert.equal(passing.errorBudget.actualErrorPercent, 10);
@@ -90,7 +100,36 @@ test('la finestra diventa misurata soltanto con campioni e copertura sufficienti
   assert.equal(passing.errorBudget.remainingPercent, 50);
   assert.equal(passing.errorBudget.burnRate, 0.5);
   assert.equal(availabilitySummary(healthy.slice(2), { now, windowDays: 10, minimumSamples: 10, minimumCoveragePercent: 90 }).status, 'not-measured');
-  assert.equal(availabilitySummary(healthy, { now, windowDays: 10, minimumSamples: 10, minimumCoveragePercent: 90, targetPercent: 95 }).status, 'fail');
+  assert.equal(availabilitySummary(healthy, { now, windowDays: 10, minimumSamples: 10, minimumCoveragePercent: 90, sampleIntervalMs: DAY_MS, targetPercent: 95 }).status, 'fail');
+});
+
+test('campioni distanti non certificano gli intervalli senza monitoraggio', () => {
+  const now = 40 * DAY_MS;
+  const sparse = Array.from({ length: 1_001 }, (_, index) => ({
+    at: now - 30 * DAY_MS + index * 30 * DAY_MS / 1_000,
+    endpoint: 'ai.nexusnxs.com/readyz', ok: true, status: 200, latencyMs: 50
+  }));
+  const report = availabilitySummary(sparse, { now });
+  assert.equal(report.status, 'not-measured');
+  assert.equal(report.endpoints[0].spanMs, 30 * DAY_MS);
+  assert.equal(report.endpoints[0].coverageMs, 1_000 * 60_000);
+  assert.ok(report.endpoints[0].coveragePercent < 3);
+});
+
+test('filtra la finestra, deduplica conservando i guasti e richiede tutti gli endpoint', () => {
+  const now = 40 * DAY_MS;
+  const sample = { endpoint: 'nexusnxs.com', ok: true, status: 200, latencyMs: 50 };
+  const dense = Array.from({ length: 1_441 }, (_, index) => ({ ...sample, at: now - DAY_MS + index * 60_000 }));
+  const rows = [...dense, { ...sample, at: now - 2 * DAY_MS }, { ...sample, at: now + 1 },
+    { ...sample, at: now, ok: false, status: 503 }];
+  const options = { now, windowDays: 1 };
+  const report = availabilitySummary(rows, options);
+  assert.equal(report.status, 'pass');
+  assert.equal(report.endpoints[0].samples, 1_441);
+  assert.equal(report.endpoints[0].coverageMs, DAY_MS);
+  assert.ok(report.availabilityPercent < 100);
+  assert.equal(availabilitySummary(rows, { ...options, expectedEndpoints: ['https://ai.nexusnxs.com/readyz'] }).measured, false);
+  assert.equal(availabilitySummary(rows, { ...options, now: now + 180_000 }).measured, false);
 });
 
 test('persistenza atomica scarta righe corrotte e limita lo storico', () => {

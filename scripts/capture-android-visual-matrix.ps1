@@ -95,12 +95,27 @@ try {
     }
     Invoke-CheckedAdb -s $device pull $remotePng (Join-Path $OutputDirectory "$($profile.Name).png") | Out-Null
     Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
-    Invoke-CheckedAdb -s $device shell rm $remotePng $remoteXml | Out-Null
     $capturedXml = [xml](Get-Content -LiteralPath (Join-Path $OutputDirectory "$($profile.Name).xml") -Raw)
     if (-not $capturedXml.SelectSingleNode("//node[@package='$package']")) {
       throw "La cattura $($profile.Name) non contiene l'app prevista."
     }
     if ($App -eq 'Control') {
+      $readinessDeadline = [DateTime]::UtcNow.AddSeconds(25)
+      $readyWait = [Diagnostics.Stopwatch]::StartNew()
+      # Cold bootstrap and authenticated telemetry can outlast the visualizer assembly.
+      # Poll only read-only captures; a wrong foreground app or timeout still fails.
+      while ($ControlState -eq 'Online' -and -not $capturedXml.SelectSingleNode("//node[@package='$package' and @text='Riavvia']") -and [DateTime]::UtcNow -lt $readinessDeadline) {
+        Start-Sleep -Milliseconds 800
+        Invoke-CheckedAdb -s $device shell uiautomator dump $remoteXml | Out-Null
+        Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
+        $capturedXml = [xml](Get-Content -LiteralPath (Join-Path $OutputDirectory "$($profile.Name).xml") -Raw)
+        if (-not $capturedXml.SelectSingleNode("//node[@package='$package']")) { throw "Foreground cambiato durante l'attesa della dashboard." }
+      }
+      if ($readyWait.ElapsedMilliseconds -gt 800) {
+        Invoke-CheckedAdb -s $device shell screencap -p $remotePng | Out-Null
+        Invoke-CheckedAdb -s $device pull $remotePng (Join-Path $OutputDirectory "$($profile.Name).png") | Out-Null
+      }
+      Write-Output "Control $($profile.Name): attesa readiness aggiuntiva $($readyWait.ElapsedMilliseconds) ms."
       $offline = $null -ne $capturedXml.SelectSingleNode("//node[@package='$package' and @text='OFFLINE']")
       $dashboard = $null -ne $capturedXml.SelectSingleNode("//node[@package='$package' and @text='Riavvia']")
       if (($ControlState -eq 'Online' -and -not $dashboard) -or ($ControlState -eq 'Offline' -and -not $offline)) {
@@ -112,6 +127,7 @@ try {
         throw "Public $($profile.Name): atteso stato $PublicState. Una schermata offline non dimostra il percorso online."
       }
     }
+    Invoke-CheckedAdb -s $device shell rm $remotePng $remoteXml | Out-Null
     $capturedPng = [IO.File]::ReadAllBytes((Join-Path $OutputDirectory "$($profile.Name).png"))
     if ($capturedPng.Length -lt 24 -or [BitConverter]::ToString($capturedPng, 0, 8) -ne '89-50-4E-47-0D-0A-1A-0A') {
       throw "Screenshot $($profile.Name) non valido."

@@ -47,6 +47,36 @@ class ComposerContinuityTest {
             .invoke(activity, action, value)
     }
 
+    @Test fun publicAssistIntentCannotAuthorizeListeningOrAlterComposer() {
+        val session = ActivityScenario.launch<NexusMainActivity>(Intent(context, NexusMainActivity::class.java))
+        scenario = session
+        session.onActivity { activity ->
+            online(activity)
+            dispatch(activity, "draft", "retained draft")
+            val before = state(activity)
+            val incoming = Intent(Intent.ACTION_ASSIST).putExtra("trusted", true)
+            NexusMainActivity::class.java.getDeclaredMethod("handleIncomingIntent", Intent::class.java)
+                .apply { isAccessible = true }.invoke(activity, incoming)
+            assertEquals(before.assistantInvocation, state(activity).assistantInvocation)
+            assertFalse(state(activity).assistantOverlay)
+            assertEquals("retained draft", state(activity).draft)
+            assertEquals(before.turns, state(activity).turns)
+            assertNull(incoming.action)
+            assertEquals(0, incoming.extras?.size() ?: 0)
+        }
+    }
+
+    @Test fun automaticAssistantRequiresTheSystemVoicePermission() {
+        val component = android.content.ComponentName(context, NexusAssistantActivity::class.java)
+        @Suppress("DEPRECATION")
+        val info = context.packageManager.getActivityInfo(component, 0)
+        assertEquals(android.Manifest.permission.BIND_VOICE_INTERACTION, info.permission)
+        assertTrue(info.exported)
+        val permission = context.packageManager.getPermissionInfo(info.permission, 0)
+        assertEquals(android.content.pm.PermissionInfo.PROTECTION_SIGNATURE,
+            permission.protectionLevel and android.content.pm.PermissionInfo.PROTECTION_MASK_BASE)
+    }
+
     private fun attachment(text: String) = JSONObject().put("name", "qa.txt").put("mime", "text/plain")
         .put("data", Base64.encodeToString(text.toByteArray(), Base64.NO_WRAP)).toString()
 

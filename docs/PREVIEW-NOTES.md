@@ -1,4 +1,11 @@
-### Novita 0.3.25
+### Novita 0.3.26
+
+- Control usa un solo contratto di azioni: la chiusura di un programma consentito conserva verifica dello stato, permessi e ricevuta.
+- Android 6.5.23 protegge l'assistente di sistema e ignora richiami ASSIST non autorizzati sul launcher pubblico.
+- Stop rilascia anche un microfono concesso in ritardo; una precedente richiesta non sostituisce una nuova sessione.
+- Le misure di disponibilita vengono ricostruite dai campioni grezzi: intervalli senza osservazioni e duplicati non possono certificare la copertura.
+
+### Miglioramenti inclusi dalla 0.3.25
 
 - Download della web app derivati dalla stessa versione/tag del publisher; eliminato il riferimento obsoleto alla 0.3.23 trovato nel controllo live.
 - Le release gia pubblicate restano immutabili: un retry verifica gli hash, una sostituzione richiede una nuova versione.
@@ -14,13 +21,15 @@
 
 ### Prove e limiti
 
-Windows: 1024 test PASS, 2 SKIP dopo le correzioni di download e distribuzione. La precedente
-suite Linux locale: 1001 PASS, 17 SKIP; nessun FAIL. I controlli su checkout
-puliti GitHub Windows/Ubuntu completano la verifica dei sorgenti.
+I controlli su checkout puliti GitHub Windows/Ubuntu verificano i sorgenti;
+il checkpoint pubblico registra revisione e risultato effettivi di ciascuna consegna.
 Installer e smoke del pacchetto PASS. Download Electron dei contenuti esatti,
-hitbox e recupero del focus verificati a scala 100% e 200%. Android: build,
-lint e firma Preview verificati. La nuova prova fisica e stata rinviata dal
-proprietario; non attribuire alla nuova build le prove delle versioni precedenti.
+hitbox e recupero del focus verificati a scala 100% e 200%. Android 6.5.23:
+build, lint, firma Preview, cinque profili fisici Online e 24 test nativi PASS.
+Il richiamo dal tasto assistente di sistema e la voce umana restano prove distinte.
+Audit Codex Security esplicitamente parziale: 65 file revisionati su 929;
+la protezione dell'assistente corregge il finding medio individuato sul sorgente
+precedente, senza certificare il restante codice.
 
 Questa e una build sperimentale pubblicata per revisione tecnica, non una
 Beta approvata per inviti commerciali o una Stable. Mancano ancora firme di

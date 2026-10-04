@@ -1,8 +1,26 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 3 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 4 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
+
+## Candidata del 4 ottobre: Preview 0.3.26
+
+Build Windows, verifica installer e smoke packaged PASS. Android pubblico6.5.23/code113:
+cinque profili Online e24test nativi PASS, senza modificare conversazioni personali.
+Control ora riusa il contratto delle azioni e autorizza anche close-application
+solo per un programma previsto e chiudibile. Il microfono acquisito dopo Stop
+viene rilasciato; richieste obsolete non sostituiscono una sessione recente.
+La disponibilita viene ricalcolata dai campioni grezzi: assenze, duplicati,
+finestra e ultimo campione contano per certificare la copertura.
+
+Audit Codex Security completato con copertura PARZIALE65/929file sul sorgente
+8e2925c,864percorsi rinviati. Un finding medio ASSIST Android e corretto nella
+candidata tramite permesso di sistema e rifiuto sul launcher; regressioni native
+PASS. Non e auditing integrale. Il richiamo dal tasto fisico dell'assistente,
+la voce umana e il controllo del bridge aggiornato restano da verificare.
+Ripetere il gate completo senza build concorrenti dopo il timeout DPAPI del
+secondo giro. Release/installazione26 non ancora completate.
 
 ## Consegna del 3 ottobre: Preview 0.3.25
 

@@ -26,8 +26,8 @@ $report = $output -join [Environment]::NewLine
 $artifactDirectory = Join-Path $projectRoot 'qa-artifacts'
 [IO.Directory]::CreateDirectory($artifactDirectory) | Out-Null
 [IO.File]::WriteAllText((Join-Path $artifactDirectory 'android-history-device.log'), $report)
-if ($exitCode -ne 0 -or $report -notmatch 'OK \(22 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
+if ($exitCode -ne 0 -or $report -notmatch 'OK \(24 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
     Write-Output $report
     throw 'Test nativi della cronologia non superati.'
 }
-Write-Output 'PASS: 22 test SQLite/Keystore e continuita Activity sul dispositivo, sandbox QA separata.'
+Write-Output 'PASS: 24 test SQLite/Keystore, continuita Activity e autorizzazione assistente sul dispositivo, sandbox QA separata.'

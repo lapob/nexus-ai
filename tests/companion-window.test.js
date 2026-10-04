@@ -3,14 +3,35 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
+const os = require('node:os');
+const { assertPresenceActionAuthorized, normalizeDesktopPresenceStatus, normalizePresenceAction } = require('../src/remote/desktop-presence-contract');
 
 const originalLoad = Module._load;
 Module._load = function patched(request, parent, isMain) {
-  if (request === 'electron') return { app: {}, BrowserWindow: class {}, ipcMain: {}, screen: {} };
+  if (request === 'electron') return {
+    app: { getPath: () => path.join(os.tmpdir(), 'nexus-manager-contract-no-profile') },
+    BrowserWindow: class {}, ipcMain: { on() {}, removeListener() {} },
+    screen: { getAllDisplays: () => [{ id: 1 }], getPrimaryDisplay: () => ({ id: 1 }) }
+  };
   return originalLoad.call(this, request, parent, isMain);
 };
-const { ambientPresenceBounds, automaticPresenceDisplayId, normalizePresenceConfiguration, presenceTransitionDelay, serializeDisplayPosition, systemPresenceBounds, systemPresenceDocument } = require('../src/infrastructure/electron/companion-window');
+const { createSystemPresenceManager, ambientPresenceBounds, automaticPresenceDisplayId, normalizePresenceConfiguration, presenceTransitionDelay, serializeDisplayPosition, systemPresenceBounds, systemPresenceDocument } = require('../src/infrastructure/electron/companion-window');
 Module._load = originalLoad;
+
+test('il manager autorizza la chiusura delle applicazioni consentite mantenendo i vincoli del catalogo', () => {
+  const manager = createSystemPresenceManager({ startHidden: true });
+  try {
+    const application = { id: 'notepad', available: true, open: true, canClose: true };
+    const status = normalizeDesktopPresenceStatus({ ...manager.getSystemPresenceStatus(), applications: [application] });
+    const close = normalizePresenceAction({ action: 'close-application', applicationId: 'notepad' });
+    assert.doesNotThrow(() => assertPresenceActionAuthorized(status, close));
+    for (const denied of [{ ...application, canClose: false }, { ...application, available: false }]) {
+      const guarded = normalizeDesktopPresenceStatus({ ...manager.getSystemPresenceStatus(), applications: [denied] });
+      assert.throws(() => assertPresenceActionAuthorized(guarded, close), error => error.status === 409);
+    }
+    assert.throws(() => normalizePresenceAction({ action: 'close-application', applicationId: 'arbitrary' }));
+  } finally { manager.dispose(); }
+});
 
 test('la Presence mantiene coordinate relative sicure su display diversi', () => {
   const left = { id: 7, workArea: { x: -2560, y: -120, width: 2560, height: 1440 } };
@@ -107,5 +128,5 @@ test('il manager usa una sola Presence trascinabile e ancorata senza fondo opaco
   assert.match(source, /const selectedDescriptor = descriptors\.find/);
   assert.match(source, /const activeIds = new Set\(selectedDescriptor \? \[selectedDescriptor\.displayId\] : \[\]\)/);
   assert.match(source, /Posizioni Presence obsolete non ripulite/);
-  assert.match(source, /'open-full-app', 'close-full-app', 'open-chatgpt', 'close-chatgpt'/);
+  assert.match(source, /allowedActions: \[\.\.\.PRESENCE_ACTIONS\]/);
 });

@@ -9,6 +9,7 @@ const { interactionStatePalette } = require('../../core/interaction-state-protoc
 const PET_SPRITE = fs.readFileSync(path.join(__dirname, '../../shared/nexus-pets.webp')).toString('base64');
 const PETS = ['orb', 'robot', 'fox'];
 const { createPetMotion } = require('../../shared/pet-motion');
+const { PRESENCE_ACTIONS } = require('../../remote/desktop-presence-contract');
 
 const PRESENCE_SIZE = 168;
 const DISPLAY_MARGIN = 18;
@@ -733,7 +734,7 @@ function createSystemPresenceManager({ logger, openPrimaryWindow, closePrimaryWi
       displaySelectionMode,
       automaticDisplayId,
       logicalDisplays: descriptors.map((entry) => ({ id: entry.logicalId, primary: entry.logicalId === 'primary' })),
-      allowedActions: ['show-nucleus', 'hide-nucleus', 'open-full-app', 'close-full-app', 'open-chatgpt', 'close-chatgpt', 'open-application', 'select-display']
+      allowedActions: [...PRESENCE_ACTIONS]
     };
   }
 

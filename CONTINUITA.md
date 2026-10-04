@@ -1,6 +1,14 @@
 # Public continuity checkpoint
 
-Updated 3 October 2026. This file is safe for source collaboration. Private data, credentials, workstation configuration and logs remain outside GitHub.
+Updated 4 October 2026. This file is safe for source collaboration. Private data, credentials, workstation configuration and logs remain outside GitHub.
+
+## Candidate 0.3.26: verification in progress
+
+Windows 0.3.26 build, installer verification and packaged smoke pass. Android public 6.5.23/code113 build, lint, Debug signing and five physical Online profiles pass; 24 native tests pass in the separate QA sandbox. The new release is not published yet; 0.3.25 remains the verified rollback.
+
+Control capabilities now use the common action contract, including authorized application closure. Two behavioral tests cover late microphone acquisition after Stop and overlapping activations. Availability gates recompute the bounded observation coverage from raw samples, filter the requested window and deduplicate observations conservatively. Missing observations cannot certify availability.
+
+Web offline/reconnection and history cancellation checks pass. Codex Security completed an explicitly partial review of revision 8e2925c: 65/929 files reviewed, 864 deferred, one medium finding on untrusted Android ASSIST entry. The candidate protects the assistant Activity with the system signature permission and rejects ASSIST on the public launcher; native regressions pass. This does not constitute full repository security coverage. Physical invocation from the actual assistant button remains pending; the OS rejects shell attempts correctly. The final isolated Windows suite passes: 1030 PASS, 2 SKIP, 0 FAIL. Source check, packaged smoke, installer and six-artifact bundle checks pass. The earlier DPAPI timeout during a concurrent build did not recur in the focused test or isolated full suite. Installed Control checks and clean GitHub CI remain to be recorded before delivery.
 
 ## Verified delivery
 

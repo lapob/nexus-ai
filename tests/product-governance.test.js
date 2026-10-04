@@ -108,10 +108,22 @@ test('lo SLO usa lo storico disponibilita piu completo senza farsi oscurare da u
     fs.mkdirSync(operational, { recursive: true });
     fs.writeFileSync(path.join(artifacts, 'availability-report.json'), `${JSON.stringify({ measured: false, endpoints: [{ endpoint: 'manual', samples: 1, coverageMs: 0 }] })}\n`);
     fs.writeFileSync(path.join(operational, 'availability-report.json'), `${JSON.stringify({ measured: true, availabilityPercent: 99.9, endpoints: [{ endpoint: 'resident', samples: 45_000, coverageMs: 30 * 86_400_000 }] })}\n`);
+    // A claimed report alone is not evidence; the gate recomputes raw observations.
+    assert.equal(evaluateArtifacts({ policy, artifactsRoot: artifacts, projectRoot })
+      .find(entry => entry.id === 'availability-window').status, 'not-measured');
+    const now = Date.now();
+    const rows = policy.objectives.readiness.endpoints.flatMap(url => {
+      const endpoint = new URL(url).hostname + new URL(url).pathname.replace(/\/$/, '');
+      return Array.from({ length: 43_201 }, (_, index) => JSON.stringify({
+        at: now - 30 * 86_400_000 + index * 60_000, endpoint, ok: true, status: 200, latencyMs: 20
+      }));
+    });
+    fs.writeFileSync(path.join(operational, 'availability-samples.ndjson'), rows.join('\n'));
     const availability = evaluateArtifacts({ policy, artifactsRoot: artifacts, projectRoot })
       .find((entry) => entry.id === 'availability-window');
     assert.equal(availability.status, 'pass');
-    assert.equal(availability.observed.endpoints[0].endpoint, 'resident');
+    assert.equal(availability.observed.endpoints.length, 3);
+    assert.ok(availability.observed.endpoints.every(entry => entry.coveragePercent >= 95));
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true });
   }

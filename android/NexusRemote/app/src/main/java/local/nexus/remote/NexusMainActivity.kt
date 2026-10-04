@@ -2715,6 +2715,14 @@ open class NexusMainActivity : ComponentActivity() {
     private fun handleIncomingIntent(incoming: Intent?) {
         incoming ?: return
         if (incoming.action == Intent.ACTION_ASSIST) {
+            // Only the system-protected assistant surface can authorize automatic listening.
+            // An action string on the public launcher is not a microphone permission grant.
+            if (this !is NexusAssistantActivity) {
+                incoming.replaceExtras(Bundle())
+                incoming.data = null
+                incoming.action = null
+                return
+            }
             state = state.copy(
                 screen = NexusScreen.CHAT,
                 work = false,
