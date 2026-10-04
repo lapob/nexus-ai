@@ -1,5 +1,21 @@
 # Roadmap tecnica
 
+## Stabilita e consegna Preview — 4 ottobre 2026
+
+Windows0.3.27 e Android6.5.23 sono pubblicati con asset verificati; Windows
+installato con smoke e servizi headless verificati. I dettagli misurati sono
+nel checkpoint pubblico e in STABILIZATION-STATUS.md. Il retry DPAPI e limitato
+ai timeout e gli errori di bootstrap conservano il codice di uscita dopo cleanup.
+Android protegge il richiamo automatico dell'assistente dal codice non autorizzato.
+Le misure di disponibilita usano campioni grezzi e non contano intervalli senza
+osservazioni come copertura. Questo non completa un audit o certifica una Stable.
+
+Prossimo lavoro: completare richiamo assistente dal tasto reale e conferme di
+Control quando ADB ritorna; raccogliere prove umane di voce/eco con consenso;
+riprendere i percorsi differiti dell'audit65/929, firma di produzione e restore
+esterno. La promozione del sito resta bloccata dalle dipendenze; non aggirare il
+gate. Modelli, dati autorizzati e nodo per automazioni rimangono requisiti distinti.
+
 ## Ripresa e pubblicazione sorgenti — 3 ottobre 2026
 
 Il programma corrente e i criteri ancora aperti sono in

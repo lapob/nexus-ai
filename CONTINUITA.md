@@ -2,9 +2,17 @@
 
 Updated 4 October 2026. This file is safe for source collaboration. Private data, credentials, workstation configuration and logs remain outside GitHub.
 
-## Candidate 0.3.27: startup recovery
+## Verified 0.3.27 delivery
 
-Installation of 0.3.26 exposed a cold Windows DPAPI timeout during bridge startup. The candidate retries a killed timeout once, bounded to 4+8 seconds, while retaining CurrentUser protection and denying cryptographic failures. Shutdown now preserves a bootstrap failure exit code after cleanup, allowing the existing task supervisor to retry. Thirteen focused tests and an actual Electron cleanup/exit1 check pass. Source check and final Windows suite pass: 1033 PASS, 2 SKIP, 0 FAIL. Build and distribution checks are pending. Android 6.5.23 is unchanged.
+Windows 0.3.27 is published as v0.3.27-preview.1 from add45bed, with eight GitHub assets verified by digest and byte count. Installation, identical ASAR, native installed smoke and the configured shortcut pass. Clean GitHub Windows/Ubuntu CI, registry signatures, secret scanning and dependency audits pass. The server and desktop bridge are running; boot/logon tasks are enabled and service startup opens neither UI nor pet. The PC was not rebooted.
+
+Live HTTPS health/readiness/home and the current Windows/Android download links pass. Two synthetic input probes completed: chat first token 3347/1075 ms, total 3401/1105 ms; TTS returned valid WAV in 8211/656 ms after startup/warm-up. These are individual observations, not a general benchmark or human voice/echo validation. Six old recoverable Windows installer/blockmap outputs were removed after matching GitHub digests and sizes, freeing 335759902 bytes. Versions 0.3.25, 0.3.26 and 0.3.27 remain locally available.
+
+Android public 6.5.23/code113 and Control 1.19.8/code42 passed five physical Online profiles each; public native QA passed 24 tests. Control's authorized application closure passed through the real authenticated bridge. ADB disconnected before the final power/service confirmation checks; these and invocation from the actual assistant button remain pending. No power action was executed. Website source now has verified 0.3.27/6.5.23 release metadata and 37 passing local tests, but production deployment remains blocked by the dependency security gate.
+
+## Startup recovery evidence
+
+Installation of 0.3.26 exposed a cold Windows DPAPI timeout during bridge startup. The candidate retries a killed timeout once, bounded to 4+8 seconds, while retaining CurrentUser protection and denying cryptographic failures. Shutdown now preserves a bootstrap failure exit code after cleanup, allowing the existing task supervisor to retry. Thirteen focused tests and an actual Electron cleanup/exit1 check pass. Source check and final Windows suite pass: 1033 PASS, 2 SKIP, 0 FAIL. Build, installer, packaged/installed smoke and the six-artifact bundle pass. Android 6.5.23 is unchanged.
 
 ## Verified 0.3.26 delivery
 
@@ -12,7 +20,7 @@ Windows 0.3.26 was published as v0.3.26-preview.1 with eight verified assets and
 
 Control capabilities now use the common action contract, including authorized application closure. Two behavioral tests cover late microphone acquisition after Stop and overlapping activations. Availability gates recompute the bounded observation coverage from raw samples, filter the requested window and deduplicate observations conservatively. Missing observations cannot certify availability.
 
-Web offline/reconnection and history cancellation checks pass. Codex Security completed an explicitly partial review of revision 8e2925c: 65/929 files reviewed, 864 deferred, one medium finding on untrusted Android ASSIST entry. The candidate protects the assistant Activity with the system signature permission and rejects ASSIST on the public launcher; native regressions pass. This does not constitute full repository security coverage. Physical invocation from the actual assistant button remains pending; the OS rejects shell attempts correctly. The final isolated Windows suite passes: 1030 PASS, 2 SKIP, 0 FAIL. Source check, packaged smoke, installer and six-artifact bundle checks pass. The earlier DPAPI timeout during a concurrent build did not recur in the focused test or isolated full suite. Installed Control checks and clean GitHub CI remain to be recorded before delivery.
+Web offline/reconnection and history cancellation checks pass. Codex Security completed an explicitly partial review of revision 8e2925c: 65/929 files reviewed, 864 deferred, one medium finding on untrusted Android ASSIST entry. The candidate protects the assistant Activity with the system signature permission and rejects ASSIST on the public launcher; native regressions pass. This does not constitute full repository security coverage. Physical invocation from the actual assistant button remains pending; the OS rejects shell attempts correctly. The final isolated Windows suite passes: 1030 PASS, 2 SKIP, 0 FAIL. Source check, packaged smoke, installer and six-artifact bundle checks pass. The earlier DPAPI timeout during a concurrent build did not recur in the focused test or isolated full suite. The authorized test application closure and clean GitHub CI were verified; remaining physical button checks are recorded above.
 
 ## Previous 0.3.25 delivery
 

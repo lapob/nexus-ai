@@ -4,14 +4,32 @@ Aggiornamento: 4 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
 
-## Recupero avvio: candidata Preview 0.3.27
+## Consegna verificata: Preview 0.3.27
+
+v0.3.27-preview.1 pubblicata da add45bed con otto asset verificati lato GitHub.
+Installazione Windows, ASAR identica, smoke installed e collegamento richiesto PASS.
+CI pulita Windows/Ubuntu PASS. Suite1033PASS/2SKIP/0FAIL; nessun modello promosso.
+Core e bridge Running; task Boot/S4U e Logon/Interactive Enabled, senza UI/pet
+all'avvio servizio. Nessun riavvio del PC eseguito: cold boot ancora distinto.
+
+HTTPS health/ready/home e download27 PASS. Due probe sintetici: TTFT3347/1075ms,
+totale3401/1105ms; TTS8211/656ms con WAV validi. Due osservazioni, non un benchmark
+o prova di eco/voce umana. Sei vecchi installer/blockmap22–24 rimossi dopo verifica
+hash/dimensioni GitHub,335759902byte liberati.25/26/27 e dati conservati.
+
+Android113 e Control42: cinque profili Online ciascuno PASS;24nativi public PASS.
+Chiusura Note del test sul bridge autentico PASS. ADB disconnesso prima delle ultime
+conferme Control e del richiamo dal tasto fisico dell'assistente: prove pendenti.
+SITE metadata27 e37test locali PASS, sourcewebsite941018f pubblicato; nessun deploy.
+
+## Recupero avvio verificato
 
 Installazione26 completata, ASAR identica e shortcut aggiornato. Due tentativi
 di bootstrap del bridge hanno rilevato DPAPI non pronto; il task riportava
 successo anche dopo l'errore. La27 ritenta solo un timeout una volta entro
 4+8secondi e conserva il codice di errore dopo la pulizia. Errori crittografici
 restano negati. Focused13/13, Electron reale cleanup/exit1 e suite1033PASS,
-2SKIP,0FAIL verificati. Build/distribuzione27 ancora in corso.
+2SKIP,0FAIL verificati. Build e distribuzione27 ora completate.
 
 Control42: cinque profili fisici Online PASS, chiusura Note creato dal test
 verificata sul bridge autentico. Collaudo finale pulsanti interrotto dalla
@@ -31,10 +49,9 @@ finestra e ultimo campione contano per certificare la copertura.
 Audit Codex Security completato con copertura PARZIALE65/929file sul sorgente
 8e2925c,864percorsi rinviati. Un finding medio ASSIST Android e corretto nella
 candidata tramite permesso di sistema e rifiuto sul launcher; regressioni native
-PASS. Non e auditing integrale. Il richiamo dal tasto fisico dell'assistente,
-la voce umana e il controllo del bridge aggiornato restano da verificare.
-Ripetere il gate completo senza build concorrenti dopo il timeout DPAPI del
-secondo giro. Release/installazione26 non ancora completate.
+PASS. Non e auditing integrale. Il richiamo dal tasto fisico dell'assistente
+e la voce umana restano da verificare; bridge aggiornato e chiusura Note PASS.
+Gate isolato ripetuto PASS; release/installazione26 completate e conservate.
 
 ## Consegna del 3 ottobre: Preview 0.3.25
 
