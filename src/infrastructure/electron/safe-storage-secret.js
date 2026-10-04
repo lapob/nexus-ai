@@ -26,13 +26,20 @@ function windowsDpapi(value, mode, {
     : `${bootstrap}$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Text.Encoding]::UTF8.GetString($p))`;
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
   const executable = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-  const result = run(executable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+  const argumentsList = ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded];
+  const options = {
     input: text,
     encoding: 'utf8',
     windowsHide: true,
     timeout: 4_000,
     maxBuffer: 16 * 1024
-  });
+  };
+  let result = run(executable, argumentsList, options);
+  // Cold PowerShell startup can exceed four seconds under installer/antivirus load.
+  // Retry only a killed timeout, once and bounded; crypto failures remain closed.
+  if (result?.error?.code === 'ETIMEDOUT') {
+    result = run(executable, argumentsList, { ...options, timeout: 8_000 });
+  }
   if (result?.error || result?.status !== 0 || !String(result?.stdout || '')) {
     throw secretProtectionError(
       mode === 'protect' ? 'Protezione credenziale locale non riuscita.' : 'Credenziale locale non decifrabile per questo utente.',

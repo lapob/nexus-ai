@@ -1,4 +1,10 @@
-### Novita 0.3.26
+### Novita 0.3.27
+
+- Avvio Windows: un timeout DPAPI viene ritentato una sola volta entro un limite di tempo; errori crittografici restano negati, senza conservare credenziali in chiaro.
+- Un errore di bootstrap restituisce un codice non zero dopo la pulizia, permettendo al supervisore Windows di recuperare il servizio.
+- Suite Windows aggiornata: 1033 PASS, 2 SKIP, nessun FAIL; verificato anche il codice di uscita su Electron reale.
+
+### Miglioramenti inclusi dalla 0.3.26
 
 - Control usa un solo contratto di azioni: la chiusura di un programma consentito conserva verifica dello stato, permessi e ricevuta.
 - Android 6.5.23 protegge l'assistente di sistema e ignora richiami ASSIST non autorizzati sul launcher pubblico.

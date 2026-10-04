@@ -67,6 +67,19 @@ test('la barriera di chiusura attende il cleanup una sola volta prima di uscire'
   assert.equal(application.quitCalls, 3);
 });
 
+test('un errore di avvio esce con codice non zero solo dopo la pulizia', async () => {
+  const application = new EventEmitter();
+  const calls = [];
+  application.quit = () => application.emit('before-quit', { preventDefault() {} });
+  application.exit = code => calls.push(['exit', code]);
+  const barrier = installShutdownBarrier({ application, getExitCode: () => 1,
+    onShutdown: async () => { calls.push(['cleanup']); } });
+  application.quit();
+  await barrier.beginShutdown();
+  assert.deepEqual(calls, [['cleanup'], ['exit', 1]]);
+  assert.equal(barrier.state, 'finished');
+});
+
 test('un bootstrap tardivo non riapre la UI dopo la chiusura durante il caricamento', async () => {
   const fs = require('node:fs');
   const vm = require('node:vm');

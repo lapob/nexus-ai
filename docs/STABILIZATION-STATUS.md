@@ -4,7 +4,21 @@ Aggiornamento: 4 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
 
-## Candidata del 4 ottobre: Preview 0.3.26
+## Recupero avvio: candidata Preview 0.3.27
+
+Installazione26 completata, ASAR identica e shortcut aggiornato. Due tentativi
+di bootstrap del bridge hanno rilevato DPAPI non pronto; il task riportava
+successo anche dopo l'errore. La27 ritenta solo un timeout una volta entro
+4+8secondi e conserva il codice di errore dopo la pulizia. Errori crittografici
+restano negati. Focused13/13, Electron reale cleanup/exit1 e suite1033PASS,
+2SKIP,0FAIL verificati. Build/distribuzione27 ancora in corso.
+
+Control42: cinque profili fisici Online PASS, chiusura Note creato dal test
+verificata sul bridge autentico. Collaudo finale pulsanti interrotto dalla
+disconnessione ADB: conferme alimentazione/servizi non ancora verificate in
+questo giro. Nessun PC riavviato o spento. Android113 invariata.
+
+## Consegna del 4 ottobre: Preview 0.3.26
 
 Build Windows, verifica installer e smoke packaged PASS. Android pubblico6.5.23/code113:
 cinque profili Online e24test nativi PASS, senza modificare conversazioni personali.

@@ -2,15 +2,19 @@
 
 Updated 4 October 2026. This file is safe for source collaboration. Private data, credentials, workstation configuration and logs remain outside GitHub.
 
-## Candidate 0.3.26: verification in progress
+## Candidate 0.3.27: startup recovery
 
-Windows 0.3.26 build, installer verification and packaged smoke pass. Android public 6.5.23/code113 build, lint, Debug signing and five physical Online profiles pass; 24 native tests pass in the separate QA sandbox. The new release is not published yet; 0.3.25 remains the verified rollback.
+Installation of 0.3.26 exposed a cold Windows DPAPI timeout during bridge startup. The candidate retries a killed timeout once, bounded to 4+8 seconds, while retaining CurrentUser protection and denying cryptographic failures. Shutdown now preserves a bootstrap failure exit code after cleanup, allowing the existing task supervisor to retry. Thirteen focused tests and an actual Electron cleanup/exit1 check pass. Source check and final Windows suite pass: 1033 PASS, 2 SKIP, 0 FAIL. Build and distribution checks are pending. Android 6.5.23 is unchanged.
+
+## Verified 0.3.26 delivery
+
+Windows 0.3.26 was published as v0.3.26-preview.1 with eight verified assets and installed with an identical ASAR and refreshed shortcut. Clean GitHub CI passes on Windows/Ubuntu for 0055930. Android public 6.5.23/code113 build, lint, Debug signing and five physical Online profiles pass; 24 native tests pass in the separate QA sandbox. Previous releases remain available for rollback. Control 1.19.8 also passes five physical Online profiles; authorized closure of the test-owned Note application succeeds through the real bridge.
 
 Control capabilities now use the common action contract, including authorized application closure. Two behavioral tests cover late microphone acquisition after Stop and overlapping activations. Availability gates recompute the bounded observation coverage from raw samples, filter the requested window and deduplicate observations conservatively. Missing observations cannot certify availability.
 
 Web offline/reconnection and history cancellation checks pass. Codex Security completed an explicitly partial review of revision 8e2925c: 65/929 files reviewed, 864 deferred, one medium finding on untrusted Android ASSIST entry. The candidate protects the assistant Activity with the system signature permission and rejects ASSIST on the public launcher; native regressions pass. This does not constitute full repository security coverage. Physical invocation from the actual assistant button remains pending; the OS rejects shell attempts correctly. The final isolated Windows suite passes: 1030 PASS, 2 SKIP, 0 FAIL. Source check, packaged smoke, installer and six-artifact bundle checks pass. The earlier DPAPI timeout during a concurrent build did not recur in the focused test or isolated full suite. Installed Control checks and clean GitHub CI remain to be recorded before delivery.
 
-## Verified delivery
+## Previous 0.3.25 delivery
 
 Windows 0.3.25 Founder Preview is published as v0.3.25-preview.1 and installed on the maintainer workstation. Source revision: 00c083e. Eight release assets were verified against GitHub hashes and sizes. Installed ASAR matches the package; installer, native smoke and configured desktop shortcut checks pass. Previous releases remain available for rollback. Android public 6.5.22/code112 is published with verified build, lint and Preview Debug signing; its new physical test is explicitly deferred by the owner. Control 1.19.8 is unchanged. This is a technical Preview, not a Stable or commercially approved Beta.
 

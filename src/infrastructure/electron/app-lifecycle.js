@@ -33,7 +33,7 @@ function shouldKeepApplicationAlive({ headless = false } = {}) {
   return headless === true;
 }
 
-function installShutdownBarrier({ application = app, onShutdown = async () => {}, logger, timeoutMs = 10_000 } = {}) {
+function installShutdownBarrier({ application = app, onShutdown = async () => {}, logger, timeoutMs = 10_000, getExitCode = () => process.exitCode } = {}) {
   let state = 'idle';
   let shutdownPromise = null;
   const beginShutdown = () => {
@@ -56,7 +56,11 @@ function installShutdownBarrier({ application = app, onShutdown = async () => {}
     }).finally(() => {
       state = 'finished';
       logger?.info?.('Chiusura UI: pulizia terminata, uscita Electron.');
-      application.quit();
+      const exitCode = Number(getExitCode());
+      // Electron quit() defaults to success; preserve bootstrap failure after cleanup
+      // so the Windows task supervisor can actually recover the failed service.
+      if (Number.isInteger(exitCode) && exitCode > 0 && exitCode <= 255) application.exit(exitCode);
+      else application.quit();
     });
     return shutdownPromise;
   };

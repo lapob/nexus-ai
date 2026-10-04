@@ -43,3 +43,30 @@ test('DPAPI Windows reale protegge un segreto senza inserirlo nella riga di coma
   assert.doesNotMatch(protectedValue, new RegExp(secret));
   assert.equal(windowsDpapi(protectedValue, 'unprotect'), secret);
 });
+
+test('DPAPI ritenta una sola volta un timeout senza esporre il segreto o cambiare ambito', () => {
+  const calls = [];
+  const result = windowsDpapi('synthetic-secret', 'protect', { run(executable, args, options) {
+    calls.push({ executable, args, options });
+    return calls.length === 1 ? { error: { code: 'ETIMEDOUT' }, status: null }
+      : { status: 0, stdout: 'protected-ciphertext' };
+  } });
+  assert.equal(result, 'protected-ciphertext');
+  assert.deepEqual(calls.map(call => call.options.timeout), [4000, 8000]);
+  for (const call of calls) {
+    assert.equal(call.options.input, 'synthetic-secret');
+    assert.equal(call.options.windowsHide, true);
+    assert.doesNotMatch(call.args.join(' '), /synthetic-secret/);
+    assert.match(Buffer.from(call.args.at(-1), 'base64').toString('utf16le'), /CurrentUser/);
+  }
+});
+
+test('DPAPI nega errori crittografici e timeout ripetuti senza fallback in chiaro', () => {
+  for (const failure of [{ status: 1, stdout: '', stderr: 'Cryptographic failure' },
+    { status: null, error: { code: 'ETIMEDOUT' } }]) {
+    let calls = 0;
+    assert.throws(() => windowsDpapi('synthetic-secret', 'unprotect', { run() { calls++; return failure; } }),
+      { code: 'SYSTEM_SECRET_UNPROTECT_FAILED' });
+    assert.equal(calls, failure.error ? 2 : 1);
+  }
+});
