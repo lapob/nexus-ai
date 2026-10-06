@@ -8,6 +8,8 @@ Image providers and signed feeds now share bounded, cancellable response consump
 
 Source gate passes; complete Windows source suite: 1040 PASS, 2 SKIP, 0 FAIL. Kotlin compilation and Preview lint pass. Focused provider/stream regressions and independent postpatch review pass. Physical Android provider/decoder/lifecycle tests are pending: ADB currently has no devices. An uncooperative provider can retain the two isolated IO workers; admission remains bounded and chat/UI workers are separate, but provider termination is not guaranteed. Packages and publication are the next block, not yet completed.
 
+The current dependency audit identified GHSA-68fv-2mgg-jv7q in development-only source-map-js1.2.1. The lockfile now selects the patched1.2.2; runtime/tooling audits report zero known vulnerabilities and source check/full1040PASS suite pass again. Windows must be rebuilt against this revision before publishing the candidate. Android114 has unchanged implementation and a verified Preview build; physical tests remain pending.
+
 Codex Security reviewed 50/930 files at immutable b903433, with three source-validated availability findings. Remaining 880 paths are recorded after the delegated review reached its usage limit; architecture mapping does not count as whole-file audit coverage. The candidate differs from that immutable report. No full security or commercial readiness is claimed. The owner selected local-only automation preparation with no additional always-on node; PC-off availability is not provided.
 
 ## Verified 0.3.27 delivery
