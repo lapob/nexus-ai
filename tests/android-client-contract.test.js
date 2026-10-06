@@ -199,7 +199,7 @@ test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assi
   assert.match(activity, /energy = voiceEnergy/);
   assert.match(activity, /haltCapture\(false, true\)[\s\S]{0,80}close\(\)/, 'un secondo tocco sul Core deve interrompere e tornare alla superficie principale');
   assert.match(instantSurface, /NexusAttachmentFlow/);
-  assert.match(instantSurface, /AttachmentPreview\(state\.composerState\(\)/);
+  assert.match(instantSurface, /AttachmentPreview\(state\.conversationId, state\.composerState\(\)/);
   assert.match(instantSurface, /Icons\.Rounded\.Add/);
   assert.match(instantSurface, /Row\(Modifier\.padding\(horizontal = 7\.dp, vertical = 7\.dp\)/, 'allega e invia devono avere inset simmetrici nel composer');
   assert.match(instantSurface, /Icons\.Rounded\.Add[\s\S]{0,180}Modifier\.size\(21\.dp\)/, 'il glifo più deve avere lo stesso peso ottico del pulsante invio');

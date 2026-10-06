@@ -1,5 +1,15 @@
 # Roadmap tecnica
 
+## Stabilizzazione allegati e immagini — 6 ottobre 2026
+
+Candidata Windows0.3.28/Android6.5.24: byte/time cap prima dell'allocazione,
+IO provider fuori UI e preview campionate. Suite1040PASS/2SKIP/0FAIL e
+compilazione/lint PASS; distribuzione e prove fisiche restano distinte.
+Audit b903433 parziale50/930,880file residui: riprendere quella copertura senza
+contare la sola mappatura. Le automazioni proseguono sul solo percorso locale,
+senza nodo sempre acceso aggiuntivo o cloud inference. Completare prima
+cancellazione, deduplicazione e ricevute reali delle integrazioni.
+
 ## Stabilita e consegna Preview — 4 ottobre 2026
 
 Windows0.3.27 e Android6.5.23 sono pubblicati con asset verificati; Windows

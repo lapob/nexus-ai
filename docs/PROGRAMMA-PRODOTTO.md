@@ -1,6 +1,6 @@
 # Programma prodotto e criteri di completamento
 
-Aggiornamento 3 ottobre 2026. Riutilizzare le capacita esistenti; questa mappa
+Aggiornamento 5 ottobre 2026. Riutilizzare le capacita esistenti; questa mappa
 separa implementazione, prove automatiche e prerequisiti esterni.
 
 | Area | Base disponibile | Criterio ancora necessario |
@@ -12,7 +12,7 @@ separa implementazione, prove automatiche e prerequisiti esterni.
 | Artefatti | Cronologia persistente, originali, diff, confronto, copia ed esportazione del testo | Editor con versioni multiple e sync autenticata richiedono un contratto dati dedicato |
 | Comprensione schermo | Allegati volontari e strumenti del workspace | Lettura strutturata della finestra selezionata prima della cattura; indicatore, consenso e nessuna acquisizione continua |
 | Integrazioni | Sezioni Connessioni, Permessi, Dispositivi; registro manifest locale fail-closed | Esecutore MCP/plugin reale con isolamento, permessi per chiamata, revoca e prove con connettori selezionati |
-| Automazioni | Workflow con checkpoint, ticket monouso e cancellazione; monitor disponibilita | Nodo sempre acceso scelto dal proprietario per n8n; scheduler persistente con scadenze, retry limitati e deduplicazione |
+| Automazioni | Workflow locali con checkpoint, ticket monouso e cancellazione; monitor disponibilita | Scelto il solo percorso locale, senza nodo aggiuntivo; scheduler persistente e integrazione n8n ancora da verificare |
 | Grafica | Inter, token comuni, renderer condiviso, reduced motion e profili hardware | Collaudo della nuova build su dispositivi, battery saver e orientamenti; non usare prove di versioni precedenti |
 | Pilota commerciale | Gate commerciale e stime di sostenibilita esistenti | Servizio e cliente reali, misure di costi, compiti riusciti, tempo risparmiato, assistenza e politica dati |
 
@@ -29,7 +29,15 @@ originali. Registrare conteggio dei compiti, successi verificati, minuti di
 assistenza e risorse consumate; non inventare ricavi o metriche di qualita.
 Non attivare abbonamenti prima dei gate commerciale, privacy e distribuzione.
 
-PC spento significa runtime locale indisponibile: serve un altro nodo acceso.
+Il proprietario ha scelto il percorso locale, senza un altro nodo disponibile.
+Non attivare hosting, relay remoto o cloud inference. Preparare le integrazioni
+con il servizio locale esistente e conservarne identita, ticket, revoca e
+ricevute; n8n deve restare disattivato finche il collegamento reale non supera
+le prove di autorizzazione, cancellazione e deduplicazione. Non esporre un
+webhook anonimo alle operazioni del PC e non riutilizzare token privati nei
+workflow pubblicati. Un workflow approvato non autorizza azioni successive
+con permessi diversi. PC spento significa runtime locale indisponibile.
+Per operare in quel caso servirebbe un altro nodo acceso.
 Nessun hosting a pagamento o cloud inference viene attivato senza una scelta
 del proprietario. La sorgente pubblicata per Codex Cloud rimane distinta
 dall'inferenza cloud del prodotto, disattivata per default.

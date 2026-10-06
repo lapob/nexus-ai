@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { parseUpdateInfo } = require('electron-updater/out/providers/Provider');
+const { boundedResponseText } = require('./bounded-response');
 
 const PUBLIC_CHANNELS = new Set(['preview', 'beta', 'stable']);
 const MAX_REMOTE_MANIFEST_BYTES = 2 * 1024 * 1024;
@@ -162,33 +163,6 @@ function remoteArtifactUrl(base, artifact) {
   const relative = String(artifact.feedPath || path.basename(String(artifact.path || ''))).replaceAll('\\', '/');
   if (!relative || relative.startsWith('/') || relative.split('/').includes('..') || /^https?:/i.test(relative)) throw new Error('Percorso feed artefatto non valido.');
   return `${base}/${relative.split('/').map(encodeURIComponent).join('/')}`;
-}
-
-async function boundedResponseText(response, maximumBytes, label, signal) {
-  if (!response?.ok) throw new Error(`${label} non disponibile.`);
-  const declaredLength = Number(response.headers?.get?.('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) throw new Error(`${label} troppo grande.`);
-  if (!response.body?.getReader) throw new Error(`${label} senza flusso leggibile.`);
-  const reader = response.body.getReader();
-  const cancel = () => { void reader.cancel().catch(() => {}); };
-  const chunks = []; let bytes = 0; let complete = false;
-  signal?.addEventListener('abort', cancel, { once: true });
-  try {
-    for (;;) {
-      signal?.throwIfAborted();
-      const { done, value } = await reader.read();
-      signal?.throwIfAborted();
-      if (done) { complete = true; break; }
-      bytes += value.byteLength;
-      if (bytes > maximumBytes) throw new Error(`${label} troppo grande.`);
-      chunks.push(Buffer.from(value));
-    }
-    return new TextDecoder().decode(Buffer.concat(chunks, bytes));
-  } finally {
-    signal?.removeEventListener('abort', cancel);
-    if (!complete) cancel();
-    reader.releaseLock();
-  }
 }
 
 function updateFeedRecords(manifest) {

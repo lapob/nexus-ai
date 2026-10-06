@@ -70,9 +70,9 @@ test('deep link e intent condivisi sono validati prima di cambiare endpoint o le
 test('allegati e backup non possono causare letture illimitate', () => {
   const activity = remoteActivity();
   assert.match(activity, /private fun readBoundedContent\(uri: Uri, limit: Int\)/);
-  assert.match(activity, /require\(total <= limit\)/);
+  assert.match(activity, /BoundedContentReader\.read/);
   assert.match(activity, /readBoundedContent\(it, MAX_BACKUP_BYTES\)/);
-  assert.match(activity, /readBoundedContent\(state\.attachmentUri\.toUri\(\), MAX_ATTACHMENT_BYTES\)/);
+  assert.doesNotMatch(activity, /readBoundedContent\(state\.attachmentUri\.toUri\(\), MAX_ATTACHMENT_BYTES\)/);
   assert.doesNotMatch(activity, /\.readBytes\(\)\.take\(/);
 });
 

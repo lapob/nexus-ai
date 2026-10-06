@@ -162,6 +162,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collect
 import org.json.JSONArray
 import org.json.JSONObject
@@ -694,6 +696,9 @@ open class NexusMainActivity : ComponentActivity() {
 
     private fun cancelAttachmentImport() {
         synchronized(attachmentImportLock) { attachmentImportGeneration++ }
+        attachmentImportFuture?.cancel(true)
+        attachmentImportFuture = null
+        contentExecutor.purge()
         state = state.copy(attachmentLoading = false)
     }
 
@@ -709,23 +714,33 @@ open class NexusMainActivity : ComponentActivity() {
             return
         }
         if (state.connection != NexusConnection.ONLINE) return
+        cancelAttachmentImport()
         val conversationId = state.conversationId
         val temporary = state.temporary
         val generation = synchronized(attachmentImportLock) { ++attachmentImportGeneration }
         state = state.copy(attachmentLoading = true, error = null)
-        runTask {
+        attachmentImportFuture = runContentTask {
             val result = runCatching {
                 val source = JSONObject(value)
                 val data = source.optString("data")
                 require(data.length <= ((MAX_ATTACHMENT_BYTES + 2) / 3) * 4)
+                val sourceUri = source.optString("uri").toUri()
+                val mime = if (data.isNotBlank()) source.optString("mime") else {
+                    require(sourceUri.scheme.equals("content", ignoreCase = true))
+                    BoundedContentReader.call({ contentResolver.getType(sourceUri).orEmpty().lowercase(Locale.ROOT) }, {}, 3_000L)
+                        .ifBlank { source.optString("mime") }
+                }
+                val fromShare = source.optBoolean("externalShare")
+                require(if (fromShare) mime.startsWith("text/") || mime.startsWith("image/") || mime == "application/pdf"
+                    else mime.startsWith("text/") || mime in setOf("image/jpeg", "image/png", "image/webp", "application/pdf", "application/json", "application/xml"))
                 val bytes = if (data.isNotBlank()) Base64.decode(data, Base64.DEFAULT)
-                    else readBoundedContent(source.optString("uri").toUri(), MAX_ATTACHMENT_BYTES)
+                    else readBoundedContent(sourceUri, MAX_ATTACHMENT_BYTES)
                 require(bytes.isNotEmpty() && bytes.size <= MAX_ATTACHMENT_BYTES)
                 val attachment = JSONObject().put("name", source.optString("name").take(120))
-                    .put("mime", source.optString("mime").take(80)).put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    .put("mime", mime.take(80)).put("data", Base64.encodeToString(bytes, Base64.NO_WRAP))
                 // A cancelled import cannot write into a deleted or different composer.
                 synchronized(attachmentImportLock) {
-                    if (generation != attachmentImportGeneration || destroyed) return@runTask
+                    if (generation != attachmentImportGeneration || destroyed) return@runContentTask
                     if (!temporary) check(store.saveComposerAttachment(conversationId, attachment))
                 }
                 attachment
@@ -824,6 +839,8 @@ open class NexusMainActivity : ComponentActivity() {
     @Volatile private var activeWorkToken = ""
     @Volatile private var workCancellationRequested = false
     private val backgroundExecutor = Executors.newFixedThreadPool(6)
+    private val contentExecutor = java.util.concurrent.ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, java.util.concurrent.ArrayBlockingQueue<Runnable>(2))
+    private var attachmentImportFuture: java.util.concurrent.Future<*>? = null
     private val cancellationExecutor = Executors.newSingleThreadExecutor()
     private val activeConnections = ConcurrentHashMap.newKeySet<HttpURLConnection>()
     @Volatile private var destroyed = false
@@ -842,6 +859,17 @@ open class NexusMainActivity : ComponentActivity() {
     private var speakNextAnswer = false
     private lateinit var frameHealth: FrameHealthMonitor
     @Volatile private var appVisible = false
+    private fun runContentTask(block: () -> Unit): java.util.concurrent.Future<*>? {
+        if (destroyed || contentExecutor.isShutdown) return null
+        return try {
+            contentExecutor.submit {
+                if (!destroyed && !Thread.currentThread().isInterrupted) block()
+            }
+        } catch (_: RejectedExecutionException) {
+            state = state.copy(attachmentLoading = false, error = nexusCopy("Un contenuto è ancora in elaborazione. Riprova tra poco.", "Content is still being processed. Try again shortly."))
+            null
+        }
+    }
     private fun runTask(block: () -> Unit) {
         if (destroyed || backgroundExecutor.isShutdown) return
         try {
@@ -914,23 +942,39 @@ open class NexusMainActivity : ComponentActivity() {
     }
     private fun readBoundedContent(uri: Uri, limit: Int): ByteArray {
         require(uri.scheme.equals("content", ignoreCase = true)) { "Sono ammessi soltanto contenuti Android autorizzati." }
-        return contentResolver.openInputStream(uri)?.use { input ->
-            val output = ByteArrayOutputStream(minOf(limit, 64 * 1024))
-            val buffer = ByteArray(8 * 1024)
-            var total = 0
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                if (count == 0) continue
-                total += count
-                require(total <= limit) { "Il contenuto supera il limite consentito." }
-                output.write(buffer, 0, count)
-            }
-            output.toByteArray()
-        } ?: error("Contenuto non disponibile")
+        val cancellation = android.os.CancellationSignal()
+        return BoundedContentReader.read({
+            val descriptor = contentResolver.openAssetFileDescriptor(uri, "r", cancellation) ?: error("Contenuto non disponibile")
+            try { descriptor.createInputStream() } catch (error: Throwable) { descriptor.close(); throw error }
+        }, { cancellation.cancel() }, limit, 8_000L)
     }
-    private val backupExporter = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> uri?.let { runCatching { contentResolver.openOutputStream(it)?.bufferedWriter()?.use { writer -> writer.write(store.exportEncryptedArchive()) } }.onFailure { state = state.copy(error = nexusCopy("Esportazione non riuscita.", "Export failed.")) } } }
-    private val backupImporter = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { runCatching { val archive = String(readBoundedContent(it, MAX_BACKUP_BYTES), StandardCharsets.UTF_8); store.importEncryptedArchive(archive) }.onSuccess { count -> refreshChats(true); state = state.copy(activity = nexusCopy("$count conversazioni ripristinate", "$count conversations restored")) }.onFailure { state = state.copy(error = nexusCopy("Questo backup non è valido o appartiene a un altro dispositivo.", "This backup is invalid or belongs to another device.")) } } }
+    private val backupExporter = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> uri?.let {
+        runContentTask {
+            val result = runCatching {
+                val archive = store.exportEncryptedArchive()
+                val cancellation = android.os.CancellationSignal()
+                BoundedContentReader.write({
+                    val descriptor = contentResolver.openAssetFileDescriptor(it, "w", cancellation) ?: error("Contenuto non disponibile")
+                    try { descriptor.createOutputStream() } catch (error: Throwable) { descriptor.close(); throw error }
+                }, { cancellation.cancel() }, archive.toByteArray(StandardCharsets.UTF_8), 8_000L)
+            }
+            postUi { result.onFailure { state = state.copy(error = nexusCopy("Esportazione non riuscita.", "Export failed.")) } }
+        }
+    } }
+    private val backupImporter = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let {
+        val generation = attachmentImportGeneration
+        runContentTask {
+            val result = runCatching {
+                val archive = String(readBoundedContent(it, MAX_BACKUP_BYTES), StandardCharsets.UTF_8)
+                synchronized(attachmentImportLock) {
+                    check(!destroyed && generation == attachmentImportGeneration && !Thread.currentThread().isInterrupted)
+                    store.importEncryptedArchive(archive)
+                }
+            }
+            postUi { result.onSuccess { count -> refreshChats(true); state = state.copy(activity = nexusCopy("$count conversazioni ripristinate", "$count conversations restored")) }
+                .onFailure { state = state.copy(error = nexusCopy("Questo backup non è valido o non è disponibile. I dati esistenti sono conservati.", "This backup is invalid or unavailable. Existing data is retained.")) } }
+        }
+    } }
     private val deviceCredentialConfirmation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val ticket = pendingAuthorizationTicket
         deviceCredentialInProgress = false
@@ -1975,6 +2019,7 @@ open class NexusMainActivity : ComponentActivity() {
         activeConnections.toList().forEach(HttpURLConnection::disconnect)
         activeConnections.clear()
         backgroundExecutor.shutdownNow()
+        contentExecutor.shutdownNow()
         cancellationExecutor.shutdownNow()
         stopAllSpeech()
         textToSpeech?.shutdown()
@@ -2010,7 +2055,6 @@ open class NexusMainActivity : ComponentActivity() {
         val name = state.attachment ?: return null
         val bytes = when {
             state.attachmentData.isNotBlank() -> runCatching { Base64.decode(state.attachmentData, Base64.DEFAULT) }.getOrNull()
-            state.attachmentUri.isNotBlank() -> runCatching { readBoundedContent(state.attachmentUri.toUri(), MAX_ATTACHMENT_BYTES) }.getOrNull()
             else -> null
         } ?: return null
         if (bytes.size > MAX_ATTACHMENT_BYTES) throw IllegalArgumentException("L’allegato supera il limite di 1,5 MB.")
@@ -2750,16 +2794,15 @@ open class NexusMainActivity : ComponentActivity() {
         val clip = runCatching { incoming.clipData }.getOrNull()
         val stream = extraStream ?: clip?.takeIf { it.itemCount == 1 }?.getItemAt(0)?.uri
         if (stream != null && !stream.scheme.equals("content", ignoreCase = true)) { incoming.action = null; return }
-        val detectedMime = stream?.let { runCatching { contentResolver.getType(it).orEmpty().lowercase(Locale.ROOT) }.getOrDefault("") }.orEmpty()
-        if (stream != null && detectedMime.isNotBlank() && !allowedMime(detectedMime)) { incoming.action = null; return }
-        val mime = detectedMime.ifBlank { declaredMime }
+        // Resolve provider MIME inside the captured, cancellable import rather than on the UI thread.
+        val mime = declaredMime
         if (!flushDraftPersistence()) return
         if (state.conversationId.isBlank() && !openConversation(store.createConversation())) return
         state = state.copy(screen = NexusScreen.CHAT, work = false, temporary = false, draft = sharedText.take(80_000).ifBlank { if (stream != null) "Analizza questo contenuto" else state.draft })
         queueDraftPersistence(state.conversationId, state.draft)
         if (stream != null) {
             val name = stream.lastPathSegment?.substringAfterLast('/')?.replace(Regex("[\\p{Cntrl}]"), "")?.take(120).orEmpty().ifBlank { "Contenuto condiviso" }
-            dispatch("attach", JSONObject().put("name", name).put("uri", stream.toString()).put("mime", mime).toString())
+            dispatch("attach", JSONObject().put("name", name).put("uri", stream.toString()).put("mime", mime).put("externalShare", true).toString())
         }
         incoming.replaceExtras(Bundle())
         incoming.data = null
@@ -3018,7 +3061,7 @@ private fun JSONArray?.toTurns() = buildList {
                             }
                         }
                         AnimatedVisibility(state.attachment != null, enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
-                            AttachmentPreview(state.composerState(), { dispatch("attach", "") })
+                            AttachmentPreview(state.conversationId, state.composerState(), { dispatch("attach", "") })
                         }
                         // Keep one text field during IME movement. Cross-fading
                         // two composer trees briefly duplicated/clipped its shell.
@@ -3761,17 +3804,10 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     val context = LocalContext.current
     fun selectUri(uri: Uri?) {
         uri?.takeIf { it.scheme.equals("content", ignoreCase = true) } ?: return
-        val mime = context.contentResolver.getType(uri).orEmpty().lowercase(Locale.ROOT)
-        val supported = mime.startsWith("text/") || mime in setOf("image/jpeg", "image/png", "image/webp", "application/pdf", "application/json", "application/xml")
-        if (!supported) {
-            android.widget.Toast.makeText(context, context.nexusCopy("Formato non supportato.", "Unsupported format."), android.widget.Toast.LENGTH_SHORT).show()
-            close()
-            return
-        }
         dispatch("attach", JSONObject()
             .put("name", uri.lastPathSegment?.substringAfterLast('/')?.replace(Regex("[\\p{Cntrl}]"), "")?.take(120) ?: "Allegato")
             .put("uri", uri.toString())
-            .put("mime", mime.take(80))
+            .put("mime", "")
             .toString())
         close()
     }
@@ -3781,7 +3817,9 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
         val uri = pendingCameraUri
         if (captured && uri != null) selectUri(uri)
-        else uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
+        else uri?.let { capturedUri ->
+            java.util.concurrent.CompletableFuture.runAsync { runCatching { BoundedContentReader.call({ context.contentResolver.delete(capturedUri, null, null) }, {}, 3_000L) } }
+        }
         pendingCameraUri = null
     }
     fun launchCamera() {
@@ -3801,18 +3839,24 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     )
 }
 
-@Composable private fun AttachmentPreview(state: NexusComposerState, remove: () -> Unit) {
-    val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
-    val bitmap = remember(state.attachmentUri, state.attachmentData, state.attachmentMime) {
-        if (!state.attachmentMime.startsWith("image/")) null else runCatching {
-            when {
-                state.attachmentData.isNotBlank() -> BitmapFactory.decodeByteArray(Base64.decode(state.attachmentData, Base64.DEFAULT), 0, Base64.decode(state.attachmentData, Base64.DEFAULT).size)
-                state.attachmentUri.isNotBlank() -> context.contentResolver.openInputStream(state.attachmentUri.toUri())?.use(BitmapFactory::decodeStream)
-                else -> null
-            }?.asImageBitmap()
-        }.getOrNull()
-    }
+@Composable private fun AttachmentPreview(conversationId: String, state: NexusComposerState, remove: () -> Unit) {
+    var expanded by remember(conversationId, state.attachmentData) { mutableStateOf(false) }
+    val bitmap = produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, conversationId, state.attachmentData, state.attachmentMime) {
+        value = null
+        if (state.attachmentMime.startsWith("image/") && state.attachmentData.isNotBlank()) {
+            value = withContext(Dispatchers.Default) {
+                runCatching {
+                    require(state.attachmentData.length <= ((LocalChatStore.MAX_COMPOSER_ATTACHMENT_BYTES + 2) / 3) * 4)
+                    val bytes = Base64.decode(state.attachmentData, Base64.DEFAULT)
+                    require(bytes.size <= LocalChatStore.MAX_COMPOSER_ATTACHMENT_BYTES)
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    val sample = BoundedContentReader.previewSampleSize(bounds.outWidth, bounds.outHeight)
+                    if (sample == 0) null else BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
+                }.getOrNull()
+            }
+        }
+    }.value
     Surface(color = Surface, shape = RoundedCornerShape(18.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Hairline), modifier = Modifier.padding(bottom = 8.dp).widthIn(max = 260.dp).then(if (bitmap != null) Modifier.clickable { expanded = true } else Modifier)) {
         Row(Modifier.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(54.dp).clip(RoundedCornerShape(13.dp)).background(Surface2), contentAlignment = Alignment.Center) { if (bitmap != null) Image(bitmap, state.attachment.orEmpty(), Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else Icon(Icons.Outlined.Description, null, tint = Cyan, modifier = Modifier.size(25.dp)) }

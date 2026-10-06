@@ -4,9 +4,13 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { setTimeout: sleepWithSignal } = require('node:timers/promises');
+const { boundedResponseBytes, boundedResponseText } = require('../security/bounded-response');
 
 const ALLOWED_SIZES = new Set(['512x512', '768x768', '1024x1024', '1024x1536', '1536x1024']);
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_IMAGE_JSON_BYTES = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 64 * 1024;
+const MAX_METADATA_BYTES = 2 * 1024 * 1024;
 const IMAGE_PROTOCOLS = new Set(['openai', 'comfyui']);
 
 // #region 01 - Validazione endpoint e contenuti
@@ -71,7 +75,7 @@ class ImageGenerationService {
     this.retryWindowMs = Math.max(10_000, Math.min(900_000, Number(retryWindowMs) || 300_000));
     this.fetchImpl = fetchImpl;
     this.now = now;
-    this.sleep = sleep || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.sleep = sleep || ((milliseconds, signal) => sleepWithSignal(milliseconds, undefined, { signal }));
     this.lastFailureAt = 0;
   }
 
@@ -116,18 +120,34 @@ class ImageGenerationService {
     signal?.addEventListener?.('abort', abort, { once: true });
     if (signal?.aborted) abort();
     try {
+      controller.signal.throwIfAborted();
       const result = this.protocol === 'comfyui'
         ? await this.generateWithComfyUi({ prompt: normalizedPrompt, size, signal: controller.signal })
         : await this.generateWithOpenAi({ prompt: normalizedPrompt, size, signal: controller.signal });
+      controller.signal.throwIfAborted();
       this.lastFailureAt = 0;
       return result;
     } catch (error) {
       if (error?.name !== 'AbortError' && !signal?.aborted) this.lastFailureAt = this.now();
-      if (error?.name === 'AbortError') throw Object.assign(new Error('Generazione immagine scaduta.'), { code: 'IMAGE_TIMEOUT' });
+      if (signal?.aborted) throw Object.assign(new Error('Generazione immagine annullata.'), { name: 'AbortError', code: 'IMAGE_CANCELLED' });
+      if (controller.signal.aborted || error?.name === 'AbortError') throw Object.assign(new Error('Generazione immagine scaduta.'), { code: 'IMAGE_TIMEOUT' });
       throw error;
     } finally {
       clearTimeout(timeout);
       signal?.removeEventListener?.('abort', abort);
+    }
+  }
+
+  async providerJson(response, limit, signal) {
+    if (!response.ok) {
+      void response.body?.cancel?.().catch(() => {});
+      throw Object.assign(new Error('Il provider immagini non ha completato la richiesta.'), { code: 'IMAGE_PROVIDER_ERROR' });
+    }
+    try {
+      return JSON.parse(await boundedResponseText(response, limit, 'Risposta immagini', signal));
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
+      throw Object.assign(new Error('Risposta immagine non valida.'), { code: 'IMAGE_RESPONSE_INVALID' });
     }
   }
 
@@ -141,8 +161,7 @@ class ImageGenerationService {
       body: JSON.stringify({ model: this.model, prompt, size, n: 1, response_format: 'b64_json' }),
       signal
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw Object.assign(new Error('Il provider immagini non ha completato la richiesta.'), { code: 'IMAGE_PROVIDER_ERROR' });
+    const payload = await this.providerJson(response, MAX_IMAGE_JSON_BYTES, signal);
     const encoded = String(payload?.data?.[0]?.b64_json || '');
     if (!encoded || encoded.length > Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 8) throw Object.assign(new Error('Risposta immagine non valida.'), { code: 'IMAGE_RESPONSE_INVALID' });
     return this.validateImage(Buffer.from(encoded, 'base64'));
@@ -156,7 +175,7 @@ class ImageGenerationService {
       body: JSON.stringify({ client_id: clientId, prompt: buildComfyWorkflow({ prompt, size, model: this.model }) }),
       signal
     });
-    const queuedPayload = await queued.json().catch(() => ({}));
+    const queuedPayload = await this.providerJson(queued, MAX_METADATA_BYTES, signal);
     if (!queued.ok || !queuedPayload.prompt_id) {
       throw Object.assign(new Error('ComfyUI non ha accettato il workflow.'), { code: 'IMAGE_PROVIDER_ERROR' });
     }
@@ -164,8 +183,9 @@ class ImageGenerationService {
     let descriptor = null;
     while (!descriptor) {
       await this.sleep(250, signal);
+      signal?.throwIfAborted();
       const history = await this.fetchImpl(endpointUrl(this.endpoint, `history/${encodeURIComponent(promptId)}`), { signal });
-      const historyPayload = await history.json().catch(() => ({}));
+      const historyPayload = await this.providerJson(history, MAX_METADATA_BYTES, signal);
       if (!history.ok) throw Object.assign(new Error('ComfyUI non ha restituito lo stato del workflow.'), { code: 'IMAGE_PROVIDER_ERROR' });
       const entry = historyPayload?.[promptId];
       const images = entry?.outputs && Object.values(entry.outputs).flatMap((output) => Array.isArray(output?.images) ? output.images : []);
@@ -178,10 +198,18 @@ class ImageGenerationService {
     imageUrl.searchParams.set('filename', String(descriptor.filename || ''));
     imageUrl.searchParams.set('subfolder', String(descriptor.subfolder || ''));
     imageUrl.searchParams.set('type', String(descriptor.type || 'output'));
-    const response = await this.fetchImpl(imageUrl.toString(), { signal });
-    if (!response.ok) throw Object.assign(new Error('ComfyUI non ha restituito il file generato.'), { code: 'IMAGE_PROVIDER_ERROR' });
-    const image = Buffer.from(await response.arrayBuffer());
     try {
+      const response = await this.fetchImpl(imageUrl.toString(), { signal });
+      if (!response.ok) {
+        void response.body?.cancel?.().catch(() => {});
+        throw Object.assign(new Error('ComfyUI non ha restituito il file generato.'), { code: 'IMAGE_PROVIDER_ERROR' });
+      }
+      let image;
+      try { image = await boundedResponseBytes(response, MAX_IMAGE_BYTES, 'Immagine', signal); }
+      catch (error) {
+        if (signal?.aborted || error?.name === 'AbortError') throw error;
+        throw Object.assign(new Error('Risposta immagine non valida.'), { code: 'IMAGE_RESPONSE_INVALID' });
+      }
       return this.validateImage(image);
     } finally {
       this.cleanupComfyOutput(descriptor);

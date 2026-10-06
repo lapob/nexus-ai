@@ -1,8 +1,26 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
-Aggiornamento: 4 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
+Aggiornamento: 6 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
+
+## Candidata 0.3.28 / Android 6.5.24
+
+Limiti di streaming e cancellazione comuni per feed firmati e risposte immagini;
+cap distinti per JSON immagini, metadata Comfy e file binari. MIME, letture e
+backup Android passano da worker isolati e limitati; preview con bounds,
+campionamento e decodifica fuori UI. Originali e limite backup16MiB conservati.
+Gate sorgenti PASS; suite1040PASS/2SKIP/0FAIL, Kotlin e lint Preview PASS.
+Revisione indipendente postpatch senza bypass/regressioni concrete.
+Pacchetti e pubblicazione sono il prossimo blocco, non ancora verificati.
+ADB assente: prove fisiche nuove non sostituite con quelle della113.
+Provider Binder non cooperativi possono trattenere i due worker dedicati;
+il confine protegge UI/chat e limita la coda, non garantisce la loro terminazione.
+
+Audit immutabile b903433:50/930file,3finding di disponibilita validati da
+sorgenti;880percorsi residui conservati dopo il limite d'uso del revisore.
+Nessuna certificazione di audit totale. Scelto il percorso automazioni locale
+senza nodo aggiuntivo; a PC spento il runtime rimane indisponibile.
 
 ## Consegna verificata: Preview 0.3.27
 

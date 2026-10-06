@@ -1,6 +1,14 @@
 # Public continuity checkpoint
 
-Updated 4 October 2026. This file is safe for source collaboration. Private data, credentials, workstation configuration and logs remain outside GitHub.
+Updated 6 October 2026. This file is safe for source collaboration. Private data, credentials, workstation configuration and logs remain outside GitHub.
+
+## Candidate 0.3.28 / Android 6.5.24
+
+Image providers and signed feeds now share bounded, cancellable response consumption. OpenAI image JSON, Comfy queue/history metadata and binary downloads have separate limits before allocation/parsing; unsuccessful reads cancel their bodies and local output cleanup retains the descriptor boundary. Android provider metadata, attachment reads and backup operations use isolated bounded workers and deadlines. Cancelled composer imports cannot persist into another conversation. Preview decoding runs off the UI thread after dimension/pixel checks and sampling; original attachment bytes and the existing 16 MiB backup limit remain intact.
+
+Source gate passes; complete Windows source suite: 1040 PASS, 2 SKIP, 0 FAIL. Kotlin compilation and Preview lint pass. Focused provider/stream regressions and independent postpatch review pass. Physical Android provider/decoder/lifecycle tests are pending: ADB currently has no devices. An uncooperative provider can retain the two isolated IO workers; admission remains bounded and chat/UI workers are separate, but provider termination is not guaranteed. Packages and publication are the next block, not yet completed.
+
+Codex Security reviewed 50/930 files at immutable b903433, with three source-validated availability findings. Remaining 880 paths are recorded after the delegated review reached its usage limit; architecture mapping does not count as whole-file audit coverage. The candidate differs from that immutable report. No full security or commercial readiness is claimed. The owner selected local-only automation preparation with no additional always-on node; PC-off availability is not provided.
 
 ## Verified 0.3.27 delivery
 
