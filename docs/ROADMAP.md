@@ -2,9 +2,12 @@
 
 ## Stabilizzazione allegati e immagini — 6 ottobre 2026
 
-Candidata Windows0.3.28/Android6.5.24: byte/time cap prima dell'allocazione,
+Preview Windows0.3.28/Android6.5.24 pubblicata: byte/time cap prima dell'allocazione,
 IO provider fuori UI e preview campionate. Suite1040PASS/2SKIP/0FAIL e
-compilazione/lint PASS; distribuzione e prove fisiche restano distinte.
+compilazione/lint, bundle e8assetGitHub PASS. Installazione Windows bloccata
+dal controllo di approvazione; installare manualmente prima dello smoke locale.
+Prove Android114fisiche e voce umana restano distinte. Corretto source-map-js1.2.2;
+SITE source aggiornato ma il gate braces continua a bloccare la produzione.
 Audit b903433 parziale50/930,880file residui: riprendere quella copertura senza
 contare la sola mappatura. Le automazioni proseguono sul solo percorso locale,
 senza nodo sempre acceso aggiuntivo o cloud inference. Completare prima

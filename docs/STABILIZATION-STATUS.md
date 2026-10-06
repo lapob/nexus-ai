@@ -4,7 +4,7 @@ Aggiornamento: 6 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
 
-## Candidata 0.3.28 / Android 6.5.24
+## Preview pubblicata 0.3.28 / Android 6.5.24
 
 Limiti di streaming e cancellazione comuni per feed firmati e risposte immagini;
 cap distinti per JSON immagini, metadata Comfy e file binari. MIME, letture e
@@ -12,12 +12,20 @@ backup Android passano da worker isolati e limitati; preview con bounds,
 campionamento e decodifica fuori UI. Originali e limite backup16MiB conservati.
 Gate sorgenti PASS; suite1040PASS/2SKIP/0FAIL, Kotlin e lint Preview PASS.
 Revisione indipendente postpatch senza bypass/regressioni concrete.
-Pacchetti e pubblicazione sono il prossimo blocco, non ancora verificati.
+Pubblicata v0.3.28-preview.1 da58531df con8asset verificati suGitHub.
+Windows build/installer/smoke packaged, bundle6artefatti, CI Windows/Ubuntu,
+audit runtime/tooling e firme registry PASS. source-map-js aggiornato1.2.2.
+Accessibilita6superfici, motion3core/full/reduced e visual4viste x4scale PASS.
+Health/readiness/download28 e offline390/1440 con reconnect PASS.
+Installazione automatica Windows respinta dal controllo di approvazione:
+resta installata0.3.27.0;28va installata manualmente prima di provarne ASAR,
+smoke installed e collegamento. Preview senza firma commerciale, nonStable.
 ADB assente: prove fisiche nuove non sostituite con quelle della113.
 Provider Binder non cooperativi possono trattenere i due worker dedicati;
 il confine protegge UI/chat e limita la coda, non garantisce la loro terminazione.
 
-Audit immutabile b903433:50/930file,3finding di disponibilita validati da
+Report audit immutabile b903433 completato con copertura parziale50/930file,
+3finding di disponibilita validati da
 sorgenti;880percorsi residui conservati dopo il limite d'uso del revisore.
 Nessuna certificazione di audit totale. Scelto il percorso automazioni locale
 senza nodo aggiuntivo; a PC spento il runtime rimane indisponibile.
