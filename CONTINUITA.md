@@ -1,3 +1,21 @@
+# Candidate verified; CI browser cache corrected — 10 October 2026
+
+SSR commit d86517b passed the complete workstation release gate:43 Node tests,
+27 browser tests, local Workers runtime, unchanged size budgets and security
+audit (349 signatures,96 attestations, zero known vulnerabilities). Immutable
+candidate a3af7717-53b5-44ea-ac9f-a388a1989b70 passed14 preview routes.
+Source published. CI source passed; browser verification failed before any
+test ran because its launcher forced the workstation cache after CI installed
+Chromium in the default cache. The launcher now respects explicit cache settings
+and uses the default cache in CI. Rerun the actual CI before claiming it passes.
+Prepare a new candidate matching this exact revision before promotion.
+
+Production promotion is still blocked by the separate AI readiness503. The
+official local runtime0.32.15 and downloaded0.40.2 both fail the existing
+distribution gate with60 High/Critical module-level findings. Candidate hash
+and official signature were verified; no runtime replacement or audit bypass.
+This is separate from the resolved website Braces dependency roots.
+
 # React/Vite SSR dependency remediation — 10 October 2026
 
 Candidate removes both Braces dependency roots and unused RSC tooling while
