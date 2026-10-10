@@ -1,5 +1,16 @@
 # Website source continuity
 
+## 10 October 2026
+
+Source now references published Windows Preview0.3.29 and unchanged Android6.5.24,
+verified against the public GitHub manifest, asset digests and byte counts.
+Cloudflare Vite plugin1.63.1, Wrangler4.149.0 and Sharp override0.35.5 replace the
+previous tooling versions; the Sharp advisory is removed. The dependency audit
+falls from eleven to seven high findings in the remaining Braces chain.
+The source gate, build/performance checks and37tests pass with the final lockfile;
+registry signatures pass. The release security gate still fails, so production
+is unchanged and no deployment bypass is allowed. These are source updates.
+
 Updated 6 October 2026. Source collaboration branch: `website` in `lapob/nexus-ai`. Application/server/Android source uses `main`; these are separate trees.
 
 The public website remains on its previously verified production version. Local source includes links for Windows Preview 0.3.28 and Android 6.5.24. Release metadata was matched against the public GitHub manifest, asset digest, version and byte count. Production promotion remains blocked by the dependency security gate for GHSA-vfj7-8cjw-p6xm in braces. Do not bypass the gate, fabricate a patched version or claim these links are deployed.
