@@ -13,7 +13,7 @@ const strict = process.argv.includes('--strict');
 // #region Lettura evidenze e credenziali senza segreti
 
 function readJson(relativePath) {
-  try { return JSON.parse(fs.readFileSync(path.resolve(root, relativePath), 'utf8')); }
+  try { return JSON.parse(fs.readFileSync(path.resolve(root, relativePath), 'utf8').replace(/^\uFEFF/, '')); }
   catch { return null; }
 }
 

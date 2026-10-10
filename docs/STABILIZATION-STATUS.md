@@ -1,5 +1,20 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
+## Verifiche aggiuntive del 10 ottobre
+
+Corretto il parsing dei manifest Android con BOM UTF-8 prodotti da PowerShell:
+Founder e Stable riconoscono ora entrambe le matrici fisiche valide della114
+e di Control42, conservando tutti i requisiti su hash, data e metriche.
+Nove test mirati PASS; gate sorgenti e suite1045PASS2SKIP0FAIL. Correzione dei
+soli strumenti QA, nessuna nuova build applicativa o modifica alla Preview29.
+Sessione vocale sintetica su quattro viewport e recupero cifrato sintetico PASS;
+non sono prove umane di voce/eco o restore da backup esterno. Governance knowledge
+PASS; dataset attuale0esempi/0preferenze, nessun training avviato. SLO6conformi,
+0fuorisoglia,3nonmisurati: eval completo, qualita deep e finestra disponibilita.
+I gate commerciali rimangono bloccati. Revisione mirata Braces: overflow locale
+riprodotto, nessun percorso HTTP pubblico concreto trovato; dipendenza e gate
+ancora irrisolti, nessuna promozione del sito. CI finale065440f ora PASS completo.
+
 ## Preview 0.3.29 — 10 ottobre 2026
 
 Pubblicata da2dbf0d3 con8asset verificati; CI Windows/Ubuntu/segreti PASS.

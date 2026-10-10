@@ -1,3 +1,34 @@
+# Completion checks and release evidence — 10 October 2026
+
+Source CI38045727001 at065440f completed successfully on Windows/Ubuntu with
+secret and dependency checks. Additional synthetic voice-session checks pass
+at four viewports; encrypted backup recovery passes on disposable synthetic
+data. These do not certify human speech/echo or external recovery of real data.
+Knowledge governance passes; the current training dataset validates with zero
+approved examples and zero preference pairs, so SFT/DPO remain blocked.
+The100-case evaluation suite validates without running inference. The aggregate
+SLO report has six passes, zero failures and three unmeasured indicators:
+complete model evaluation, deep quality and the historical availability window.
+
+A release-tooling defect was reproduced and fixed: Founder/Stable readers
+rejected the UTF-8 BOM emitted by Windows PowerShell Android matrix reports.
+Both gates now accept the leading BOM while preserving malformed-JSON rejection,
+APK hashes, timestamp, Online state, profile and frame/jank checks. Both actual
+five-profile Android reports are recognized. Nine focused tests pass; the final
+source gate and isolated full suite pass:1045PASS,2SKIP,0FAIL. No application
+runtime or package changed; published Preview29 remains immutable.
+
+Website dependency remediation remains blocked. Independent scoped review
+reproduced the Braces overflow through fast-glob in a fresh local process,
+without a concrete public HTTP-input path in the current application. No patched
+upstream version is available; no advisory suppression or deployment performed.
+This does not complete the separate application-wide partial security scan.
+See docs/PROGRAMMA-PRODOTTO.md for measured state and remaining prerequisites.
+Installed Windows remains0.3.27; manual29 installation is needed before installed
+ASAR/smoke/shortcut verification. A prior automatic installation was policy-blocked
+and must not be retried through an alternative mechanism. No PC restart/shutdown,
+model training/download, cloud inference or private-data deletion performed.
+
 # Published Preview 0.3.29 — 10 October 2026
 
 Published v0.3.29-preview.1 from2dbf0d3086705ccaa518168c8567f4a3eba173e1, with eight assets verified on GitHub. CI38045046741 passes on Windows/Ubuntu with secrets and dependency checks. Windows build, installer inspection, packaged smoke, SBOM346components, six-artifact bundle and Founder package pass. The headless service was restarted without rebooting the PC; live home/health/readiness return200 and the public page exposes the new memory behavior and29 download URLs. Isolated production browser checks pass at390x844 and1440x900 for history reload/reset, offline cached navigation, font and reconnect. Windows automatic installation remains blocked; the published setup must be installed manually before installed smoke and shortcut refresh. Android114 is unchanged.

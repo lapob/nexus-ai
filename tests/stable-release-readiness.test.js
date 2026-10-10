@@ -21,7 +21,7 @@ test('la matrice Android deve provare esattamente APK della release', () => {
   const profiles = ['small', 'compact', 'font', 'landscape', 'tablet'];
   const data = { App: 'Public', ExpectedPublicState: 'Online', CapturedAt: new Date(Date.now() - 1000).toISOString(), Profiles: profiles,
     FrameMetrics: profiles.map(Profile => ({ Profile, TotalFrames: 100, JankyPercent: 2 })) };
-  const check = () => { fs.writeFileSync(file, JSON.stringify(data)); return androidMatrixCheck('device', file, apk).status; };
+  const check = () => { fs.writeFileSync(file, `\uFEFF${JSON.stringify(data)}`); return androidMatrixCheck('device', file, apk).status; };
   try {
     fs.writeFileSync(apk, 'synthetic release one');
     assert.equal(check(), 'blocked');

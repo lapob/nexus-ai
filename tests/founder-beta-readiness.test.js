@@ -67,7 +67,7 @@ test('la Founder Beta richiede insieme prove automatiche firma dispositivi e res
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });
 
-test('accetta il timestamp PowerShell dei report Android fisici', () => {
+test('accetta timestamp e BOM UTF-8 dei report Android PowerShell senza ignorare dati invalidi', () => {
   const item = fixture();
   try {
     const matrix = {
@@ -79,8 +79,15 @@ test('accetta il timestamp PowerShell dei report Android fisici', () => {
     };
     item.write('qa-artifacts/android-control-matrix/manifest.json', { ...matrix, App: 'Control', ExpectedPublicState: null, ExpectedControlState: 'Online' });
     item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
+    for (const app of ['control', 'public']) {
+      const file = path.join(item.projectRoot, `qa-artifacts/android-${app}-matrix/manifest.json`);
+      fs.writeFileSync(file, `\uFEFF${fs.readFileSync(file, 'utf8')}`, 'utf8');
+    }
     const report = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
     assert.equal(report.checks.find((entry) => entry.id === 'android-control-device').status, 'pass');
     assert.equal(report.checks.find((entry) => entry.id === 'android-public-device').status, 'pass');
+    fs.writeFileSync(path.join(item.projectRoot, 'qa-artifacts/android-public-matrix/manifest.json'), '\uFEFF{malformed', 'utf8');
+    const invalid = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
+    assert.equal(invalid.checks.find((entry) => entry.id === 'android-public-device').status, 'blocked');
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });

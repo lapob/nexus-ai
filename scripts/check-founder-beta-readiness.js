@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 // #region 01 — Prove automatiche e controlli esterni
 
 function readJson(projectRoot, relativePath) {
-  try { return JSON.parse(fs.readFileSync(path.join(projectRoot, relativePath), 'utf8')); }
+  try { return JSON.parse(fs.readFileSync(path.join(projectRoot, relativePath), 'utf8').replace(/^\uFEFF/, '')); }
   catch { return null; }
 }
 
