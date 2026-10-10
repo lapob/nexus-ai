@@ -1,3 +1,28 @@
+# Production promoted and verified — 10 October 2026
+
+Source website8bd340bc053eb28f9dd3860ae6bd0ce5aaf86328 passed complete CI
+38051859828 and the workstation release gate:43 Node tests,27 browser tests,
+actual Workers runtime, unchanged budgets and zero known audit findings.
+Immutable candidate8b4e1ea9-4b8b-49b4-b3d8-6b90f3d79851 passed14 preview routes.
+The standard promotion path published the same build to production as version
+9580fd57-7a33-4b0f-bc8c-f44703ff8750. Postdeployment checks passed14 routes,
+navigation, headers and the independently verified AI service. No rollback was
+needed; the existing automatic rollback path was retained.
+
+Fresh production Chromium checks also pass centered home text/icon groups and
+no horizontal overflow at320/390/768/1440/1920px, including three scroll
+positions. Real desktop/Android product image zoom is centered and dismissible
+at1440x1000,844x390 and390x844; no browser exceptions were observed.
+
+AI readiness recovered to200 automatically after restoration of its existing
+scanner. Its managed runtime uses a pre-existing development-loopback policy;
+this does not resolve the separate distribution audit, which still reports60
+High/Critical module-level findings on both runtime candidates. Reachability
+and the appropriate security profile for a public gateway remain open.
+No new runtime installation or audit exception was introduced. The503-blocked
+notes below describe earlier checkpoints, not current production availability.
+Desktop memory/artifact/recipe changes are source-only after Preview29.
+
 # Candidate verified; CI browser cache corrected — 10 October 2026
 
 SSR commit d86517b passed the complete workstation release gate:43 Node tests,
