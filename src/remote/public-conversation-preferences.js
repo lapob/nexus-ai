@@ -62,7 +62,7 @@ function createPublicConversationPreferences(normalize) {
   trigger.onclick = () => { refresh(); dialog.showModal(); };
   dialog.addEventListener('click', event => { if (event.target === dialog) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   dialog.addEventListener('close', () => trigger.focus({ preventScroll: true }));
-  return { value: () => normalize(profile) };
+  return { value: () => normalize(profile), clear: () => { profile = normalize({}); refresh(); } };
 }
 // #endregion
 module.exports = { createPublicConversationPreferences, PUBLIC_PROFILE_STYLE };

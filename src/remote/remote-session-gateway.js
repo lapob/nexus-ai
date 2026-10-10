@@ -737,7 +737,7 @@ class RemoteSessionGateway {
     this.failedPairings = new Map();
     this.requestBuckets = new Map();
     this.persistentQuotas = new PersistentQuotaStore({ filePath: `${statePath}.quotas` });
-    this.requestLedger = requestLedger || new PersistentRequestLedger({ filePath: `${statePath}.requests` });
+    this.requestLedger = requestLedger || new PersistentRequestLedger({ filePath: `${statePath}.requests`, persistContent: false });
     this.activities = new Map();
     this.eventStreams = new Set();
     this.telemetryStreams = new Set();
@@ -972,7 +972,7 @@ class RemoteSessionGateway {
     if (!this.guestDailyAllowed(guest, 'message', requestCost, 240)) {
       throw requestFailure('Limite giornaliero raggiunto. Riprova più tardi.', 'GUEST_DAILY_LIMIT', 429);
     }
-    this.requestLedger.begin(descriptor.key, descriptor.fingerprint);
+    this.requestLedger.begin(descriptor.key, descriptor.fingerprint, guest.installationHash);
     const execution = this.startGuestExecution(guest, body, descriptor);
     return { descriptor, state: 'started', entry: null, execution };
   }
@@ -981,6 +981,7 @@ class RemoteSessionGateway {
     const controller = new AbortController();
     const execution = {
       key: descriptor.key,
+      owner: guest.installationHash,
       controller,
       listeners: new Set(),
       subscribers: 0,
@@ -1030,6 +1031,7 @@ class RemoteSessionGateway {
           },
           attachments
         });
+        if (controller.signal.aborted) throw Object.assign(new Error('Richiesta annullata.'), { name: 'AbortError', code: 'ABORT_ERR' });
         const finalTurn = updated.turns.at(-1) || {};
         const artifacts = normalizeArtifacts(finalTurn.artifacts, { publicAudience: true });
         const result = {
@@ -2202,6 +2204,15 @@ class RemoteSessionGateway {
         const execution = this.activeGuestExecutions.get(key);
         if (execution && !execution.settled) execution.controller.abort();
         return this.json(response, 200, { cancelled: Boolean(execution && !execution.settled) });
+      }
+      if (request.method === 'DELETE' && url.pathname === '/api/guest/memory') {
+        const guest = this.guestSession(request);
+        if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
+        for (const execution of this.activeGuestExecutions.values()) {
+          if (execution.owner === guest.installationHash) execution.controller.abort();
+        }
+        this.requestLedger.forgetOwner(guest.installationHash);
+        return this.json(response, 200, { cleared: true });
       }
       if (request.method === 'POST' && url.pathname === '/api/guest/messages/stream') {
         const guest = this.guestSession(request);

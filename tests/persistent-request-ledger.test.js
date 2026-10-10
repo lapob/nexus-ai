@@ -5,6 +5,34 @@ const path = require('node:path');
 const test = require('node:test');
 const { PersistentRequestLedger } = require('../src/remote/persistent-request-ledger');
 
+test('public ledger retains replay only in RAM, forgets only its owner and expires contents', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ledger-private-'));
+  const filePath = path.join(root, 'requests.json');
+  let now = 1000000;
+  const owner = '1'.repeat(64), other = '2'.repeat(64), first = 'a'.repeat(64), second = 'b'.repeat(64);
+  const ledger = new PersistentRequestLedger({ filePath, persistContent: false, now: () => now });
+  try {
+    for (const [key, subject] of [[first, owner], [second, other]]) {
+      ledger.begin(key, key, subject); ledger.append(key, 'PRIVATE_RESPONSE');
+      ledger.complete(key, { message: 'PRIVATE_RESPONSE', completedAt: now });
+    }
+    assert.equal(fs.readFileSync(filePath, 'utf8').includes('PRIVATE_RESPONSE'), false);
+    assert.equal(ledger.replay(first).token, 'PRIVATE_RESPONSE');
+    ledger.forgetOwner(owner);
+    assert.equal(ledger.complete(first, { message: 'LATE_COMPLETION' }), null);
+    ledger.fail(first);
+    assert.equal(ledger.replay(first).token, '');
+    assert.equal(ledger.inspect(first, first).state, 'interrupted');
+    assert.equal(ledger.replay(second).token, 'PRIVATE_RESPONSE');
+    now += 300001;
+    assert.equal(ledger.inspect(second, second).state, 'interrupted');
+    assert.equal(ledger.replay(second).token, '');
+    const restarted = new PersistentRequestLedger({ filePath, persistContent: false, now: () => now });
+    assert.equal(restarted.replay(second).token, '');
+    restarted.close();
+  } finally { ledger.close(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('il ledger persiste risultato, cursore e conflitti di idempotenza', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ledger-'));
   const filePath = path.join(root, 'requests.json');

@@ -7,6 +7,7 @@ const path = require('node:path');
 const {
   availabilitySummary,
   collectAvailabilitySample,
+  formatAvailabilityReport,
   persistAvailability
 } = require('../src/infrastructure/storage/availability-monitor');
 
@@ -33,7 +34,7 @@ async function sample() {
     expectedEndpoints: readiness.endpoints
   });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
-  console.log(`Disponibilita NexusNXS: ${report.status}; budget consumato ${report.errorBudget.consumedPercent}%; ${report.endpoints.map((entry) => `${entry.endpoint} ${entry.availabilityPercent}%`).join(', ')}`);
+  console.log(formatAvailabilityReport(report, samples));
   if (strictCurrent && samples.some((entry) => !entry?.ok)) process.exitCode = 1;
   return report;
 }

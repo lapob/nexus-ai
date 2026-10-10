@@ -3,6 +3,14 @@ const assert = require('node:assert/strict');
 const { classifyTechnicalTask, conversationalGuidance, deriveSearchQueries, parsePlannerOutput, mergeSources, sourceReliability } = require('../src/application/reasoning');
 const { agentPlanSchema, buildSystemPrompt, directApplicationPlan, remoteActionCapabilities } = require('../src/application/register-ipc');
 
+test('respectful interaction preserves criticism, user control and honest limits', () => {
+  const guidance = conversationalGuidance('Non funziona, correggi il problema');
+  assert.match(guidance, /Critiche, correzioni, disaccordo/);
+  assert.match(guidance, /Non ostacolare mai interruzione, cancellazione/);
+  assert.match(guidance, /non simulare sofferenza/);
+  assert.match(guidance, /problema persistente/);
+});
+
 test('il planner operativo usa uno schema limitato agli strumenti disponibili', () => {
   const schema = agentPlanSchema({ tools: [{ name: 'read_file' }, { name: 'write_file' }] });
   assert.deepEqual(schema.properties.tool.anyOf[0].enum, ['read_file', 'write_file']);

@@ -9,9 +9,32 @@ const {
   collectAvailabilitySample,
   createAvailabilityMonitor,
   endpointId,
+  formatAvailabilityReport,
   persistAvailability,
   readAvailabilitySamples
 } = require('../src/infrastructure/storage/availability-monitor');
+
+test('il rapporto distingue HTTP 503, errore di rete e SLO non misurato', () => {
+  const rows = [
+    { at: Date.now(), endpoint: 'nexusnxs.com', ok: true, status: 200, latencyMs: 100 },
+    { at: Date.now(), endpoint: 'ai.nexusnxs.com/healthz', ok: false, status: 503, latencyMs: 120 },
+    { at: Date.now(), endpoint: 'ai.nexusnxs.com/readyz', ok: false, status: 0, latencyMs: 5000 }
+  ];
+  const report = availabilitySummary(rows);
+  const output = formatAvailabilityReport(report, rows);
+  assert.match(output, /degraded; SLO 30 giorni: storico insufficiente, budget non misurato/);
+  assert.match(output, /ERRORE ai.nexusnxs.com\/healthz: HTTP 503 \(120 ms\)/);
+  assert.match(output, /ERRORE ai.nexusnxs.com\/readyz: connessione fallita o timeout/);
+  assert.doesNotMatch(output, /20000%/);
+  assert.equal(report.errorBudget.consumedPercent, 20000);
+});
+
+test('una ripresa corrente non nasconde uno SLO storico fallito', () => {
+  const row = { at: Date.now(), endpoint: 'nexusnxs.com', ok: true, status: 200, latencyMs: 10 };
+  const output = formatAvailabilityReport({ measured: true, windowDays: 30, status: 'fail', errorBudget: { consumedPercent: 200 } }, [row]);
+  assert.match(output, /online; SLO 30 giorni: fail; budget consumato 200%/);
+  assert.match(output, /OK nexusnxs.com: HTTP 200/);
+});
 
 test('il monitor conserva solo endpoint pubblico, esito e latenza', async () => {
   let clock = 1_000;

@@ -1,3 +1,17 @@
+### Novita 0.3.29
+
+- Cronologia web senza account nel browser, recuperata dopo il ricaricamento; cancellazione coordinata fra schede e protezione contro risposte, allegati e scritture tardive. Se il salvataggio e negato, la memoria temporanea e indicata chiaramente.
+- Il ledger pubblico conserva su disco soltanto metadati opachi; replay delle risposte in RAM con scadenza breve. Il reset autenticato annulla e cancella soltanto le richieste della propria installazione.
+- Conversazione rispettosa anche in caso di frustrazione, senza simulare sofferenza o impedire cancellazione e stop. Questo non certifica emozioni o qualita del modello.
+- Il controllo di disponibilita mostra gli errori HTTP effettivi e distingue lo stato attuale dalla copertura SLO ancora insufficiente. Con il solo server locale, a PC spento il servizio resta indisponibile.
+- Allegati originali, immagini e bozze non inviate non vengono salvati nella cronologia web. Per cancellare IndexedDB dal browser occorre rimuovere i dati del sito; la sola cronologia di navigazione non basta. Limiti e conservazione sono descritti in `docs/LOCAL-DATA.md`.
+
+### Novita 0.3.28
+
+- Letture immagini e feed con limiti di byte e tempo prima dell'allocazione, cancellazione condivisa e originali preservati.
+- Android 6.5.24/code114: import e backup su worker isolati, anteprime campionate fuori UI. APK invariata nella29; public114 e Control42 hanno superato cinque profili fisici Online il10ottobre.
+- Audit Codex Security del6ottobre: report parziale50/930file,880percorsi residui. Non e un audit totale.
+
 ### Novita 0.3.27
 
 - Avvio Windows: un timeout DPAPI viene ritentato una sola volta entro un limite di tempo; errori crittografici restano negati, senza conservare credenziali in chiaro.

@@ -17,6 +17,7 @@ function cleanEntry(value) {
   const status = ['running', 'complete', 'interrupted'].includes(value.status) ? value.status : null;
   if (!status || typeof value.fingerprint !== 'string') return null;
   return {
+    ...(typeof value.owner === 'string' && /^[a-f0-9]{64}$/i.test(value.owner) ? { owner: value.owner } : {}),
     fingerprint: value.fingerprint.slice(0, 128),
     status,
     rating: [1, -1].includes(value.rating) ? value.rating : 0,
@@ -37,7 +38,7 @@ function cleanEntry(value) {
 // #region Ledger idempotente
 
 class PersistentRequestLedger {
-  constructor({ filePath, ttlMs = DEFAULT_TTL_MS, maxEntries = DEFAULT_MAX_ENTRIES, maxContentChars = DEFAULT_MAX_CONTENT_CHARS, now = () => Date.now(), persistDelayMs = 120 } = {}) {
+  constructor({ filePath, ttlMs = DEFAULT_TTL_MS, maxEntries = DEFAULT_MAX_ENTRIES, maxContentChars = DEFAULT_MAX_CONTENT_CHARS, now = () => Date.now(), persistDelayMs = 120, persistContent = true } = {}) {
     if (!filePath) throw new Error('Percorso ledger richieste mancante.');
     this.filePath = filePath;
     this.ttlMs = Math.max(60_000, Number(ttlMs) || DEFAULT_TTL_MS);
@@ -45,9 +46,14 @@ class PersistentRequestLedger {
     this.maxContentChars = Math.max(MAX_STREAM_CHARS, Number(maxContentChars) || DEFAULT_MAX_CONTENT_CHARS);
     this.now = now;
     this.persistDelayMs = Math.max(0, Number(persistDelayMs) || 0);
+    this.persistContent = persistContent;
     this.entries = new Map();
     this.persistTimer = null;
     this.load();
+    if (!persistContent) {
+      this.replayExpiry = setInterval(() => this.prune(), 60_000);
+      this.replayExpiry.unref?.();
+    }
   }
 
   load() {
@@ -77,6 +83,9 @@ class PersistentRequestLedger {
     let changed = false;
     for (const [key, entry] of this.entries) {
       if (entry.updatedAt < cutoff) { this.entries.delete(key); changed = true; }
+      else if (!this.persistContent && entry.status !== 'running' && entry.updatedAt < this.now() - 5 * 60_000 && (entry.content || entry.result)) {
+        entry.content = ''; entry.result = null; entry.status = 'interrupted'; changed = true;
+      }
     }
     if (this.entries.size > this.maxEntries) {
       const oldest = [...this.entries.entries()].sort((left, right) => left[1].updatedAt - right[1].updatedAt);
@@ -106,11 +115,12 @@ class PersistentRequestLedger {
     return { state: entry.status, entry: { ...entry, result: entry.result ? { ...entry.result } : null } };
   }
 
-  begin(key, fingerprint) {
+  begin(key, fingerprint, owner) {
     const current = this.inspect(key, fingerprint);
     if (current.state !== 'missing') return current;
     const at = this.now();
     const entry = { fingerprint, status: 'running', createdAt: at, updatedAt: at, content: '', result: null };
+    if (typeof owner === 'string' && /^[a-f0-9]{64}$/i.test(owner)) entry.owner = owner;
     this.entries.set(key, entry);
     this.persistNow();
     return { state: 'started', entry: { ...entry } };
@@ -129,7 +139,7 @@ class PersistentRequestLedger {
 
   complete(key, result) {
     const entry = this.entries.get(key);
-    if (!entry) return null;
+    if (!entry || entry.status !== 'running') return null;
     const at = this.now();
     const cleanResult = {
       message: String(result?.message || '').slice(0, MAX_STREAM_CHARS),
@@ -148,7 +158,7 @@ class PersistentRequestLedger {
 
   fail(key) {
     const entry = this.entries.get(key);
-    if (!entry) return;
+    if (!entry || entry.status !== 'running') return;
     if (!entry.content) this.entries.delete(key);
     else {
       entry.status = 'interrupted';
@@ -182,6 +192,15 @@ class PersistentRequestLedger {
     return true;
   }
 
+  forgetOwner(owner) {
+    if (typeof owner !== 'string' || !/^[a-f0-9]{64}$/i.test(owner)) return;
+    for (const entry of this.entries.values()) {
+      if (entry.owner !== owner) continue;
+      entry.content = ''; entry.result = null; entry.rating = 0; entry.status = 'interrupted';
+    }
+    this.persistNow();
+  }
+
   schedulePersist() {
     if (this.persistTimer) return;
     this.persistTimer = setTimeout(() => {
@@ -195,13 +214,18 @@ class PersistentRequestLedger {
     if (this.persistTimer) { clearTimeout(this.persistTimer); this.persistTimer = null; }
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
     const temporary = `${this.filePath}.${process.pid}.tmp`;
-    const entries = Object.fromEntries(this.entries);
+    // Public conversations belong to the client. Keep only opaque idempotency
+    // tombstones on disk; a restart must neither replay lost text nor regenerate
+    // an already accepted request. In-process replay still uses bounded RAM.
+    const entries = Object.fromEntries([...this.entries].map(([key, entry]) => [key,
+      this.persistContent ? entry : { ...entry, status: 'interrupted', content: '', result: null }
+    ]));
     fs.writeFileSync(temporary, JSON.stringify({ schemaVersion: 1, entries }), { encoding: 'utf8', mode: 0o600 });
     fs.renameSync(temporary, this.filePath);
     try { fs.chmodSync(this.filePath, 0o600); } catch { /* Windows applica le ACL della cartella. */ }
   }
 
-  close() { this.persistNow(); }
+  close() { clearInterval(this.replayExpiry); this.persistNow(); }
 }
 
 // #endregion

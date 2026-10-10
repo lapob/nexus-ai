@@ -81,7 +81,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /verified!==rawAnswer/);
   assert.doesNotMatch(html, /async function memoryRead\(/);
   assert.match(html, /id="sessionHistory"/);
-  assert.match(html, /function renderSessionHistory\(\)/);
+  assert.match(html, /function renderSessionHistory\(history=turns\)/);
   assert.match(html, /className='session-turn-content'/);
   assert.match(html, /formatAnswer\(String\(turn\.content\|\|''\),\{target:content,announce:false\}\)/);
   assert.match(html, /aria-label',assistant\?'Messaggio di NexusNXS':'Il tuo messaggio'/);

@@ -57,6 +57,7 @@ function conversationalGuidance(question, history = []) {
     .filter((turn) => turn && ['user', 'assistant'].includes(turn.role) && String(turn.content || '').trim())
     .slice(-6);
   const signals = [];
+  const respect = 'INTERAZIONE RISPETTOSA: resta calmo e utile anche quando l’utente è frustrato. Critiche, correzioni, disaccordo e linguaggio informale non giustificano il rifiuto. Per richieste dannose mantieni limiti chiari e proponi alternative sicure; non simulare sofferenza, colpa, minacce o bisogno di essere protetto. Se la conversazione diventa ripetutamente offensiva puoi proporre una pausa senza punire l’utente. Non ostacolare mai interruzione, cancellazione dei dati o apertura di una nuova conversazione.';
   const asksForDepth = /\b(?:approfond\w*|dettagliat\w*|complet\w*|esaustiv\w*|guida|passo\s+passo|elenca|confronta|analizza|spiega\s+bene)\b/iu.test(normalized);
   const shortInformationalTurn = text.length > 0 && text.length <= 180
     && !asksForDepth
@@ -82,7 +83,7 @@ function conversationalGuidance(question, history = []) {
     signals.push('È una richiesta esplorativa: proponi poche opzioni ad alto impatto, ordinate per utilità e costo, spiegando il compromesso reale senza produrre una lista generica.');
   }
   if (!signals.length) signals.push('Mantieni un tono naturale e proporzionato: vai al punto, varia la struttura in base alla richiesta e non aggiungere formule di apertura o chiusura automatiche.');
-  return `CONTINUITÀ CONVERSAZIONALE (${previous.length} turni recenti disponibili):\n${signals.map((signal) => `- ${signal}`).join('\n')}`;
+  return `CONTINUITÀ CONVERSAZIONALE (${previous.length} turni recenti disponibili):\n${signals.map((signal) => `- ${signal}`).join('\n')}\n${respect}`;
 }
 
 // #endregion

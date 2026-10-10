@@ -1564,7 +1564,35 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('il risultato idempotente sopravvive al riavvio e a un nuovo token guest', async () => {
+test('public memory deletion is authenticated, isolated and cancels late completion', async () => {
+  const { root, gateway } = fixture();
+  let release, started;
+  const began = new Promise(resolve => { started = resolve; });
+  const waiting = new Promise(resolve => { release = resolve; });
+  try {
+    const port = await freePort(); await gateway.configure({ enabled: true, port });
+    const base = `http://127.0.0.1:${port}`;
+    const first = await bootstrapGuest(base, '019fa53a-63c1-79b1-bf97-08fdf3bb5c90');
+    const second = await bootstrapGuest(base, '019fa53a-63c1-79b1-bf97-08fdf3bb5c91');
+    const send = (guest, id) => fetch(`${base}/api/guest/messages`, { method: 'POST', headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Synthetic privacy case', clientMessageId: id }) });
+    assert.equal((await send(second, '019fa53a-63c1-79b1-bf97-08fdf3bb5ca1')).status, 200);
+    gateway.onMessage = async ({ conversation, onToken }) => {
+      onToken('Late private text'); started(); await waiting;
+      return { ...conversation, updatedAt: Date.now(), turns: [{ role: 'assistant', content: 'LATE_FINAL' }] };
+    };
+    const pending = send(first, '019fa53a-63c1-79b1-bf97-08fdf3bb5ca2');
+    await Promise.race([began, pending.then(response => { throw new Error(`Privacy request ended before inference: ${response.status}`); }), new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error('Privacy request did not start')), 3000); timer.unref(); })]);
+    assert.equal((await fetch(`${base}/api/guest/memory`, { method: 'DELETE' })).status, 401);
+    assert.equal((await fetch(`${base}/api/guest/memory`, { method: 'DELETE', headers: { Authorization: `Bearer ${first.token}` } })).status, 200);
+    release(); await pending;
+    const entries = [...gateway.requestLedger.entries.values()];
+    assert.equal(entries.some(entry => entry.content === 'Risposta remota'), true, 'Other installation survives');
+    assert.equal(entries.some(entry => /Late private|LATE_FINAL/.test(entry.content)), false);
+    assert.equal(fs.readFileSync(`${path.join(root, 'remote-access.json')}.requests`, 'utf8').includes('LATE_FINAL'), false);
+  } finally { release?.(); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('il server pubblico conserva tombstone senza testi e non rigenera dopo il riavvio', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-ledger-'));
   const statePath = path.join(root, 'remote-access.json');
   const store = { list: () => [], save: (record) => record };
@@ -1584,14 +1612,15 @@ test('il risultato idempotente sopravvive al riavvio e a un nuovo token guest', 
     const body = JSON.stringify({ text: 'Una volta', history: [], clientMessageId: '019fa53a-63c1-79b1-bf97-08fdf3bb5c91' });
     const firstResult = await (await fetch(`http://127.0.0.1:${firstPort}/api/guest/messages`, { method: 'POST', headers: { Authorization: `Bearer ${initialGuest.token}`, 'Content-Type': 'application/json' }, body })).json();
     assert.equal(firstResult.message, 'Persistente');
+    assert.equal(fs.readFileSync(`${statePath}.requests`, 'utf8').includes('Persistente'), false);
     await first.stop();
 
     const secondPort = await freePort();
     restarted = new RemoteSessionGateway({ statePath, conversationStore: store, onMessage: handler, logger: { info() {}, warn() {} } });
     await restarted.configure({ enabled: true, port: secondPort });
     const renewedGuest = await bootstrapGuest(`http://127.0.0.1:${secondPort}`, installationId);
-    const replayed = await (await fetch(`http://127.0.0.1:${secondPort}/api/guest/messages`, { method: 'POST', headers: { Authorization: `Bearer ${renewedGuest.token}`, 'Content-Type': 'application/json' }, body })).json();
-    assert.deepEqual(replayed, firstResult);
+    const replayed = await fetch(`http://127.0.0.1:${secondPort}/api/guest/messages`, { method: 'POST', headers: { Authorization: `Bearer ${renewedGuest.token}`, 'Content-Type': 'application/json' }, body });
+    assert.equal(replayed.status, 409);
     assert.equal(calls, 1);
   } finally { await first?.stop(); await restarted?.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });

@@ -131,6 +131,18 @@ function availabilitySummary(samples = [], { targetPercent = 99.5, windowDays = 
   });
 }
 
+function formatAvailabilityReport(report, samples = []) {
+  const current = samples.map(normalizeSample).filter(Boolean);
+  const healthy = current.length > 0 && current.every((sample) => sample.ok);
+  const window = report.measured
+    ? `SLO ${report.windowDays} giorni: ${report.status}; budget consumato ${report.errorBudget.consumedPercent}%`
+    : `SLO ${report.windowDays} giorni: storico insufficiente, budget non misurato`;
+  return [
+    `Disponibilita NexusNXS: ${healthy ? 'online' : 'degraded'}; ${window}.`,
+    ...current.map((sample) => `${sample.ok ? 'OK' : 'ERRORE'} ${sample.endpoint}: ${sample.status ? `HTTP ${sample.status}` : 'connessione fallita o timeout'} (${sample.latencyMs} ms)`)
+  ].join('\n');
+}
+
 // #endregion
 // #region 02 - Persistenza e ciclo residente
 
@@ -220,6 +232,7 @@ module.exports = {
   collectAvailabilitySample,
   createAvailabilityMonitor,
   endpointId,
+  formatAvailabilityReport,
   normalizeSample,
   persistAvailability,
   readAvailabilitySamples

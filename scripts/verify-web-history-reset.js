@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { RemoteSessionGateway } = require('../src/remote/remote-session-gateway');
+const { createPublicLocalMemory } = require('../src/remote/public-local-memory');
 const { browserExecutable, Cdp, freePort, waitForTarget, removeTemporaryPath } = require('./web-visual-regression');
 // #region Read-only browser predicates
 async function waitFor(client, expression) {
@@ -24,7 +25,7 @@ async function main() {
   fs.mkdirSync(output, { recursive: true });
   const profile = fs.mkdtempSync(path.join(output, 'profile-'));
   const port = await freePort(), publicPort = await freePort(), debugPort = await freePort();
-  let client, child;
+  let client, secondClient, child;
   const gateway = new RemoteSessionGateway({ statePath: path.join(profile, 'gateway.json'), publicPort,
     conversationStore: { list: () => [], save: value => value },
     onMessage: async () => { throw new Error('No real inference allowed'); }, logger: { info() {}, warn() {} } });
@@ -68,6 +69,27 @@ async function main() {
     await client.evaluate(`qa.frame({type:'token',token:'Nuova risposta'});qa.frame({type:'complete',text:'Nuova risposta'});qa.controller.close();true`);
     await waitFor(client, "document.querySelector('#send').dataset.mode==='send'");
     assert.match(await client.evaluate("document.querySelector('#answer').textContent"), /Nuova risposta/);
+    // The same browser database survives reload, but reset in another tab must
+    // invalidate both the displayed conversation and any pending write.
+    const secondUrl = `${url}?memoryCheck=1`;
+    const { targetId } = await client.command('Target.createTarget', { url: secondUrl });
+    const targets = await fetch(`http://127.0.0.1:${debugPort}/json`).then(response => response.json());
+    const secondTarget = targets.find(target => target.id === targetId);
+    assert.ok(secondTarget, 'The second tab has a distinct target');
+    secondClient = await new Cdp(secondTarget.webSocketDebuggerUrl).open();
+    await waitFor(secondClient, "document.querySelector('#answer')?.textContent.includes('Nuova risposta')");
+    await secondClient.command('Page.reload');
+    await waitFor(secondClient, "document.querySelector('#answer')?.textContent.includes('Nuova risposta')");
+    await client.evaluate(`document.querySelector('#keyboard').click();document.querySelector('#prompt').value='Bozza da cancellare';localStorage.setItem('nexusnxs.slash-commands.v1','[]');localStorage.setItem('unrelated-owner-data','preserve');true`);
+    await secondClient.evaluate(`document.querySelector('#memoryClear').click();true`);
+    await waitFor(client, "document.querySelector('#answer').textContent===''&&document.querySelector('#prompt').value===''");
+    assert.equal(await client.evaluate("localStorage.getItem('unrelated-owner-data')"), 'preserve');
+    assert.equal(await client.evaluate("localStorage.getItem('nexusnxs.slash-commands.v1')"), null);
+    await secondClient.command('Page.reload');
+    await secondClient.command('Page.bringToFront');
+    await waitFor(secondClient, "document.body?.dataset.serviceReadiness==='ready'");
+    assert.equal(await secondClient.evaluate("document.querySelector('#answer').textContent"), '');
+    await client.command('Page.bringToFront');
     await client.evaluate(`qa.checkReadiness=globalThis.nexusCheckReadiness;globalThis.nexusCheckReadiness=()=>new Promise(resolve=>qa.ready=resolve);true`);
     await submit('Richiesta in preparazione');
     await waitFor(client, "typeof qa.ready==='function'");
@@ -84,10 +106,26 @@ async function main() {
     await client.evaluate(`document.querySelector('#send').click();qa.controller.error(new DOMException('Aborted','AbortError'));true`);
     await waitFor(client, "document.querySelector('#send').dataset.mode==='send'");
     assert.match(await client.evaluate("document.querySelector('#answer').textContent"), /Parte da conservare/);
-    fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed: true, cancelled: true, lateFramesRejected: true, lateImagesRejected: true, pendingReadinessCancelled: true, nextHistoryEmpty: true, normalStopPreservesPartial: true }, null, 2));
+    await client.evaluate(`qa.nativeReader=FileReader;globalThis.FileReader=class {readAsDataURL(){qa.lateReader=this}};const input=document.querySelector('#attachmentInput'),files=new DataTransfer();files.items.add(new File(['test'],'synthetic.txt',{type:'text/plain'}));input.files=files.files;input.dispatchEvent(new Event('change'));true`);
+    await waitFor(client, 'Boolean(qa.lateReader)');
+    await client.evaluate(`document.querySelector('#memoryClear').click();true`);
+    await waitFor(client, "document.querySelector('#answer').textContent===''");
+    await client.evaluate(`qa.lateReader.result='data:text/plain;base64,dGVzdA==';qa.lateReader.onload();globalThis.FileReader=qa.nativeReader;true`);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    assert.equal(await client.evaluate("document.querySelector('#attachment').dataset.count"), '0');
+    const staleWrite = await client.evaluate(`(async()=>{const first=(${createPublicLocalMemory.toString()})(),second=(${createPublicLocalMemory.toString()})();await first.read();await second.read();await first.write([{role:'user',content:'Synthetic old state'}]);await second.clear();const accepted=await first.write([{role:'user',content:'MUST_NOT_REAPPEAR'}]);return {accepted,turns:await second.read()}})()`);
+    assert.equal(staleWrite.accepted, false);
+    assert.deepEqual(staleWrite.turns, []);
+    await secondClient.command('Page.addScriptToEvaluateOnNewDocument', { source: `IDBFactory.prototype.open=function(){throw new DOMException('Storage denied','SecurityError')}` });
+    await secondClient.command('Page.reload');
+    await secondClient.command('Page.bringToFront');
+    await waitFor(secondClient, "document.body?.dataset.memoryStorage==='temporary'");
+    assert.match(await secondClient.evaluate("document.querySelector('#memoryStorageNotice').textContent"), /temporanea/);
+    fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed: true, cancelled: true, lateFramesRejected: true, lateImagesRejected: true, pendingReadinessCancelled: true, nextHistoryEmpty: true, normalStopPreservesPartial: true, localReload: true, crossTabClear: true, draftCleared: true, unrelatedStoragePreserved: true }, null, 2));
     console.log('PASS: history reset aborts, cancels server request, discards late frames and starts with empty history.');
   } finally {
     try { await client?.command('Browser.close'); } catch {}
+    secondClient?.close();
     client?.close();
     if (child && child.exitCode === null) child.kill();
     await gateway.stop();

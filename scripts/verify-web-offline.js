@@ -71,7 +71,7 @@ async function main() {
     await waitFor(client, `performance.timeOrigin!==${previousDocument}&&document.body?.dataset.serviceReadiness==='ready'&&document.querySelector('#prompt').value===''`);
     assert.equal(await client.evaluate("document.querySelectorAll('.attachment-chip').length"), 0);
     fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed: true, report, reconnectedWithoutSending: true, anonymousReloadCleared: true }, null, 2));
-    console.log('PASS: bozza e allegati offline, tre orientamenti/dimensioni, riconnessione senza invio, reload anonimo senza persistenza.');
+    console.log('PASS: bozza e allegati offline, tre orientamenti/dimensioni, riconnessione senza invio; bozze non inviate e allegati non persistono al reload.');
   } finally {
     try { await client?.command('Browser.close'); } catch {}
     client?.close();
