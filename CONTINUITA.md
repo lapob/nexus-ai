@@ -1,5 +1,26 @@
 # Website source continuity
 
+## Dependency boundary review — 10 October 2026
+
+Independent read-only investigation reproduced the installed Braces overflow
+through fast-glob in a fresh local Node process with a nested pattern below
+the character limit. No concrete public HTTP-input path was established:
+the identified consumers belong to Next lint configuration and Vinext's
+build-time CommonJS/configuration loader. Existing built bundles contained
+no affected package/plugin identifiers in a textual scan; this is not formal
+provenance verification of the deployed artifact.
+
+The official advisory GHSA-vfj7-8cjw-p6xm still lists no patched release.
+Registry checks confirm that updating Vinext alone leaves the affected chain.
+Inline configuration can reduce one path but does not remove the dependency;
+removing the framework would break the current build/runtime contract.
+Outcome: blocked, no vulnerability patch applied and no deployment performed.
+Do not suppress development findings, fake versions or downgrade the framework
+to make the release gate pass. Adopt a compatible corrected release, then rerun
+the reproduction, ordinary glob controls and all existing release checks.
+The standalone review evidence is retained by Codex Security outside Git;
+this scoped investigation does not certify the complete application repository.
+
 ## 10 October 2026
 
 Source now references published Windows Preview0.3.29 and unchanged Android6.5.24,
