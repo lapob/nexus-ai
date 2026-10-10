@@ -18,11 +18,18 @@ Its Braces roots are removed through native React/Vite SSR while preserving
 the existing product components and Worker boundaries. Full release gate passes
 43tests/27browser, actual Workers runtime, budgets and zero known audit findings.
 Candidate8b4e1ea9-4b8b-49b4-b3d8-6b90f3d79851 passes14 preview routes.
-Production remains unchanged: AI readiness503 blocks promotion. Official runtime
-0.32.15 and candidate0.40.2 both fail the distribution security gate with60
-High/Critical module-level findings; reachability is not certified. Official
-signature/archive hash verified, no runtime replacement or security bypass.
-Historical Braces-blocked and readiness200 notes below are superseded by this.
+Production promotion completed through the standard release path, including
+postdeployment route/header checks and independent AI health verification.
+Production version9580fd57-7a33-4b0f-bc8c-f44703ff8750 uses website8bd340b.
+AI readiness recovered to200 automatically after its existing scanner was
+restored. The managed runtime uses a pre-existing development-loopback policy;
+this recovery does not resolve the separate distribution gate: runtime0.32.15
+and candidate0.40.2 still report60 High/Critical module-level findings.
+Reachability and the appropriate security profile for a public gateway remain
+open. Official signature/archive hash verified; no new runtime was installed
+and no new security exception was introduced. Earlier503-blocked notes are
+historical. Desktop sourcef1ac4f2 CI38052957705 completed successfully on both
+Windows and Ubuntu with secret checks. These features are not in Preview29.
 
 # Completion checks and release evidence — 10 October 2026
 

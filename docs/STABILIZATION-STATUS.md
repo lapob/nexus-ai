@@ -8,10 +8,15 @@ Electron con IPC reale. Vedere CONTINUITA.md e LOCAL-DATA.md per verifiche e
 limiti: nessun pacchetto nuovo o parita mobile/web viene dichiarato.
 cloud:check/check PASS; suite completa isolata1050PASS/2SKIP/0FAIL.
 La candidata sito React/Vite SSR elimina le radici Braces; CIwebsite8bd340b
-completaPASS,43test/27browser e14routepreviewPASS. Produzione non promossa:
-AIready503 per gate runtime0.32.15/0.40.2 con60High/Critical a livello modulo.
-Nessuna esclusione audit, nessun nuovo runtime installato. Le note storiche
-sotto suBraces irrisolto e servizio200 non descrivono lo stato attuale.
+completaPASS,43test/27browser e14routepreviewPASS. Produzione pubblicata dalla
+stessa build: versione9580fd57-7a33-4b0f-bc8c-f44703ff8750, verifiche dopo
+deploy PASS. AIready200 dopo recupero automatico dello scanner esistente.
+Il runtime gestito usa la policy development-loopback preesistente; non equivale
+al superamento del gate distribuzione0.32.15/0.40.2, ancora FAIL con60finding
+High/Critical a livello modulo. Reachability e profilo per gateway pubblico
+restano da verificare. Nessuna nuova eccezione audit o installazione runtime.
+Le note sotto suBraces irrisolto e promozione bloccata sono storiche.
+CI sorgenti desktopf1ac4f2 completata PASS su Windows/Ubuntu e segreti.
 
 ## Verifiche aggiuntive del 10 ottobre
 
