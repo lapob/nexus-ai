@@ -3,6 +3,8 @@
  * @description Cronologia conversazioni locale, limitata e resiliente.
  */
 
+import { normalizeArtifactRevisions } from '../../shared/artifact-revisions.mjs';
+
 // #region 01 — Contratti e normalizzazione
 
 export interface ConversationTurn {
@@ -25,7 +27,8 @@ function normalizeArtifacts(value: unknown): import('../types/nexus').Operationa
     diff: String(item.diff || '').slice(0, 48_000),
     added: Math.max(0, Number(item.added) || 0),
     removed: Math.max(0, Number(item.removed) || 0),
-    truncated: item.truncated === true
+    truncated: item.truncated === true,
+    revisions: normalizeArtifactRevisions(item.revisions)
     , events: Array.isArray(item.events) ? item.events.slice(0, 12).map((event: any) => ({ label: String(event?.label || '').slice(0, 160), status: event?.status === 'warning' ? 'warning' : 'complete' })) : []
     , diagnostics: Array.isArray(item.diagnostics) ? item.diagnostics.slice(0, 12).map((entry: any) => ({ file: String(entry?.file || '').slice(0, 300), line: Math.max(0, Number(entry?.line) || 0), column: Math.max(0, Number(entry?.column) || 0), message: String(entry?.message || '').slice(0, 300) })) : []
   }));
@@ -113,20 +116,23 @@ export function fitConversationBudget(
       continue;
     }
     if (retained.length === 0) {
-      retained.push({
+      const compact = {
         ...record,
         turns: record.turns.slice(-6).map((turn) => ({
-          ...turn,
+          role: turn.role,
+          createdAt: turn.createdAt,
           content: turn.content.slice(0, 12_000)
         }))
-      });
+      };
+      while (compact.turns.length && used + JSON.stringify(compact).length > budget) compact.turns.shift();
+      if (used + JSON.stringify(compact).length <= budget) retained.push(compact);
     }
     break;
   }
   return retained;
 }
 
-export function saveConversation(record: ConversationRecord): ConversationRecord[] {
+export function saveConversation(record: ConversationRecord, persist = true): ConversationRecord[] {
   const current = loadConversationHistory().filter((item) => item.id !== record.id);
   const firstQuestion = record.turns.find((turn) => turn.role === 'user')?.content || 'Conversazione';
   const normalized: ConversationRecord = {
@@ -137,7 +143,7 @@ export function saveConversation(record: ConversationRecord): ConversationRecord
   };
   const next = fitConversationBudget([normalized, ...current]);
   try { window.localStorage.setItem(STORAGE_NAMESPACE, JSON.stringify(next)); } catch {}
-  void window.nexus.saveConversationHistory(normalized).catch(() => {});
+  if (persist) void window.nexus.saveConversationHistory(normalized).catch(() => {});
   return next;
 }
 

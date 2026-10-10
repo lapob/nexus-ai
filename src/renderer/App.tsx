@@ -224,6 +224,7 @@ export function App() {
           error=""
           active={nexus.generating}
           artifacts={nexus.artifacts}
+          onReviseArtifact={nexus.reviseCurrentArtifact}
           trainingSaved={nexus.trainingSaved}
           onApproveTraining={nexus.approveForTraining}
           onRateResponse={nexus.rateResponse}
@@ -266,6 +267,8 @@ export function App() {
         record={nexus.viewedConversation}
         onSteer={nexus.steerConversation}
         onDeleteFrom={nexus.deleteConversationFrom}
+        onReviseArtifact={nexus.reviseArtifact}
+        generating={nexus.generating}
         onClose={() => {
           nexus.closeConversationView();
           nexus.setHistoryOpen(true);

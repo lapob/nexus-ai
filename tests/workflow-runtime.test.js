@@ -5,6 +5,49 @@ const os = require('node:os');
 const path = require('node:path');
 const { WorkflowRuntime, validateSteps } = require('../src/agents/workflow-runtime');
 const { ActionRuntime } = require('../src/agents/action-runtime');
+const { documentCopyRecipe } = require('../src/shared/local-workflow-recipes.mjs');
+
+test('document recipe uses the actual executor, preserves the source and requires approval for both steps', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-document-recipe-'));
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-document-other-'));
+  const action = new ActionRuntime({ vaultPath: root, auditPath: path.join(root, 'logs/actions.jsonl'),
+    shell: {}, logger: { warn() {} }, platform: 'linux', applicationProbe: () => false });
+  const runtime = new WorkflowRuntime({ actionRuntime: action, checkpointDirectory: path.join(root, 'workflows') });
+  try {
+    fs.writeFileSync(path.join(root, 'source.md'), '# Documento originale\nContenuto autorizzato.');
+    for (const source of ['../source.md', '/source.md', 'C:\\source.md', 'source.exe', 'dir//source.md']) assert.throws(() => documentCopyRecipe(source, 'copy.md'));
+    const flow = runtime.create(documentCopyRecipe('source.md', 'copy.md'));
+    const first = runtime.next(flow.id);
+    assert.equal(fs.existsSync(path.join(root, 'copy.md')), false);
+    const copied = await runtime.decide(flow.id, { ticketId: first.proposal.id, approved: true });
+    assert.equal(copied.workflow.status, 'pending'); assert.equal(copied.result.receipt.outcome, 'completed');
+    assert.equal(fs.readFileSync(path.join(root, 'copy.md'), 'utf8'), fs.readFileSync(path.join(root, 'source.md'), 'utf8'));
+    const second = runtime.next(flow.id);
+    const read = await runtime.decide(flow.id, { ticketId: second.proposal.id, approved: true });
+    assert.equal(read.workflow.status, 'complete'); assert.match(read.result.stdout, /Contenuto autorizzato/);
+    const again = runtime.create(documentCopyRecipe('source.md', 'copy.md'));
+    const overwrite = runtime.next(again.id);
+    await assert.rejects(runtime.decide(again.id, { ticketId: overwrite.proposal.id, approved: true }));
+    assert.equal(fs.readFileSync(path.join(root, 'source.md'), 'utf8'), '# Documento originale\nContenuto autorizzato.');
+    const denied = runtime.create(documentCopyRecipe('source.md', 'denied.md'));
+    runtime.next(denied.id); await runtime.cancel(denied.id);
+    assert.equal(fs.existsSync(path.join(root, 'denied.md')), false);
+    fs.writeFileSync(path.join(root, 'large.md'), 'x'.repeat(2 * 1024 * 1024 + 1));
+    const large = runtime.create(documentCopyRecipe('large.md', 'large-copy.md'));
+    assert.throws(() => runtime.next(large.id), /2 MiB/);
+    const bound = runtime.create(documentCopyRecipe('source.md', 'bound.md'));
+    action.setWorkspaceRoot(other);
+    assert.throws(() => runtime.next(bound.id), { code: 'WORKFLOW_WORKSPACE_CHANGED' });
+    action.setWorkspaceRoot(root);
+    const boundProposal = runtime.next(bound.id);
+    action.setWorkspaceRoot(other);
+    await assert.rejects(runtime.decide(bound.id, true), { code: 'WORKFLOW_WORKSPACE_CHANGED' });
+    assert.equal(fs.existsSync(path.join(other, 'bound.md')), false);
+    const cancelled = await runtime.cancel(bound.id);
+    assert.equal(cancelled.workflow.status, 'cancelled'); assert.equal(cancelled.result.receipt.outcome, 'cancelled');
+    assert.equal(action.tickets.has(boundProposal.proposal.id), false);
+  } finally { runtime.shutdown(); await action.shutdown(); fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(other, { recursive: true, force: true }); }
+});
 
 test('workflow conserva esiti falliti e annullati senza attribuirli a un rifiuto utente', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-outcomes-'));

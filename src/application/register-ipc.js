@@ -859,6 +859,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
   ipcMain.handle(CHANNELS.health, async (event) => { assertTrustedSender(event); const settings = getSettings(); await ensureRuntime(settings); return aiRuntime.health(); });
   ipcMain.handle(CHANNELS.historyList, (event) => { assertTrustedSender(event); return conversationStore.list(); });
   ipcMain.handle(CHANNELS.historySave, (event, record) => { assertTrustedSender(event); return conversationStore.save(record); });
+  ipcMain.handle(CHANNELS.historyReviseArtifact, (event, payload) => { assertTrustedSender(event); return conversationStore.reviseArtifact(payload); });
   ipcMain.handle(CHANNELS.historyRemove, (event, id) => { assertTrustedSender(event); return conversationStore.remove(id); });
   ipcMain.handle(CHANNELS.historyImport, (event, records) => { assertTrustedSender(event); return conversationStore.import(records); });
   ipcMain.handle(CHANNELS.remoteStatus, (event) => { assertTrustedSender(event); return remoteGateway.status(); });
@@ -1217,7 +1218,22 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     if (!Number.isSafeInteger(payload?.id) || payload.id < 1 || typeof payload.content !== 'string'
       || payload.content.trim().length < 3 || payload.content.length > 2000) throw new Error('Ricordo non valido.');
     if (!memoryStore) throw new Error('Memoria non disponibile.');
-    return { updated: memoryStore.updateById(payload.id, payload.content) };
+    const options = payload.options ?? {};
+    if (typeof options !== 'object' || Array.isArray(options) || Object.keys(options).some((key) => key !== 'expiresAt')) throw new Error('Opzioni del ricordo non valide.');
+    return { updated: memoryStore.updateById(payload.id, payload.content, options) };
+  });
+  ipcMain.handle(CHANNELS.memoryExport, async (event) => {
+    assertTrustedSender(event);
+    if (!memoryStore) throw new Error('Memoria non disponibile.');
+    const result = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
+      title: 'Esporta ricordi personali (JSON non cifrato)',
+      defaultPath: `NexusNXS-memory-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'Ricordi personali JSON', extensions: ['json'] }]
+    });
+    if (result.canceled || !result.filePath) return { status: 'cancelled' };
+    const exported = memoryStore.exportPortable();
+    await fs.promises.writeFile(result.filePath, JSON.stringify(exported, null, 2), { encoding: 'utf8', mode: 0o600 });
+    return { status: 'saved', count: exported.memories.length, total: exported.totalActive, truncated: exported.truncated };
   });
   ipcMain.handle(CHANNELS.memoryForget, (event, value) => {
     assertTrustedSender(event);

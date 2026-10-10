@@ -1,5 +1,36 @@
 # Dati locali e uso senza account
 
+## Sorgenti desktop successivi alla Preview29
+
+Il pannello memoria mostra ambito locale, provenienza, ultimo utilizzo e scadenza;
+permette di mantenere la scadenza, scegliere30/90giorni o nessuna. L'esportazione
+con dialogo nativo produce un JSON **non cifrato**, senza ID interni o sourceId.
+Il limite e500ricordi attivi: l'esito indica conteggio e totale se incompleto.
+Il file esportato e indipendente dalla cancellazione dei ricordi nell'app.
+
+Gli artefatti delle conversazioni desktop conservano il risultato AI e fino
+a6copie modificabili di48.000caratteri ciascuna, in ordine di revisione.
+Le copie sono salvate nello stesso SQLite della conversazione; eliminare la
+conversazione elimina anche le sue copie. Il download riguarda la versione
+selezionata. Il confronto prima/dopo continua a descrivere il risultato AI;
+modificare una copia non modifica i file del progetto. Salvataggi obsoleti o
+destinati a conversazioni eliminate vengono rifiutati. La cache dell'interfaccia
+resta limitata; per record grandi conserva il testo compatto, mentre SQLite
+mantiene gli artefatti entro i limiti del proprio archivio.
+
+La ricetta locale inPermessi copia e consulta documenti TXT/MD/JSON/CSV fino
+a2MiB, tramite gli esecutori gia esistenti e due consensi separati. Non
+sovrascrive una destinazione presente e resta vincolata alla cartella iniziale.
+Checkpoint e ricevute sono dati operativi distinti dalla cronologia chat;
+il browser conserva soltanto l'ID dell'ultima ricetta. La lettura e un'anteprima
+temporanea limitata a48.000caratteri, non un nuovo archivio documentale.
+L'interruzione non annulla una copia gia completata. I vecchi workflow senza
+vincolo di workspace devono essere ricreati prima di procedere.
+
+Queste estensioni sono sorgenti verificati con dati sintetici, successivi alla
+Preview29: non sono incluse automaticamente nei pacchetti pubblicati e non
+certificano parita delle nuove funzioni su web, Android o iOS.
+
 Aggiornamento 10 ottobre 2026. Modifiche pubblicate nella Preview0.3.29 e nel
 servizio web aggiornato; Android6.5.24 resta invariata. L'installazione Windows
 locale richiede ancora l'intervento manuale del proprietario.

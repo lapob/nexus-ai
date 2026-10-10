@@ -3212,6 +3212,21 @@ button.shortcut-item:focus-visible kbd {
 .memory-list article > span { flex: 1 1 12rem; }
 .memory-list article textarea { width:100%;min-width:0;max-height:12rem;resize:vertical;padding:.65rem;border:1px solid rgba(118,211,212,.2);border-radius:.7rem;background:rgba(5,16,18,.8);color:inherit;font:inherit;line-height:1.5; }
 .memory-edit-actions { display:flex;flex-wrap:wrap;gap:.4rem; }
+.memory-expiry { border:0;padding:0;margin:.35rem 0;min-width:0; }
+.artifact-versions { max-width: 18rem; margin: .5rem 0; }
+.artifact-versions .nexus-select[data-open] .nexus-select-menu { position: relative; inset: auto; width: 100%; min-width: 0; max-width: 100%; margin-top: .35rem; }
+.artifact-editor { display: grid; gap: .75rem; min-width: 0; }
+.artifact-editor textarea { width: 100%; box-sizing: border-box; min-height: min(16rem, 45dvh); max-height: 55dvh; resize: vertical; padding: .8rem; border: 1px solid var(--hairline); border-radius: .75rem; background: var(--surface-soft); color: var(--text-primary); font: inherit; line-height: 1.55; }
+.artifact-editor small { color: var(--text-secondary); }
+.artifact-editor > div { display: flex; gap: .5rem; justify-content: flex-end; }
+.local-workflow { display: grid; gap: .75rem; min-width: 0; }
+.local-workflow > p { color: var(--text-secondary); font-size: var(--text-control); }
+.local-workflow-fields { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.local-workflow-fields .settings-field { flex: 1 1 12rem; min-width: 0; }
+.local-workflow-state { display: flex; gap: .75rem; align-items: center; }
+.local-workflow-preview { display: grid; gap: .5rem; padding: .75rem; background: var(--surface-soft); border-radius: .75rem; min-width: 0; }
+.local-workflow-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 10rem; overflow: auto; color: var(--text-primary); font: inherit; }
+.local-workflow-receipt { display: flex; align-items: center; gap: .5rem; color: var(--text-secondary); }
 .memory-list article > button,.memory-edit-actions button { flex-shrink:0;min-height:44px;min-width:44px; }
 @media(max-width:600px){.memory-list article{flex-wrap:wrap;gap:.5rem}.memory-list article > span{flex-basis:100%}}
 .memory-list article strong { color: rgba(216, 238, 239, 0.9); font-size: 0.78rem; font-weight: 420; overflow-wrap: anywhere; white-space: normal; }

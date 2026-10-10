@@ -335,7 +335,8 @@ export function useNexusController() {
   const responsePaintTimer = useRef<number | null>(null);
   const draftSaveTimer = useRef<number | null>(null);
   const lastResponsePaintAt = useRef(0);
-  const history = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const history = useRef<Array<{ role: 'user' | 'assistant'; content: string; artifacts?: OperationalArtifact[] }>>([]);
+  const removedConversationIds = useRef(new Set<string>());
   const currentConversationId = useRef<string>(crypto.randomUUID());
   const currentConversationCreatedAt = useRef(Date.now());
   const listening = useRef(false);
@@ -1708,7 +1709,7 @@ export function useNexusController() {
     void stopSpeech(false);
     currentConversationId.current = record.id;
     currentConversationCreatedAt.current = record.createdAt;
-    history.current = record.turns.map(({ role, content }) => ({ role, content })).slice(-16);
+    history.current = record.turns.map(({ role, content, artifacts }) => ({ role, content, artifacts })).slice(-16);
     if (record.workspace?.path) setWorkspace({ ...record.workspace, active: true });
     const lastUser = [...record.turns].reverse().find((turn) => turn.role === 'user')?.content || '';
     const lastAnswer = [...record.turns].reverse().find((turn) => turn.role === 'assistant')?.content || '';
@@ -1778,6 +1779,7 @@ export function useNexusController() {
   }, [addLog, completeConversation, flushResponsePaint, settings?.model, stopSpeech]);
 
   const deleteConversation = useCallback((id: string) => {
+    removedConversationIds.current.add(id);
     setConversationHistory(removeConversation(id));
     if (id === currentConversationId.current) startNewConversation();
   }, [startNewConversation]);
@@ -1787,7 +1789,7 @@ export function useNexusController() {
     const baseTurns = record.turns.slice(0, Math.max(0, turnIndex + 1));
     currentConversationId.current = record.id;
     currentConversationCreatedAt.current = record.createdAt;
-    history.current = baseTurns.map(({ role, content }) => ({ role, content })).slice(-16);
+    history.current = baseTurns.map(({ role, content, artifacts }) => ({ role, content, artifacts })).slice(-16);
     setViewedConversation(null);
     setHistoryOpen(false);
     responseRef.current = '';
@@ -1803,8 +1805,33 @@ export function useNexusController() {
     const updated = { ...record, turns, updatedAt: Date.now(), incomplete: false };
     setConversationHistory(saveConversation(updated));
     setViewedConversation(updated);
-    if (record.id === currentConversationId.current) history.current = turns.map(({ role, content }) => ({ role, content })).slice(-16);
+    if (record.id === currentConversationId.current) history.current = turns.map(({ role, content, artifacts }) => ({ role, content, artifacts })).slice(-16);
   }, []);
+
+  const reviseArtifact = useCallback(async (record: ConversationRecord, turnCreatedAt: number, artifactId: string, content: string, expectedRevisionId: string) => {
+    if (requestGenerating.current) throw new Error('Attendi il completamento della risposta.');
+    const updated = await window.nexus.reviseConversationArtifact({ conversationId: record.id, turnCreatedAt, artifactId, content, expectedRevisionId });
+    if (removedConversationIds.current.has(record.id)) throw new Error('Conversazione rimossa.');
+    setConversationHistory(saveConversation(updated, false));
+    setViewedConversation(current => current?.id === updated.id ? updated : current);
+    if (currentConversationId.current === updated.id) {
+      const revised = updated.turns.find(turn => turn.createdAt === turnCreatedAt)?.artifacts?.find(item => item.id === artifactId);
+      if (revised) {
+        // A new turn may have started while IPC was completing. Merge only
+        // this artifact, preserving any new messages and streamed artifacts.
+        history.current = history.current.map(turn => ({ ...turn, ...(turn.artifacts ? { artifacts: turn.artifacts.map(item => item.id === artifactId ? revised : item) } : {}) }));
+        artifactsRef.current = artifactsRef.current.map(item => item.id === artifactId ? revised : item);
+        setArtifacts(artifactsRef.current);
+      }
+    }
+  }, []);
+
+  const reviseCurrentArtifact = useCallback(async (artifactId: string, content: string, expectedRevisionId: string) => {
+    const record = conversationHistory.find(item => item.id === currentConversationId.current);
+    const turn = record && [...record.turns].reverse().find(item => item.role === 'assistant' && item.artifacts?.some(artifact => artifact.id === artifactId));
+    if (!record || !turn) throw new Error('Salva prima la conversazione.');
+    await reviseArtifact(record, turn.createdAt, artifactId, content, expectedRevisionId);
+  }, [conversationHistory, reviseArtifact]);
 
   // #endregion
 
@@ -1925,6 +1952,8 @@ export function useNexusController() {
     workspace,
     conversationHistory,
     viewedConversation,
+    reviseArtifact,
+    reviseCurrentArtifact,
     currentConversationId: currentConversationId.current,
     voiceEnabled,
     privacyMode,

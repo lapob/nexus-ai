@@ -250,6 +250,11 @@ export interface StartupCapability {
 // #region 02 — Bridge IPC esposto dal preload
 
 export interface NexusBridge {
+  createWorkflow(workflow: { summary: string; steps: Array<{ id: string; tool: string; arguments: Record<string, unknown> }> }): Promise<LocalWorkflowSnapshot>;
+  nextWorkflowStep(workflowId: string): Promise<{ workflow: LocalWorkflowSnapshot; proposal: { id: string; summary: string; preview: string } } | null>;
+  decideWorkflowStep(workflowId: string, ticketId: string, approved: boolean): Promise<{ workflow: LocalWorkflowSnapshot; result?: { receipt?: { id: string }; stdout?: string }; error?: { message: string } }>;
+  cancelWorkflow(workflowId: string): Promise<{ workflow: LocalWorkflowSnapshot }>;
+  workflowStatus(workflowId: string): Promise<LocalWorkflowSnapshot>;
   bootstrap(): Promise<BootstrapData>;
   health(): Promise<BootstrapData['ai']['health']>;
   diagnostics(): Promise<{
@@ -313,9 +318,10 @@ export interface NexusBridge {
   trainingStats(): Promise<{ examples: number; approved: number; quarantined: number; corrected: number; preferencePairs: number; domains: Record<string, number>; evaluationExamples: number; evaluationReady: boolean; nextMilestone: number; memories?: number }>;
   trainingEvaluation(): Promise<{ examples: number; readiness: number; diversity: number; correctionCoverage: number; averagePromptTokens: number; status: 'ready' | 'growing' | 'early' }>;
   clearTrainingExamples(): Promise<{ removed: number }>;
-  listMemories(): Promise<Array<{ id: number; type: string; content: string; updatedAt: number; sourceKind?: string; expiresAt?: number | null }>>;
+  listMemories(): Promise<Array<{ id: number; type: string; content: string; updatedAt: number; sourceKind?: string; expiresAt?: number | null; lastUsedAt?: number | null; useCount?: number }>>;
   forgetMemory(id: number): Promise<{ removed: number }>;
-  updateMemory(id: number, content: string): Promise<{ updated: number }>;
+  updateMemory(id: number, content: string, options?: { expiresAt?: number | null }): Promise<{ updated: number }>;
+  exportMemories(): Promise<{ status: 'saved' | 'cancelled'; count?: number; total?: number; truncated?: boolean }>;
   responseCacheStats(): Promise<{ entries: number; hits: number }>;
   clearResponseCache(): Promise<{ removed: number }>;
   exportPersonalData(clientData: unknown, passphrase: string): Promise<{ status: 'saved' | 'cancelled'; path?: string }>;
@@ -346,6 +352,7 @@ export interface NexusBridge {
   clearWorkspace(): Promise<WorkspaceContext>;
   listConversationHistory(): Promise<import('../systems/ConversationHistory').ConversationRecord[]>;
   saveConversationHistory(record: import('../systems/ConversationHistory').ConversationRecord): Promise<import('../systems/ConversationHistory').ConversationRecord>;
+  reviseConversationArtifact(payload: { conversationId: string; turnCreatedAt: number; artifactId: string; expectedRevisionId: string; content: string }): Promise<import('../systems/ConversationHistory').ConversationRecord>;
   removeConversationHistory(id: string): Promise<boolean>;
   importConversationHistory(records: import('../systems/ConversationHistory').ConversationRecord[]): Promise<import('../systems/ConversationHistory').ConversationRecord[]>;
   remoteStatus(): Promise<RemoteSessionStatus>;
@@ -395,8 +402,14 @@ export interface OperationalArtifact {
   added?: number;
   removed?: number;
   truncated?: boolean;
+  revisions?: import('../../shared/artifact-revisions.mjs').ArtifactRevision[];
   events?: Array<{ label: string; status: 'complete' | 'warning' }>;
   diagnostics?: Array<{ file: string; line: number; column?: number; message: string }>;
+}
+
+export interface LocalWorkflowSnapshot {
+  id: string; summary: string; status: string; cursor: number; stepCount: number;
+  steps: Array<{ id: string; tool: string; status: string; result?: { receipt?: { id: string; outcome?: string } } }>;
 }
 
 declare global {

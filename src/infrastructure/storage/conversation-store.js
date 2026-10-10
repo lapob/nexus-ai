@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { closeDatabase, configureDatabase } = require('./sqlite-durability');
+const { randomUUID } = require('node:crypto');
+const { normalizeArtifactRevisions, MAX_ARTIFACT_REVISIONS } = require('../../shared/artifact-revisions.mjs');
 
 const MAX_CONVERSATIONS = 200;
 const MAX_TURNS = 80;
@@ -24,7 +26,8 @@ function normalizeRecord(value = {}) {
       title: String(item.title || 'Dettaglio').slice(0, 260), subtitle: String(item.subtitle || '').slice(0, 160),
       language: String(item.language || 'text').slice(0, 40), content: String(item.content || '').slice(0, MAX_ARTIFACT_CONTENT),
       previousContent: String(item.previousContent || '').slice(0, MAX_ARTIFACT_CONTENT), diff: String(item.diff || '').slice(0, MAX_ARTIFACT_CONTENT),
-      added: Math.max(0, Number(item.added) || 0), removed: Math.max(0, Number(item.removed) || 0), truncated: item.truncated === true
+      added: Math.max(0, Number(item.added) || 0), removed: Math.max(0, Number(item.removed) || 0), truncated: item.truncated === true,
+      revisions: normalizeArtifactRevisions(item.revisions)
       , events: Array.isArray(item.events) ? item.events.slice(0, 12).map((event) => ({ label: String(event?.label || '').slice(0, 160), status: event?.status === 'warning' ? 'warning' : 'complete' })) : []
       , diagnostics: Array.isArray(item.diagnostics) ? item.diagnostics.slice(0, 12).map((entry) => ({ file: String(entry?.file || '').slice(0, 300), line: Math.max(0, Number(entry?.line) || 0), column: Math.max(0, Number(entry?.column) || 0), message: String(entry?.message || '').slice(0, 300) })) : []
     })) } : {})
@@ -112,6 +115,33 @@ class ConversationStore {
 
   remove(id) {
     return this.database.prepare('DELETE FROM conversations WHERE id=?').run(String(id).slice(0, 128)).changes > 0;
+  }
+
+  reviseArtifact(payload = {}) {
+    const { conversationId, turnCreatedAt, artifactId, expectedRevisionId, content } = payload;
+    if (typeof conversationId !== 'string' || !conversationId || conversationId.length > 128
+      || !Number.isSafeInteger(turnCreatedAt) || typeof artifactId !== 'string' || !artifactId || artifactId.length > 160
+      || typeof expectedRevisionId !== 'string' || expectedRevisionId.length > 80
+      || typeof content !== 'string' || content.length > MAX_ARTIFACT_CONTENT) throw new TypeError('Versione non valida.');
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const record = this.get(conversationId);
+      if (!record) throw new Error('Conversazione rimossa.');
+      const matches = record.turns.filter(turn => turn.role === 'assistant' && turn.createdAt === turnCreatedAt)
+        .flatMap(turn => (turn.artifacts || []).filter(item => item.id === artifactId));
+      if (matches.length !== 1) throw new Error('Risultato non disponibile.');
+      const artifact = matches[0];
+      const revisions = normalizeArtifactRevisions(artifact.revisions);
+      const latest = revisions.at(-1);
+      if ((latest?.id || '') !== expectedRevisionId) throw new Error('Il risultato è cambiato. Riaprilo prima di salvare.');
+      if (content !== (latest?.content ?? artifact.content ?? '')) {
+        artifact.revisions = [...revisions, { id: randomUUID(), content, createdAt: Date.now(), sequence: (latest?.sequence || 0) + 1 }].slice(-MAX_ARTIFACT_REVISIONS);
+        record.updatedAt = Date.now();
+      }
+      const saved = this.save(record);
+      this.database.exec('COMMIT');
+      return saved;
+    } catch (error) { this.database.exec('ROLLBACK'); throw error; }
   }
 
   import(records) {

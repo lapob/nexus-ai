@@ -20,6 +20,48 @@ test('correzione esplicita aggiorna solo il ricordo attivo indicato', () => {
   } finally { store.close(); fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('scadenza esplicita persiste, invalida la cache e rifiuta valori invalidi senza modifiche', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-expiry-'));
+  const filePath = path.join(directory, 'memory.sqlite3');
+  let store = new PersonalMemoryStore({ filePath });
+  try {
+    const saved = store.remember({ content: 'Il progetto Aurora usa Java', sourceId: 'explicit-turn' });
+    const before = store.revision();
+    const expiresAt = Date.now() + 90 * 86_400_000;
+    store.updateById(saved.id, saved.content, { expiresAt });
+    assert.notEqual(store.revision(), before);
+    store.close(); store = new PersonalMemoryStore({ filePath });
+    assert.equal(store.list()[0].expiresAt, expiresAt);
+    assert.equal(store.list()[0].sourceId, 'explicit-turn');
+    const revision = store.revision();
+    for (const options of [{ expiresAt: 0 }, { expiresAt: 'never' }, { expiresAt: NaN }, { expiresAt: Date.now() + 11 * 366 * 86_400_000 }, { unknown: true }, null, []]) {
+      assert.throws(() => store.updateById(saved.id, 'Modifica invalida', options));
+      assert.equal(store.revision(), revision);
+      assert.equal(store.list()[0].content, saved.content);
+    }
+    store.updateById(saved.id, saved.content, { expiresAt: null });
+    assert.equal(store.list()[0].expiresAt, null);
+    store.updateById(saved.id, saved.content, { expiresAt });
+    store.expireStale(expiresAt + 1);
+    assert.deepEqual(store.findRelevant('progetto Aurora'), []);
+    assert.equal(store.exportPortable().memories.length, 0);
+  } finally { store.close(); fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('esportazione limitata dichiara il totale senza presentare una copia parziale come completa', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-bounded-export-'));
+  const store = new PersonalMemoryStore({ filePath: path.join(directory, 'memory.sqlite3') });
+  try {
+    store.database.exec('BEGIN');
+    for (let index = 0; index < 501; index += 1) store.remember({ content: `Il progetto autorizzato numero ${index} usa Rust` });
+    store.database.exec('COMMIT');
+    const exported = store.exportPortable();
+    assert.equal(exported.memories.length, 500);
+    assert.equal(exported.totalActive, 501);
+    assert.equal(exported.truncated, true);
+  } finally { store.close(); fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('riconosce solo richieste esplicite di memoria', () => {
   assert.deepEqual(explicitMemoryInstruction('Ricorda che preferisco risposte concise'), {
     action: 'remember', content: 'preferisco risposte concise', type: 'preference'
@@ -102,6 +144,9 @@ test('l esportazione portabile esclude identificatori interni e ricordi rimossi'
   store.remember({ content: 'Il progetto Nuovo usa Rust', sourceId: 'private-turn-2' });
   const exported = store.exportPortable();
   assert.equal(exported.schemaVersion, 1);
+  assert.equal(exported.scope, 'local-personal');
+  assert.equal(exported.totalActive, 1);
+  assert.equal(exported.truncated, false);
   assert.equal(exported.memories.length, 1);
   assert.equal(exported.memories[0].content, 'Il progetto Nuovo usa Rust');
   assert.equal(Object.hasOwn(exported.memories[0], 'id'), false);

@@ -124,6 +124,7 @@ class WorkflowRuntime {
       status: 'pending',
       cursor: 0,
       ownerSubjectId: String(subjectId || '').trim().slice(0, 128),
+      workspaceId: this.actionRuntime.workspaceIdentity?.() || '',
       steps: validatedSteps
     };
     this.save(workflow);
@@ -164,6 +165,11 @@ class WorkflowRuntime {
     if (owner && owner !== caller) throw workflowFailure('Workflow non disponibile per questa sessione.', 'WORKFLOW_SUBJECT_MISMATCH', 403);
   }
 
+  assertWorkspace(workflow) {
+    const current = this.actionRuntime.workspaceIdentity?.();
+    if (current && workflow.workspaceId !== current) throw workflowFailure('Lo spazio di lavoro è cambiato. Crea una nuova attività.', 'WORKFLOW_WORKSPACE_CHANGED', 409);
+  }
+
   status(id, context = {}) {
     const workflow = this.load(id);
     this.assertOwner(workflow, context.subjectId, context.requireSubject === true);
@@ -174,6 +180,7 @@ class WorkflowRuntime {
     if (!this.accepting) throw workflowFailure('NexusNXS è in fase di chiusura.', 'WORKFLOW_SHUTTING_DOWN', 503);
     const workflow = this.resolve(value);
     this.assertOwner(workflow, context.subjectId, context.requireSubject === true);
+    this.assertWorkspace(workflow);
     if (TERMINAL_STATUSES.has(workflow.status)) return null;
     const step = workflow.steps[workflow.cursor];
     if (!step) return null;
@@ -211,6 +218,7 @@ class WorkflowRuntime {
     if (!this.accepting) throw workflowFailure('NexusNXS è in fase di chiusura.', 'WORKFLOW_SHUTTING_DOWN', 503);
     const workflow = this.resolve(value);
     this.assertOwner(workflow, context.subjectId, context.requireSubject === true);
+    this.assertWorkspace(workflow);
     const step = workflow.steps[workflow.cursor];
     if (!step || step.status !== 'awaiting-approval') {
       throw workflowFailure('Nessun passaggio attende approvazione.', 'WORKFLOW_NOT_AWAITING_APPROVAL', 409);
@@ -286,7 +294,9 @@ class WorkflowRuntime {
     const step = workflow.steps[workflow.cursor];
     let result = null;
     if (step?.status === 'awaiting-approval' && step.ticket) {
-      result = await this.actionRuntime.execute(step.ticket, {
+      result = typeof this.actionRuntime.cancelProposal === 'function'
+        ? this.actionRuntime.cancelProposal(step.ticket, { transactionId: workflow.id })
+        : await this.actionRuntime.execute(step.ticket, {
         approved: false,
         approvalMode: 'always',
         transactionId: workflow.id,

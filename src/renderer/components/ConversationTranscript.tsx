@@ -14,6 +14,8 @@ interface ConversationTranscriptProps {
   onClose: () => void;
   onSteer: (record: ConversationRecord, turnIndex: number, instruction: string) => void;
   onDeleteFrom: (record: ConversationRecord, turnIndex: number) => void;
+  onReviseArtifact: (record: ConversationRecord, turnCreatedAt: number, artifactId: string, content: string, expectedRevisionId: string) => Promise<void>;
+  generating?: boolean;
 }
 
 // #region 01 — Formattazione e scorrimento
@@ -38,7 +40,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
     : part)}</>;
 }
 
-export function ConversationTranscript({ record, onClose, onSteer, onDeleteFrom }: ConversationTranscriptProps) {
+export function ConversationTranscript({ record, onClose, onSteer, onDeleteFrom, onReviseArtifact, generating }: ConversationTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLSpanElement>(null);
   const scrollFrame = useRef<number | null>(null);
@@ -222,7 +224,7 @@ export function ConversationTranscript({ record, onClose, onSteer, onDeleteFrom 
                     </div>}
                   </div>
                   {turn.role === 'assistant'
-                    ? <><MarkdownContent text={turn.content} /><ArtifactShelf artifacts={turn.artifacts || []} /></>
+                    ? <><MarkdownContent text={turn.content} /><ArtifactShelf artifacts={turn.artifacts || []} onRevise={generating ? undefined : (id, content, expected) => onReviseArtifact(record, turn.createdAt, id, content, expected)} /></>
                     : <p><HighlightedText text={turn.content} query={query} /></p>}
                   {steeringTurn === index && (
                     <form className="conversation-steer" onSubmit={(event) => { event.preventDefault(); const value = steeringText.trim(); if (record && value) onSteer(record, index, value); }}>

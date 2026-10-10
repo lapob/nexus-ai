@@ -561,10 +561,11 @@
   right: clamp(1rem, 5vw, 5rem);
   bottom: clamp(5.5rem, 12vh, 8rem);
   left: clamp(1rem, 5vw, 5rem);
-  width: min(58rem, calc(100vw - 2rem));
+  width: auto;
+  max-width: 58rem;
   max-height: min(58vh, 34rem);
   margin-inline: auto;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid rgba(132, 213, 216, 0.15);
   border-radius: 1rem;
   background: rgba(2, 8, 10, 0.97);

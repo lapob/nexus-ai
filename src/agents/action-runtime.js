@@ -596,6 +596,20 @@ class ActionRuntime {
     };
   }
 
+  workspaceIdentity() { return workspaceFingerprint(this.vaultPath); }
+
+  cancelProposal(ticketId, { transactionId = '' } = {}) {
+    const id = asText(ticketId, 'Il ticket', 128);
+    const ticket = this.tickets.get(id);
+    this.tickets.delete(id);
+    if (!ticket) return { status: 'cancelled' };
+    // Revocation never validates or touches the filesystem: it must remain
+    // possible after a workspace change or after a document was removed.
+    this.audit({ event: 'cancelled', tool: ticket.tool, verification: 'cancelled-before-execution' });
+    const recorded = this.recordReceipt(ticket, { outcome: 'cancelled', verification: 'cancelled-before-execution', rollbackStatus: 'not-required', transactionId: transactionId || id });
+    return { status: 'cancelled', receipt: recorded.receipt, receiptPersisted: recorded.persisted };
+  }
+
   async shutdown({ timeoutMs = 2_500 } = {}) {
     this.acceptingActions = false;
     this.tickets.clear();
@@ -675,7 +689,12 @@ class ActionRuntime {
       const destination = resolveWritableInsideRoot(this.vaultPath, args.destination, { protectContent: true });
       if (destination === source || isInside(source, destination)) throw new Error('La destinazione non può trovarsi dentro la sorgente.');
       assertContentTree(this.vaultPath, source);
-      return { source, destination };
+      if (args.documentOnly === true) {
+        const stat = fs.statSync(source);
+        if (tool !== 'copy_path' || !stat.isFile() || stat.size > 2 * 1024 * 1024
+          || !/\.(?:txt|md|json|csv)$/i.test(source) || !/\.(?:txt|md|json|csv)$/i.test(destination)) throw new Error('La ricetta accetta solo documenti testuali fino a 2 MiB.');
+      }
+      return { source, destination, ...(args.documentOnly === true ? { documentOnly: true } : {}) };
     }
     if (tool === 'trash_path') return { path: resolveInsideRoot(this.vaultPath, args.path) };
     throw new Error(`Strumento sconosciuto: ${tool}.`);

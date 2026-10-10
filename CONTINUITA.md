@@ -1,3 +1,29 @@
+# Desktop memory, artifact copies and local recipe — 10 October 2026
+
+Source changes after Preview29: local memory scope/provenance/last use,
+explicit expiry and native unencrypted JSON export; AI artifact originals plus
+six bounded editable copies persisted transactionally with stale-save rejection;
+finite document copy/read recipe through existing WorkflowRuntime/ActionRuntime,
+separate approvals, receipts,2MiB cap and workspace binding. Revocation remains
+possible after workspace changes. No project files are changed by artifact edits.
+Electron/IPC tests on a disposable synthetic profile pass memory export/cancel,
+artifact edit/reload/original/three layouts/conflict, and recipe preview/approvals/
+checkpoint reload/copied text/two actual receipts. Focused store/workflow tests
+pass. Final cloud:check and check pass; the isolated full suite passes1050tests,
+with2intentional skips and zero failures. Publication, hygiene and section
+checks including the newly tracked shared modules pass. No new packaged release.
+
+Website website8bd340b is published, complete GitHub CI38051859828 passes.
+Its Braces roots are removed through native React/Vite SSR while preserving
+the existing product components and Worker boundaries. Full release gate passes
+43tests/27browser, actual Workers runtime, budgets and zero known audit findings.
+Candidate8b4e1ea9-4b8b-49b4-b3d8-6b90f3d79851 passes14 preview routes.
+Production remains unchanged: AI readiness503 blocks promotion. Official runtime
+0.32.15 and candidate0.40.2 both fail the distribution security gate with60
+High/Critical module-level findings; reachability is not certified. Official
+signature/archive hash verified, no runtime replacement or security bypass.
+Historical Braces-blocked and readiness200 notes below are superseded by this.
+
 # Completion checks and release evidence — 10 October 2026
 
 Source CI38045727001 at065440f completed successfully on Windows/Ubuntu with

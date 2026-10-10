@@ -1,5 +1,18 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
+## Sorgenti successivi alla Preview29 — 10 ottobre
+
+Memoria trasparente/esportazione/scadenza, copie versionate degli artefatti e
+ricetta documenti locale completate nel desktop e provate su profilo sintetico
+Electron con IPC reale. Vedere CONTINUITA.md e LOCAL-DATA.md per verifiche e
+limiti: nessun pacchetto nuovo o parita mobile/web viene dichiarato.
+cloud:check/check PASS; suite completa isolata1050PASS/2SKIP/0FAIL.
+La candidata sito React/Vite SSR elimina le radici Braces; CIwebsite8bd340b
+completaPASS,43test/27browser e14routepreviewPASS. Produzione non promossa:
+AIready503 per gate runtime0.32.15/0.40.2 con60High/Critical a livello modulo.
+Nessuna esclusione audit, nessun nuovo runtime installato. Le note storiche
+sotto suBraces irrisolto e servizio200 non descrivono lo stato attuale.
+
 ## Verifiche aggiuntive del 10 ottobre
 
 Corretto il parsing dei manifest Android con BOM UTF-8 prodotti da PowerShell:

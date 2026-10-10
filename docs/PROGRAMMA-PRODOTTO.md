@@ -29,11 +29,21 @@ abbassare i requisiti: hash dell'APK, data, stato Online, numero di profili e
 metriche di fluidita restano obbligatori. Una prova valida non rende pronta
 una distribuzione quando mancano gli altri controlli.
 
-La produzione del sito resta bloccata da GHSA-vfj7-8cjw-p6xm, senza versione
-Braces corretta disponibile al controllo del 10 ottobre. La revisione mirata
-ha riprodotto localmente l'overflow attraverso fast-glob, senza individuare
-un percorso concreto dai parametri HTTP pubblici alla dipendenza. Questo
-limite non elimina la vulnerabilita del tooling o autorizza a ignorare il gate.
+Le radici Braces del sito sono state rimosse sostituendo il livello Vinext/Next
+con React/Vite SSR, riusando pagine, font, particelle e confini del Worker.
+Il commit website8bd340b supera CI completa,43test e27prove browser; la candidata
+immutabile8b4e1ea9 supera14route. La produzione resta bloccata dalla readiness503
+del servizio AI: sia Ollama0.32.15 sia il candidato ufficiale0.40.2 falliscono
+il gate di distribuzione con60findingHigh/Critical a granularita modulo.
+Non e stata provata la raggiungibilita di tutti i finding e non e stato ignorato
+il controllo. Nessun runtime nuovo o modello e stato installato.
+
+Nei sorgenti desktop successivi alla Preview29 sono ora implementati memoria
+trasparente con scadenza/esportazione, artefatti con originale AI e ultime6copie,
+e una ricetta documenti locale attraversoWorkflowRuntime/ActionRuntime.
+Le prove Electron/IPC con profilo sintetico coprono modifica, recupero, consenso
+per ogni passo e ricevute. Vedere LOCAL-DATA.md per limiti e conservazione;
+non sono nuove funzioni gia distribuite automaticamente a tutti i client.
 
 ## Perfezionamenti successivi, dopo i requisiti di distribuzione
 

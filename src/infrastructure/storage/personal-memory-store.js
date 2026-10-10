@@ -183,7 +183,8 @@ class PersonalMemoryStore {
     return this.database.prepare("UPDATE memories SET status='forgotten', updated_at=? WHERE id=? AND status='active'").run(Date.now(), id).changes;
   }
 
-  updateById(id, content) {
+  updateById(id, content, options = {}) {
+    if (!options || typeof options !== 'object' || Array.isArray(options) || Object.keys(options).some((key) => key !== 'expiresAt')) throw new Error('Opzioni del ricordo non valide.');
     const clean = normalizeText(content);
     if (!Number.isSafeInteger(id) || id < 1 || clean.length < 3) throw new Error('Ricordo non valido.');
     this.expireStale();
@@ -194,11 +195,15 @@ class PersonalMemoryStore {
     if (duplicate) throw new Error('Questo ricordo esiste già.');
     const type = classifyMemory(clean);
     const now = Date.now();
+    const customExpiry = Object.hasOwn(options, 'expiresAt');
+    if (customExpiry && options.expiresAt !== null && (!Number.isSafeInteger(options.expiresAt)
+      || options.expiresAt <= now || options.expiresAt > now + 10 * 366 * 86_400_000)) throw new Error('Scadenza del ricordo non valida.');
+    const expiresAt = customExpiry ? options.expiresAt : type === 'episodic' ? now + 30 * 86_400_000 : null;
     const subject = exclusiveMemorySubject(clean, type) || null;
     this.database.exec('BEGIN IMMEDIATE');
     try {
       this.database.prepare('UPDATE memories SET content=?, memory_key=?, type=?, subject_key=?, updated_at=?, expires_at=? WHERE id=?')
-        .run(clean, key, type, subject, now, type === 'episodic' ? now + 30 * 86_400_000 : null, id);
+        .run(clean, key, type, subject, now, expiresAt, id);
       if (subject) this.database.prepare("UPDATE memories SET status='superseded', superseded_by=?, updated_at=? WHERE subject_key=? AND id<>? AND status='active'").run(id, now, subject, id);
       this.database.exec('COMMIT');
     } catch (error) { this.database.exec('ROLLBACK'); throw error; }
@@ -217,10 +222,15 @@ class PersonalMemoryStore {
 
   exportPortable() {
     this.expireStale();
+    const totalActive = this.stats().active;
+    const memories = this.list({ limit: 500 }).map(({ id: _id, sourceId: _sourceId, ...memory }) => memory);
     return Object.freeze({
       schemaVersion: 1,
+      scope: 'local-personal',
       exportedAt: new Date().toISOString(),
-      memories: this.list({ limit: 500 }).map(({ id: _id, sourceId: _sourceId, ...memory }) => memory)
+      totalActive,
+      truncated: totalActive > memories.length,
+      memories
     });
   }
 

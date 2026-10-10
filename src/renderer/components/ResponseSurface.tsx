@@ -6,6 +6,8 @@ import { memo, type ReactNode, useEffect, useId, useMemo, useRef, useState } fro
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { QuietClose } from './QuietClose';
+import { NexusSelect } from './NexusSelect';
+import { MAX_ARTIFACT_CONTENT } from '../../shared/artifact-revisions.mjs';
 import type { OperationalArtifact } from '../types/nexus';
 
 function CopyGlyph({ state = 'idle' }: { state?: 'idle' | 'copied' | 'error' }) {
@@ -41,6 +43,7 @@ interface ResponseSurfaceProps {
   error: string;
   active: boolean;
   artifacts: OperationalArtifact[];
+  onReviseArtifact: (id: string, content: string, expectedRevisionId: string) => Promise<void>;
   previousResponse?: string;
   trainingSaved: boolean;
   onApproveTraining: (approvedResponse?: string, rejectedResponse?: string) => void;
@@ -346,18 +349,23 @@ function CodeBlock({ language, content }: { language: string; content: string })
   );
 }
 
-export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] }) {
+export function ArtifactShelf({ artifacts, onRevise }: { artifacts: OperationalArtifact[]; onRevise?: (id: string, content: string, expectedRevisionId: string) => Promise<void> }) {
   const [openId, setOpenId] = useState('');
   const [viewMode, setViewMode] = useState<'result' | 'diff' | 'split'>('result');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [versionId, setVersionId] = useState('');
+  const [edit, setEdit] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const editExpected = useRef('');
   const trigger = useRef<HTMLButtonElement | null>(null);
-  const closeDetail = () => { setOpenId(''); trigger.current?.focus(); };
+  const closeDetail = () => { if (saving) return; setOpenId(''); setEdit(null); trigger.current?.focus(); };
   useEffect(() => {
     if (!openId) return;
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') closeDetail(); };
     window.addEventListener('keydown', close);
     return () => window.removeEventListener('keydown', close);
-  }, [openId]);
+  }, [openId, saving]);
   if (!artifacts.length) return null;
   const changed = artifacts.filter((item) => item.kind === 'file-change').length;
   const added = artifacts.reduce((total, item) => total + (item.added || 0), 0);
@@ -370,9 +378,13 @@ export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] 
         {removed > 0 && <strong data-tone="removed">−{removed}</strong>}
       </div>
       <div className="artifact-items">
-        {artifacts.map((artifact) => (
+        {artifacts.map((artifact) => {
+          const revisions = artifact.revisions || [];
+          const selected = revisions.find(item => item.id === versionId);
+          const displayed = { ...artifact, content: selected?.content ?? artifact.content };
+          return (
           <div className="artifact-item" data-open={openId === artifact.id} key={artifact.id}>
-            <button type="button" aria-expanded={openId === artifact.id} onClick={(event) => { trigger.current = event.currentTarget; setCopyState('idle'); setViewMode('result'); setOpenId(artifact.id); }}>
+            <button type="button" aria-expanded={openId === artifact.id} onClick={(event) => { trigger.current = event.currentTarget; setCopyState('idle'); setViewMode('result'); setVersionId(revisions.at(-1)?.id || ''); setEdit(null); setSaveError(''); setOpenId(artifact.id); }}>
               <span>{artifact.title}</span><small>{artifact.subtitle || 'Dettaglio'}</small>
             </button>
             {openId === artifact.id && createPortal((
@@ -380,27 +392,42 @@ export function ArtifactShelf({ artifacts }: { artifacts: OperationalArtifact[] 
                   <div className="artifact-popover-meta">
                     <span>{artifact.title}</span>
                     <span>
-                      {artifact.kind === 'file-change' && artifact.previousContent !== undefined && <>
+                      {!versionId && edit === null && artifact.kind === 'file-change' && artifact.previousContent !== undefined && <>
                         <button type="button" data-active={viewMode === 'result'} onClick={() => setViewMode('result')}>Risultato</button>
                         <button type="button" data-active={viewMode === 'diff'} onClick={() => setViewMode('diff')}>Modifiche</button>
                         <button type="button" data-active={viewMode === 'split'} onClick={() => setViewMode('split')}>Prima / dopo</button>
                       </>}
-                      <button className="response-icon-action" type="button" aria-label={copyState === 'error' ? 'Copia non riuscita: riprova' : copyState === 'copied' ? 'Contenuto copiato' : 'Copia contenuto'} onClick={() => void window.nexus.copyText(viewMode === 'diff' ? artifact.diff || '' : artifact.content || '').then(() => setCopyState('copied')).catch(() => setCopyState('error'))}><CopyGlyph state={copyState} /></button>
-                      <button className="response-icon-action" type="button" aria-label={viewMode === 'diff' ? 'Scarica modifiche' : 'Scarica risultato'} onClick={() => downloadArtifact(artifact, viewMode === 'diff' ? 'diff' : 'current')}><DownloadGlyph /></button>
-                      {artifact.previousContent !== undefined && <button className="response-icon-action" type="button" aria-label="Scarica originale" onClick={() => downloadArtifact(artifact, 'original')}><DownloadGlyph original /></button>}
+                      <button className="response-icon-action" type="button" disabled={edit !== null} aria-label={copyState === 'error' ? 'Copia non riuscita: riprova' : copyState === 'copied' ? 'Contenuto copiato' : 'Copia contenuto'} onClick={() => void window.nexus.copyText(viewMode === 'diff' ? artifact.diff || '' : displayed.content || '').then(() => setCopyState('copied')).catch(() => setCopyState('error'))}><CopyGlyph state={copyState} /></button>
+                      <button className="response-icon-action" type="button" disabled={edit !== null} aria-label={viewMode === 'diff' ? 'Scarica modifiche' : 'Scarica risultato'} onClick={() => downloadArtifact(displayed, viewMode === 'diff' ? 'diff' : 'current')}><DownloadGlyph /></button>
+                      {artifact.kind === 'file-change' && artifact.previousContent !== undefined && <button className="response-icon-action" type="button" aria-label="Scarica originale" onClick={() => downloadArtifact(artifact, 'original')}><DownloadGlyph original /></button>}
+                      {onRevise && edit === null && <button className="response-icon-action" type="button" aria-label="Modifica una copia" onClick={() => { editExpected.current = revisions.at(-1)?.id || ''; setViewMode('result'); setEdit(displayed.content || ''); setSaveError(''); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
                       <QuietClose onClick={closeDetail} label="Chiudi dettaglio" />
                     </span>
                   </div>
+                  {edit !== null ? <form className="artifact-editor" onSubmit={async event => {
+                    event.preventDefault(); if (!onRevise || saving) return;
+                    setSaving(true); setSaveError('');
+                    try { await onRevise(artifact.id, edit, editExpected.current); setEdit(null); setOpenId(''); trigger.current?.focus(); }
+                    catch { setSaveError('Copia non salvata. Il risultato potrebbe essere cambiato: chiudi e riapri il dettaglio.'); }
+                    finally { setSaving(false); }
+                  }}>
+                    <textarea aria-label="Contenuto della copia" autoFocus spellCheck={false} maxLength={MAX_ARTIFACT_CONTENT} disabled={saving} value={edit} onChange={event => setEdit(event.target.value)} />
+                    <small>Conserva il risultato AI e le ultime 6 copie. Non modifica i file del progetto.</small>
+                    <div><button className="response-icon-action" type="button" disabled={saving} aria-label="Annulla modifica" onClick={() => setEdit(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button><button className="response-icon-action" type="submit" disabled={saving} aria-label="Salva copia"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg></button></div>
+                  </form> : <>
+                  {revisions.length > 0 && <div className="artifact-versions"><NexusSelect ariaLabel="Versione del risultato" value={versionId} options={[{ value: '', label: 'Risultato AI' }, ...revisions.map(item => ({ value: item.id, label: `Copia ${item.sequence}` }))]} onValueChange={value => { setVersionId(value); setViewMode('result'); setCopyState('idle'); }} /></div>}
                   {viewMode === 'split' && artifact.previousContent !== undefined
                     ? <div className="artifact-split"><div><small>Prima</small><pre><HighlightedCode language={artifact.language || 'text'} content={artifact.previousContent || 'File nuovo'} /></pre></div><div><small>Dopo</small><pre><HighlightedCode language={artifact.language || 'text'} content={artifact.content || ''} /></pre></div></div>
-                    : <pre><HighlightedCode language={viewMode === 'diff' ? 'diff' : artifact.language || 'text'} content={viewMode === 'diff' ? artifact.diff || 'Nessuna differenza disponibile.' : artifact.content || 'Nessun output.'} /></pre>}
+                    : <pre><HighlightedCode language={viewMode === 'diff' ? 'diff' : artifact.language || 'text'} content={viewMode === 'diff' ? artifact.diff || 'Nessuna differenza disponibile.' : displayed.content || 'Nessun output.'} /></pre>}
+                  </>}
+                  {saveError && <small role="alert" className="artifact-truncated">{saveError}</small>}
                   {Boolean(artifact.events?.length) && <ol className="artifact-timeline">{artifact.events?.map((event, index) => <li key={`${event.label}-${index}`} data-status={event.status}><i />{event.label}</li>)}</ol>}
                   {Boolean(artifact.diagnostics?.length) && <div className="artifact-diagnostics">{artifact.diagnostics?.map((entry, index) => <div key={`${entry.file}-${entry.line}-${index}`}><strong>{entry.file}:{entry.line}{entry.column ? `:${entry.column}` : ''}</strong><span>{entry.message}</span></div>)}</div>}
                   {artifact.truncated && <small className="artifact-truncated">Anteprima abbreviata per mantenere fluida la chat.</small>}
                 </motion.div>
               ), document.body)}
           </div>
-        ))}
+        ); })}
       </div>
     </section>
   );
@@ -440,7 +467,7 @@ export const MarkdownContent = memo(function MarkdownContent({ text, streaming =
 
 // #region 02 — Canvas della risposta
 
-export function ResponseSurface({ response, error, active, artifacts, previousResponse = '', trainingSaved, onApproveTraining, onRateResponse, onRegenerate, onContinue, onStop, onDismiss }: ResponseSurfaceProps) {
+export function ResponseSurface({ response, error, active, artifacts, onReviseArtifact, previousResponse = '', trainingSaved, onApproveTraining, onRateResponse, onRegenerate, onContinue, onStop, onDismiss }: ResponseSurfaceProps) {
   const [rating, setRating] = useState<'up' | 'down' | null>(null);
   const [ratingError, setRatingError] = useState('');
   const [ratingPending, setRatingPending] = useState(false);
@@ -549,7 +576,7 @@ export function ResponseSurface({ response, error, active, artifacts, previousRe
                 ? <MarkdownContent text={streamSafeMarkdown(response)} streaming />
                 : <MarkdownContent text={response} />}
           </div>
-          {!error && !active && <ArtifactShelf artifacts={artifacts} />}
+          {!error && !active && <ArtifactShelf artifacts={artifacts} onRevise={onReviseArtifact} />}
           {!error && !active && comparing && previousResponse && (
             <section className="response-comparison" aria-label="Confronto risposte">
               <div>

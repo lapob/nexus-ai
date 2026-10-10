@@ -21,6 +21,7 @@ import { VoiceRecognition } from '../systems/VoiceRecognition';
 import { modelDisplayName, uniquePresentedModels } from '../systems/ModelPresentation';
 import { NexusSelect } from './NexusSelect';
 import { QuietClose } from './QuietClose';
+import { LocalWorkflowRecipe } from './LocalWorkflowRecipe';
 
 // #region 01 — Contratti, dispositivi e test microfono
 
@@ -133,7 +134,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
   const [trainingStats, setTrainingStats] = useState<{ examples: number; approved: number; quarantined: number; corrected: number; preferencePairs: number; domains: Record<string, number>; evaluationExamples: number; evaluationReady: boolean; nextMilestone: number; memories?: number } | null>(null);
   const [trainingEvaluation, setTrainingEvaluation] = useState<{ examples: number; readiness: number; diversity: number; correctionCoverage: number; averagePromptTokens: number; status: 'ready' | 'growing' | 'early' } | null>(null);
   const [memories, setMemories] = useState<Awaited<ReturnType<Window['nexus']['listMemories']>>>([]);
-  const [memoryEdit, setMemoryEdit] = useState<{ id: number; content: string } | null>(null);
+  const [memoryEdit, setMemoryEdit] = useState<{ id: number; content: string; expiry: string } | null>(null);
   const [responseCache, setResponseCache] = useState<{ entries: number; hits: number }>({ entries: 0, hits: 0 });
   const [confirmTrainingClear, setConfirmTrainingClear] = useState(false);
   const [actionHistory, setActionHistory] = useState<Array<{ timestamp: string; event: string; tool: string; preview?: string }>>([]);
@@ -1134,26 +1135,46 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     </div>
                   </section>}
                   {memories.length > 0 && <div className="memory-list settings-wide">
-                    <div className="memory-list-heading"><span><strong>Ciò che NexusNXS ricorda</strong><small>{labels.memoryHelp}</small></span></div>
+                    <div className="memory-list-heading"><span><strong>Ciò che NexusNXS ricorda</strong><small>{labels.memoryHelp}</small></span>
+                      <button type="button" className="settings-quiet-action" aria-label={labels.memoryExport} disabled={busy} onClick={async () => {
+                        setBusy(true);
+                        try {
+                          const result = await window.nexus.exportMemories();
+                          if (result.status === 'saved') setMessage(`${labels.memoryExported}: ${result.count}${result.truncated ? ` / ${result.total}` : ''}.`);
+                        } catch { setMessage(labels.memoryFailed); }
+                        finally { setBusy(false); }
+                      }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 17v4h14v-4" /></svg></button>
+                    </div>
                     {memories.map((memory) => <article key={memory.id}>
                       <span><small>#{memory.id} · {memory.type === 'preference' ? 'Preferenza' : memory.type === 'project' ? 'Progetto' : memory.type === 'procedural' ? 'Procedura' : memory.type === 'episodic' ? 'Evento' : 'Informazione'}</small>
-                        {memoryEdit?.id === memory.id ? <textarea aria-label={labels.memoryEdit} maxLength={2000} rows={3} autoFocus value={memoryEdit.content} disabled={busy} onChange={event => setMemoryEdit({ id: memory.id, content: event.target.value })} /> : <strong>{memory.content}</strong>}
+                        {memoryEdit?.id === memory.id ? <>
+                          <textarea aria-label={labels.memoryEdit} maxLength={2000} rows={3} autoFocus value={memoryEdit.content} disabled={busy} onChange={event => setMemoryEdit({ ...memoryEdit, content: event.target.value })} />
+                          <fieldset className="memory-expiry" disabled={busy}><NexusSelect ariaLabel={labels.memoryExpires} value={memoryEdit.expiry} options={[
+                            { value: 'keep', label: labels.memoryKeepExpiry }, { value: '30', label: labels.memory30Days },
+                            { value: '90', label: labels.memory90Days }, { value: 'never', label: labels.memoryNoExpiry }
+                          ]} onValueChange={expiry => setMemoryEdit({ ...memoryEdit, expiry })} /></fieldset>
+                        </> : <strong>{memory.content}</strong>}
                         <details className="memory-provenance">
                           <summary aria-label={labels.memoryDetails}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 11v6M12 7v1" /></svg></summary>
                           {memory.sourceKind === 'explicit-user-statement' && <small>{labels.memorySource}</small>}
+                          <small>{labels.memoryScope}</small>
                           <small>{labels.memoryUpdated}: <time dateTime={new Date(memory.updatedAt).toISOString()}>{new Date(memory.updatedAt).toLocaleDateString(resolvedUiLocale(preferences.locale))}</time></small>
                           <small>{memory.expiresAt ? `${labels.memoryExpires}: ${new Date(memory.expiresAt).toLocaleDateString(resolvedUiLocale(preferences.locale))}` : labels.memoryNoExpiry}</small>
+                          {memory.lastUsedAt && <small>{labels.memoryLastUsed}: <time dateTime={new Date(memory.lastUsedAt).toISOString()}>{new Date(memory.lastUsedAt).toLocaleDateString(resolvedUiLocale(preferences.locale))}</time></small>}
                         </details>
                       </span>
                       {memoryEdit?.id === memory.id ? <div className="memory-edit-actions">
                         <button type="button" className="settings-quiet-action" disabled={busy || memoryEdit.content.trim().length < 3} onClick={async () => {
                           setBusy(true);
-                          try { await window.nexus.updateMemory(memory.id, memoryEdit.content); setMemories(await window.nexus.listMemories()); setMemoryEdit(null); setMessage(labels.memorySaved); }
+                          try {
+                            const expiresAt = memoryEdit.expiry === 'keep' ? memory.expiresAt ?? null : memoryEdit.expiry === 'never' ? null : Date.now() + Number(memoryEdit.expiry) * 86_400_000;
+                            await window.nexus.updateMemory(memory.id, memoryEdit.content, { expiresAt }); setMemories(await window.nexus.listMemories()); setMemoryEdit(null); setMessage(labels.memorySaved);
+                          }
                           catch { setMessage(labels.memoryFailed); }
                           finally { setBusy(false); }
                         }}>{labels.memorySave}</button>
                         <button type="button" className="settings-quiet-action" disabled={busy} onClick={() => setMemoryEdit(null)}>{labels.memoryCancel}</button>
-                      </div> : <button type="button" className="settings-quiet-action" aria-label={labels.memoryEdit} disabled={busy} onClick={() => setMemoryEdit({ id: memory.id, content: memory.content })}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
+                      </div> : <button type="button" className="settings-quiet-action" aria-label={labels.memoryEdit} disabled={busy} onClick={() => setMemoryEdit({ id: memory.id, content: memory.content, expiry: 'keep' })}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
                       {memoryEdit?.id !== memory.id && <button type="button" className="settings-quiet-action" aria-label={labels.memoryForget} disabled={busy} onClick={async () => {
                         setBusy(true);
                         try {
@@ -1279,6 +1300,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                     })}
                   </div>
                   <p className="action-policy-note settings-wide">Le azioni distruttive, i percorsi protetti e i comandi non consentiti restano bloccati in ogni modalità.</p>
+                  <LocalWorkflowRecipe workspace={workspace} onSelectWorkspace={async () => setWorkspace(await window.nexus.selectWorkspace())} />
                   </>}
                   {tab === 'activity' && <>
                   <div className="action-history settings-wide">
