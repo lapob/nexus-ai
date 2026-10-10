@@ -1,5 +1,19 @@
 # Roadmap tecnica
 
+## Memoria locale e disponibilita — 10 ottobre 2026
+
+Preview29 pubblicata e servizio aggiornato: cronologia web locale senza account,
+reset coordinato fra schede, cancellazione delle richieste della propria
+installazione e ledger pubblico senza risposte su disco. Browser production
+mobile/desktop reload/reset/offline/reconnect PASS; suite1045PASS2SKIP0FAIL,
+CI Windows/Ubuntu e pacchetti verificati. Android114 eControl42 hanno ora cinque
+profili fisici Online ciascuna verificati; voce umana e tasto assistente restano
+distinti. Installazione Windows manuale ancora necessaria, senza retry automatici.
+LOCAL-DATA.md descrive i limiti reali di cancellazione e offline. Il monitor
+conserva i guasti HTTP503 quando il solo PC locale e spento; un nodo aggiuntivo
+non e stato scelto. Completare i requisiti gia aperti prima di nuove promesse
+commerciali o di superiorita del modello; nessun training/cloud attivato.
+
 ## Stabilizzazione allegati e immagini — 6 ottobre 2026
 
 Preview Windows0.3.28/Android6.5.24 pubblicata: byte/time cap prima dell'allocazione,

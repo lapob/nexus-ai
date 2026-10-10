@@ -16,7 +16,24 @@ const { chromium } = require('../../.SITE/node_modules/@playwright/test');
       await page.goto('https://ai.nexusnxs.com/', { waitUntil: 'networkidle' });
       await page.evaluate(() => navigator.serviceWorker.ready);
       await page.waitForFunction(() => navigator.serviceWorker.controller);
-      await page.locator('#keyboard').click();
+      // Seed only this disposable browser context, without invoking inference.
+      await page.evaluate(() => new Promise((resolve, reject) => {
+        const request = indexedDB.open('nexusnxs-demo', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result, tx = db.transaction('state', 'readwrite');
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onabort = tx.onerror = () => { db.close(); reject(tx.error); };
+          tx.objectStore('state').put([{ role: 'user', content: 'Domanda sintetica locale' },
+            { role: 'assistant', content: 'Risposta sintetica locale' }], 'turns');
+        };
+      }));
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForFunction(() => document.querySelector('#answer').textContent.includes('Risposta sintetica locale'));
+      await page.locator('#memoryClear').click();
+      await page.waitForFunction(() => document.querySelector('#phase').textContent === 'Memoria locale cancellata');
+      assert.equal(await page.locator('#answer').textContent(), '');
+      if (!await page.locator('#prompt').isVisible()) await page.locator('#keyboard').click();
       await page.locator('#prompt').fill('Bozza sintetica di collaudo offline');
       await context.setOffline(true);
       await page.waitForFunction(() => document.body.dataset.serviceReadiness === 'offline');
@@ -27,6 +44,7 @@ const { chromium } = require('../../.SITE/node_modules/@playwright/test');
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.body.dataset.serviceReadiness === 'offline');
       assert.equal(await page.locator('#keyboard').isVisible(), true, 'Cached shell remains usable');
+      assert.equal(await page.locator('#answer').textContent(), '', 'Cleared local history cannot return after cached reload');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const cachedPaths = await page.evaluate(async () => {
         const paths = [];
@@ -39,7 +57,7 @@ const { chromium } = require('../../.SITE/node_modules/@playwright/test');
       assert.equal(cachedPaths.some(item => item.startsWith('/api/')), false, 'No conversation API data cached');
       await context.setOffline(false);
       await page.waitForFunction(() => document.body.dataset.serviceReadiness === 'ready', null, { timeout: 30000 });
-      console.log(`PASS ${viewport.width}x${viewport.height}: offline, draft, cached reload, font, reconnect`);
+      console.log(`PASS ${viewport.width}x${viewport.height}: local history reload/reset, offline, draft, cached reload, font, reconnect`);
       await context.close();
     }
   } finally { await browser.close(); }

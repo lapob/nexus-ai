@@ -1,7 +1,8 @@
 # Dati locali e uso senza account
 
-Aggiornamento 10 ottobre 2026. Descrive la candidata nei sorgenti; non attribuire
-queste modifiche alla Preview 0.3.28 gia pubblicata o al servizio ancora attivo.
+Aggiornamento 10 ottobre 2026. Modifiche pubblicate nella Preview0.3.29 e nel
+servizio web aggiornato; Android6.5.24 resta invariata. L'installazione Windows
+locale richiede ancora l'intervento manuale del proprietario.
 
 | Client | Conservazione | Rete |
 | --- | --- | --- |

@@ -1,5 +1,24 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
+## Preview 0.3.29 — 10 ottobre 2026
+
+Pubblicata da2dbf0d3 con8asset verificati; CI Windows/Ubuntu/segreti PASS.
+Suite1045PASS2SKIP0FAIL, buildWindows/installer/smoke packaged, SBOM346 e
+bundle6artefatti PASS. Cronologia web IndexedDB senza account, cancellazione
+fra schede e invalidazione di stream/allegati/scritture tardive; replayserver
+solo inRAM temporanea, ledger su disco senza testo. Dettagli in LOCAL-DATA.md.
+Servizio headless aggiornato e HTTPS ready/health200; prove browser pubbliche
+di recupero/reset e offline/reconnect PASS390x844 e1440x900. Android114immutata
+e Control42: cinque profili fisici Online ciascuna PASS il10ottobre.
+Windows non installata automaticamente: blocco della policy precedente ancora
+da rispettare; installazione manuale prima delle prove dell'app installata.
+Il monitor mostra HTTP reali e non presenta lo SLO come misurato senza storico.
+La mail GitHub503 analizzata coincide con il PC locale spento; avvio al boot
+e disponibilita attuale verificati. Nessuna garanzia di disponibilita aPCspento.
+Restano firme produzione, prove umane voce/eco, audit completo, restore esterno
+e criteri commerciali. Sito: sorgenti29 e patchSharp0.35.5 verificati, gate
+dipendenze ancora bloccante perBraces; nessuna nuova produzione del sito.
+
 Aggiornamento: 6 ottobre 2026. Non e una dichiarazione di prontezza commerciale.
 Il checkpoint pubblico e `CONTINUITA.md` nella radice del repository. Il checkpoint
 operativo del proprietario resta nella cartella padre, fuori dalla pubblicazione.
