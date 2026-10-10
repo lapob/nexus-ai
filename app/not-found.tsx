@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata } from "./lib/site-metadata";
 import { NexusOperationalState } from "./components/NexusOperationalState";
 import { HardNavigationLink } from "./components/HardNavigationLink";
 

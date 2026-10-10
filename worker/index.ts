@@ -1,5 +1,5 @@
 /** Cloudflare Worker entry point for the NexusNXS public site. */
-import handler from "vinext/server/app-router-entry";
+import handler from "./site-handler";
 import { publicAiShell } from "./public-ai-shell";
 
 interface Env {

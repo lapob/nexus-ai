@@ -8,9 +8,13 @@ import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";
 export default function GlobalError({
   error,
   reset,
+  head,
+  tail,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
+  head?: React.ReactNode;
+  tail?: React.ReactNode;
 }) {
   useEffect(() => {
     console.error(error);
@@ -19,10 +23,10 @@ export default function GlobalError({
   return (
     <html lang="it">
       <head>
+        {head}
         <title>NexusNXS — Richiede attenzione</title>
         <meta name="robots" content="noindex, nofollow" />
         {/* Shared with the service-worker offline shell. */}
-        {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/nexus-operational.css" />
       </head>
       <body className="nexus-operational-body">
@@ -40,6 +44,7 @@ export default function GlobalError({
           </NexusOperationalState>
         </main>
         <NexusPresenceRuntime />
+        {tail}
       </body>
     </html>
   );

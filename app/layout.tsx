@@ -1,20 +1,16 @@
-import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import "./globals.css";
 import "./navigation.css";
 import "./experience.css";
 import "./narrative.css";
 import { CspNonceProvider } from "./components/CspNonceContext";
 import { ConnectivityPresence } from "./components/ConnectivityPresence";
-import { NexusPresenceRuntime } from "./components/NexusPresenceRuntime";
 import { HardNavigationLink } from "./components/HardNavigationLink";
 import { SiteHeader } from "./components/SiteChrome";
-import { SiteMotionRuntime } from "./components/SiteMotionRuntime";
 import { PRIMARY_NAV_ITEMS } from "./lib/site-navigation";
 
-export const viewport: Viewport = { themeColor: "#020405", colorScheme: "dark" };
+export const viewport = { themeColor: "#020405", colorScheme: "dark" };
 
-export function generateMetadata(): Metadata {
+export function generateMetadata() {
   const origin = "https://nexusnxs.com";
   const title = "NexusNXS — AI privata, protetta e connessa";
   const description = "AI per PC e Android, con NexusNXS Core, accessi revocabili e continuità protetta tra dispositivi.";
@@ -38,29 +34,27 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default async function RootLayout({
-  children,
-}: Readonly<{
+export default function RootLayout({ children, nonce, pathname, head, tail }: Readonly<{
   children: React.ReactNode;
+  nonce?: string;
+  pathname: string;
+  head?: React.ReactNode;
+  tail?: React.ReactNode;
 }>) {
-  const nonce = (await headers()).get("x-nexusnxs-csp-nonce") ?? undefined;
-
   return (
     <html lang="it">
-      <head>
+      <head>{head}
         {/* This stylesheet is also consumed by the static offline shell. */}
-        {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/nexus-operational.css" />
         <noscript>
-          {/* eslint-disable-next-line @next/next/no-css-tags */}
-          <link rel="stylesheet" href="/noscript.css" />
+            <link rel="stylesheet" href="/noscript.css" />
         </noscript>
         <script nonce={nonce} src="/register-sw.js" defer />
       </head>
       <body>
         <CspNonceProvider nonce={nonce}>
           <a className="skip-link" href="#site-content">Vai al contenuto</a>
-          <SiteHeader />
+          <SiteHeader pathname={pathname} />
           <noscript>
             <nav className="nxs-noscript" aria-label="Navigazione principale senza JavaScript">
               <HardNavigationLink className="nxs-noscript__brand" href="/">NEXUSNXS</HardNavigationLink>
@@ -72,9 +66,8 @@ export default async function RootLayout({
           </noscript>
           <div id="site-content" tabIndex={-1}>{children}</div>
           <ConnectivityPresence />
-          <SiteMotionRuntime />
-          <NexusPresenceRuntime />
         </CspNonceProvider>
+        {tail}
       </body>
     </html>
   );

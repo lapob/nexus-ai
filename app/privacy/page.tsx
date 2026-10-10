@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata } from "../lib/site-metadata";
 import { BrainCircuit, Database, EyeOff, Mail, ShieldCheck } from "lucide-react";
 import { SiteFooter } from "../components/SiteChrome";
 

@@ -1,5 +1,5 @@
 import { DesktopHomePreview } from "./components/DesktopHomePreview";
-import Image from "next/image";
+import Image from "./components/SiteImage";
 import { ProductImageZoom } from "./components/ProductImageZoom";
 import { ArrowUpRight, BrainCircuit, MessageCircle, Mic2, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";

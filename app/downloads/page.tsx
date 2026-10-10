@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata } from "../lib/site-metadata";
 import release from "../data/public-release.json";
 import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert, Smartphone } from "lucide-react";
-import Image from "next/image";
+import Image from "../components/SiteImage";
 import { SiteFooter } from "../components/SiteChrome";
 
 export const metadata: Metadata = {

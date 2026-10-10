@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata } from "../lib/site-metadata";
 import { CircleDollarSign, FileText, Scale, ShieldAlert, Wrench } from "lucide-react";
 import { SiteFooter } from "../components/SiteChrome";
 

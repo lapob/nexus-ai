@@ -1,7 +1,6 @@
-import type { MetadataRoute } from "next";
 import { PUBLIC_PAGE_PATHS } from "./lib/site-navigation";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default function sitemap() {
   const base = "https://nexusnxs.com";
   return PUBLIC_PAGE_PATHS.map((path, index) => ({
     url: `${base}${path === "/" ? "" : path}`,

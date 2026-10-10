@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "./SiteImage";
 import { ProductImageZoom } from "./ProductImageZoom";
 
 export function DesktopHomePreview() {

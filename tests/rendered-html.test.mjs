@@ -46,7 +46,7 @@ test("keeps production metadata and portable scripts", async () => {
   assert.match(layout, /manifest\.webmanifest/);
   assert.match(layout, /<html lang="it">/);
   assert.match(packageJson, /cross-env WRANGLER_LOG_PATH=/);
-  assert.match(chrome, /next\/image/);
+  assert.match(chrome, /SiteImage/);
   assert.match(chrome, /HardNavigationLink/);
   assert.doesNotMatch(`${layout}\n${chrome}`, /codex-preview|_sites-preview/i);
 });
@@ -117,11 +117,12 @@ test("redirects every known production alias to nexusnxs.com", async () => {
 });
 
 test("uses one semantic NexusNXS AI health check everywhere", async () => {
-  const [endpoints, statusHelper, statusRoute, statusPage] = await Promise.all([
+  const [endpoints, statusHelper, statusRoute, statusPage, siteHandler] = await Promise.all([
     readFile(new URL("../app/lib/service-endpoints.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/service-status.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/status/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/status/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../worker/site-handler.tsx", import.meta.url), "utf8"),
   ]);
   const publicStatusSources = `${endpoints}\n${statusHelper}\n${statusRoute}\n${statusPage}`;
   assert.match(endpoints, /https:\/\/ai\.nexusnxs\.com/);
@@ -133,7 +134,8 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
   assert.match(statusHelper, /if \(pendingCheck\) return pendingCheck/);
   assert.match(statusHelper, /data\.status === "ready"/);
   assert.match(statusRoute, /checkNexusNxsAi/);
-  assert.match(statusPage, /checkNexusNxsAi/);
+  assert.match(siteHandler, /checkNexusNxsAi/);
+  assert.match(statusPage, /StatusSnapshot/);
   assert.match(statusPage, /PRIVATO/);
   assert.match(statusPage, /Fuori dal perimetro pubblico/);
 });

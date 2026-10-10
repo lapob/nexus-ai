@@ -4,17 +4,17 @@ import { ProductImageZoom } from "./ProductImageZoom";
 
 import { useEffect, useRef, useState } from "react";
 import { Activity, ArrowDownToLine, ArrowUpRight, BrainCircuit, House, Monitor, ShieldCheck, Smartphone } from "lucide-react";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
+import Image from "./SiteImage";
+
 import { PRIMARY_NAV_ITEMS } from "../lib/site-navigation";
 import { HardNavigationLink } from "./HardNavigationLink";
 
-export function SiteHeader() {
+export function SiteHeader({ pathname = "/" }: { pathname?: string }) {
   const [open, setOpen] = useState(false);
   const [online, setOnline] = useState<boolean | null>(null);
   const [navigating, setNavigating] = useState(false);
   const [chromeAwake, setChromeAwake] = useState(true);
-  const pathname = usePathname();
+
   const toggleRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);
 

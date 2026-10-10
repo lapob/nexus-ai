@@ -1,3 +1,26 @@
+# React/Vite SSR dependency remediation — 10 October 2026
+
+Candidate removes both Braces dependency roots and unused RSC tooling while
+reusing all existing pages, CSS, Inter, particle physics and product assets.
+The Worker still owns AI proxy/offline, maintenance, nonce/CSP and canonical
+host redirects. Explicit SSR preserves metadata, security.txt, status, 404,
+GET/HEAD, legacy pricing/trailing slash redirects and release output paths.
+The internal RSC protocol is no longer emitted; product navigation uses full
+links. Dev builds then serves a local preview; no HMR is claimed.
+
+Clean locked install:349 verified signatures,96 attestations, zero known
+vulnerabilities. Dependency graph contains no Braces/micromatch/fast-glob or
+Vinext/CommonJS chain.43 tests pass; unchanged size budgets pass. Actual local
+Workers runtime and Wrangler dry-run pass. Browser review found and corrected
+an unnecessary Suspense hydration fallback and lost motion classes; nine
+focused repetitions pass, including narrow/wide hydration of seven routes.
+Prepatch independent investigation completed. Postpatch independent review
+was interrupted before its final report; a separate parent boundary review
+completed instead. This is scoped remediation, not a full security audit.
+
+Next: exact clean source commit, complete release gate, immutable candidate
+verification, then controlled production promotion with existing rollback.
+No deployment has occurred at this checkpoint. Historical notes follow.
 # Website source continuity
 
 ## Dependency boundary review — 10 October 2026

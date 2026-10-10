@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata } from "../lib/site-metadata";
 import { Bug, CheckCircle2, Database, EyeOff, FileKey2, Fingerprint, KeyRound, LockKeyhole, PackageCheck, ShieldCheck, Siren, TimerReset } from "lucide-react";
 import { SiteFooter } from "../components/SiteChrome";
 import { HardNavigationLink } from "../components/HardNavigationLink";

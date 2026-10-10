@@ -48,7 +48,7 @@ npm run verify:security
 npm run verify:release
 ```
 
-`npm run verify:release` è il gate obbligatorio: compatibilità Vinext, firme e
+`npm run verify:release` è il gate obbligatorio: SSR React/Vite, runtime Workers locale, firme e
 vulnerabilità delle dipendenze, lint, TypeScript, build pulita, test del Worker e
 dry-run dell'artefatto Cloudflare. Ogni build elimina prima `dist`, così nessun
 metadato di hosting obsoleto può sopravvivere.
@@ -128,3 +128,15 @@ richiede una nuova versione verificata; non si crea un secondo progetto.
 - `scripts/`: pulizia, verifica live e release con rollback.
 - `tests/`: rendering, navigazione, hosting e stati operativi.
 - `wrangler.jsonc`: identità e configurazione autorevole del Worker.
+
+## Rendering e sviluppo
+
+Le pagine riutilizzano i componenti React esistenti. Vite produce client e
+Worker SSR; il router pubblico esplicito preserva navigazione completa,
+metadata, CSP con nonce, stato, manutenzione, security.txt e redirect.
+`npm run dev` ricostruisce e avvia la preview locale; dopo modifiche ai sorgenti
+ripetere il comando. `npm run start -- --hostname 127.0.0.1 --port 3000` serve
+l'ultima build. La preview Node e solo locale; `verify:runtime` controlla
+anche il runtime Cloudflare reale in modalita locale, senza credenziali.
+Il protocollo RSC interno non viene piu emesso: la navigazione del prodotto
+usa collegamenti completi e mantiene il fallback offline esistente.

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Image from "next/image";
+import Image from "./SiteImage";
 
 export type NexusPresenceState =
   | "online"
