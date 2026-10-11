@@ -1,3 +1,7 @@
+## Revisione grafica e Preview31 — 11 ottobre
+
+Distribuita Preview0.3.31 dal source8bc6c38: maggior contrasto delle note settings e strumenti QA corretti. Suite1061PASS/2SKIP/0FAIL, check/cloud/source smoke e packaged smokePASS; bundle/SBOM/installer e CI Windows/UbuntuPASS. Tre Core desktop, hover/fullscreen e transizioni full/reduced verificati sulla workstation. Catture a scale100/200 e40stati web sintetici incl200%testo/landscape; dettagli e limiti in UI_SPECIFICATION.md. Android114 invariato, nessun dispositivo ADB nel nuovo controllo. Nessuna installazione Windows o modifica del servizio attivo. Non dichiarare certificazione WCAG completa: axe settings lascia un controllo incompleto sulle trasparenze. Nessun finding upstream risolto dalla grafica.
+
 # Preview0.3.30 distribution — 11 October 2026
 
 Desktop memory, artifact-copy and local recipe changes below are now distributed in public Preview0.3.30 from c65eac6. Installer/bundle/SBOM checks and three consecutive packaged smoke runs pass. The smoke path previously forced native exit during pending cleanup; it now respects the quit barrier. Full source suite1060PASS/2SKIP/0FAIL, source smoke and Windows/Ubuntu CI pass. Android114 is unchanged and private Control is excluded. Preview is unsigned/manual-update, with Preview29 retained for rollback. No Windows installation or headless-server update is claimed; runtime audit, human voice, model comparison, cross-client parity and commercial evidence remain open.

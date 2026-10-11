@@ -1,3 +1,9 @@
+# Preview0.3.31 published and graphics verified — 11 October 2026
+
+Public prerelease v0.3.31-preview.1 has eight verified GitHub assets from source8bc6c388514e9094f9a27eb5f66d837ace4e4d6a; Windows/Ubuntu CI38138653842 passes. Installer/bundle/SBOM and packaged smoke pass. The settings contrast correction is now included in the desktop package; no new geometry, font or animation controller. Android114 is unchanged and Control is private. Previous previews remain available. Windows remains unsigned/manual-install; no installation or headless-server restart was performed.
+
+Graphic evidence and proposals are in UI_SPECIFICATION.md. The workstation measurements and synthetic browsers do not certify every OS or phone. ADB found no devices. One native Node test-host abort remains recorded separately from passing Electron tests. Two interrupted QA profiles remain because automatic approval rejected their cleanup; no alternative deletion was attempted. Runtime audit, voice human tests and commercial gates remain open.
+
 # Graphics review and Preview0.3.31 prepared — 11 October 2026
 
 Settings helper text now reuses the shared mist token; no new font, geometry or motion controller. Web Core QA measures renderer draw deltas and rejects absent/nonfinite/frozen metrics. Motion cleanup retries only its own exclusive temporary profile. Focused9PASS; final cloud:check/check/source-smokePASS and isolated suite1061PASS/2SKIP/0FAIL. Three desktop Core/fullscreen/full-reduced motion, ten desktop captures, forty synthetic web states and26 site/web captures were checked; see UI_SPECIFICATION.md for limits and next refinements. ADB had no devices: no new Android physical test is claimed. Version0.3.31 is prepared for an immutable new Preview; prior Preview30 remains untouched until build/installer/packaged-smoke/bundle and publication complete. No server restart, runtime replacement or automatic installation.
