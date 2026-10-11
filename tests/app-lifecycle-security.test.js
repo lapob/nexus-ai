@@ -80,6 +80,52 @@ test('un errore di avvio esce con codice non zero solo dopo la pulizia', async (
   assert.equal(barrier.state, 'finished');
 });
 
+test('lo smoke della finestra attende il cleanup invece di forzare uscita e distruzione', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const application = new EventEmitter();
+  let quitCalls = 0;
+  let forcedExits = 0;
+  let destroyed = false;
+  let finishSmoke;
+  application.getPath = () => '/synthetic-profile';
+  application.quit = () => { quitCalls += 1; application.emit('before-quit', { preventDefault() {} }); };
+  application.exit = () => { forcedExits += 1; };
+  let releaseCleanup;
+  const cleanup = new Promise(resolve => { releaseCleanup = resolve; });
+  const barrier = installShutdownBarrier({ application, onShutdown: () => cleanup, getExitCode: () => 0 });
+  class FakeWindow extends EventEmitter {
+    constructor() {
+      super();
+      this.webContents = new EventEmitter();
+      this.webContents.setWindowOpenHandler = () => {};
+    }
+    setMenu() {}
+    loadURL() { this.webContents.emit('did-finish-load'); }
+    destroy() { destroyed = true; }
+  }
+  const filename = require.resolve('../src/infrastructure/electron/create-main-window');
+  const fixture = { module: { exports: {} }, __dirname: path.dirname(filename),
+    process: { env: {}, argv: [], platform: 'win32' },
+    setTimeout: callback => { finishSmoke = callback; },
+    require: name => name === 'electron'
+      ? { app: application, BrowserWindow: FakeWindow, screen: { getAllDisplays: () => [] } }
+      : name === './window-state'
+        ? { loadWindowState: () => ({}), saveWindowState() {} }
+        : require(name) };
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), fixture, { filename });
+  fixture.module.exports.createMainWindow({ rendererUrl: 'nexus://app/index.html', smokeTest: true });
+  await finishSmoke();
+  assert.equal(barrier.state, 'running');
+  assert.equal(destroyed, false);
+  assert.equal(forcedExits, 0);
+  releaseCleanup();
+  await barrier.beginShutdown();
+  assert.equal(barrier.state, 'finished');
+  assert.equal(quitCalls, 2);
+});
+
 test('un bootstrap tardivo non riapre la UI dopo la chiusura durante il caricamento', async () => {
   const fs = require('node:fs');
   const vm = require('node:vm');

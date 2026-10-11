@@ -477,8 +477,9 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
       if (smokeHoldMilliseconds) {
         await new Promise((resolve) => setTimeout(resolve, smokeHoldMilliseconds));
       }
-      win.destroy();
-      app.exit(0);
+      // Respect the normal shutdown barrier. Forcing exit immediately after
+      // destroy can race pending provider cleanup and crash packaged Electron.
+      app.quit();
     // Le catture visive aspettano anche il chunk WebGL lazy; lo smoke
     // contrattuale resta rapido perché non deve attendere il visualizzatore.
     // Lo smoke contrattuale esercita anche l'intera animazione di chiusura del

@@ -256,7 +256,7 @@ async function inspectBridge(target) {
     }
     if (!contract) throw lastInspectionError || new Error('Impossibile ispezionare il renderer Electron.');
     const code = await exit;
-    if (code !== 0) throw new Error(stderr.trim() || `Electron terminato con codice ${code}.`);
+    if (code !== 0) throw new Error(`Electron terminato con codice ${code} e segnale ${child.signalCode || 'nessuno'}.`);
     if (!contract.bridgeComplete) throw new Error(`Il preload ha esposto un bridge NexusNXS incompleto: ${JSON.stringify(contract)}.`);
     if (!contract.bootstrapComplete) throw new Error('Il contratto bootstrap non è stato completato.');
     if (!contract.permissionPersistence) throw new Error('Il profilo autorizzazioni non sopravvive a un salvataggio parziale.');

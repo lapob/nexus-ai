@@ -1,3 +1,7 @@
+# Preview smoke shutdown correction — 11 October 2026
+
+Packaged smoke exposed an intermittent native exit3221225477 after forced window destruction during pending service cleanup. The smoke window now uses the normal quit barrier; exit diagnostics retain code and signal. Behavioral lifecycle test8PASS, cloud:check/checkPASS, isolated suite1060PASS/2SKIP/0FAIL and source Electron smokePASS. Rebuild and repeated packaged smoke are required before publishing Preview0.3.30. No installer execution or server runtime replacement.
+
 # Preview0.3.30 build prepared — 11 October 2026
 
 Source version incremented for a new desktop Preview; prior Preview29 assets
@@ -167,3 +171,4 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
+
