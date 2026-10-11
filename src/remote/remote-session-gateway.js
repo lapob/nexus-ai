@@ -3008,7 +3008,7 @@ class RemoteSessionGateway {
               this.assertRequestAuthorized(request);
             };
             assertAuthorized();
-            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, report, signal, assertAuthorized });
+            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, publicIngress, report, signal, assertAuthorized });
             assertAuthorized();
             if (messageKey) {
               this.completedRemoteMessages.set(messageKey, Date.now());

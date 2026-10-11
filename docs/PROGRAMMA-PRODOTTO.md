@@ -3,6 +3,12 @@
 Aggiornamento 10 ottobre 2026. Riutilizzare le capacita esistenti; questa mappa
 separa implementazione, prove automatiche e prerequisiti esterni.
 
+Verifica11ottobre: policy runtime pubblico corretta e verificata nei sorgenti,
+inclusi ownership, rifiuti propagati, guest, paired ingress e metadata. Restano
+finding upstream e distribuzione sul servizio attivo: non equivalgono alla patch
+source. Suite1059PASS/2SKIP/0FAIL; voce umana rinviata, confronto modelli non
+eseguito e nessun nuovo training. Vedere il checkpoint per le prove specifiche.
+
 | Area | Base disponibile | Criterio ancora necessario |
 | --- | --- | --- |
 | Control e disponibilita | Bridge autenticato, campionamento desktop condiviso, azioni allowlist e ricevute; avvio headless osservato dopo il boot del 10 ottobre | Finestra di disponibilita sufficiente, conferme fisiche finali e recupero da backup esterno; nessun riavvio PC eseguito dal collaudo |

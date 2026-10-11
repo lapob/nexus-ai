@@ -126,7 +126,7 @@
     "availability:gate": "node scripts/monitor-product-availability.js --once --strict-current",
     "availability:monitor": "node scripts/monitor-product-availability.js --watch --interval=60000",
     "backup:drill": "node scripts/run-backup-recovery-drill.js",
-    "server:check:production": "npm run connections:verify && npm run tailscale:policy:gate && npm run security:ollama && npm run security:gate && npm run security:asvs && npm run security:regression && npm run load:gateway && npm run slo:gate",
+    "server:check:production": "npm run connections:verify && npm run tailscale:policy:gate && npm run security:ollama:distribution && npm run security:gate && npm run security:asvs && npm run security:regression && npm run load:gateway && npm run slo:gate",
     "security:dast": "node --test tests/remote-session-gateway.test.js",
     "security:regression": "node --test tests/action-runtime.test.js tests/app-lifecycle-security.test.js tests/encrypted-backup.test.js tests/logger.test.js tests/prompt-security.test.js tests/release-integrity.test.js tests/release-manifest.test.js tests/remote-session-gateway.test.js tests/security-boundaries.test.js tests/security-event-store.test.js tests/security.test.js tests/update-manager.test.js tests/wake-on-lan.test.js tests/wake-relay.test.js",
     "verify:experience": "npm run start:prepare && npm run ai:provision && npm run ai:evaluate:gate -- qwen3:8b qwen3:14b && npm run voice:evaluate && npm run smoke && npm run verify:shutdown && npm run soak -- --cycles=250",

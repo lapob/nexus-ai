@@ -42,7 +42,7 @@ const { AIProviderRegistry } = require('../ai/ai-provider-registry');
 const { AIRuntime } = require('../ai/ai-runtime');
 const { OllamaProvider } = require('../ai/providers/ollama-provider');
 const { NexusServiceProvider } = require('../ai/providers/nexus-service-provider');
-const { ManagedOllamaRuntime, selectManagedRuntimePort } = require('../ai/managed-ollama-runtime');
+const { ManagedOllamaRuntime, assertRuntimeAdmission, managedRuntimeSecurityUsage, selectManagedRuntimePort } = require('../ai/managed-ollama-runtime');
 const { detectHardware, runtimeTuning } = require('../ai/hardware-profile');
 const {
   MODEL_PROFILES,
@@ -148,6 +148,7 @@ function bootstrapElectron({ env = process.env } = {}) {
   app.on('child-process-gone', (_event, details) => crashReports.append('child', details));
   const managedRuntime = new ManagedOllamaRuntime({
     enabled: managedRuntimeEnabled,
+    securityUsage: managedRuntimeSecurityUsage({ serverMode, isPackaged: app.isPackaged }),
     resourcesPath: app.isPackaged ? process.resourcesPath : path.join(appRoot, 'vendor'),
     executablePath: String(env.NEXUS_OLLAMA_EXECUTABLE_PATH || '').trim() || null,
     userDataPath: sharedDataRoot,
@@ -570,7 +571,10 @@ function bootstrapElectron({ env = process.env } = {}) {
         communityFeedbackStore,
         responseCache,
         securityEventStore,
-        modelProvider: () => aiRuntime.listModels(),
+        modelProvider: async () => {
+          await assertRuntimeAdmission(managedRuntime, { provider: runtimeConfig.ai.provider, requireDistribution: true });
+          return aiRuntime.listModels();
+        },
         imageGenerationService,
         imageCapabilityProvider: () => imageGenerationService.capabilityState(),
         researchAvailable: webResearchService?.enabled !== false,

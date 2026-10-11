@@ -7,9 +7,100 @@ const { EventEmitter } = require('node:events');
 const vm = require('node:vm');
 const {
   ManagedOllamaRuntime,
+  assertRuntimeAdmission,
+  managedRuntimeSecurityUsage,
   parseExcludedTcpPortRanges,
   selectManagedRuntimePort
 } = require('../src/ai/managed-ollama-runtime');
+
+test('il profilo permissivo richiede sviluppo locale esplicito e non mutabile', () => {
+  assert.equal(managedRuntimeSecurityUsage(), 'distribution');
+  assert.equal(managedRuntimeSecurityUsage({ isPackaged: false }), 'development');
+  assert.equal(managedRuntimeSecurityUsage({ isPackaged: false, serverMode: true }), 'distribution');
+  assert.equal(managedRuntimeSecurityUsage({ isPackaged: true }), 'distribution');
+  const runtime = new ManagedOllamaRuntime();
+  assert.equal(runtime.securityUsage, 'distribution');
+  assert.equal(Reflect.set(runtime, 'securityUsage', 'development'), false);
+  assert.throws(() => new ManagedOllamaRuntime({ securityUsage: 'other' }), TypeError);
+});
+
+test('un listener sano ma non posseduto non supera ammissione o recupero', async () => {
+  let healthCalls = 0;
+  const runtime = new ManagedOllamaRuntime({ enabled: true, logger: { warn() {} } });
+  runtime.health = async () => { healthCalls++; return true; };
+  assert.equal((await runtime.start()).reason, 'port-in-use');
+  assert.equal((await runtime.ensureHealthy()).available, false);
+  assert.ok(healthCalls > 0);
+  await assert.rejects(assertRuntimeAdmission(runtime, { provider: 'ollama', requireDistribution: true }),
+    error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+});
+
+test('il gate strict blocca il processo; sviluppo locale resta utilizzabile ma non pubblico', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-runtime-admission-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const executable = path.join(root, 'ollama');
+  fs.writeFileSync(executable, 'fixture');
+  for (const securityUsage of ['distribution', 'development']) {
+    let spawns = 0; let audits = 0;
+    const runtime = new ManagedOllamaRuntime({ enabled: true, securityUsage,
+      executablePath: executable, userDataPath: root, logger: { warn() {}, error() {}, info() {} },
+      runtimeSecurityCheck(_path, options) {
+        audits++;
+        if (options.usage !== 'development') throw Object.assign(new Error('finding'), { code: 'OLLAMA_RUNTIME_VULNERABLE' });
+        return { blockingFindings: 1 };
+      },
+      spawnProcess() { spawns++; return new EventEmitter(); }, terminateProcess() {}
+    });
+    runtime.health = async () => spawns > 0;
+    const result = await runtime.start();
+    assert.equal(result.available, securityUsage === 'development');
+    assert.equal(spawns, securityUsage === 'development' ? 1 : 0);
+    assert.equal(audits, 1);
+    await assert.rejects(assertRuntimeAdmission(runtime, { provider: 'ollama', requireDistribution: true }),
+      error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+    if (securityUsage === 'development') await assertRuntimeAdmission(runtime, { provider: 'ollama' });
+    runtime.shutdown();
+  }
+});
+
+test('runtime esterno solo privato e risultato unavailable non ignorabile', async () => {
+  const external = new ManagedOllamaRuntime({ enabled: false });
+  external.health = async () => true;
+  await assertRuntimeAdmission(external, { provider: 'ollama' });
+  await assert.rejects(assertRuntimeAdmission(external, { provider: 'ollama', requireDistribution: true }),
+    error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+  await assert.rejects(assertRuntimeAdmission(null, { provider: 'ollama', requireDistribution: true }),
+    error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+  await assert.rejects(assertRuntimeAdmission({ enabled: true, ensureHealthy: async () => ({ available: false }) }, { provider: 'ollama' }),
+    error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+  await assertRuntimeAdmission(null, { provider: 'nexus-service', requireDistribution: true });
+});
+
+test('uscita durante health e readiness non conserva una ammissione già revocata', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-runtime-health-race-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const executable = path.join(root, 'ollama'); fs.writeFileSync(executable, 'fixture');
+  for (const duringStartup of [true, false]) {
+    const child = new EventEmitter();
+    const runtime = new ManagedOllamaRuntime({ enabled: true, executablePath: executable, userDataPath: root,
+      runtimeSecurityCheck: () => ({ blockingFindings: 0 }), spawnProcess: () => child,
+      terminateProcess() {}, logger: { warn() {}, info() {}, error() {} }
+    });
+    runtime.health = async () => {
+      if (!runtime.process) return false;
+      if (duringStartup) child.emit('exit', 1, null);
+      return true;
+    };
+    assert.equal((await runtime.start()).available, !duringStartup);
+    if (!duringStartup) {
+      runtime.health = async () => { child.emit('exit', 1, null); return true; };
+      await assert.rejects(assertRuntimeAdmission(runtime, { provider: 'ollama', requireDistribution: true }),
+        error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+    }
+    assert.equal(runtime.hasAdmittedProcess(), false);
+    runtime.shutdown();
+  }
+});
 
 test('il launcher riusa la porta effettiva del Core anche con PID grande e riserve Windows', () => {
   const source = fs.readFileSync(path.join(__dirname, '../scripts/start-electron.js'), 'utf8');
@@ -72,6 +163,7 @@ test('shutdown termina soltanto il runtime Ollama posseduto e ne vieta il riavvi
   runtime.health = async () => ++healthChecks > 1;
 
   assert.equal((await runtime.start()).available, true);
+  await assertRuntimeAdmission(runtime, { provider: 'ollama', requireDistribution: true });
   assert.equal(spawns, 1);
   assert.equal(runtime.shutdown(), true);
   assert.equal(taskkillCalls, 1);

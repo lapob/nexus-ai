@@ -1,3 +1,25 @@
+# Runtime admission boundary corrected in source — 11 October 2026
+
+Managed Ollama defaults to an immutable distribution security profile. Only
+explicit local nonpackaged/nonserver development uses the loopback exception.
+Public guest and paired public-ingress chat check admission before settings
+adaptation or provider preparation; anonymous model metadata uses the same
+guard. Failed admission now stops provider initialization. Health/startup/recovery
+require the admitted owned process, including a post-await check when it exits.
+Private inference with an external runtime remains supported; public metadata
+and public/server Ollama require an admitted distribution-profile managed runtime.
+The production server command now invokes the strict distribution CLI gate.
+
+Independent prepatch investigation and postpatch review completed. Review found
+a process-exit race, reproduced and corrected; its original trigger is rejected.
+Focused96 tests pass. cloud:check/check pass; isolated suite1059 passes,2 skips,
+zero failures. Electron smoke, synthetic voice sessions at four widths and
+encrypted synthetic backup recovery pass. Human voice testing was postponed.
+This fixes the source policy mismatch, not upstream runtime vulnerabilities:
+the existing runtime audit findings remain open. No running service or runtime
+was replaced, restarted or promoted; the deployed service retains its earlier
+version. A source fix is not a claim of production remediation or a full audit.
+
 # Desktop memory, artifact copies and local recipe — 10 October 2026
 
 Source changes after Preview29: local memory scope/provenance/last use,

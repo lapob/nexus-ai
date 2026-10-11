@@ -8,6 +8,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const { assertOllamaRuntimeSecure } = require('./ollama-runtime-security');
+const { AIError, AI_ERROR_CODES } = require('./ai-errors');
+
+function managedRuntimeSecurityUsage({ serverMode = false, isPackaged = true } = {}) {
+  return !serverMode && isPackaged === false ? 'development' : 'distribution';
+}
+
+async function assertRuntimeAdmission(runtime, { provider, requireDistribution = false } = {}) {
+  if (!runtime?.enabled && !(requireDistribution && provider === 'ollama')) return;
+  const state = runtime && await runtime.ensureHealthy({ requireDistribution });
+  if (state?.available !== true) {
+    throw new AIError(AI_ERROR_CODES.PROVIDER_UNAVAILABLE,
+      'Il runtime AI non ha superato i controlli necessari per questa sessione.',
+      { provider: provider || 'ollama', retryable: false });
+  }
+}
 
 const RUNTIME_ENV_KEYS = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP',
@@ -92,6 +107,10 @@ class ManagedOllamaRuntime {
     this.platform = options.platform || process.platform;
     this.spawnProcess = options.spawnProcess || spawn;
     this.runtimeSecurityCheck = options.runtimeSecurityCheck || assertOllamaRuntimeSecure;
+    const securityUsage = options.securityUsage ?? 'distribution';
+    if (!['development', 'distribution'].includes(securityUsage)) throw new TypeError('Profilo sicurezza runtime non valido.');
+    Object.defineProperty(this, 'securityUsage', { value: securityUsage, enumerable: true });
+    this.runtimeAdmitted = false;
     // Limita taskkill al PID creato da questa istanza: un servizio Ollama
     // installato o avviato dall'utente non viene mai terminato da NexusNXS.
     this.terminateProcess = options.terminateProcess
@@ -124,6 +143,11 @@ class ManagedOllamaRuntime {
 
   // #region 02 — Salute e lifecycle
 
+  hasAdmittedProcess() {
+    return Boolean(this.ownedProcess && this.runtimeAdmitted && this.process
+      && this.process.exitCode == null && this.process.signalCode == null);
+  }
+
   async health() {
     try {
       const response = await fetch(`${this.baseUrl}/api/version`, { signal: AbortSignal.timeout(1500) });
@@ -136,7 +160,7 @@ class ManagedOllamaRuntime {
   async waitUntilReady(timeoutMs = 20000, generation = this.lifecycleGeneration) {
     const deadline = Date.now() + timeoutMs;
     while (!this.disposed && generation === this.lifecycleGeneration && Date.now() < deadline) {
-      if (await this.health()) return true;
+      if (await this.health()) return !this.disposed && generation === this.lifecycleGeneration && this.hasAdmittedProcess();
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     return false;
@@ -171,7 +195,7 @@ class ManagedOllamaRuntime {
       // Grype deve ricevere il percorso reale: su Windows non segue sempre i
       // junction usati per aggirare i limiti del loader ROCm.
       this.runtimeSecurityCheck(this.securityExecutablePath, {
-        usage: 'development', host: this.host
+        usage: this.securityUsage, host: this.host
       });
     } catch (error) {
       this.logger?.error('Runtime AI NEXUSNXS bloccato dal gate di sicurezza.', {
@@ -204,11 +228,13 @@ class ManagedOllamaRuntime {
     });
     this.process = child;
     this.ownedProcess = true;
+    this.runtimeAdmitted = true;
     child.once('exit', (code, signal) => {
       this.logger?.info('Runtime AI NEXUSNXS terminato.', { code, signal });
       if (this.process === child) {
         this.process = null;
         this.ownedProcess = false;
+        this.runtimeAdmitted = false;
       }
     });
     child.once('error', (error) => this.logger?.error('Avvio runtime AI NEXUSNXS fallito.', { error }));
@@ -218,9 +244,20 @@ class ManagedOllamaRuntime {
     return { managed: true, available, baseUrl: this.baseUrl, modelsPath: this.modelsPath };
   }
 
-  async ensureHealthy() {
+  async ensureHealthy({ requireDistribution = false } = {}) {
     if (this.disposed) return { available: false, recovered: false, reason: 'runtime-stopped' };
-    if (await this.health()) return { available: true, recovered: false };
+    if (requireDistribution && (!this.enabled || this.securityUsage !== 'distribution')) {
+      return { available: false, recovered: false, reason: 'runtime-security-profile' };
+    }
+    const generation = this.lifecycleGeneration;
+    const child = this.process;
+    if ((!this.enabled || this.hasAdmittedProcess()) && await this.health()) {
+      if (this.disposed || generation !== this.lifecycleGeneration
+        || (this.enabled && (child !== this.process || !this.hasAdmittedProcess()))) {
+        return { available: false, recovered: false, reason: 'runtime-stopped' };
+      }
+      return { available: true, recovered: false };
+    }
     if (this.disposed) return { available: false, recovered: false, reason: 'runtime-stopped' };
     if (!this.enabled) return { available: false, recovered: false, reason: 'external-runtime-offline' };
     const now = Date.now();
@@ -251,6 +288,7 @@ class ManagedOllamaRuntime {
     if (this.process === child) {
       this.process = null;
       this.ownedProcess = false;
+      this.runtimeAdmitted = false;
     }
     return true;
   }
@@ -269,6 +307,8 @@ class ManagedOllamaRuntime {
 
 module.exports = {
   ManagedOllamaRuntime,
+  assertRuntimeAdmission,
+  managedRuntimeSecurityUsage,
   parseExcludedTcpPortRanges,
   sanitizedRuntimeEnvironment,
   selectManagedRuntimePort

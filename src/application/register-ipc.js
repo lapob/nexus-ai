@@ -33,6 +33,7 @@ const { analyzeUntrustedContent, deterministicSecurityReply, formatUntrustedData
 const { mergeSettings, validateSettings } = require('../core/config');
 const { publicErrorMessage } = require('../core/errors');
 const { normalizeAIError, AI_ERROR_CODES } = require('../ai/ai-errors');
+const { assertRuntimeAdmission } = require('../ai/managed-ollama-runtime');
 const { SpeechArbiter } = require('../voice/speech-arbiter');
 const { speculativeInferencePolicy } = require('./speculative-inference-policy');
 const { parseAgentPlan } = require('../agents/action-runtime');
@@ -518,9 +519,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     }
     activeConfig = JSON.stringify(configuration);
   };
-  const ensureRuntime = async (settings) => {
+  const ensureRuntime = async (settings, { requireDistribution = false } = {}) => {
     if (shuttingDown) throw runtimeShutdownError();
-    if (managedRuntime?.enabled) await managedRuntime.ensureHealthy();
+    await assertRuntimeAdmission(managedRuntime, {
+      provider: settings.ai.provider,
+      requireDistribution: requireDistribution || distributionMode === 'server'
+    });
     if (shuttingDown) throw runtimeShutdownError();
     const key = JSON.stringify(settings.ai);
     if (key !== activeConfig) await initializeRuntime(settings.ai);
@@ -1866,9 +1870,13 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       if (senderRequests.get(event.sender.id) === requestId) senderRequests.delete(event.sender.id);
     }
   });
-  const remoteChat = async ({ conversation, text, mode, requestedModel = 'automatic', conversationPreferences = null, report = () => {}, onToken = () => {}, ephemeral = false, attachments = { context: '', images: [] }, signal: remoteSignal = null, assertAuthorized = null }) => {
+  const remoteChat = async ({ conversation, text, mode, requestedModel = 'automatic', conversationPreferences = null, report = () => {}, onToken = () => {}, ephemeral = false, publicIngress = false, attachments = { context: '', images: [] }, signal: remoteSignal = null, assertAuthorized = null }) => {
     const assertRemoteActive = () => { throwIfRequestAborted(remoteSignal); assertAuthorized?.(); };
     assertRemoteActive();
+    if (ephemeral || publicIngress || distributionMode === 'server') {
+      await ensureRuntime(getSettings(), { requireDistribution: true });
+      assertRemoteActive();
+    }
     const remoteStartedAt = performance.now();
     report('Comprendo la richiesta e preparo il contesto…');
     const parsed = parseChatRequest({ question: text, mode, history: conversation.turns });

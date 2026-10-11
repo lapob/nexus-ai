@@ -422,12 +422,101 @@ test('la preparazione non modifica memoria se la ricerca ignora un annullamento'
   assert.equal(writes, 0);
 });
 
+test('guest, ingresso pubblico e server verificano il runtime prima di qualsiasi preparazione', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/application/register-ipc.js'), 'utf8');
+  const start = source.indexOf('  const remoteChat = async');
+  const end = source.indexOf('  const remoteActionPlan', start);
+  for (const input of [{ ephemeral: true }, { publicIngress: true }, { server: true }]) {
+    let checked = 0;
+    const chat = vm.runInNewContext(`${source.slice(start, end)}; remoteChat;`, {
+      distributionMode: input.server ? 'server' : 'developer', throwIfRequestAborted() {},
+      getSettings: () => ({ ai: { provider: 'ollama' } }),
+      ensureRuntime: async (_settings, options) => {
+        checked++;
+        assert.equal(options.requireDistribution, true);
+        throw new Error('security denied before provider');
+      },
+      adaptiveSettings: () => { throw new Error('must not prepare'); },
+      performance: { now() { throw new Error('must not start inference'); } }
+    });
+    await assert.rejects(chat({ conversation: { turns: [] }, text: 'test', ...input }), /security denied before provider/);
+    assert.equal(checked, 1);
+  }
+});
+
+test('ensureRuntime propaga il rifiuto prima di inizializzare il provider', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/application/register-ipc.js'), 'utf8');
+  const start = source.indexOf('  const ensureRuntime = async');
+  const end = source.indexOf('  const aiWarmup =', start);
+  const { assertRuntimeAdmission } = require('../src/ai/managed-ollama-runtime');
+  for (const distributionMode of ['server', 'developer']) {
+    let initialized = 0;
+    const ensureRuntime = vm.runInNewContext(`${source.slice(start, end)}; ensureRuntime;`, {
+      shuttingDown: false, managedRuntime: { enabled: false, ensureHealthy: async () => ({ available: false }) },
+      distributionMode, assertRuntimeAdmission, activeConfig: '',
+      initializeRuntime: async () => { initialized++; }
+    });
+    const settings = { ai: { provider: 'ollama' } };
+    if (distributionMode === 'server') {
+      await assert.rejects(ensureRuntime(settings), error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+      assert.equal(initialized, 0);
+    } else {
+      await ensureRuntime(settings);
+      assert.equal(initialized, 1);
+      await assert.rejects(ensureRuntime(settings, { requireDistribution: true }), error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+      assert.equal(initialized, 1);
+    }
+  }
+});
+
+test('il provider metadata pubblico applica lo stesso gate prima di listModels', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/application/bootstrap.js'), 'utf8');
+  const start = source.indexOf('modelProvider: async () => {') + 'modelProvider: '.length;
+  const end = source.indexOf(',\n        imageGenerationService,', start);
+  assert.ok(start > 0 && end > start);
+  let calls = 0;
+  const { assertRuntimeAdmission } = require('../src/ai/managed-ollama-runtime');
+  const provider = vm.runInNewContext(`(${source.slice(start, end).replace(/\r/g, '')})`, {
+    assertRuntimeAdmission, runtimeConfig: { ai: { provider: 'ollama' } },
+    managedRuntime: { enabled: false, ensureHealthy: async () => ({ available: false }) },
+    aiRuntime: { listModels: () => { calls++; return []; } }
+  });
+  await assert.rejects(provider(), error => error.code === 'AI_PROVIDER_UNAVAILABLE');
+  assert.equal(calls, 0);
+});
+
+test('il contesto pubblico delle chat associate deriva dal listener e non dal corpo', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ingress-context-'));
+  const record = { id: 'ingress-chat', title: 'Test', turns: [], createdAt: Date.now(), updatedAt: Date.now() };
+  const contexts = [];
+  const gateway = new RemoteSessionGateway({ statePath: path.join(root, 'remote.json'),
+    conversationStore: { list: () => [record], save: value => value }, logger: { info() {}, warn() {} },
+    onMessage: async context => { contexts.push(context.publicIngress); return record; }
+  });
+  try {
+    const port = await freePort(); gateway.publicPort = await freePort();
+    await gateway.configure({ enabled: true, port });
+    const privateBase = `http://127.0.0.1:${port}`;
+    const device = await pair(privateBase, gateway.createPairingCode().code);
+    for (const publicIngress of [false, true]) {
+      const base = `http://127.0.0.1:${publicIngress ? gateway.publicPort : port}`;
+      const response = await fetch(`${base}/api/conversations/${record.id}/messages`, {
+        method: 'POST', headers: { Authorization: `Bearer ${device.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'test', publicIngress: !publicIngress })
+      });
+      assert.equal(response.status, 200, await response.text());
+    }
+    assert.deepEqual(contexts, [false, true]);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('la risposta istantanea ricontrolla l autorizzazione prima di salvare', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/application/register-ipc.js'), 'utf8');
   const start = source.indexOf('  const remoteChat = async');
   const end = source.indexOf('  const remoteActionPlan', start);
   let authorized = true; let writes = 0;
   const chat = vm.runInNewContext(`${source.slice(start, end)}; remoteChat;`, {
+    distributionMode: 'developer', ensureRuntime: async () => {},
     performance, throwIfRequestAborted() {}, parseChatRequest: () => ({ question: 'ciao', mode: 'fast', history: [] }),
     normalizeConversationPreferences: () => ({ responseLanguage: 'auto' }), getSettings: () => ({}),
     strictToolRoutingReply: () => 'Risposta sintetica', performanceStore: null,

@@ -1,5 +1,18 @@
 # Stabilizzazione: evidenze e lavoro residuo
 
+## Ammissione runtime — 11 ottobre
+
+Corretta nei sorgenti l'eccezione development nel percorso server/pubblico.
+Default distribution immutabile, proprietà del processo verificata anche dopo
+health asincrono, esito negativo propagato prima di inizializzare il provider.
+Guest e ingresso pubblico associato verificati prima di adaptiveSettings;
+metadata anonimi soggetti allo stesso gate. Runtime esterno privato conservato.
+Revisione indipendente completata,96testmiratiPASS; cloud:check/checkPASS,
+suite1059PASS/2SKIP/0FAIL e smokeElectronPASS. Voce sintetica4dimensioni e
+backup cifrato sinteticoPASS; voce umana rinviata dal proprietario.
+La patch non è ancora nel servizio attivo e non risolve i finding upstream.
+Non aggiornare il runtime server o promuovere un candidato respinto dal gate.
+
 ## Sorgenti successivi alla Preview29 — 10 ottobre
 
 Memoria trasparente/esportazione/scadenza, copie versionate degli artefatti e
