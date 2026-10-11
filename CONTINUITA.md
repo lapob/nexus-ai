@@ -1,3 +1,7 @@
+# Preview0.3.30 downloads promoted — 11 October 2026
+
+Website source583c7869d5fa55eeb1eb2bb0bcba4890e9f0d895 passed the full release gate:43 Node tests,27 browser tests, actual Workers runtime,349 package signatures and zero known dependency audit findings. Immutable candidatee5994e88-d0d3-4804-b4a6-a2e7d72b6c69 was verified and the normal promotion completed as production6a155bdf-1f0f-43e9-bcab-36bdc8f4c366. Postdeployment14 routes/navigation/headers and independent AI health pass. A fresh /downloads readback returns200 and the verified Windows0.3.30 link; AIready returns200. No rollback was needed. Public Preview30 retains Preview29 for rollback; Android6.5.24 is unchanged. This is a website download update, without desktop installation or active-server/runtime replacement. Human voice, runtime audit and commercial prerequisites remain open.
+
 # Preview0.3.30 download metadata prepared — 11 October 2026
 
 GitHub prerelease v0.3.30-preview.1 is public with eight verified assets. The existing sync tool verified the public manifest, GitHub SHA-256 digests and sizes before updating only app/data/public-release.json. Windows0.3.30 replaces the public download target; Android6.5.24 is unchanged. Previous production version9580fd57 remains active until the standard full release gate and immutable candidate promotion pass. This metadata update does not install the desktop client or update the headless server; its runtime audit remains blocked.
