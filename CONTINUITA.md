@@ -1,3 +1,9 @@
+# Preview0.3.30 published — 11 October 2026
+
+Public prerelease v0.3.30-preview.1 contains eight GitHub-verified assets from source c65eac6f9feb3438797a44d93b650d8fc3b0d6b3. Desktop memory provenance/expiry/export, editable artifact copies and the bounded local document recipe are included. Android6.5.24/code114 is reused unchanged; private Control is excluded. Windows installer validation, three consecutive packaged smoke runs, SBOM and bundle checks pass; Windows/Ubuntu CI passes. Preview29 remains available for rollback. The smoke shutdown correction uses the normal cleanup barrier; one separate Node test-host abort is recorded in local QA and was not counted as success.
+
+Windows Preview is unsigned and requires manual installation; no automatic installer or active headless-server update was performed. Runtime distribution admission is corrected in source, but the upstream runtime audit remains blocked. Human acoustic tests are postponed by the owner. Web/Android memory and artifact editing parity, further integrations, isolated model comparisons and commercial prerequisites remain open; this release does not complete them.
+
 # Preview smoke shutdown correction — 11 October 2026
 
 Packaged smoke exposed an intermittent native exit3221225477 after forced window destruction during pending service cleanup. The smoke window now uses the normal quit barrier; exit diagnostics retain code and signal. Behavioral lifecycle test8PASS, cloud:check/checkPASS, isolated suite1060PASS/2SKIP/0FAIL and source Electron smokePASS. Rebuild and repeated packaged smoke are required before publishing Preview0.3.30. No installer execution or server runtime replacement.

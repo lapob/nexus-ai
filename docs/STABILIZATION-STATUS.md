@@ -1,3 +1,7 @@
+# Preview0.3.30 distribution — 11 October 2026
+
+Desktop memory, artifact-copy and local recipe changes below are now distributed in public Preview0.3.30 from c65eac6. Installer/bundle/SBOM checks and three consecutive packaged smoke runs pass. The smoke path previously forced native exit during pending cleanup; it now respects the quit barrier. Full source suite1060PASS/2SKIP/0FAIL, source smoke and Windows/Ubuntu CI pass. Android114 is unchanged and private Control is excluded. Preview is unsigned/manual-update, with Preview29 retained for rollback. No Windows installation or headless-server update is claimed; runtime audit, human voice, model comparison, cross-client parity and commercial evidence remain open.
+
 # Stabilizzazione: evidenze e lavoro residuo
 
 ## Ammissione runtime — 11 ottobre
