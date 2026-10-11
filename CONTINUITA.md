@@ -1,3 +1,10 @@
+# Graphic refinement and Preview0.3.31 promoted — 11 October 2026
+
+Website source 168679539afde6ef16f4b282fd4e781b1471c200 passed the full release gate: 43 Node tests, 27 browser tests, actual Workers runtime, 349 package signatures and zero known dependency audit findings. Immutable candidate 59359312-f4f4-4a71-afb0-2b52df281b4b was promoted through the normal release path as production 956fcc2d-ca66-4bb0-a73a-61f62ec72418. Postdeployment checks passed 14 routes, navigation, headers and independent AI health. No rollback was needed; the prior deployment remains available.
+
+Fresh production browser checks at 320, 390, 844 and 1440 px verify the home action on one line, centered text/icon group, vertical alignment and no horizontal overflow or browser exceptions. The old child font rule caused the narrow-screen wrap and was removed rather than adding another override. The canonical offline shell and verified Preview31 download links are included in the same deployment.
+
+The live AI web app also passes isolated graphic checks at 390 and 1440 px: profile controls are 48 px high, and the composer retains its draft across offline/reconnection without overflow or browser exceptions. No message was submitted and no inference was requested. This is a browser viewport test, not a physical Android or acoustic voice test. Desktop Preview31 is published; no desktop installation or active-server/runtime replacement is included. Runtime distribution audit and commercial prerequisites remain open. This documentation update requires no new deployment.
 # Graphic refinement and Preview0.3.31 candidate — 11 October 2026
 
 Removed the legacy16px child rule that wrapped the primary home action at320px; its label now inherits the intended14px typography. The browser regression verifies one line, centered complete text/icon group and vertical alignment at seven widths and three scroll positions. release:sync verified GitHub manifest/hash/size for Preview0.3.31; previous releases are preserved.
