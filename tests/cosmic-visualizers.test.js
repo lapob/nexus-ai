@@ -6,6 +6,25 @@ const vm=require('node:vm');
 const {execFileSync}=require('node:child_process');
 const {createDesktopRecipes}=require('../src/shared/desktop-recipes');
 const root=path.resolve(__dirname,'..');
+const {collectCosmicPerformance,validCosmicPerformance}=require('../scripts/measure-cosmic-performance');
+
+test('performance gate rejects missing metrics and a frozen renderer despite fast browser frames', async()=>{
+  const measure=async frozen=>{
+    let now=0,draws=100;
+    const sandbox={document:{getElementById:()=>({dataset:{}})},performance:{now:()=>now},
+      nexusCosmicMetrics:{tier:'adaptive',renderer:()=>({draws,drawMs:2,particles:42000})},
+      requestAnimationFrame(fn){now+=1000/60;if(!frozen)draws++;queueMicrotask(()=>fn(now));}};
+    return vm.runInNewContext(`(${collectCosmicPerformance.toString()})()`,sandbox);
+  };
+  const moving=await measure(false),frozen=await measure(true);
+  assert.equal(validCosmicPerformance(moving),true);
+  assert.equal(moving.continuum.particleCount,42000);
+  assert.equal(validCosmicPerformance(frozen),false);
+  assert.equal(frozen.drawnFrames,0);
+  assert.equal(validCosmicPerformance({...moving,continuum:{tier:'adaptive',renderer:{}}}),false);
+  assert.equal(validCosmicPerformance({...moving,coreFps:NaN}),false);
+  assert.equal(validCosmicPerformance({...moving,p95FrameMs:undefined}),false);
+});
 function fixture(extra={}){
   let id=0,time=0;const frames=new Map(),listeners=new Set();
   const events={addEventListener(_,fn){listeners.add(fn);},removeEventListener(_,fn){listeners.delete(fn);}};

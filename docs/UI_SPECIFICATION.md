@@ -104,3 +104,13 @@ npm run smoke
 ```
 
 Il controllo visivo copre almeno `1440×900` e `900×650`.
+
+## Revisione grafica dell 11 ottobre 2026
+
+Catture osservate di home e web app a320/390/844/1440/2560px, con impostazioni e composer:26 schermate, nessun overflow orizzontale o eccezione JavaScript. Sito osservato in produzione; web app con sorgenti e risposte di servizio sintetiche. Desktop: tre Core, pointer, fullscreen e transizioni full/reduced passano; cinque superfici a scale100/200 producono dieci catture valide. Queste prove non sostituiscono telefono, macOS, Linux o iOS reali.
+
+Correzioni: rimossa dal sito la vecchia dimensione16px imposta ai figli del pulsante, responsabile della scritta su due righe a320px. Il test verifica riga singola, centratura testo/icona e allineamento verticale a sette larghezze e tre scroll. Le note e descrizioni desktop riusano il token mist opaco: maggiore leggibilita senza nuovi colori o font. Il contrasto stimato della descrizione sul fondo#030A0B passa da3.68:1 a9.95:1; e una stima sul fondo specificato, non una misura di tutti i pixel. Axe non rileva violazioni nella vista settings, ma lascia un controllo incompleto sulle trasparenze.
+
+Il misuratore web legge ora renderer() e il delta di draws, anziche serializzare funzioni vuote. Il gate rifiuta metriche mancanti/nonfinite e un Core fermo anche con rAF veloce; regressione dedicata verificata. Il campione headless della workstation ha p95rAF4.3ms e zero intervalli lunghi, su Coredesktop42.000punti e mobile96.000punti. Non e una prova di240fps su smartphone ne una misura del completamento GPU. Il cleanup motion riusa il retry del profilo esclusivo dopo la chiusura di Chromium.
+
+Perfezionamenti proposti, non ancora consegnati: usare tracce GPU/energia su telefoni reali a60/90/120Hz per scegliere una cadenza stabile; affinare la continuita luminosa fra ascolto, interruzione e ritorno al testo dopo le prove vocali umane; mostrare le fasi reali dei job immagini/strumenti con lo stesso linguaggio della materia, senza percentuali inventate; verificare contrasto e blur con contenuti chiari/scuri lunghi e lightbox su dispositivi fisici. Privilegiare ritmo, chiarezza e continuita, senza moltiplicare glow, pannelli o loop decorativi.

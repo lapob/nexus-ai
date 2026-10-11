@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const net = require('node:net');
+const { removeTemporaryPath } = require('./web-visual-regression');
 
 const root = path.resolve(__dirname, '..');
 const electron = require('electron');
@@ -189,7 +190,8 @@ async function launchCase(view, { motion = 'system', width = 1920, height = 1080
       this.client?.close();
       if (child.exitCode === null) child.kill();
       await Promise.race([exit, delay(2_000)]);
-      fs.rmSync(profile, { recursive: true, force: true });
+      if (path.dirname(path.resolve(profile)) !== path.resolve(os.tmpdir())) throw new Error('Profilo motion fuori confine temporaneo');
+      await removeTemporaryPath(profile);
     }
   };
 }

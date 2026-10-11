@@ -1,3 +1,7 @@
+# Graphics review and Preview0.3.31 prepared — 11 October 2026
+
+Settings helper text now reuses the shared mist token; no new font, geometry or motion controller. Web Core QA measures renderer draw deltas and rejects absent/nonfinite/frozen metrics. Motion cleanup retries only its own exclusive temporary profile. Focused9PASS; final cloud:check/check/source-smokePASS and isolated suite1061PASS/2SKIP/0FAIL. Three desktop Core/fullscreen/full-reduced motion, ten desktop captures, forty synthetic web states and26 site/web captures were checked; see UI_SPECIFICATION.md for limits and next refinements. ADB had no devices: no new Android physical test is claimed. Version0.3.31 is prepared for an immutable new Preview; prior Preview30 remains untouched until build/installer/packaged-smoke/bundle and publication complete. No server restart, runtime replacement or automatic installation.
+
 # Preview0.3.30 published — 11 October 2026
 
 Public prerelease v0.3.30-preview.1 contains eight GitHub-verified assets from source c65eac6f9feb3438797a44d93b650d8fc3b0d6b3. Desktop memory provenance/expiry/export, editable artifact copies and the bounded local document recipe are included. Android6.5.24/code114 is reused unchanged; private Control is excluded. Windows installer validation, three consecutive packaged smoke runs, SBOM and bundle checks pass; Windows/Ubuntu CI passes. Preview29 remains available for rollback. The smoke shutdown correction uses the normal cleanup barrier; one separate Node test-host abort is recorded in local QA and was not counted as success.

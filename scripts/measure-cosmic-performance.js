@@ -24,10 +24,13 @@ const profiles = [
   { id: 'mobile', width: 390, height: 844 }
 ];
 
-const METRICS_EXPRESSION = `new Promise((resolve) => {
+function collectCosmicPerformance() {
+  return new Promise((resolve) => {
     const core = document.getElementById('core');
-    if (!core) return resolve({ error: 'Core non trovato' });
+    const api = globalThis.nexusCosmicMetrics;
+    if (!core || typeof api?.renderer !== 'function') return resolve({ error: 'Metriche Core non disponibili' });
     core.dataset.state = 'thinking';
+    const before = api.renderer();
     const samples = [];
     let previous = performance.now();
     const started = previous;
@@ -38,18 +41,39 @@ const METRICS_EXPRESSION = `new Promise((resolve) => {
       else {
         const sorted = samples.slice(2).sort((a, b) => a - b);
         const percentile = (ratio) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))] || 0;
+        const renderer = api.renderer();
+        const durationMs = now - started;
+        const drawnFrames = renderer.draws - before.draws;
         resolve({
+          durationMs,
+          drawnFrames,
+          coreFps: drawnFrames * 1000 / durationMs,
           sampleCount: sorted.length,
           fps: Number((1000 / (sorted.reduce((sum, value) => sum + value, 0) / Math.max(1, sorted.length))).toFixed(1)),
           p50FrameMs: Number(percentile(.5).toFixed(2)),
           p95FrameMs: Number(percentile(.95).toFixed(2)),
           longFramePercent: Number((sorted.filter((value) => value > 34).length / Math.max(1, sorted.length) * 100).toFixed(2)),
-          continuum: globalThis.nexusCosmicMetrics || null
+          continuum: { tier: api.tier, particleCount: renderer.particles, renderer }
         });
       }
     };
     requestAnimationFrame(tick);
-  })`;
+  });
+}
+const METRICS_EXPRESSION = `(${collectCosmicPerformance.toString()})()`;
+
+function validCosmicPerformance(entry) {
+  const renderer = entry?.continuum?.renderer;
+  const floor = entry?.continuum?.tier === 'efficient' ? 27 : 50;
+  return Boolean(renderer && Number.isSafeInteger(renderer.draws) && renderer.draws > 0
+    && Number.isFinite(renderer.drawMs) && Number.isFinite(renderer.particles) && renderer.particles > 0
+    && Number.isFinite(entry.durationMs) && entry.durationMs >= 3000
+    && Number.isSafeInteger(entry.drawnFrames) && entry.drawnFrames > 0
+    && Number.isFinite(entry.coreFps) && entry.coreFps >= floor
+    && Number.isFinite(entry.sampleCount) && entry.sampleCount >= 20
+    && Number.isFinite(entry.p95FrameMs) && entry.p95FrameMs <= 25
+    && Number.isFinite(entry.longFramePercent) && entry.longFramePercent <= 3);
+}
 
 // #endregion
 
@@ -76,6 +100,15 @@ async function measure(profile) {
       screenHeight: profile.height
     });
     await client.command('Page.reload', { ignoreCache: true });
+    await evaluateWhenReady(client, `new Promise((resolve, reject) => {
+      const started = performance.now();
+      const check = () => {
+        if (globalThis.nexusCosmicMetrics?.renderer?.().arrival === 1) return resolve(true);
+        if (performance.now() - started > 30000) return reject(new Error('Core non ancora assemblato'));
+        setTimeout(check, 50);
+      };
+      check();
+    })`, 45_000);
     return await evaluateWhenReady(client, METRICS_EXPRESSION, 45_000);
   } finally {
     client?.close();
@@ -86,21 +119,19 @@ async function measure(profile) {
   }
 }
 
-(async () => {
+async function main() {
   const report = [];
   for (const profile of profiles) report.push({ profile: profile.id, ...await measure(profile) });
   console.log(JSON.stringify({ url, measuredAt: new Date().toISOString(), profiles: report }, null, 2));
   if (strict) {
-    const failed = report.some((entry) => {
-      const continuum = entry.continuum;
-      const floor = continuum?.targetFps >= 60 ? 50 : 27;
-      return !continuum || continuum.sampledFps < floor || entry.p95FrameMs > 25 || entry.longFramePercent > 3;
-    });
+    const failed = report.some((entry) => !validCosmicPerformance(entry));
     if (failed) process.exitCode = 1;
   }
-})().catch((error) => {
+}
+if (require.main === module) main().catch((error) => {
   console.error(error?.stack || error);
   process.exitCode = 1;
 });
+module.exports = { collectCosmicPerformance, validCosmicPerformance };
 
 // #endregion

@@ -1,3 +1,9 @@
+### Novita 0.3.31
+
+- Desktop: descrizioni, note e categoria selezionata nelle impostazioni piu leggibili, usando il colore secondario condiviso e lo stesso font.
+- QA: misurazione del movimento effettivo del Core e rifiuto delle metriche incomplete; pulizia dei profili di prova resistente al rilascio tardivo dei processi Chromium.
+- Restano le funzioni della0.3.30. Nessuna modifica ad Android6.5.24/code114 o Control42, nessun aggiornamento del runtime server. Preview non firmata, installazione manuale; prove vocali umane e requisiti commerciali ancora distinti.
+
 ### Novita 0.3.30
 
 - Desktop: memoria personale con provenienza, ultimo utilizzo, scadenza modificabile ed esportazione JSON esplicita non cifrata. Esportazione limitata con conteggio visibile; nessuna sincronizzazione automatica.
