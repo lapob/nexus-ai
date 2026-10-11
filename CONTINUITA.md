@@ -1,3 +1,7 @@
+# Preview0.3.30 download metadata prepared — 11 October 2026
+
+GitHub prerelease v0.3.30-preview.1 is public with eight verified assets. The existing sync tool verified the public manifest, GitHub SHA-256 digests and sizes before updating only app/data/public-release.json. Windows0.3.30 replaces the public download target; Android6.5.24 is unchanged. Previous production version9580fd57 remains active until the standard full release gate and immutable candidate promotion pass. This metadata update does not install the desktop client or update the headless server; its runtime audit remains blocked.
+
 # Production promoted and verified — 10 October 2026
 
 Source website8bd340bc053eb28f9dd3860ae6bd0ce5aaf86328 passed complete CI
