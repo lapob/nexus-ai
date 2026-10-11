@@ -629,10 +629,13 @@ test("both home actions center the complete text and icon group", async ({page})
       expect(result.overflow).toBe(false);
       const primary = await page.locator('.hero-entry .primary-button').evaluate(el=>{
         const text=el.querySelector('span').getBoundingClientRect(),icon=el.querySelector('svg').getBoundingClientRect(),button=el.getBoundingClientRect();
-        return {text:Math.abs((text.left+icon.right)/2-document.documentElement.clientWidth/2),button:Math.abs(button.x+button.width/2-document.documentElement.clientWidth/2)};
+        const range=document.createRange();range.selectNodeContents(el.querySelector('span'));
+        return {text:Math.abs((text.left+icon.right)/2-document.documentElement.clientWidth/2),button:Math.abs(button.x+button.width/2-document.documentElement.clientWidth/2),lines:range.getClientRects().length,verticalAlignment:Math.abs(text.y+text.height/2-icon.y-icon.height/2)};
       });
       expect(primary.text,JSON.stringify({width,top,primary})).toBeLessThan(2);
       expect(primary.button).toBeLessThan(2);
+      expect(primary.lines,JSON.stringify({width,top,primary})).toBe(1);
+      expect(primary.verticalAlignment).toBeLessThan(2);
     }
   }
 });

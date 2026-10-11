@@ -1,3 +1,9 @@
+# Graphic refinement and Preview0.3.31 candidate — 11 October 2026
+
+Removed the legacy16px child rule that wrapped the primary home action at320px; its label now inherits the intended14px typography. The browser regression verifies one line, centered complete text/icon group and vertical alignment at seven widths and three scroll positions. release:sync verified GitHub manifest/hash/size for Preview0.3.31; previous releases are preserved.
+
+The edge offline shell was regenerated through the existing tool from the canonical public AI UI. It includes the already-tested profile styling and browser-local history/reset implementation, plus Preview31 links; this is more than a link-only change. No inference runs at the edge, and no active headless-server restart is included. Full source/browser/runtime/security gates and immutable-candidate promotion are required before publication. Physical Android and human voice are not claimed by this review.
+
 # Preview0.3.30 downloads promoted — 11 October 2026
 
 Website source583c7869d5fa55eeb1eb2bb0bcba4890e9f0d895 passed the full release gate:43 Node tests,27 browser tests, actual Workers runtime,349 package signatures and zero known dependency audit findings. Immutable candidatee5994e88-d0d3-4804-b4a6-a2e7d72b6c69 was verified and the normal promotion completed as production6a155bdf-1f0f-43e9-bcab-36bdc8f4c366. Postdeployment14 routes/navigation/headers and independent AI health pass. A fresh /downloads readback returns200 and the verified Windows0.3.30 link; AIready returns200. No rollback was needed. Public Preview30 retains Preview29 for rollback; Android6.5.24 is unchanged. This is a website download update, without desktop installation or active-server/runtime replacement. Human voice, runtime audit and commercial prerequisites remain open.
