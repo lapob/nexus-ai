@@ -1,3 +1,11 @@
+### Novita 0.3.30
+
+- Desktop: memoria personale con provenienza, ultimo utilizzo, scadenza modificabile ed esportazione JSON esplicita non cifrata. Esportazione limitata con conteggio visibile; nessuna sincronizzazione automatica.
+- Artefatti desktop: originale AI conservato, ultime sei copie modificabili e versionate, copia/download della versione scelta e rifiuto dei salvataggi in conflitto. Le modifiche non scrivono nei file del progetto.
+- Ricetta locale "Copia e consulta": documenti fino a 2 MiB, copia senza sovrascrittura, approvazione separata per ogni passo, ricevute e recupero del checkpoint. Disponibile quando il client ha un workspace locale autorizzato.
+- Nei sorgenti server: ammissione runtime strict per richieste pubbliche, proprietà del processo e blocco dopo perdita dell'ammissione. La Preview client non aggiorna il servizio server e non risolve i finding delle dipendenze del runtime.
+- Restano distinti il collaudo vocale umano, le firme e gli aggiornamenti automatici di produzione, la parità delle nuove funzioni con web/Android e i requisiti commerciali. Android 6.5.24/code114 e Control42 non cambiano in questa Preview.
+
 ### Novita 0.3.29
 
 - Cronologia web senza account nel browser, recuperata dopo il ricaricamento; cancellazione coordinata fra schede e protezione contro risposte, allegati e scritture tardive. Se il salvataggio e negato, la memoria temporanea e indicata chiaramente.

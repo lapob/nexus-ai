@@ -1,3 +1,13 @@
+# Preview0.3.30 build prepared — 11 October 2026
+
+Source version incremented for a new desktop Preview; prior Preview29 assets
+remain immutable. New desktop memory/artifact/recipe capabilities reuse existing
+components and stores. Android6.5.24/code114 and private Control42 are unchanged.
+Release check/check/tests/smoke passed before the metadata-only version change.
+Build and installer/bundle validation must complete before publication; this
+checkpoint does not claim that new binaries have been published or installed.
+No server runtime replacement is included; its upstream audit remains blocked.
+
 # Runtime admission boundary corrected in source — 11 October 2026
 
 Managed Ollama defaults to an immutable distribution security profile. Only
