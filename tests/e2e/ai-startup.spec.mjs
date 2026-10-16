@@ -69,3 +69,40 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     expect(errors).toEqual([]);
   });
 }
+
+test('reload restores a slow local conversation before revealing its controls', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(origin);
+  await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('nexusnxs-demo', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction('state', 'readwrite');
+      tx.objectStore('state').put([{ role: 'user', content: 'Domanda locale di prova' }, { role: 'assistant', content: 'Risposta ripristinata' }], 'turns');
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }));
+  await page.addInitScript(() => {
+    const original = indexedDB.open.bind(indexedDB);
+    indexedDB.open = (...args) => {
+      const request = original(...args);
+      if (args[0] !== 'nexusnxs-demo') return request;
+      return new Proxy(request, {
+        get(target, key) { const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value; },
+        set(target, key, handler) {
+          target[key] = key === 'onsuccess' ? event => setTimeout(() => handler(event), 1100) : handler;
+          return true;
+        }
+      });
+    };
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'pending');
+  await expect.poll(() => page.locator('.shell').evaluate(element => getComputedStyle(element).opacity)).toBe('0');
+  await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
+  await expect(page.locator('body')).toHaveClass(/conversation-active/);
+  await expect(page.locator('#answer')).toContainText('Risposta ripristinata');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});

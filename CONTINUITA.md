@@ -1,3 +1,13 @@
+# Reload and offline-cache regression candidate — 16 October 2026
+
+The canonical root response covers ordinary GET, service-worker cache requests
+with wildcard Accept and bodyless HEAD. APIs remain upstream-owned. Startup also
+waits for local history restoration, preventing idle controls before a slow
+conversation reload. Four browser cases pass under the actual Worker CSP,
+including delayed IndexedDB history, image blobs and reduced motion. The prior
+candidate passed44 source tests and30 browser tests; an exact new candidate with
+31 browser tests is required for this last refinement. Production remains
+unchanged until the independent readiness gate passes; it currently returns503.
 # Canonical AI startup candidate — 16 October 2026
 
 The public AI root/index navigation uses one canonical UI instead of depending
