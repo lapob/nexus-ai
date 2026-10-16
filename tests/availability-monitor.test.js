@@ -165,3 +165,29 @@ test('persistenza atomica scarta righe corrotte e limita lo storico', () => {
     assert.equal(readAvailabilitySamples(filePath, { windowDays: 45 }).length, 1_000);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('scheduled observations preserve outages without a failed job; explicit strict checks still fail', async () => {
+  const { sample } = require('../scripts/monitor-product-availability');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-availability-cli-'));
+  const priorExit = process.exitCode;
+  try {
+    const options = { historyFile: path.join(root, 'samples.ndjson'), reportFile: path.join(root, 'report.json'), summaryFile: path.join(root, 'summary.md'),
+      fetchImpl: async () => ({ ok: false, status: 503 }), enforceCurrent: false };
+    process.exitCode = 0;
+    const report = await sample(options);
+    assert.equal(process.exitCode, 0);
+    assert.equal(report.current.state, 'degraded');
+    assert.equal(report.current.failedEndpoints, report.current.endpoints);
+    assert.ok(readAvailabilitySamples(options.historyFile).every(row => row.ok === false && row.status === 503));
+    assert.match(fs.readFileSync(options.summaryFile, 'utf8'), /\*\*degraded\*\*/);
+    assert.match(fs.readFileSync(options.summaryFile, 'utf8'), /not that the AI was available/);
+    await sample({ ...options, enforceCurrent: true });
+    assert.equal(process.exitCode, 1);
+    process.exitCode = 0;
+    await assert.rejects(sample({ ...options, reportFile: root }), /EISDIR|EPERM|EACCES/);
+    const workflow = fs.readFileSync(path.resolve(__dirname, '../.github/workflows/availability.yml'), 'utf8');
+    assert.match(workflow, /if: github.event_name == 'schedule'\s+run: node .* --once --interval=900000/);
+    assert.match(workflow, /if: github.event_name != 'schedule'\s+run: node .* --strict-current/);
+    assert.doesNotMatch(workflow, /continue-on-error/);
+  } finally { process.exitCode = priorExit; fs.rmSync(root, { recursive: true, force: true }); }
+});

@@ -17,6 +17,11 @@ const { windowsDownload: WINDOWS_DOWNLOAD, androidDownload: ANDROID_DOWNLOAD } =
 });
 
 const EXPERIENCE_STYLE = `<style>
+/* Reveal assembled controls once, after bindings, layout and the local font. */
+html[data-nxs-boot="pending"] .shell{opacity:0;pointer-events:none}
+html[data-nxs-boot="ready"] .shell{animation:nxs-ui-ready .28s ease-out both}
+@keyframes nxs-ui-ready{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){html[data-nxs-boot="ready"] .shell{animation:none}}
 /* Icon actions use light, not tooltips or pointer focus rectangles. */
 button[data-tooltip]::after,button[data-tooltip]::before{display:none!important}
 .composer button,.voice-session-controls button,.image-download{user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
@@ -356,6 +361,21 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
 function publicDraftRuntime() {
   // Retire the opt-in tab cache without persisting private composer content.
   try { sessionStorage.removeItem('nxs.tab-draft.v1'); } catch { /* Private storage may be unavailable. */ }
+}
+
+function publicUiReadyRuntime() {
+  const root = document.documentElement;
+  let timer;
+  const boundedFont = new Promise(resolve => { timer = setTimeout(resolve, 800); });
+  Promise.race([document.fonts?.ready || Promise.resolve(), boundedFont])
+    .catch(() => {})
+    .then(() => {
+      clearTimeout(timer);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.querySelector('.shell')?.removeAttribute('inert');
+        root.dataset.nxsBoot = 'ready';
+      }));
+    });
 }
 
 function publicReadinessRuntime() {
@@ -825,6 +845,9 @@ function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, and
     .replace('background:radial-gradient(circle,#61d9d4 1.4px,transparent 2px) 0 50%/6px 6px repeat-x;animation:flow .95s steps(3) infinite', 'background:#78deda;box-shadow:0 0 0 3px rgba(80,211,208,.07),0 0 16px rgba(80,211,208,.46)')
     .replace('@keyframes flow{50%{opacity:.34;transform:translateX(3px)}}', '');
   return unifiedMotionBase
+    .replace(/<html(?=[\s>])/, '<html data-nxs-boot="pending"')
+    .replace(/<(main|div)( class="shell")/, '<$1 inert$2')
+    .replace('</head>', '<link rel="preload" href="/inter-latin.woff2" as="font" type="font/woff2" crossorigin></head>')
     .replace('<div class="identity"><span class="wordmark">NexusNXS</span><span class="state">Operativo</span></div>', '<div class="identity"><button id="refreshApp" class="brand-lockup" type="button" aria-label="NexusNXS AI"><img class="brand-mark" src="/nexus-icon.png" width="36" height="36" alt=""><span class="wordmark">NexusNXS AI</span></button><div class="identity-actions"><span class="state" role="status">Verifica servizio…</span><button id="download" class="download-trigger" type="button" aria-label="Scarica NexusNXS AI"><span>Scarica</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg></button></div></div>')
     .replace('Una sessione essenziale per provare risposte rapide, ragionamento guidato e continuità naturale.', 'Parla al Core. Se preferisci, passa alla tastiera. La continuità resta su questo dispositivo.')
     .replace('<div class="core" aria-hidden="true"><span class="ring"></span><span class="node"></span></div>', '<button id="core" class="core" type="button" aria-label="Attiva NexusNXS"><canvas id="coreCanvas" aria-hidden="true"></canvas><span id="coreCaption" class="core-caption">Core pronto</span></button>')
@@ -834,7 +857,7 @@ function enhancePublicAiHtml({ base, coreStyle, coreScript, windowsDownload, and
     .replace('<p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p>', '<p class="privacy"><span class="accuracy-note">NexusNXS può commettere errori.</span> <span id="memoryStorageNotice">Chat salvata in questo browser, senza account.</span> Le richieste sono elaborate dal server. <button id="memoryClear" class="memory-clear" type="button" aria-label="Cancella chat e preferenze locali">Cancella dati</button> · <a href="https://nexusnxs.com/">Scopri NexusNXS AI</a></p>')
     .replace('<p id="answer" class="answer"></p>', '<div id="cognition" class="cognition" data-step="understand" hidden aria-hidden="true"><span>Attività</span><ol><li data-step="understand">Comprende</li><li data-step="plan">Pianifica</li><li data-step="retrieve">Ricerca</li><li data-step="verify">Verifica</li><li data-step="respond">Risponde</li></ol></div><header id="answerContext" class="web-answer-context" data-kind="answer" hidden><i aria-hidden="true"></i><span><small id="answerKind">Risposta</small><strong id="answerStatus" hidden></strong></span></header><p id="answer" class="answer"></p><div id="responseActions" class="response-actions" hidden><button id="copyResponse" class="response-action" data-label="Copia" type="button">Copia</button><button id="deepenResponse" class="response-action" data-label="Approfondisci" type="button">Approfondisci</button><button id="exportResponse" class="response-action" data-label="Esporta" type="button">Esporta</button><button id="feedbackAction" class="feedback-action" type="button" aria-label="Mi piace" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H3V10h4Zm0 0 5-7c2 0 3 1 2 4l-1 3h6a2 2 0 0 1 2 2l-2 7a3 3 0 0 1-3 2H7"/></svg></button><button id="feedbackNegative" class="feedback-action" type="button" aria-label="Non mi piace" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14V3H3v11h4Zm0 0 5 7c2 0 3-1 2-4l-1-3h6a2 2 0 0 0 2-2l-2-7a3 3 0 0 0-3-2H7"/></svg></button><span id="feedbackStatus" class="feedback-status" role="status" aria-live="polite"></span></div><div id="artifacts" class="artifact-grid"></div><figure id="imageResult" class="generated-image" hidden><img id="imageOutput" alt=""><figcaption><a id="imageDownload" class="image-download" aria-label="Scarica immagine" download></a></figcaption></figure>')
     .replace('</head>', () => `${coreStyle}${EXPERIENCE_STYLE}${PUBLIC_PROFILE_STYLE}${INTERACTION_VISIBILITY_STYLE}${ATTACHMENT_STYLE}${RESPONSE_STYLE}${RESPONSE_PRESENTATION_STYLE}${COGNITION_STYLE}${SESSION_EXPERIENCE_STYLE}${CONVERSATION_LAYOUT_STYLE}${SLASH_COMMAND_STYLE}${KEYBOARD_VIEWPORT_STYLE}</head>`)
-    .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog><script>(${publicReadinessRuntime.toString()})();</script>${experienceScript({ windowsDownload, androidDownload })}<script>(${publicDraftRuntime.toString()})();</script>${coreScript}</body>`);
+    .replace('</body>', () => `<dialog id="downloadSheet" class="download-sheet"><div class="sheet-body"><div class="sheet-top"><p class="sheet-label">DOWNLOAD ADATTIVO</p><button id="sheetClose" class="sheet-close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg></button></div><h2 id="sheetTitle">NexusNXS</h2><p id="deviceNote" class="device-note"></p><a id="installLink" class="download-action" href="#" rel="noreferrer">Scarica NexusNXS</a><div id="unavailable" class="unavailable" hidden></div></div></dialog><script>(${publicReadinessRuntime.toString()})();</script>${experienceScript({ windowsDownload, androidDownload })}<script>(${publicDraftRuntime.toString()})();</script>${coreScript}<script>(${publicUiReadyRuntime.toString()})();</script><noscript><p role="status">Attiva JavaScript per usare NexusNXS AI.</p></noscript></body>`);
 }
 
 // Nomi pubblici canonici. Gli alias storici restano esportati per una release,

@@ -186,6 +186,17 @@ fewer than 20 rendered frames or more than 18% janky frames. A dedicated manual
 self-hosted workflow preserves these artifacts without pretending that an
 emulator proves real-device behavior.
 
+## Scheduled availability observations
+
+The public GitHub schedule records HTTP failures and timeouts in raw samples and
+its report, with the actual current state in the run summary. Scheduled success
+means collection succeeded; it does not mean the AI was online or its SLO passed.
+This avoids repeated Actions failure emails for the same unavailable workstation.
+Manual runs retain `--strict-current` and fail if any endpoint is unavailable.
+Collection, persistence and artifact-upload errors still fail normally. Release,
+readiness, security and commercial gates are unchanged. A single scheduled run
+cannot establish a 30-day availability window. The browser shell can remain
+available independently while the local inference service reports not ready.
 ## Controls outside software
 
 The application can verify its own restore path, but it cannot create physical

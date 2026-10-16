@@ -23,7 +23,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-      - run: node scripts/monitor-product-availability.js --once --strict-current
+      # Scheduled runs collect observations, including outages, without emailing
+      # the same endpoint failure every fifteen minutes. Collection errors fail.
+      - name: Record scheduled availability observations
+        if: github.event_name == 'schedule'
+        run: node scripts/monitor-product-availability.js --once --interval=900000
+      - name: Require ready endpoints for a manual check
+        if: github.event_name != 'schedule'
+        run: node scripts/monitor-product-availability.js --once --strict-current --interval=900000
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

@@ -1,3 +1,21 @@
+# Web startup and availability notifications — 16 October 2026
+
+Source candidate: the public UI stays inert and invisible until its controls,
+layout and local font are ready, with an800ms font deadline and a short reveal
+that respects reduced motion. This removes intermediate controls during a slow
+HTML response. Loaded, rejected and stalled-font regressions pass. Browser
+streaming tests cover320px, landscape844px and desktop1440px.
+
+Scheduled availability checks now retain real503/timeout samples and an explicit
+online/degraded summary without treating an endpoint outage as collection failure.
+Manual checks remain strict; monitor IO failures and artifact errors still fail.
+No release or security gate is relaxed. Source suite1065 passes with2 skips and
+zero failures; cloud:check/check and synthetic offline recovery pass. This does
+not prove acoustic voice quality, physical Android performance or readiness.
+
+The active AI endpoint returns health200 but readiness503, with runtime security
+scan errors in the workstation log. No runtime was replaced or safety gate
+bypassed. Frontend production promotion remains subject to the existing gates.
 # Preview0.3.31 published and graphics verified — 11 October 2026
 
 Public prerelease v0.3.31-preview.1 has eight verified GitHub assets from source8bc6c388514e9094f9a27eb5f66d837ace4e4d6a; Windows/Ubuntu CI38138653842 passes. Installer/bundle/SBOM and packaged smoke pass. The settings contrast correction is now included in the desktop package; no new geometry, font or animation controller. Android114 is unchanged and Control is private. Previous previews remain available. Windows remains unsigned/manual-install; no installation or headless-server restart was performed.

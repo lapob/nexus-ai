@@ -78,3 +78,30 @@ for (const interruption of ['offline', 'pagehide', 'visibilitychange']) {
   });
 }
 
+
+for (const fontState of ['loaded', 'rejected', 'stalled']) {
+  test(`first paint reveals one bound UI after font ${fontState}, with a bounded wait`, async () => {
+    const html = enhancePublicAiHtml({ base: '<html lang="it"><head></head><body><main class="shell"></main></body></html>', coreStyle: '', coreScript: '' });
+    assert.match(html, /<html data-nxs-boot="pending"/);
+    assert.match(html, /<main inert class="shell"/);
+    const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(code => code.includes('function publicUiReadyRuntime'));
+    let settle, rejectFont, timeout, removed = false;
+    const frames = [], dataset = { nxsBoot: 'pending' };
+    const ready = new Promise((resolve, reject) => { settle = resolve; rejectFont = reject; });
+    vm.runInNewContext(code, {
+      document: { documentElement: { dataset }, fonts: { ready }, querySelector: () => ({ removeAttribute: name => { assert.equal(name, 'inert'); removed = true; } }) },
+      setTimeout: (callback, delay) => { assert.equal(delay, 800); timeout = callback; return 1; }, clearTimeout() {},
+      requestAnimationFrame: callback => frames.push(callback)
+    });
+    assert.equal(dataset.nxsBoot, 'pending');
+    assert.equal(removed, false);
+    if (fontState === 'loaded') settle(); else if (fontState === 'rejected') rejectFont(new Error('font unavailable')); else timeout();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(frames.length, 1);
+    frames.shift()();
+    assert.equal(dataset.nxsBoot, 'pending');
+    frames.shift()();
+    assert.equal(dataset.nxsBoot, 'ready');
+    assert.equal(removed, true);
+  });
+}
