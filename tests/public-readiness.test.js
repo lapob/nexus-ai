@@ -105,3 +105,22 @@ for (const fontState of ['loaded', 'rejected', 'stalled']) {
     assert.equal(removed, true);
   });
 }
+test('initial controls wait for restored history instead of flashing the idle layout', async () => {
+  const html = enhancePublicAiHtml({ base: '<html><head></head><body></body></html>', coreStyle: '', coreScript: '' });
+  const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(code => code.includes('function publicUiReadyRuntime'));
+  let restore;
+  const restored = new Promise(resolve => { restore = resolve; });
+  const frames = [], dataset = { nxsBoot: 'pending' };
+  vm.runInNewContext(code, {
+    nexusUiRestored: restored,
+    document: { documentElement: { dataset }, fonts: { ready: Promise.resolve() }, querySelector: () => ({ removeAttribute() {} }) },
+    setTimeout: () => 1, clearTimeout() {}, requestAnimationFrame: callback => frames.push(callback)
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(dataset.nxsBoot, 'pending');
+  assert.equal(frames.length, 0);
+  restore();
+  await new Promise(resolve => setImmediate(resolve));
+  frames.shift()(); frames.shift()();
+  assert.equal(dataset.nxsBoot, 'ready');
+});

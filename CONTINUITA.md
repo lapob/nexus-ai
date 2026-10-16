@@ -1,3 +1,12 @@
+# Slow-history refresh regression verified — 16 October 2026
+
+Initial reveal also waits for local conversation restoration. This prevents an
+idle toolbar flashing before a slower IndexedDB read restores the written chat.
+The existing storage timeouts remain; no chat content is exposed by the startup
+barrier. Source suite1066 passes,2 skips, zero failures. Browser tests under the
+real Worker CSP pass at320px, landscape844px and1440px, plus a reload with local
+synthetic history and an1100ms delayed database open. Blob image decoding and
+reduced motion pass. These are isolated tests without inference or personal data.
 # Web startup and availability notifications — 16 October 2026
 
 Source candidate: the public UI stays inert and invisible until its controls,

@@ -367,7 +367,12 @@ function publicUiReadyRuntime() {
   const root = document.documentElement;
   let timer;
   const boundedFont = new Promise(resolve => { timer = setTimeout(resolve, 800); });
-  Promise.race([document.fonts?.ready || Promise.resolve(), boundedFont])
+  Promise.all([
+    Promise.race([document.fonts?.ready || Promise.resolve(), boundedFont]),
+    // Storage already has bounded operations. Do not flash the idle toolbar
+    // before a slower device restores its existing conversation.
+    Promise.resolve(globalThis.nexusUiRestored).catch(() => {})
+  ])
     .catch(() => {})
     .then(() => {
       clearTimeout(timer);
@@ -826,7 +831,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("if(requestAbort.signal.aborted)throw", "if(imageGeneration!==historyGeneration||requestAbort.signal.aborted)throw")
     .replace('const responseText=await generateImage(text);turns.push', "const responseText=await generateImage(text);if(requestGeneration!==historyGeneration)return;turns.push")
     .replace('await memoryWrite();formatAnswer(responseText);', 'await memoryWrite();if(requestGeneration!==historyGeneration)return;formatAnswer(responseText);')
-    .replace('restore();setVoiceState', 'memoryReady=restore();setVoiceState')
+    .replace('restore();setVoiceState', 'memoryReady=restore();globalThis.nexusUiRestored=memoryReady.then(()=>undefined);setVoiceState')
     .replace('function renderSessionHistory(){sessionHistory.replaceChildren();for(const turn of turns)', 'function renderSessionHistory(history=turns){sessionHistory.replaceChildren();for(const turn of history)')
     .replace('if(recentUser&&recentAnswer){userPrompt', "if(recentUser&&recentAnswer){document.body.classList.add('conversation-active','keyboard-open');renderSessionHistory(turns.slice(0,-2));setViewportMetrics();userPrompt")
     .replace("let id=localStorage.getItem('nxs.demo.installation');", "let id='';try{id=localStorage.getItem('nxs.demo.installation')}catch{}")
