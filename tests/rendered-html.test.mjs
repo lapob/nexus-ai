@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function fetchWorker(url, { env = {}, headers = {} } = {}) {
+async function fetchWorker(url, { env = {}, headers = {}, method = "GET" } = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${url}`);
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(
-    new Request(url, { headers: { accept: "text/html", ...headers } }),
+    new Request(url, { method, headers: { accept: "text/html", ...headers } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) }, ...env },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -407,6 +407,14 @@ test("canonical AI navigation never forwards credentials and API responses remai
     const nonce = /script-src 'nonce-([^']+)'/.exec(page.headers.get("content-security-policy"))[1];
     for (const tag of html.matchAll(/<(?:script|style)\b([^>]*)>/g)) assert.ok(tag[1].includes(`nonce="${nonce}"`));
   }
+  assert.equal(requests.length, 0);
+  const cachedShell = await fetchWorker("https://ai.nexusnxs.com/", { headers: { accept: "*/*" }, env: { AI_UPSTREAM: upstream } });
+  assert.equal(cachedShell.headers.get("x-nexusnxs-edge-state"), "shell");
+  assert.match(await cachedShell.text(), /publicUiReadyRuntime/);
+  const head = await fetchWorker("https://ai.nexusnxs.com/", { method: "HEAD", env: { AI_UPSTREAM: upstream } });
+  assert.equal(head.status, 200);
+  assert.equal(head.headers.get("content-type"), "text/html; charset=utf-8");
+  assert.equal(await head.text(), "");
   assert.equal(requests.length, 0);
   const readiness = await fetchWorker("https://ai.nexusnxs.com/readyz", { headers: { accept: "application/json" }, env: { AI_UPSTREAM: upstream } });
   assert.equal(readiness.status, 503);

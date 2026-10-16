@@ -87,8 +87,8 @@ async function proxyAi(request: Request, env: Env, nonce: string): Promise<Respo
   const url = new URL(request.url);
   // One canonical UI for cold loads, reloads and offline recovery. The local
   // server still owns API readiness, authentication and every inference request.
-  if ((url.pathname === "/" || url.pathname === "/index.html") && isAiNavigation(request)) {
-    return secureAiResponse(new Response(aiOfflineHtml(nonce), {
+  if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/index.html")) {
+    return secureAiResponse(new Response(request.method === "HEAD" ? null : aiOfflineHtml(nonce), {
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
         "Content-Security-Policy": aiUiContentSecurityPolicy(nonce) },
     }), env.CF_VERSION_METADATA?.id, "shell");
