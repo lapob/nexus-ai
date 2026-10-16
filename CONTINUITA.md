@@ -1,3 +1,18 @@
+# Canonical AI startup candidate — 16 October 2026
+
+The public AI root/index navigation uses one canonical UI instead of depending
+on the server version for HTML and a separate shell on tunnel failure. The local
+server continues to own all API readiness, authentication and inference. The UI
+response is no-store and nonce-protected; blob images and audio retain the same
+local-source support as the canonical gateway. Readiness failures remain503.
+
+The shell is generated with the existing sync tool. Startup waits for initialized
+controls and a bounded local-font/layout settlement before a short reveal,
+respecting reduced motion. Three streaming-browser regressions cover narrow,
+landscape and desktop layouts; worker tests verify navigation isolation, nonces
+and unchanged upstream readiness responses. These are synthetic browser tests.
+Production is not promoted at this checkpoint: the independent AI readiness gate
+currently returns503 and must not be bypassed. Previous production is preserved.
 # Graphic refinement and Preview0.3.31 promoted — 11 October 2026
 
 Website source 168679539afde6ef16f4b282fd4e781b1471c200 passed the full release gate: 43 Node tests, 27 browser tests, actual Workers runtime, 349 package signatures and zero known dependency audit findings. Immutable candidate 59359312-f4f4-4a71-afb0-2b52df281b4b was promoted through the normal release path as production 956fcc2d-ca66-4bb0-a73a-61f62ec72418. Postdeployment checks passed 14 routes, navigation, headers and independent AI health. No rollback was needed; the prior deployment remains available.

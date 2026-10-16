@@ -369,19 +369,18 @@ test("proves the exact Cloudflare Worker version across the site and AI edge", a
   });
   assert.equal(ai.status, 200);
   assert.equal(ai.headers.get("x-nexusnxs-worker-version"), versionId);
-  assert.equal(ai.headers.get("x-nexusnxs-edge-state"), "online");
-  assert.equal(await ai.text(), "AI online");
+  assert.equal(ai.headers.get("x-nexusnxs-edge-state"), "shell");
+  assert.match(await ai.text(), /publicUiReadyRuntime/);
 });
 
-test("replaces a failed AI tunnel with the branded offline experience", async () => {
+test("serves one canonical UI independently of the tunnel while readiness remains offline", async () => {
   const offlineUpstream = { fetch: async () => new Response("Cloudflare 1033", { status: 530 }) };
   const navigation = await fetchWorker("https://ai.nexusnxs.com/", {
     env: { AI_UPSTREAM: offlineUpstream },
   });
-  assert.equal(navigation.status, 503);
-  assert.equal(navigation.headers.get("x-nexusnxs-state"), "offline");
-  assert.equal(navigation.headers.get("x-nexusnxs-edge-state"), "offline");
-  assert.equal(navigation.headers.get("retry-after"), "8");
+  assert.equal(navigation.status, 200);
+  assert.equal(navigation.headers.get("cache-control"), "no-store");
+  assert.equal(navigation.headers.get("x-nexusnxs-edge-state"), "shell");
   assert.match(navigation.headers.get("content-security-policy") ?? "", /script-src 'nonce-/);
   const html = await navigation.text();
   assert.match(html, /<title>NexusNXS AI<\/title>/);
@@ -395,4 +394,22 @@ test("replaces a failed AI tunnel with the branded offline experience", async ()
   });
   assert.equal(health.status, 503);
   assert.deepEqual(await health.json(), { status: "offline", retryAfter: 8 });
+});
+
+test("canonical AI navigation never forwards credentials and API responses remain upstream-owned", async () => {
+  const requests = [];
+  const upstream = { fetch: async request => { requests.push(request); return new Response('{"status":"not_ready"}', { status: 503 }); } };
+  for (const pathname of ["/", "/index.html"]) {
+    const page = await fetchWorker(`https://ai.nexusnxs.com${pathname}`, { env: { AI_UPSTREAM: upstream } });
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /data-nxs-boot="pending"/);
+    const nonce = /script-src 'nonce-([^']+)'/.exec(page.headers.get("content-security-policy"))[1];
+    for (const tag of html.matchAll(/<(?:script|style)\b([^>]*)>/g)) assert.ok(tag[1].includes(`nonce="${nonce}"`));
+  }
+  assert.equal(requests.length, 0);
+  const readiness = await fetchWorker("https://ai.nexusnxs.com/readyz", { headers: { accept: "application/json" }, env: { AI_UPSTREAM: upstream } });
+  assert.equal(readiness.status, 503);
+  assert.equal(requests.length, 1);
+  assert.deepEqual(await readiness.json(), { status: "not_ready" });
 });

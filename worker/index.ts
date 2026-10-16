@@ -32,8 +32,8 @@ function contentSecurityPolicy(nonce: string): string {
   return `default-src 'self'; script-src 'self' 'nonce-${nonce}'; script-src-attr 'none'; style-src 'self' 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests`;
 }
 
-function aiOfflineContentSecurityPolicy(nonce: string): string {
-  return `default-src 'none'; script-src 'nonce-${nonce}'; script-src-attr 'none'; style-src 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+function aiUiContentSecurityPolicy(nonce: string): string {
+  return `default-src 'none'; script-src 'nonce-${nonce}'; script-src-attr 'none'; style-src 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
 }
 
 function aiOfflineHtml(nonce: string): string {
@@ -68,7 +68,7 @@ function aiUnavailableResponse(request: Request, nonce: string, versionId?: stri
   });
   if (isAiNavigation(request)) {
     headers.set("Content-Type", "text/html; charset=utf-8");
-    headers.set("Content-Security-Policy", aiOfflineContentSecurityPolicy(nonce));
+    headers.set("Content-Security-Policy", aiUiContentSecurityPolicy(nonce));
     return secureAiResponse(new Response(aiOfflineHtml(nonce), { status: 503, headers }), versionId, "offline");
   }
   headers.set("Content-Type", "application/json; charset=utf-8");
@@ -85,6 +85,14 @@ async function aiAsset(request: Request, env: Env, pathname: string): Promise<Re
 
 async function proxyAi(request: Request, env: Env, nonce: string): Promise<Response> {
   const url = new URL(request.url);
+  // One canonical UI for cold loads, reloads and offline recovery. The local
+  // server still owns API readiness, authentication and every inference request.
+  if ((url.pathname === "/" || url.pathname === "/index.html") && isAiNavigation(request)) {
+    return secureAiResponse(new Response(aiOfflineHtml(nonce), {
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
+        "Content-Security-Policy": aiUiContentSecurityPolicy(nonce) },
+    }), env.CF_VERSION_METADATA?.id, "shell");
+  }
   if (request.method === "GET" && (url.pathname === "/nexus-icon.png" || url.pathname === "/inter-latin.woff2")) {
     return secureAiResponse(await aiAsset(request, env, url.pathname), env.CF_VERSION_METADATA?.id);
   }
