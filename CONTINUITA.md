@@ -1,3 +1,20 @@
+# Startup verified; production held by AI readiness — 16 October 2026
+
+UI runtime source a240145 and its canonical shell passed44 Node tests and31
+browser tests locally. The remote run exposed a timing race in the new reload
+fixture: fixed delays could end between two assertions. The fixture now holds
+HTML delivery and restoration completion until explicitly released by the test.
+All four startup regressions pass with the actual Worker CSP, real local history,
+blob images and reduced motion. The checks are retained, without retry masking.
+
+Candidate1ff79830-e06a-4a0b-9325-481ffe563036 was uploaded but never promoted.
+Its source is a240145; this later test/documentation revision needs a fresh exact
+candidate after readiness recovers. Do not repeat production promotion or assume
+the live website contains these fixes. Production remains956fcc2d. Readiness
+returns503; health200 alone is insufficient. The existing promotion/readiness
+and security gates remain unchanged. No desktop/Android installer update is
+needed for these web and monitoring changes. Final source and full release
+checks must be read from their current logs/CI before claiming completion.
 # Reload and offline-cache regression candidate — 16 October 2026
 
 The canonical root response covers ordinary GET, service-worker cache requests

@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 
 let server, origin;
-const timers = new Set();
+const heldResponses = new Set();
 test.beforeAll(async () => {
   const { default: worker } = await import('../../dist/server/index.js');
   const shell = await worker.fetch(new Request('https://ai.nexusnxs.com/', { headers: { accept: 'text/html' } }), {
@@ -15,11 +15,15 @@ test.beforeAll(async () => {
   expect(cut).toBeGreaterThan(0);
   const font = await readFile(new URL('../../public/fonts/inter-latin.woff2', import.meta.url));
   server = createServer((request, response) => {
-    if (request.url === '/') {
+    const url = new URL(request.url, 'http://localhost');
+    if (url.pathname === '/release') {
+      for (const pending of heldResponses) pending.end(html.slice(cut));
+      heldResponses.clear(); response.writeHead(204); response.end();
+    } else if (url.pathname === '/') {
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': policy });
       response.write(html.slice(0, cut));
-      const timer = setTimeout(() => { timers.delete(timer); response.end(html.slice(cut)); }, 700);
-      timers.add(timer);
+      if (url.searchParams.has('hold')) heldResponses.add(response);
+      else response.end(html.slice(cut));
     } else if (request.url === '/inter-latin.woff2') {
       response.writeHead(200, { 'Content-Type': 'font/woff2' }); response.end(font);
     } else if (request.url === '/readyz') {
@@ -30,7 +34,7 @@ test.beforeAll(async () => {
   origin = `http://127.0.0.1:${server.address().port}`;
 });
 test.afterAll(async () => {
-  for (const timer of timers) clearTimeout(timer);
+  heldResponses.clear();
   server.closeAllConnections();
   await new Promise(resolve => server.close(resolve));
 });
@@ -41,9 +45,10 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     await page.emulateMedia({ reducedMotion: viewport.width === 844 ? 'reduce' : 'no-preference' });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(origin, { waitUntil: 'commit' });
+    await page.goto(`${origin}/?hold=1`, { waitUntil: 'commit' });
     await expect(page.locator('.shell')).toHaveAttribute('inert', '');
     await expect.poll(() => page.locator('.shell').evaluate(element => getComputedStyle(element).opacity)).toBe('0');
+    await page.request.post(`${origin}/release`);
     await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
     await expect(page.locator('.shell')).not.toHaveAttribute('inert');
     await expect(page.locator('#profileSettings')).toHaveCount(1);
@@ -85,22 +90,20 @@ test('reload restores a slow local conversation before revealing its controls', 
     };
   }));
   await page.addInitScript(() => {
-    const original = indexedDB.open.bind(indexedDB);
-    indexedDB.open = (...args) => {
-      const request = original(...args);
-      if (args[0] !== 'nexusnxs-demo') return request;
-      return new Proxy(request, {
-        get(target, key) { const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value; },
-        set(target, key, handler) {
-          target[key] = key === 'onsuccess' ? event => setTimeout(() => handler(event), 1100) : handler;
-          return true;
-        }
-      });
-    };
+    // Hold the restoration completion signal explicitly: CI load must not
+    // race a fixed sleep or make the database's own timeout the test clock.
+    let restored;
+    const held = new Promise(resolve => { globalThis.releaseRestoration = resolve; });
+    Object.defineProperty(globalThis, 'nexusUiRestored', {
+      configurable: true,
+      set(value) { restored = Promise.all([value, held]); },
+      get() { return restored; }
+    });
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'pending');
   await expect.poll(() => page.locator('.shell').evaluate(element => getComputedStyle(element).opacity)).toBe('0');
+  await page.evaluate(() => globalThis.releaseRestoration());
   await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
   await expect(page.locator('body')).toHaveClass(/conversation-active/);
   await expect(page.locator('#answer')).toContainText('Risposta ripristinata');
