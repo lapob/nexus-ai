@@ -1,3 +1,25 @@
+# Neutral web settings verified; production still held — 17 October 2026
+
+Canonical AI settings now reuse the project design tokens for neutral surfaces,
+field backgrounds, text, borders and keyboard focus, with inherited Inter,
+48px icon actions and18px backdrop blur. The200% text check exposed a heading
+collision with Close; wrapping now retains both controls inside the dialog.
+Five isolated browser viewport/text scenarios pass with enforced CSP, save/reset
+and Escape focus restoration. No user data was used or sent.
+
+Final synchronized shell passes44 unit tests,31 browser tests, actual local
+Workers runtime, registry signatures/dependency audit, performance budgets and
+deployment dry run. npm ls reports no invalid/extraneous dependencies, and
+TypeScript noUnusedLocals/noUnusedParameters passes. Optional packages are
+excluded from the separate plain npm audit; the release security gate retains
+its full existing policy. No referenced dependency was removed merely for being
+older than its newest release.
+
+This is source publication only. Production956fcc2d remains unchanged because
+public AI readiness returns503. Recover the admitted runtime first, then prepare
+an exact candidate and use the normal promotion gate. Do not bypass readiness
+or claim the live settings have already changed.
+
 # Startup verified; production held by AI readiness — 16 October 2026
 
 UI runtime source a240145 and its canonical shell passed44 Node tests and31
