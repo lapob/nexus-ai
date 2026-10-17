@@ -1,3 +1,26 @@
+# Physical Android offline checks — 17 October 2026
+
+Public Android6.5.24/code114 passed24 native SQLite/Keystore, composer continuity
+and assistant authorization tests in the separate QA sandbox. Five display/font
+profiles on one physical Samsung passed the existing Offline visual/frame gate,
+including landscape and200% text. Observed gfxinfo jank ranged1.61–6.62% across
+those sessions; these are not GPU completion measurements or proof of zero jank.
+Original display, density, font and rotation were restored. Existing Online
+matrix evidence was preserved separately; today's Offline results do not replace
+it or certify online readiness. No personal history was cleared or sent.
+
+The release app opens its keyboard and retains focus while toggling reasoning.
+Attachment selection remains disabled while offline, so a real online picker and
+upload recovery are not claimed. Control's initial Offline screen was observed;
+private dashboard actions remain unverified until the phone joins the private
+network. The PC is online in that network with no online peers currently visible.
+Phone touches were paused for the owner to enable Tailscale. No power command,
+voice recording, inference, runtime replacement or production deployment occurred.
+
+The public readiness endpoint still returns503. Restore the admitted runtime
+before preparing another exact website candidate or promoting production. The
+latest scheduled availability runs now complete successfully while preserving
+outage observations, as intended; this does not mean inference is available.
 # Slow-history refresh regression verified — 16 October 2026
 
 Initial reveal also waits for local conversation restoration. This prevents an
