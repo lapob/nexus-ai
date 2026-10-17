@@ -1,3 +1,35 @@
+## Control: readiness e collaudo fisico — 17 ottobre
+
+Control1.19.9/code43 compilata/lintata e installata come aggiornamento Preview
+senza cancellare dati. Cinque profili Online della prima candidata sullo stesso Samsung PASS, inclusi
+landscape e testo200%; jank gfxinfo0.49–1.36% nelle sessioni misurate, non una
+certificazione GPU o di tutti i dispositivi. Display/font/rotazione ripristinati.
+Navigazione fissa, scroll dal dock, cambio sezione in cima, cartelle e conferme
+power annullate verificati; verifica server non distruttiva PASS sulla43. Nessun
+riavvio, spegnimento o comando di apertura/chiusura applicazioni PC eseguito.
+Ultimo affinamento compatibilita compilato/lintato e installato con hash codice
+verificato; prova UI fisica finale pendente per telefono in uso su altra app.
+Non attribuire la matrice della prima candidata all'hash APK finale.
+
+Corretta nei sorgenti la telemetria che indicava AI online indipendentemente
+dalla readiness. Riutilizzata la sonda bounded/cached; endpoint verifica servizio
+con liveness invariata e aiReady separato. UI distingue PC connesso e AI non
+disponibile; campo aiReady assente o invalido produce Da verificare sul vecchio
+server, senza dedurre readiness dalla liveness. cloud:check/check e Gradle PASS.
+Backend non ancora caricato nel servizio attivo: ready pubblico503, recupero
+runtime ammesso necessario prima dell'aggiornamento server e della promozione
+sito. La vecchia telemetria live puo ancora indicare AI operativa. Nessuna nuova
+release pubblica Windows/Android o firmaStable; Control e una Preview privata.
+
+Impostazioni web: token neutri condivisi, Inter,48dp e blur18px; cinque scenari
+browser incl200%testo/CSP/focus/salvataggioPASS e collisione titolo-chiudi corretta.
+Sito finale44test/31browser/runtimeWorkers/audit/firme/dryrunPASS; non deploy.
+Pulizia182981308byte, corrente/rollback mantenuti; npm audit senza optional0finding,
+alberi dipendenze e noUnused TypeScriptPASS su entrambi. Suite finale1068PASS,
+2SKIP,0FAIL. Un giro precedente ha fallito il file wake-relay senza diagnostica;
+mirato8PASS e successivo giro completoPASS, log precedente conservato e causa
+non dimostrata, senza sopprimere test o rimuovere il fallimento dallo storico.
+
 ## Revisione grafica e Preview31 — 11 ottobre
 
 Distribuita Preview0.3.31 dal source8bc6c38: maggior contrasto delle note settings e strumenti QA corretti. Suite1061PASS/2SKIP/0FAIL, check/cloud/source smoke e packaged smokePASS; bundle/SBOM/installer e CI Windows/UbuntuPASS. Tre Core desktop, hover/fullscreen e transizioni full/reduced verificati sulla workstation. Catture a scale100/200 e40stati web sintetici incl200%testo/landscape; dettagli e limiti in UI_SPECIFICATION.md. Android114 invariato, nessun dispositivo ADB nel nuovo controllo. Nessuna installazione Windows o modifica del servizio attivo. Non dichiarare certificazione WCAG completa: axe settings lascia un controllo incompleto sulle trasparenze. Nessun finding upstream risolto dalla grafica.

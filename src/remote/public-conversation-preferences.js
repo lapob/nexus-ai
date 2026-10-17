@@ -1,17 +1,23 @@
 /** @module remote/public-conversation-preferences Minimal client-owned profile, shared by text and voice. */
+const { colors, cosmicGlass, layout } = require('../../config/nexus-design-tokens.json');
 // Present at response generation so the gateway adds its style-src nonce.
 // Dynamically appended inline styles are rejected by the public CSP.
 const PUBLIC_PROFILE_STYLE = `<style>
-#profileSheet{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;color-scheme:dark}
+#profileSheet{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;color-scheme:dark;background:${colors.surface};color:${colors.ice};border-color:${colors.hairline};font:inherit}
+#profileSheet::backdrop{background:${colors.ink}b8;backdrop-filter:blur(${cosmicGlass.blurPx.preferred}px);-webkit-backdrop-filter:blur(${cosmicGlass.blurPx.preferred}px)}
+#profileSheet .sheet-body{padding:clamp(20px,4vw,28px)}
+#profileSheet .sheet-close{width:${layout.touchTargetDp}px;height:${layout.touchTargetDp}px;flex:0 0 ${layout.touchTargetDp}px;border-color:transparent;background:transparent;color:${colors.mist}}
+#profileSheet .sheet-close:focus-visible{outline:2px solid ${colors.cyan};outline-offset:2px}
+@media(hover:hover){#profileSheet .sheet-close:hover{background:${colors.surfaceRaised};color:${colors.ice}}}
 .identity .profile-trigger{width:44px;height:44px;padding:0;display:grid;place-items:center;flex:0 0 44px}
 .identity .profile-trigger svg{display:block;width:20px;height:20px}
-#profileTitle{font-size:1.05rem;font-weight:650}
+#profileTitle{min-width:0;font-size:1.05rem;font-weight:650;line-height:1.3;overflow-wrap:anywhere}
 .profile-fields{display:grid;gap:20px;margin-block:24px}
-.profile-fields label{display:grid;gap:8px;font-size:.85rem;font-weight:600;color:#c4d9d9}
-.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:10px 14px;border:1px solid #345457;border-radius:14px;background:#102124;color:#e5f3f3;font:inherit;color-scheme:dark}
-.profile-fields select:focus-visible{outline:2px solid #78deda;outline-offset:3px}
+.profile-fields label{display:grid;gap:8px;font-size:.85rem;font-weight:600;color:${colors.ice}}
+.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:${layout.touchTargetDp}px;padding:10px 14px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;font-weight:450;color-scheme:dark}
+.profile-fields select:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px}
 .profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:16px}
-.profile-note{font-size:.8rem!important;color:#a6bbbb!important;line-height:1.6;overflow-wrap:anywhere}
+#profileSheet .profile-note{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 </style>`;
 // #region Browser profile editor
 function createPublicConversationPreferences(normalize) {

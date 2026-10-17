@@ -1,3 +1,59 @@
+# Control readiness reporting and physical checks — 17 October 2026
+
+Private Control1.19.9/code43 was built, linted and installed as a data-preserving
+Preview update. Five display/font profiles of its first build on one physical
+Samsung passed the Online visual/frame gate, including landscape and200% text. Observed gfxinfo
+jank ranged0.49–1.36%; these measurements do not certify every device or zero
+missed frames. Original display, density, font and rotation were restored.
+The earlier Control42 and public114 evidence remains separate. The final43
+compatibility refinement was subsequently built/linted and installed; its code
+hash matches the final APK. Its final physical UI recheck is pending because
+the phone is in use outside Nexus. Do not reuse the first build's matrix for
+the final APK hash.
+
+Physical checks passed for fixed section navigation during scrolling, scrolling
+from the power dock, resetting scroll on section changes, both application
+folders, and opening/cancelling both power confirmations. Dashboard navigation
+and dock are hidden in confirmations. The new version also passed read-only
+server verification and returned to Overview. No PC restart/shutdown, application
+launch/close command, voice recording or personal chat submission was executed.
+
+The dashboard exposed a real reporting bug: telemetry labelled AI online simply
+because its gateway was alive. Source telemetry now uses the existing bounded,
+cached readiness probe. The service-check endpoint retains its liveness status
+and separately exposes aiReady. Control labels the private connection as
+PC connected, and distinguishes known AI unavailability in the detail and check
+result. When an older server omits the readiness boolean, the final client
+displays AI unverified instead of treating its liveness as AI availability.
+HTTP regression tests cover cold start, recovery, provider failure,
+authorization and a stalled readiness probe without invoking inference.
+
+The shared neutral settings palette now comes from the existing design tokens:
+Inter, readable fields,48px icon actions and18px backdrop blur. Five browser
+viewport/text scenarios pass with enforced CSP,200% text, no header collision,
+Escape focus return and save/reset. Site checks pass44 unit and31 browser tests,
+actual local Workers runtime, dependency/signature audit and deployment dry run.
+These local checks are not a production deployment.
+
+Cleanup removed182981308 bytes of generated Android build output and four old
+APKs, retaining current versions and rollback. Both repositories have no npm
+dependency-tree problems, no unused TypeScript locals/parameters and no known
+findings in npm audits with optional packages omitted. Referenced dependencies
+remain; a newer version alone does not establish that a package is unused.
+
+Final source suite:1068PASS/2SKIP/0FAIL, cloud:check/check and Gradle
+assemblePreview/lintPreview PASS. An earlier full-suite execution failed at the
+entire wake-relay test file without diagnostics; its8 isolated tests and the
+subsequent complete suite pass. The earlier failure is retained in the QA log,
+with no demonstrated root cause. Control remains a debug-signed private Preview; no Stable
+signature or public binary release is claimed. Public Android114 is unchanged.
+The active server has not loaded this backend fix: public health is200 but
+readiness remains503. Until the runtime security gate is resolved and the server
+can be safely updated, its older telemetry can still report AI online; the final
+client treats missing aiReady as unverified. Website
+production and Windows installers were not updated. Human acoustic voice tests
+and the wider commercial requirements remain open.
+
 # Physical Android offline checks — 17 October 2026
 
 Public Android6.5.24/code114 passed24 native SQLite/Keystore, composer continuity

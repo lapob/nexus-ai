@@ -1413,10 +1413,13 @@ class RemoteSessionGateway {
     if (this.telemetryCache.value && this.telemetryCache.expiresAt > now) return this.telemetryCache.value;
     if (this.telemetryProbe) return this.telemetryProbe;
     this.telemetryProbe = Promise.resolve().then(async () => {
+      const system = await this.systemSnapshotProvider();
+      const aiReady = await this.isReady();
       const value = {
-        ...await this.systemSnapshotProvider(),
+        ...system,
         nexusService: {
-          status: 'online',
+          status: aiReady ? 'online' : 'not_ready',
+          aiReady,
           uptimeSeconds: Math.round(process.uptime()),
           requests: this.guestCapacity(),
           anonymousSessions: this.guestSessions.size,
@@ -2527,6 +2530,7 @@ class RemoteSessionGateway {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
         return this.json(response, 200, {
           status: 'online',
+          aiReady: await this.isReady(),
           uptimeSeconds: Math.round(process.uptime()),
           requests: this.guestCapacity(),
           anonymousSessions: this.guestSessions.size,

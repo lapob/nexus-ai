@@ -858,6 +858,70 @@ test('readiness attende il warm-up reale e i messaggi guest falliscono rapidamen
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('Control distingue il PC connesso dal motore AI non pronto anche durante recupero e guasto', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-control-readiness-'));
+  let runtimeReady = false;
+  let messageCalls = 0;
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (record) => record },
+    systemSnapshotProvider: async () => ({ memory: { percent: 42 } }),
+    readinessProvider: () => {
+      if (runtimeReady === 'error') throw new Error('runtime unavailable');
+      return runtimeReady;
+    },
+    onMessage: async () => { messageCalls += 1; return {}; },
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    const port = await freePort();
+    await gateway.configure({ enabled: true, allowLan: false, port });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const paired = await pair(baseUrl, gateway.createPairingCode({ scope: 'console' }).code, 'console');
+    const headers = { Authorization: `Bearer ${paired.token}` };
+    assert.equal((await fetch(`${baseUrl}/api/system/service`)).status, 401);
+    for (const state of [false, true, 'error', true]) {
+      runtimeReady = state;
+      gateway.invalidateReadiness();
+      gateway.telemetryCache.expiresAt = 0;
+      const expectedReady = state === true;
+      const service = await fetch(`${baseUrl}/api/system/service`, { headers });
+      assert.equal(service.status, 200, 'il controllo privato resta raggiungibile');
+      const serviceState = await service.json();
+      assert.equal(serviceState.status, 'online', 'status conserva il contratto di liveness');
+      assert.equal(serviceState.aiReady, expectedReady);
+      const telemetry = await (await fetch(`${baseUrl}/api/system/telemetry`, { headers })).json();
+      assert.equal(telemetry.memory.percent, 42, 'le metriche PC restano utilizzabili');
+      assert.equal(telemetry.nexusService.status, expectedReady ? 'online' : 'not_ready');
+      assert.equal(telemetry.nexusService.aiReady, expectedReady);
+      assert.equal((await fetch(`${baseUrl}/readyz`)).status, expectedReady ? 200 : 503);
+    }
+    assert.equal(messageCalls, 0, 'misurare la readiness non deve generare risposte');
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('la telemetria non resta bloccata quando la readiness non risponde', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-control-readiness-timeout-'));
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (record) => record },
+    systemSnapshotProvider: async () => ({ memory: { percent: 42 } }),
+    readinessProvider: () => pending,
+    readinessProbeTimeoutMs: 25,
+    onMessage: async () => ({}),
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    const started = Date.now();
+    const snapshot = await gateway.telemetrySnapshot();
+    assert.equal(snapshot.nexusService.status, 'not_ready');
+    assert.equal(snapshot.nexusService.aiReady, false);
+    assert.ok(Date.now() - started < 1_000, 'il flusso Control non deve attendere il runtime bloccato');
+  } finally { release(false); await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('readiness applica timeout e singleflight quando il provider resta appeso', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-readiness-timeout-'));
   let providerCalls = 0;

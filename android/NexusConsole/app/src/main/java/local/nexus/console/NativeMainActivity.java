@@ -704,7 +704,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         LinearLayout presenceRow = new LinearLayout(this);
         presenceRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView dot = text("●", 17, ACCENT);
-        TextView online = text("  Tutto operativo", 16, TEXT);
+        TextView online = text("  PC connesso", 16, TEXT);
         online.setTag("health-summary");
         online.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         presenceRow.addView(dot);
@@ -740,7 +740,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         servicesTitle.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         servicesTitle.setPadding(0, 0, 0, dp(9));
         services.addView(servicesTitle);
-        services.addView(infoRow("AI pubblica", nexusService != null && "online".equals(nexusService.optString("status")) ? "Operativa" : "Non disponibile"));
+        services.addView(infoRow("AI pubblica", aiAvailability(nexusService)));
         services.addView(infoRow("Controllo privato", "Connesso"));
         JSONObject requests = nexusService == null ? null : nexusService.optJSONObject("requests");
         services.addView(divider());
@@ -986,7 +986,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         request("GET", "/api/system/service", null, true, result -> {
             setState("Online", false);
             recordSafeAction("Server verificato");
-            android.widget.Toast.makeText(this, "Server NexusNXS operativo", android.widget.Toast.LENGTH_SHORT).show();
+            String message = "PC connesso · AI " + aiAvailability(result).toLowerCase(Locale.ROOT);
+            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show();
         }, true, () -> {
             if (!foreground || currentScreen != SCREEN_DASHBOARD) return;
             // Una singola sonda puo scadere durante un cambio rete senza che il
@@ -1449,7 +1450,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         setTaggedText("metric:GPU", (snapshot.optJSONObject("activity") == null ? 0 : snapshot.optJSONObject("activity").optInt("gpuPercent")) + "%");
         setTaggedText("metric:RAM", (snapshot.optJSONObject("memory") == null ? 0 : snapshot.optJSONObject("memory").optInt("percent")) + "%");
         JSONObject nexusService = snapshot.optJSONObject("nexusService");
-        setTaggedText("value:AI pubblica", nexusService != null && "online".equals(nexusService.optString("status")) ? "Operativa" : "Non disponibile");
+        setTaggedText("value:AI pubblica", aiAvailability(nexusService));
         setTaggedText("service:requests", String.valueOf(requestCount(nexusService == null ? null : nexusService.optJSONObject("requests"))));
         setTaggedText("service:sessions", nexusService == null ? "0" : String.valueOf(nexusService.optInt("anonymousSessions")));
         setTaggedText("service:streams", nexusService == null ? "0" : String.valueOf(nexusService.optInt("connectedStreams")));
@@ -1580,6 +1581,11 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         return value.isEmpty() ? "NXS-CORE-01" : value.toUpperCase(Locale.ROOT);
     }
 
+    private String aiAvailability(JSONObject nexusService) {
+        if (nexusService == null || !(nexusService.opt("aiReady") instanceof Boolean)) return "Da verificare";
+        return nexusService.optBoolean("aiReady") ? "Operativa" : "Non disponibile";
+    }
+
     private String corePulseSummary(JSONObject nexusService) {
         int open = 0;
         int known = 0;
@@ -1590,10 +1596,10 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             known++;
             if (Boolean.TRUE.equals(state)) open++;
         }
-        boolean aiOnline = nexusService != null && "online".equals(nexusService.optString("status"));
         int streams = nexusService == null ? 0 : nexusService.optInt("connectedStreams");
         String apps = known == 0 ? "app in verifica" : open + (open == 1 ? " app aperta" : " app aperte");
-        return (aiOnline ? "AI operativa" : "AI in verifica") + "  ·  " + apps + "  ·  " + streams + (streams == 1 ? " flusso live" : " flussi live");
+        String aiState = "AI " + aiAvailability(nexusService).toLowerCase(Locale.ROOT);
+        return aiState + "  ·  " + apps + "  ·  " + streams + (streams == 1 ? " flusso live" : " flussi live");
     }
 
     private int requestCount(JSONObject requests) {
@@ -1685,7 +1691,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         boolean critical = cpu >= 90 || ram >= 90 || gpu >= 95;
         View target = content.findViewWithTag("health-summary");
         if (target instanceof TextView) {
-            ((TextView) target).setText(critical ? "  Carico elevato" : "  Tutto operativo");
+            ((TextView) target).setText(critical ? "  Carico elevato" : "  PC connesso");
             ((TextView) target).setTextColor(critical ? DANGER : TEXT);
         }
     }
