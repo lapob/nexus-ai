@@ -55,6 +55,23 @@ Le valutazioni rimangono separate dai dati di training e dal servizio attivo.
 
 ## Ambiente AMD da collaudare prima del training
 
+Scelta tecnologica aggiornata al 21 ottobre: mantenere il candidato llama.cpp
+Vulkan già misurato sul PC Windows/AMD mentre si completa l'ammissione. La
+[documentazione vLLM](https://docs.vllm.ai/en/latest/getting_started/installation/gpu/)
+include Radeon RX 9000 con ROCm, ma richiede Linux e non supporta Windows
+nativamente. WSL o un server Linux separato comporterebbero un altro ambiente
+da collaudare; non sono stati installati né considerati un miglioramento misurato.
+
+Per i modelli ONNX della voce, Microsoft indica che
+[DirectML è in manutenzione e lo sviluppo si sposta su WinML](https://onnxruntime.ai/docs/execution-providers/DirectML-ExecutionProvider.html).
+Valutare WinML per selezione automatica del provider soltanto dopo compatibilità
+del worker e confronto locale CPU/GPU di avvio, RAM/VRAM, latenza e qualità.
+Il percorso attuale Kokoro ONNX CPU resta invariato: non sostituirlo sulla base
+del solo nome della tecnologia. Il nuovo modello
+[Qwen3.8-27B ufficiale](https://huggingface.co/Qwen/Qwen3.8-27B) resta una candidata
+da confrontare, distinta dalla quantizzazione di terzi e dal training Nexus.
+Nessuna di queste verifiche di documentazione promuove automaticamente un modello.
+
 La documentazione corrente di [Unsloth per AMD](https://unsloth.ai/docs/get-started/install/amd)
 include Windows e GPU Radeon RDNA4. Non è quindi corretto assumere che servano
 necessariamente CUDA o un passaggio a Linux. Questa disponibilità non prova

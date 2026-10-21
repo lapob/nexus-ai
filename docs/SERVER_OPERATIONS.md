@@ -118,6 +118,33 @@ local development is not sufficient evidence for a public service.
 
 ### Native runtime candidate
 
+`node scripts/inspect-native-runtime.js <absolute-executable-path>` reads every
+flat-directory EXE/DLL without loading it. It records bounded x64 PE imports,
+delay imports, sizes and SHA256 hashes, including backend DLLs not referenced
+by the main executable. It rejects malformed tables, native symlinks, duplicate
+names, local loader redirects and files changing during the read. Its output
+is diagnostic evidence, not a trusted release policy or a complete SBOM.
+
+`native-runtime-security.js` is now the manager's default verifier. A source-trusted
+policy must bind the whole inventory, executable, reviewed model hash/size/alias,
+usage, provenance identifiers and a dependency review expiring within 30 days.
+The external import set must match the review, with hash/size checks for its
+reviewed host files and any explicitly covered dynamic driver files. Review
+evidence must cover embedded, dynamically loaded and host components; a zero-match
+scanner report cannot substitute for that review. Changing the caller's policy
+object after construction cannot alter the verifier's private copy. The trusted
+release/model lists remain empty: no native distribution has been approved.
+
+The real b11789 inventory contains 30 PE modules and 21 external import names.
+The old two-header review did not cover all these components. Four host libraries
+checked separately have valid signatures, but this does not establish complete
+dependency coverage or prove the loader's dynamic resolution. LLVM OpenMP binary
+metadata also illustrates why its API/product version is insufficient to infer
+the compiler's release. The pinned source/build, embedded code, plugin behavior,
+driver selection and actual loader resolution still require review before adding
+an entry to the trusted policy. Rehashing files is not an OS sandbox or protection
+against a privileged attacker changing them between verification and loading.
+
 `ManagedLlamaRuntime` now owns the isolated candidate process. Startup and crash
 recovery are single-flight; probes require its private token and selected model.
 A failed stop retains ownership and prevents overlapping launches. Shutdown
@@ -139,7 +166,7 @@ five-second wait for exclusive port release. A persistent foreign listener is
 still rejected. Shutdown requests owner-channel closure, then forces only the
 still-owned process tree/group if needed; failed termination never clears
 ownership to permit a competing model launch.
-Its default verifier rejects all launches. A trusted injected verifier must bind
+Its default verifier rejects all currently unreviewed launches. A trusted verifier must bind
 its explicit admission to canonical executable/model paths, alias and usage;
 this interface is not a completed distribution verifier. Evaluation mode cannot
 satisfy `assertRuntimeAdmission(..., { requireDistribution: true })`, and a

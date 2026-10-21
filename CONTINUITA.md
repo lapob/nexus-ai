@@ -1,3 +1,26 @@
+# Native inventory and admission policy — 21 October 2026
+
+Added a bounded, read-only Windows x64 PE inventory and a concrete default
+native admission verifier. It binds exact modules, external imports, reviewed
+host files, model integrity and usage to a source-trusted policy and a dependency
+review expiring within 30 days. Generated reports cannot approve themselves;
+the trusted release/model lists are still empty. No runtime was promoted.
+
+The existing real candidate has 30 modules and 21 external import names. A
+two-header scan cannot establish coverage of embedded code, dynamic drivers or
+loader behavior. Four sampled host libraries have valid signatures; this is
+partial evidence, not complete admission. See SERVER_OPERATIONS for the CLI,
+policy requirements and limitations. Initial focused tests: 29 passed.
+
+Current technology documentation was checked for Windows/AMD compatibility:
+vLLM requires Linux/WSL rather than native Windows, and WinML is an evaluation
+option for ONNX voice acceleration. No additional stack or model was installed.
+Final source gates: 1128 passed, two skipped, zero failures; all 29 focused
+inventory/admission/lifecycle tests, cloud:check and workstation check pass.
+Publication safety covers 950 candidate files. No renderer or dependency change.
+Production readiness and physical-device/voice/Apple tests remain separate
+requirements.
+
 # Final source verification — 21 October 2026
 
 Full suite: 1,119 passed, two skipped, zero failures. All 64 focused

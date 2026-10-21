@@ -10,6 +10,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { sanitizedRuntimeEnvironment } = require('./managed-ollama-runtime');
 const { spawnSupervisedLlamaProcess, terminateSupervisedLlamaProcess } = require('./native-runtime-supervisor');
 const { LlamaCppProvider } = require('./providers/llama-cpp-provider');
+const { assertNativeRuntimeSecure } = require('./native-runtime-security');
 
 // #region 01 — Confini immutabili e verifica del listener
 
@@ -72,7 +73,7 @@ class ManagedLlamaRuntime {
     for (const [key, value] of Object.entries(fixed)) Object.defineProperty(this, key, { value, enumerable: true });
     this.spawnProcess = dependencies.spawnProcess || spawnSupervisedLlamaProcess;
     this.terminateProcess = dependencies.terminateProcess || terminateSupervisedLlamaProcess;
-    this.runtimeSecurityCheck = dependencies.runtimeSecurityCheck || (() => { throw new Error('Native admission not configured.'); });
+    this.runtimeSecurityCheck = dependencies.runtimeSecurityCheck || assertNativeRuntimeSecure;
     this.portFree = dependencies.portFree || isPortFree;
     this.logger = dependencies.logger;
     this.process = null;

@@ -1,3 +1,20 @@
+## Inventario e policy di ammissione nativa — 21 ottobre
+
+Implementati lettura PE x64 senza esecuzione e verificatore predefinito per il
+manager candidato. Sono coperti import normali/ritardati, backend inclusi nella
+directory, integrità dell'intero inventario, host revisionati, modello e uso.
+Policy fidata nel sorgente, copiata alla costruzione; revisione dipendenze con
+scadenza massima 30 giorni. Report generati, variabili ambiente o zero match
+scanner non ammettono una release. Le liste fidate restano vuote.
+
+Inventario reale: 30 moduli, 21 nomi di import esterni. Quattro host campionati
+hanno firma valida; mancano revisione completa dei componenti incorporati,
+caricamenti dinamici e risoluzione effettiva del loader. 29 test mirati PASS;
+suite finale 1128 PASS, 2 SKIP, 0 FAIL; cloud:check, check e publication PASS.
+Non è ripristino del servizio pubblico.
+Valutazione tecnologie correnti documentata in MODEL_TRAINING, senza installare
+WSL/vLLM, trainer, WinML o nuovi modelli. Runtime e voce attivi invariati.
+
 ## Lifecycle nativo e annullamento — 21 ottobre
 
 Il manager nativo candidato gestisce avvio singolo, probe autenticato del
