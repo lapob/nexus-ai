@@ -6,6 +6,8 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $workspaceRoot = Split-Path $projectRoot -Parent
 $launcher = Join-Path $projectRoot 'scripts\start-electron.js'
+. (Join-Path $PSScriptRoot 'lib\development-paths.ps1')
+Initialize-NexusScannerEnvironment -Layout (Get-NexusDevelopmentLayout -ProjectRoot $projectRoot)
 $node = if ($env:NEXUS_NODE_EXECUTABLE) {
   if (-not (Test-Path -LiteralPath $env:NEXUS_NODE_EXECUTABLE -PathType Leaf)) { throw 'Runtime Node configurato non disponibile.' }
   $env:NEXUS_NODE_EXECUTABLE

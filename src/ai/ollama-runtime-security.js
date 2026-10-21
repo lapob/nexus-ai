@@ -102,7 +102,8 @@ function auditOllamaRuntime(executablePath, {
   requireSignature = platform === 'win32',
   usage = 'distribution',
   host = '',
-  minimumVersion = DEVELOPMENT_MINIMUM_VERSION
+  minimumVersion = DEVELOPMENT_MINIMUM_VERSION,
+  scannerExecutable = process.env.NEXUS_GRYPE_EXECUTABLE || 'grype'
 } = {}) {
   let executable = path.resolve(String(executablePath || ''));
   if (!fs.existsSync(executable) || !fs.statSync(executable).isFile()) {
@@ -127,7 +128,7 @@ function auditOllamaRuntime(executablePath, {
     );
   }
 
-  const scanResult = runChecked(runProcess, 'grype', [
+  const scanResult = runChecked(runProcess, scannerExecutable, [
     `file:${executable}`, '--scope', 'all-layers', '-o', 'json'
   ], {
     // Grype's first database-backed scan can be slow on the portable SSD.

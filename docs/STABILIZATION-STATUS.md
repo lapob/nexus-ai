@@ -1,15 +1,64 @@
+## Offline, ricerca e patch dipendenze — 21 ottobre
+
+Worker offline condiviso con il sito e servito anche senza tunnel AI, cache
+legata al contenuto, sola navigazione root/index, cache estranee preservate,
+timeout di navigazione e scritture cache non bloccanti. API/readyz/healthz esclusi.
+Quattro profili browser fonte e quattro produzione esistente PASS, con storia
+sintetica, reload/reset offline, allegati/bozza in memoria, Inter, riconnessione
+senza invio. Sezioni nuove verificate sulla fonte, non gia presenti in produzione.
+Indicatore cognitivo limitato alle richieste effettive; test annullamento/frame
+tardivi/seconda scheda/storage negato PASS. Settings cinque scenari PASS.
+
+Vite aggiornato a8.1.6 nell'app e8.2.4 nel sito per nuove advisory del server di
+sviluppo. Nessun altro numero di versione nel lockfile cambiato. Fonte1074PASS,
+2SKIP,0FAIL, cloud/check e audit npm senza optional PASS. Il gate completo sito
+passa firme/attestazioni, audit, test, Workers, budget e dry run; nessun deploy.
+
+Ricerca locale ripristinata tramite manager esistente e immagine gia presente,
+senza pull: sonda freshOnly con tre fonti HTTPS/data di recupero PASS,487ms sul
+singolo campione. Task server al boot abilitato senza ritardo, in esecuzione;
+accensione completa non collaudata. Il gate rifiuta anche Ollama0.40.7 con63match
+High/Critical; nessun motore alternativo ammesso, AIready503 ancora bloccante.
+Ulteriore pulizia di26binari QA respinta dal controllo automatico: non applicata
+e non ritentata. Non equivale a guasto delle app o perdita di dati.
+
+## Impostazioni, voce e ammissione motore — 17 ottobre
+
+Impostazioni web con sezioni Conversazione, Voce e connessione, Dati sul
+dispositivo; picker nativi a tema dove supportati, Inter, superfici neutre,
+header raggiungibile durante lo scroll e conferma prima di cancellare.
+Esportazione JSON con avviso file non cifrato; reset riusa cancellazione della
+generazione e memoria locale. QA browser su cinque viewport/testo, popup aperto,
+stati503, risposte tardive, tastiera/CSP ed export/delete sintetici PASS.
+Suite1070PASS2SKIP0FAIL, cloud:check/check PASS. Non ancora produzione.
+
+Scanner portabile e DB fresco ripristinati, con override espliciti preservati
+e senza modificare il PATH globale. Audit distribuzione rifiuta sia il runtime
+Ollama installato sia l'ultima candidata ufficiale:62 match High/Critical, senza
+deroghe. Questi match non costituiscono verifica di sfruttabilita per ogni CVE.
+Una build llama.cpp Vulkan con provenienza ufficiale Sigstore verificata usa
+i pesi esistenti nella sola sonda isolata. Le prove selezionate hanno evidenziato
+errori di calcolo/formato: candidata non promossa. Zero match su un binario C++
+non dimostra copertura delle sue dipendenze o ammissione sicura.
+
+STT/TTS reali attraverso il gateway locale:200/200 e frase sintetica trascritta
+correttamente; circa5.0s sintesi e10.9s trascrizione su un solo clip freddo.
+Voce umana, eco e interruzione acustica non misurate. AIready503 resta il blocco
+per conversazione e promozione web; cloud disattivato, servizio non riavviato.
+
 ## Control: readiness e collaudo fisico — 17 ottobre
 
 Control1.19.9/code43 compilata/lintata e installata come aggiornamento Preview
-senza cancellare dati. Cinque profili Online della prima candidata sullo stesso Samsung PASS, inclusi
-landscape e testo200%; jank gfxinfo0.49–1.36% nelle sessioni misurate, non una
+senza cancellare dati. Cinque profili Online dell'APK finale sullo stesso Samsung PASS, inclusi
+landscape e testo200%; jank gfxinfo0.35–0.95% nelle sessioni misurate, non una
 certificazione GPU o di tutti i dispositivi. Display/font/rotazione ripristinati.
 Navigazione fissa, scroll dal dock, cambio sezione in cima, cartelle e conferme
 power annullate verificati; verifica server non distruttiva PASS sulla43. Nessun
 riavvio, spegnimento o comando di apertura/chiusura applicazioni PC eseguito.
 Ultimo affinamento compatibilita compilato/lintato e installato con hash codice
-verificato; prova UI fisica finale pendente per telefono in uso su altra app.
-Non attribuire la matrice della prima candidata all'hash APK finale.
+verificato; matrice fisica finale e otto verifiche interattive PASS contro quello
+stesso APK. Riferimento canonico aggiornato conservando la precedente matrice;
+non attribuire le prove della prima candidata ad altri hash.
 
 Corretta nei sorgenti la telemetria che indicava AI online indipendentemente
 dalla readiness. Riutilizzata la sonda bounded/cached; endpoint verifica servizio

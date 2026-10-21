@@ -46,8 +46,10 @@ async function main() {
     await waitFor(client, 'qa.requests.length===1');
     await client.evaluate(`qa.frame({type:'token',token:'Risposta parziale'});true`);
     await waitFor(client, "document.querySelector('#answer').textContent.includes('parziale')");
+    assert.equal(await client.evaluate("document.querySelector('#cognition').hidden"), false, 'Real response progress remains visible');
     await client.evaluate(`document.querySelector('#memoryClear').click();true`);
     await waitFor(client, "document.querySelector('#answer').textContent===''");
+    assert.equal(await client.evaluate("document.querySelector('#cognition').hidden"), true, 'Clearing a response stops its progress display');
     assert.equal(await client.evaluate('qa.requests[0].signal.aborted'), true);
     await waitFor(client, 'qa.cancels.length===1');
     assert.equal(await client.evaluate('qa.cancels[0].clientMessageId===qa.requests[0].body.clientMessageId'), true);

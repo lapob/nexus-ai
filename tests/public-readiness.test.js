@@ -2,6 +2,92 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { enhancePublicAiHtml } = require('../src/remote/public-demo');
+const { PUBLIC_AI_SERVICE_WORKER } = require('../src/remote/remote-session-gateway');
+
+function offlineWorker({ network = async () => new Response('online', { headers: { 'Content-Type': 'text/html' } }), quota = false } = {}) {
+  const events = {}, deleted = [], writes = [], timers = new Map();
+  let timerId = 0, claimed = false, installed = false;
+  const active = /const CACHE=PREFIX\+'([^']+)'/.exec(PUBLIC_AI_SERVICE_WORKER)[1];
+  const current = `nexusnxs-ai-shell-${active}`;
+  const cache = { match: async () => new Response('cached AI'),
+    addAll: async paths => { assert.deepEqual(Array.from(paths), ['/', '/manifest.webmanifest', '/nexus-icon.png', '/inter-latin.woff2']); },
+    put: async (key, response) => { if (quota) throw new Error('quota'); writes.push({ key, text: await response.text() }); } };
+  vm.runInNewContext(PUBLIC_AI_SERVICE_WORKER, {
+    URL, Response, Headers, Blob, AbortController, fetch: network,
+    setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id),
+    caches: { open: async name => { assert.equal(name, current); return cache; },
+      keys: async () => [current, 'nexusnxs-ai-shell-v5', 'another-app-cache'],
+      delete: async key => { deleted.push(key); return true; } },
+    self: { location: { origin: 'https://ai.example.test' }, addEventListener: (name, fn) => { events[name] = fn; },
+      skipWaiting: async () => { installed = true; }, clients: { claim: async () => { claimed = true; } } }
+  });
+  const lifecycle = async name => { let promise; events[name]({ waitUntil: value => { promise = value; } }); await promise; };
+  const request = (pathname, mode = 'navigate', method = 'GET') => {
+    const pending = []; let response;
+    events.fetch({ request: { url: `https://ai.example.test${pathname}`, mode, method },
+      respondWith: value => { response = value; }, waitUntil: value => pending.push(value) });
+    return { response, settle: async () => { const value = await response; await Promise.all(pending); return value; } };
+  };
+  return { lifecycle, request, deleted, writes, timers, states: () => ({ installed, claimed }) };
+}
+
+test('offline worker upgrades only its own shell cache and never intercepts API or other pages', async () => {
+  const worker = offlineWorker();
+  await worker.lifecycle('install'); await worker.lifecycle('activate');
+  assert.deepEqual(worker.states(), { installed: true, claimed: true });
+  assert.deepEqual(worker.deleted, ['nexusnxs-ai-shell-v5']);
+  for (const [pathname, method] of [['/api/guest/messages', 'GET'], ['/api/guest/messages', 'POST'], ['/settings', 'GET'], ['/readyz', 'GET']]) {
+    assert.equal(worker.request(pathname, 'navigate', method).response, undefined);
+  }
+});
+
+test('a working network response survives cache quota failure and non-shell responses cannot poison root', async () => {
+  const full = offlineWorker({ quota: true });
+  assert.equal(await (await full.request('/').settle()).text(), 'online');
+  assert.equal(full.timers.size, 0);
+  const normal = offlineWorker();
+  assert.equal(await (await normal.request('/index.html').settle()).text(), 'online');
+  assert.deepEqual(normal.writes, [{ key: '/', text: 'online' }]);
+  const json = offlineWorker({ network: async () => new Response('{}', { headers: { 'Content-Type': 'application/json' } }) });
+  await json.request('/').settle(); assert.equal(json.writes.length, 0);
+  const redirected = new Response('other page', { headers: { 'Content-Type': 'text/html' } });
+  Object.defineProperty(redirected, 'url', { value: 'https://ai.example.test/login' });
+  const other = offlineWorker({ network: async () => redirected });
+  await other.request('/').settle(); assert.equal(other.writes.length, 0);
+});
+
+test('offline and stalled navigation return the current cached shell without caching an error', async () => {
+  for (const network of [async () => { throw new Error('offline'); }, async () => new Response('unavailable', { status: 503 })]) {
+    const worker = offlineWorker({ network });
+    assert.equal(await (await worker.request('/').settle()).text(), 'cached AI');
+    assert.equal(worker.writes.length, 0); assert.equal(worker.timers.size, 0);
+  }
+  const stalled = offlineWorker({ network: (_request, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
+  }) });
+  const navigation = stalled.request('/');
+  assert.equal(stalled.timers.size, 1); [...stalled.timers.values()][0]();
+  assert.equal(await (await navigation.settle()).text(), 'cached AI');
+  assert.equal(stalled.timers.size, 0);
+});
+
+test('headers followed by a stalled or oversized HTML body cannot replace the offline shell', async () => {
+  const worker = offlineWorker({ network: async (_request, options) => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('<html>partial'));
+      options.signal.addEventListener('abort', () => controller.error(new Error('body timeout')), { once: true });
+    }
+  }), { headers: { 'Content-Type': 'text/html' } }) });
+  const pending = worker.request('/');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(worker.timers.size, 1, 'The deadline includes receiving the body');
+  [...worker.timers.values()][0]();
+  assert.equal(await (await pending.settle()).text(), 'cached AI');
+  assert.equal(worker.writes.length, 0);
+  const oversized = offlineWorker({ network: async () => new Response('x'.repeat(1048577), { headers: { 'Content-Type': 'text/html' } }) });
+  assert.equal(await (await oversized.request('/').settle()).text(), 'cached AI');
+  assert.equal(oversized.writes.length, 0);
+});
 
 test('la pagina passa da preparazione a pronta e offline senza polling duplicato', async () => {
   const html = enhancePublicAiHtml({ base: '<html><head></head><body></body></html>', coreStyle: '', coreScript: '' });

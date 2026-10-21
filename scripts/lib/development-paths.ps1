@@ -58,6 +58,21 @@ function Get-NexusDevelopmentLayout {
   }
 }
 
+function Initialize-NexusScannerEnvironment {
+  param([Parameter(Mandatory)]$Layout)
+
+  # Only the scanner is selected; do not prepend a writable toolchain root to
+  # PATH or shadow unrelated server commands. Explicit host settings win.
+  $scanner = Join-Path $Layout.ToolchainsRoot 'grype.exe'
+  if ([string]::IsNullOrWhiteSpace($env:NEXUS_GRYPE_EXECUTABLE) -and (Test-Path -LiteralPath $scanner -PathType Leaf)) {
+    $env:NEXUS_GRYPE_EXECUTABLE = $scanner
+  }
+  $cache = Join-Path $Layout.ToolchainsRoot 'cache\grype'
+  if ([string]::IsNullOrWhiteSpace($env:GRYPE_DB_CACHE_DIR) -and (Test-Path -LiteralPath $cache -PathType Container)) {
+    $env:GRYPE_DB_CACHE_DIR = $cache
+  }
+}
+
 #endregion
 #region 02 - Toolchain Android
 

@@ -1,15 +1,60 @@
+# Offline recovery and dependency patches — 21 October 2026
+
+The canonical AI service worker now serves only root/index navigation, uses a
+shell-content cache version, preserves unrelated caches, bounds stalled network
+navigation and keeps successful responses usable if a cache write fails. API,
+health and readiness responses are never cached. The website sync now exports
+the same worker and manifest as the gateway; edge installation no longer
+depends on the AI tunnel. Registration also works on secure loopback for real
+source tests. Attachment notifications no longer imply active AI reasoning.
+
+Four real-browser viewport/orientation cases pass for current source and four
+for the existing production shell: offline reload, local history/deletion,
+in-tab draft/attachment, font cache and reconnect without sending. The source
+also verifies its expanded settings offline and503 warming-to-ready recovery.
+Production still has the earlier settings; no new deployment is implied.
+Unsent drafts and raw attachments intentionally do not persist after reload.
+History reset tests also pass for active stream cancellation, late frames and
+images, cross-tab reset and denied storage. Five settings/CSP/keyboard scenarios
+pass. All data used in these checks is synthetic and isolated.
+
+Fresh audits exposed Vite development-server advisories in both repositories.
+Patched within the existing version lines:8.1.6 here and8.2.4 on website. No
+other locked dependency version changed. Source suite1074 pass,2 skip,0 fail;
+cloud:check/check and npm audit excluding optional packages pass. Website
+release checks include registry signatures/attestations, vulnerability audit,
+unit/browser tests, actual Workers runtime, budgets and deployment dry run.
+The website's fresh Windows dependency install reproduces three npm extraneous
+diagnostics for locked optional WASM helpers. Prune did not remove them; they
+remain for platform compatibility, not as a claimed zero-warning tree.
+
+The existing private search manager restored the already-provisioned SearXNG
+container without pulling an image. A freshOnly query returned three HTTPS
+sources with retrieval times through WebResearchService, in487ms for that one
+sample. This is a working search probe, not end-to-end AI conversation quality.
+The server task is enabled at boot with no configured delay and is running;
+no PC restart or full cold-boot test was performed.
+
+The latest checked official Ollama candidate0.40.7 is still refused by the
+distribution gate, now63 High/Critical package matches. Only its signed audit
+executable was probed, not activated. The alternative runtime is not admitted.
+Public AI readiness remains503: source publication does not restore inference
+or promote the website. Cloud remains disabled. Further QA-binary cleanup was
+not applied because automatic approval rejected that deletion; do not retry it
+through another command or tool. Current apps, models and rollback are retained.
+
 # Control readiness reporting and physical checks — 17 October 2026
 
 Private Control1.19.9/code43 was built, linted and installed as a data-preserving
-Preview update. Five display/font profiles of its first build on one physical
+Preview update. Five display/font profiles of the final APK on one physical
 Samsung passed the Online visual/frame gate, including landscape and200% text. Observed gfxinfo
-jank ranged0.49–1.36%; these measurements do not certify every device or zero
+jank ranged0.35–0.95%; these measurements do not certify every device or zero
 missed frames. Original display, density, font and rotation were restored.
-The earlier Control42 and public114 evidence remains separate. The final43
-compatibility refinement was subsequently built/linted and installed; its code
-hash matches the final APK. Its final physical UI recheck is pending because
-the phone is in use outside Nexus. Do not reuse the first build's matrix for
-the final APK hash.
+The earlier Control42, intermediate43 and public114 evidence remains separate.
+The final43 compatibility refinement was built/linted and installed; its code
+hash matches the final APK. Its final physical matrix and eight interaction
+checks pass against that exact artifact. Canonical Control evidence now refers
+to the final APK; the previous matrix is preserved separately for rollback.
 
 Physical checks passed for fixed section navigation during scrolling, scrolling
 from the power dock, resetting scroll on section changes, both application
@@ -34,6 +79,33 @@ viewport/text scenarios pass with enforced CSP,200% text, no header collision,
 Escape focus return and save/reset. Site checks pass44 unit and31 browser tests,
 actual local Workers runtime, dependency/signature audit and deployment dry run.
 These local checks are not a production deployment.
+
+The next settings revision adds collapsible conversation, voice/connection and
+device-data sections, shared neutral native pickers where supported, and a
+sticky accessible header. Voice status remains separate from AI readiness.
+Status reads abort on close and ignore late replies. JSON export warns that the
+download is unencrypted; confirmed deletion reuses the existing cancellation
+and local-memory reset. Isolated browser checks cover real open pickers, narrow
+and enlarged text, keyboard/CSP, late status replies and synthetic export/delete.
+Source suite:1070 pass,2 skip,0 fail; cloud:check and check pass.
+
+The portable scanner and fresh vulnerability database now work without changing
+the host PATH. Explicit scanner/cache overrides remain authoritative. Both the
+installed Ollama and the latest official candidate remain refused by the
+distribution gate with62 High/Critical package matches. No exception was added.
+Synthetic speech synthesis and transcription through the actual local gateway
+both returned200 and the expected sentence, at about5.0s and10.9s respectively
+for that single cold clip. This is not a human acoustic or conversational test.
+
+A pinned llama.cpp Vulkan build has verified official Sigstore provenance and
+recognizes the GPU. Existing weights were reused for an isolated local probe.
+The selected raw-model checks exposed calculation/format errors; one privacy
+assertion failed textually without an observed private-data disclosure. Neither
+these selected cases nor zero binary-scanner matches provide production
+admission or a full quality comparison. No model/runtime promotion occurred.
+AI readiness remains503, so production promotion is still held. Cloud remains
+disabled; human voice tests, complete runtime admission, signed Stable delivery
+and the other documented product gates remain open.
 
 Cleanup removed182981308 bytes of generated Android build output and four old
 APKs, retaining current versions and rollback. Both repositories have no npm

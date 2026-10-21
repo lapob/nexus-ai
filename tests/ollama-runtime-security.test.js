@@ -56,6 +56,33 @@ test('il gate passa allo scanner il file reale anche attraverso una junction', (
   assert.equal(result.executable, expected);
 });
 
+test('uno scanner portabile esplicito conserva il gate fail-closed', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-scanner-path-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const executable = path.join(root, 'ollama.exe'), scanner = path.join(root, 'portable tools', 'grype.exe');
+  fs.writeFileSync(executable, 'synthetic-runtime');
+  for (const outcome of ['clean', 'vulnerable', 'missing']) {
+    let scanned = false;
+    const baseline = fixtureRunner({ findings: outcome === 'vulnerable'
+      ? [{ vulnerability: { id: 'HIGH-PORTABLE', severity: 'High' }, artifact: { name: 'stdlib' } }] : [] });
+    const options = {
+      platform: 'linux', requireSignature: false, scannerExecutable: scanner,
+      runProcess(command, args, settings) {
+        if (command !== executable) {
+          assert.equal(command, scanner); assert.equal(args[0], `file:${executable}`);
+          assert.equal(settings.env.GRYPE_CHECK_FOR_APP_UPDATE, 'false'); scanned = true;
+          if (outcome === 'missing') return { status: null, error: new Error('scanner missing') };
+          return baseline('grype', args);
+        }
+        return baseline(command, args);
+      }
+    };
+    if (outcome === 'clean') assert.equal(auditOllamaRuntime(executable, options).blockingFindings, 0);
+    else assert.throws(() => auditOllamaRuntime(executable, options), error => error.code === (outcome === 'missing' ? 'OLLAMA_SECURITY_SCAN_FAILED' : 'OLLAMA_RUNTIME_VULNERABLE'));
+    assert.equal(scanned, true);
+  }
+});
+
 test('il gate blocca vulnerabilità High o Critical e ignora severità inferiori', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-ollama-security-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

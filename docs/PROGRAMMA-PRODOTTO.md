@@ -1,5 +1,24 @@
 # Programma prodotto e criteri di completamento
 
+## Aggiornamento 17 ottobre 2026
+
+Control43 finale supera matrice fisica e interazioni non distruttive sullo
+stesso APK. Impostazioni web ampliate e verificate nei sorgenti; produzione
+ancora ferma alla precedente versione. Lo scanner ripristinato rifiuta entrambi
+i runtime Ollama verificati con62 match High/Critical. La candidata Vulkan
+alternativa ha provenienza verificata e funziona in isolamento, ma richiede
+ammissione nativa e confronto completo di qualita prima di qualsiasi promozione.
+Il singolo roundtrip vocale sintetico PASS non sostituisce il test umano.
+
+Il mandato comprende ragionamento, ricerca aggiornata, memoria, voce, allegati
+e automazioni nello stesso flusso. L'esistenza dei moduli non certifica parita
+tra client o successo di tutte le attivita: completare prima il ripristino
+sicuro dell'inferenza e i gate gia elencati. La ricerca deve riportare fonti e
+data o dichiarare il limite; le azioni mantengono permessi, annullamento e
+ricevute. Nessun training da voti, cloud inference o nodo sempre acceso attivato.
+
+## Stato storico del 10 ottobre
+
 Aggiornamento 10 ottobre 2026. Riutilizzare le capacita esistenti; questa mappa
 separa implementazione, prove automatiche e prerequisiti esterni.
 

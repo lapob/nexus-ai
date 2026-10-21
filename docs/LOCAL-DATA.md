@@ -1,5 +1,21 @@
 # Dati locali e uso senza account
 
+## Web offline: revisione sorgenti del 21 ottobre 2026
+
+Dopo una prima apertura con rete e l'installazione della cache, la pagina puo
+riaprirsi senza connessione e mostrare la cronologia locale. La prima visita
+assoluta senza rete non puo scaricare l'app. Voce, nuove risposte, ricerca e
+generazione immagini richiedono i rispettivi servizi: offline non attiva un
+modello dentro il browser e non invia automaticamente una bozza alla riconnessione.
+
+Il worker conserva soltanto pagina pubblica, manifest, icona e font. API, token,
+risposte conversazionali e stato di disponibilita non entrano nella cache HTTP.
+Ogni versione della pagina ha una cache distinta; l'aggiornamento rimuove solo
+le vecchie cache Nexus AI, senza toccare quelle di altre applicazioni.
+Le impostazioni sorgente permettono di esportare la conversazione testuale in
+JSON non cifrato e di confermare il reset; il file scaricato resta separato dal
+reset. Questi aggiornamenti verificati non sono ancora promossi in produzione.
+
 ## Sorgenti desktop successivi alla Preview29
 
 Il pannello memoria mostra ambito locale, provenienza, ultimo utilizzo e scadenza;

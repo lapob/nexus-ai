@@ -1661,7 +1661,11 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /aria-label="Non mi piace"/);
     assert.match(publicHtml, /api\/guest\/images\/generate/);
     assert.doesNotMatch(publicHtml, /history:\[\]/);
-    assert.doesNotMatch(publicHtml, /<nav|impostazioni|cronologia|workstation|codice di collegamento|Le tue conversazioni|questa demo|\/api\/pair/i);
+    // Local conversation preferences and data controls belong to the public
+    // client; private PC administration and pairing must remain absent.
+    assert.match(publicHtml, /Impostazioni/);
+    assert.match(publicHtml, /Dati sul dispositivo/);
+    assert.doesNotMatch(publicHtml, /<nav|workstation|codice di collegamento|questa demo|\/api\/pair/i);
     const publicScripts = [...publicHtml.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
     assert.ok(publicScripts.length > 0);
     for (const script of publicScripts) assert.doesNotThrow(() => new vm.Script(script, { filename: 'public-ai.js' }));
@@ -1691,9 +1695,9 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.equal(serviceWorker.status, 200);
     assert.equal(serviceWorker.headers.get('service-worker-allowed'), '/');
     const serviceWorkerSource = await serviceWorker.text();
-    assert.match(serviceWorkerSource, /nexusnxs-ai-shell-v5/);
+    assert.match(serviceWorkerSource, /nexusnxs-ai-shell-[\s\S]*v6-/);
     assert.match(serviceWorkerSource, /if\(!response\.ok\)return/);
-    assert.match(serviceWorkerSource, /cache\.put\('\/',response\.clone\(\)\)/);
+    assert.match(serviceWorkerSource, /cache\.put\('\/',snapshot\)/);
     assert.equal((await fetch(`${baseUrl}/api/system/telemetry`)).status, 404);
     assert.equal((await fetch(`${baseUrl}/api/actions/plan`, { method: 'POST' })).status, 404);
     assert.equal((await fetch(`${baseUrl}/api/workflows/create`, { method: 'POST' })).status, 404);

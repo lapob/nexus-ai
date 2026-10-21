@@ -83,6 +83,30 @@ test('bootstrap logging preserves bracket paths and native exit status', { skip:
   } finally { fs.rmSync(fixture, { recursive: true, force: true }); }
 });
 
+test('portable scanner bootstrap discovers existing tools without changing PATH or explicit host settings', { skip: !windows }, () => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-scanner-bootstrap-'));
+  try {
+    const cache = path.join(fixture, 'cache', 'grype'); fs.mkdirSync(cache, { recursive: true });
+    const scanner = path.join(fixture, 'grype.exe'); fs.writeFileSync(scanner, 'not executed');
+    const result = run(`${functions(['Initialize-NexusScannerEnvironment'], path.join(root, 'scripts/lib/development-paths.ps1'))}
+      $ErrorActionPreference='Stop'; $layout=[pscustomobject]@{ToolchainsRoot=${quote(fixture)}};
+      $originalPath=$env:Path; $env:NEXUS_GRYPE_EXECUTABLE=''; $env:GRYPE_DB_CACHE_DIR='';
+      Initialize-NexusScannerEnvironment -Layout $layout;
+      $first=@{scanner=$env:NEXUS_GRYPE_EXECUTABLE;cache=$env:GRYPE_DB_CACHE_DIR;pathRetained=($env:Path -eq $originalPath)};
+      $env:NEXUS_GRYPE_EXECUTABLE='explicit-scanner'; $env:GRYPE_DB_CACHE_DIR='explicit-cache';
+      Initialize-NexusScannerEnvironment -Layout $layout;
+      $second=@{scanner=$env:NEXUS_GRYPE_EXECUTABLE;cache=$env:GRYPE_DB_CACHE_DIR};
+      $env:NEXUS_GRYPE_EXECUTABLE=''; $env:GRYPE_DB_CACHE_DIR='';$layout.ToolchainsRoot=Join-Path $layout.ToolchainsRoot 'absent';
+      Initialize-NexusScannerEnvironment -Layout $layout;
+      @{first=$first;second=$second;missingUnchanged=([string]::IsNullOrEmpty($env:NEXUS_GRYPE_EXECUTABLE) -and [string]::IsNullOrEmpty($env:GRYPE_DB_CACHE_DIR))}|ConvertTo-Json -Depth 4 -Compress`);
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout);
+    assert.deepEqual(data.first, { scanner, cache, pathRetained: true });
+    assert.deepEqual(data.second, { scanner: 'explicit-scanner', cache: 'explicit-cache' });
+    assert.equal(data.missingUnchanged, true);
+  } finally { fs.rmSync(fixture, { recursive: true, force: true }); }
+});
+
 for (const mode of ['Boot', 'Logon']) {
   test(`${mode} task uses owner identity, limited privileges and preserves tasks on registration failure`, { skip: !windows }, () => {
     for (const fail of [true, false]) {

@@ -5,7 +5,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { RemoteSessionGateway } = require('../src/remote/remote-session-gateway');
+const { RemoteSessionGateway, PUBLIC_AI_HTML } = require('../src/remote/remote-session-gateway');
+const { createPublicLocalMemory } = require('../src/remote/public-local-memory');
 const { PUBLIC_PROFILE_STYLE } = require('../src/remote/public-conversation-preferences');
 const { colors } = require('../config/nexus-design-tokens.json');
 const { browserExecutable, Cdp, evaluateWhenReady, freePort, waitForTarget, removeTemporaryPath } = require('./web-visual-regression');
@@ -16,9 +17,14 @@ async function main() {
   const live = process.argv.includes('--live');
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-profile-'));
   const output = path.resolve(__dirname, '../qa-artifacts');
+  const reportPath = path.join(output, 'public-personalization-report.json');
+  fs.writeFileSync(reportPath, JSON.stringify({ passed: false, startedAt: new Date().toISOString() }));
   const port = await freePort(), publicPort = await freePort(), debugPort = await freePort();
   const gateway = new RemoteSessionGateway({ statePath: path.join(profile, 'gateway.json'), publicPort,
-    conversationStore: { list: () => [], save: value => value }, logger: { info() {}, warn() {} } });
+    conversationStore: { list: () => [], save: value => value },
+    // Configuration is available while inference is deliberately not ready.
+    voiceTranscriber: async () => ({ text: 'unused fixture' }), voiceSynthesizer: async () => ({ audio: Buffer.alloc(0) }),
+    logger: { info() {}, warn() {} } });
   let client, child;
   try {
     if (!live) await gateway.configure({ enabled: true, allowLan: false, port });
@@ -59,7 +65,7 @@ async function main() {
             horizontalOverflow:box.left<0||box.right>innerWidth||dialog.scrollWidth>dialog.clientWidth,rows:rows.map(rect),box:rect(dialog)});
         }));
       })`);
-      assert.equal(geometry.title, 'Personalizzazione');
+      assert.equal(geometry.title, 'Impostazioni');
       assert.equal(geometry.layout, 'grid');
       assert.ok(geometry.selectHeight >= 46);
       assert.equal(geometry.surface, rgb(colors.surface));
@@ -87,8 +93,82 @@ async function main() {
     assert.equal(await evaluateWhenReady(client, `new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(!document.querySelector('#profileSheet').open&&document.activeElement===document.querySelector('#profileSettings')))))`), true);
     const actions = await client.evaluate(`(()=>{const a=document.querySelector('#profileSettings').getBoundingClientRect(),b=document.querySelector('#download').getBoundingClientRect();return {overlap:Math.min(a.right,b.right)-Math.max(a.left,b.left)>0,width:a.width,downloadWidth:b.width}})()`);
     assert.equal(actions.overlap, false);
-    fs.writeFileSync(path.join(output, 'public-personalization-report.json'), JSON.stringify({ passed: true, live, cspEnforced: true, saveResetPassed: true, actions, report }, null, 2));
-    console.log('PASS: CSP profile styles, 5 viewport/text scenarios, shared neutral tokens, keyboard focus, save/reset.');
+    await client.evaluate(`document.querySelector('#profileSettings').click();document.querySelector('#profile-tone').focus();true`);
+    let nativePicker = false;
+    if (await client.evaluate(`CSS.supports('appearance','base-select')`)) {
+      const field = await client.evaluate(`(()=>{const b=document.querySelector('#profile-tone').getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2}})()`);
+      await client.command('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...field });
+      await client.command('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...field });
+      nativePicker = await evaluateWhenReady(client, `new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(document.querySelector('#profile-tone').matches(':open')))))`);
+      const openImage = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+      fs.writeFileSync(path.join(output, 'public-personalization-open-picker.png'), Buffer.from(openImage.data, 'base64'));
+      assert.equal(nativePicker, true, 'the actual native picker must open: ' + JSON.stringify(await client.evaluate(`({appearance:getComputedStyle(document.querySelector('#profile-tone')).appearance,active:document.activeElement?.id,dialog:document.querySelector('#profileSheet').open})`)));
+      assert.equal(await client.evaluate(`getComputedStyle(document.querySelector('#profile-tone'),'::picker(select)').backgroundColor`), rgb(colors.surfaceRaised));
+      for (const [key, code, virtual] of [['ArrowDown', 'ArrowDown', 40], ['Enter', 'Enter', 13]]) {
+        await client.command('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: virtual });
+        await client.command('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: virtual });
+      }
+      assert.equal(await client.evaluate(`document.querySelector('#profile-tone').value`), 'warm');
+      assert.equal(await client.evaluate(`JSON.parse(localStorage.getItem('nexusnxs.conversation.preferences.v1')).tone`), 'warm');
+      assert.equal(await client.evaluate(`document.querySelector('#profileSheet').open`), true);
+    }
+    await client.evaluate(`document.querySelector('#profileServices').open=true;true`);
+    await evaluateWhenReady(client, `new Promise(resolve=>{const check=()=>document.querySelector('#profileServices').getAttribute('aria-busy')==='true'||document.querySelector('#profile-service-engine').textContent==='Da verificare'?setTimeout(check,30):resolve(true);check();})`);
+    if (!live) {
+      assert.equal(await client.evaluate(`document.querySelector('#profile-service-engine').textContent`), 'Non disponibile');
+      assert.equal(await client.evaluate(`document.querySelector('#profile-service-voice-input').textContent`), 'Disponibile');
+      assert.equal(await client.evaluate(`document.querySelector('#profile-service-voice-output').textContent`), 'Disponibile');
+    }
+    const expandedImage = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    fs.writeFileSync(path.join(output, 'public-personalization-services.png'), Buffer.from(expandedImage.data, 'base64'));
+    // A deliberately late mock response must not mutate a dismissed sheet.
+    assert.equal(await client.evaluate(`(async()=>{
+      const original=fetch,releases=[];globalThis.fetch=(url,options)=>['/readyz','/api/capabilities'].includes(url)?new Promise(resolve=>releases.push(()=>resolve(new Response(JSON.stringify(url==='/readyz'?{status:'ready'}:{capabilities:[]}),{status:200})))):original(url,options);
+      document.querySelector('#profileServiceRetry').click();
+      const before=[...document.querySelectorAll('.profile-service-row output')].map(node=>node.textContent).join('|');
+      document.querySelector('#profileSheet').close();for(const release of releases)release();
+      await new Promise(resolve=>setTimeout(resolve,80));globalThis.fetch=original;
+      return !document.querySelector('#profileSheet').open&&before===[...document.querySelectorAll('.profile-service-row output')].map(node=>node.textContent).join('|');
+    })()`), true);
+    for (const [width, height, scale] of [[320, 568, 1], [390, 844, 2], [844, 390, 1], [1440, 900, 1]]) {
+      await client.command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+      const expanded = await client.evaluate(`new Promise(resolve=>{
+        document.documentElement.style.fontSize='${scale * 100}%';document.querySelector('#profileSettings').click();
+        document.querySelector('#profileConversation').open=false;document.querySelector('#profileServices').open=true;document.querySelector('#profileData').open=true;
+        document.querySelector('#profileDelete').click();const dialog=document.querySelector('#profileSheet');dialog.scrollTop=dialog.scrollHeight;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=dialog.getBoundingClientRect(),close=dialog.querySelector('.sheet-top .sheet-close').getBoundingClientRect();resolve({overflow:dialog.scrollWidth>dialog.clientWidth,closeVisible:close.top>=box.top&&close.bottom<=box.bottom&&close.right<=box.right});}));
+      })`);
+      assert.equal(expanded.overflow, false); assert.equal(expanded.closeVisible, true, 'close must remain reachable while scrolling expanded settings');
+      const picture = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+      fs.writeFileSync(path.join(output, `public-settings-expanded-${width}-${scale}.png`), Buffer.from(picture.data, 'base64'));
+      await client.evaluate(`document.querySelector('#profileDeleteCancel').click();document.querySelector('#profileConversation').open=true;document.querySelector('#profileServices').open=false;document.querySelector('#profileData').open=false;document.querySelector('#profileSheet').close();true`);
+    }
+    if (!live) {
+      await client.evaluate(`(async()=>{const memory=(${createPublicLocalMemory.toString()})(()=>{});await memory.read();await memory.write([{role:'user',content:'Synthetic settings question'},{role:'assistant',content:'Synthetic settings answer'}]);return true})()`);
+      const timeOrigin = await client.evaluate('performance.timeOrigin');
+      await client.command('Page.reload', { ignoreCache: true });
+      await evaluateWhenReady(client, `new Promise(resolve=>{const check=()=>performance.timeOrigin===${timeOrigin}||document.documentElement.dataset.nxsBoot!=='ready'?setTimeout(check,30):resolve(true);check();})`);
+      const data = await client.evaluate(`(async()=>{
+        document.querySelector('#profileSettings').click();document.querySelector('#profileData').open=true;
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;let exported;
+        URL.createObjectURL=blob=>{exported=blob;return create(blob)};HTMLAnchorElement.prototype.click=function(){if(this.download!=='nexusnxs-conversazione.json')click.call(this)};
+        document.querySelector('#profileExport').click();const payload=JSON.parse(await exported.text());
+        URL.createObjectURL=create;HTMLAnchorElement.prototype.click=click;
+        document.querySelector('#profileDelete').click();const confirmationShown=!document.querySelector('.profile-confirm').hidden;
+        document.querySelector('#profileDeleteCancel').click();
+        const memory=(${createPublicLocalMemory.toString()})(()=>{});const retained=(await memory.read()).length;
+        document.querySelector('#profileDelete').click();document.querySelector('#profileDeleteConfirm').click();
+        let remaining=2;for(let i=0;i<40&&remaining;i++){remaining=(await memory.read()).length;if(remaining)await new Promise(resolve=>setTimeout(resolve,30));}
+        return {schema:payload.schema,turns:payload.turns,confirmationShown,retained,remaining,closed:!document.querySelector('#profileSheet').open,preferencesCleared:!localStorage.getItem('nexusnxs.conversation.preferences.v1')};
+      })()`);
+      assert.equal(data.schema, 'nexusnxs.conversation.export.v1');
+      assert.deepEqual(data.turns, [{ role: 'user', content: 'Synthetic settings question' }, { role: 'assistant', content: 'Synthetic settings answer' }]);
+      assert.equal(data.confirmationShown, true); assert.equal(data.retained, 2); assert.equal(data.remaining, 0);
+      assert.equal(data.closed && data.preferencesCleared, true);
+    }
+    fs.writeFileSync(reportPath, JSON.stringify({ passed: true, live, sourceSha256: require('node:crypto').createHash('sha256').update(PUBLIC_AI_HTML).digest('hex'), cspEnforced: true, saveResetPassed: true, nativePicker, lateStatusIgnored: true, syntheticHistoryExportDeletePassed: !live, actions, report }, null, 2));
+    console.log('PASS: neutral sections/native picker, status/readiness, late responses, synthetic history export/delete, 5 viewport/text scenarios, CSP and keyboard.');
   } finally {
     try { await client?.command('Browser.close'); } catch {}
     client?.close(); if (child && child.exitCode === null) child.kill();
