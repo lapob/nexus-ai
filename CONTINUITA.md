@@ -1,3 +1,55 @@
+# Final source verification — 21 October 2026
+
+Full suite: 1,119 passed, two skipped, zero failures. All 64 focused
+runtime/provider tests, cloud:check, workstation check and the isolated
+Electron renderer/IPC smoke pass. Browser source checks cover offline and
+reconnection, personalization and history deletion during generation. Both
+Android clients pass offline lintPreview compilation. Physical Samsung tests
+are postponed by the owner; iOS has not been compiled or tested on Apple.
+
+This is a source update only. No installer, APK, web deployment, model
+promotion or production service restart was performed. Public inference
+remains blocked by runtime admission and quality requirements. The next
+operational step is a concrete native distribution verifier and capability
+integration, followed by isolated quality and recovery gates before promotion.
+
+# Native lifecycle and cancellation boundaries — 21 October 2026
+
+Added an isolated native process manager with authenticated model probes,
+single-flight startup/recovery, bounded admission and shutdown, immutable local
+configuration and no reuse or termination of foreign listeners. It reuses the
+existing environment filter and owned-process termination helper. There is no
+default native admission implementation: a trusted verifier must explicitly
+bind its verdict to the executable, model, alias and usage. Evaluation admission
+cannot satisfy the public distribution gate. Production registration is still
+absent; this is not a public-service recovery announcement.
+
+The final Vulkan smoke passed under Node (6.57s startup/6.65s recovery) and
+Electron utilityProcess (21.83s/25.60s), including fresh integrity checks,
+unauthenticated rejection, chat, cancellation, subsequent chat and shutdown
+without an owned process remaining. These are isolated lifecycle
+measurements, not intelligence or voice benchmarks. The initial Deep attempt
+with 768 total tokens stopped without a valid final answer. A declared variant
+with the same total and a separate 512-token reasoning cap completes 100 raw
+and 100 pipeline cases: 88/100 and 89/100, with about 6.7s median latency. Both
+still fail mandatory/category gates; no promotion. Quick and Deep change both
+mode and budget, so this does not isolate the cap's effect or compare competitors.
+
+A private owner channel now closes the native child when its owner disappears.
+A real parent SIGKILL test verifies the listener disappears; standalone launch
+without the owner channel is rejected. Node uses IPC; Electron uses its utility
+process and MessagePort API, preserving RunAsNode:false. Final checks exposed
+and fixed delayed port release and shutdown waiting for a close event after
+exit had already confirmed termination. Binary/dependency admission remains
+separate. Failed smokes are retained alongside the final successful probes.
+
+AIRuntime now discards results and callbacks after cancellation/session
+replacement, frees external abort listeners and prevents an old finally or
+error from clearing a new request or changing its circuit breaker. Focused
+runtime/provider checks pass; see the final verification checkpoint for totals.
+Model Factory still has zero approved training examples/preferences: SFT/DPO
+remain blocked. No private conversation, vote or holdout is training data.
+
 # Current native technology and shared evaluation — 21 October 2026
 
 The existing eval lab now shares one network-free inference core across trusted

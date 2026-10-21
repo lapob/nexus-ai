@@ -15,7 +15,8 @@ function managedRuntimeSecurityUsage({ serverMode = false, isPackaged = true } =
 }
 
 async function assertRuntimeAdmission(runtime, { provider, requireDistribution = false } = {}) {
-  if (!runtime?.enabled && !(requireDistribution && provider === 'ollama')) return;
+  const localProvider = provider === 'ollama' || provider === 'llama-cpp';
+  if (!runtime?.enabled && !(requireDistribution && localProvider)) return;
   const state = runtime && await runtime.ensureHealthy({ requireDistribution });
   if (state?.available !== true) {
     throw new AIError(AI_ERROR_CODES.PROVIDER_UNAVAILABLE,
@@ -311,7 +312,8 @@ module.exports = {
   managedRuntimeSecurityUsage,
   parseExcludedTcpPortRanges,
   sanitizedRuntimeEnvironment,
-  selectManagedRuntimePort
+  selectManagedRuntimePort,
+  terminateOwnedProcessTree
 };
 
 // #endregion

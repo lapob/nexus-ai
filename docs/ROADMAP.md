@@ -1,5 +1,26 @@
 # Roadmap tecnica
 
+## Lifecycle verificato, produzione ancora da ammettere — 21 ottobre
+
+Completato il manager del processo nativo in isolamento, con autenticazione,
+ownership, avvio/recupero singoli e shutdown atteso. Probe401, chat, cancellazione,
+crash e chat successiva provati sul candidato reale; nessun processo rimasto.
+Completata la protezione comune da risposte/callback tardivi e finally di una
+sessione precedente. Questi blocchi non vanno ricreati nel prossimo harness.
+
+Prima di registrare il provider pubblico restano il verificatore concreto del
+binario/dipendenze, configurazione e contratti delle capacità, qualità ammessa
+e ripristino verificato del servizio. Deep con 768 token non completa una risposta
+valida nel primo confronto senza cap separato. Variante dichiarata cap 512/768 totali
+completa 100 casi raw e 100 pipeline con 88/89%, ma italiano e strumenti non superano tutti
+i requisiti e restano due must-pass falliti. Non ritoccare holdout o soglie per
+promuoverla. Guardia della perdita del proprietario provata con SIGKILL in Node
+ed Electron utility, preservando i fuse. Recupero porta e conferma exit corretti;
+smoke GPU finale PASS su Node ed Electron, quest'ultimo più lento e da profilare.
+Restano verificatore nativo concreto, composizione/capacità e servizio reale.
+La Model Factory conta 0 dati approvati; definire
+un corpus autorizzato/revisionato prima di stimare ed eseguire SFT/DPO.
+
 ## Candidato nativo misurato — 21 ottobre 2026
 
 Aggiornamento dello stesso giorno: provata anche build11789 conQwen3.5-9B

@@ -118,6 +118,52 @@ local development is not sufficient evidence for a public service.
 
 ### Native runtime candidate
 
+`ManagedLlamaRuntime` now owns the isolated candidate process. Startup and crash
+recovery are single-flight; probes require its private token and selected model.
+A failed stop retains ownership and prevents overlapping launches. Shutdown
+invalidates pending admission and waits for confirmed process exit, with close
+as a fallback when spawn fails. Application stdio is ignored; an IPC-disconnected
+supervisor can emit exit without a later close. The
+manager reuses the existing environment filter and process-tree termination.
+An internal IPC supervisor also terminates the native child if the owner exits
+abruptly. It refuses standalone startup without that channel and cannot accept
+replacement commands through messages. A real parent SIGKILL/listener test
+covers this boundary, separately from a normal application shutdown. Electron
+uses [utilityProcess](https://www.electronjs.org/docs/latest/api/utility-process)
+and a private owner MessagePort, while Node uses its IPC channel. The packaged
+RunAsNode fuse remains disabled. Real Electron checks cover normal shutdown,
+owner death and the actual Vulkan candidate; these are not installer tests.
+
+After an authenticated owned listener has exited, startup allows a bounded
+five-second wait for exclusive port release. A persistent foreign listener is
+still rejected. Shutdown requests owner-channel closure, then forces only the
+still-owned process tree/group if needed; failed termination never clears
+ownership to permit a competing model launch.
+Its default verifier rejects all launches. A trusted injected verifier must bind
+its explicit admission to canonical executable/model paths, alias and usage;
+this interface is not a completed distribution verifier. Evaluation mode cannot
+satisfy `assertRuntimeAdmission(..., { requireDistribution: true })`, and a
+missing/disabled native manager is rejected by that public gate.
+
+`providerConfig()` contains an ephemeral secret for trusted provider construction
+only: never persist it or expose it in IPC, settings, telemetry or logs. Environment
+variables do not provide arbitrary flags, remote URLs, inherited model credentials
+or a native admission bypass. The fixed server arguments were checked against the
+[pinned b11789 server contract](https://github.com/ggml-org/llama.cpp/blob/b531e4c7494e5a9349e40d2ea9efc3686f635cdf/tools/server/README.md).
+This manager remains absent from production composition until the remaining
+admission, capability and quality requirements below are met.
+
+The validated optional `reasoningBudget` maps to the pinned server's thinking
+budget; default `-1` preserves unrestricted behavior. With 768 total tokens and
+an explicit 512-token thinking cap, the existing 100-case holdout completes at
+88% raw/89% pipeline, about 6.7s median. It still fails mandatory/category gates.
+The uncapped attempt is retained as incomplete, not silently replaced. None of
+these measurements admits the runtime, proves voice quality or selects a model
+for production; raw/pipeline and Quick/Deep remain separate comparisons. The
+final smoke measured Node startup/recovery at 6.57s/6.65s and Electron at 21.83s/
+25.60s, including the harness's full integrity verification. The Electron path
+needs further profiling; do not present Node timings as packaged-app timings.
+
 `src/ai/providers/llama-cpp-provider.js` implements the existing AIProvider
 contract for isolated local comparisons. It is intentionally absent from the
 production configuration allowlist and bootstrap registry. Importing it or

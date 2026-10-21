@@ -39,9 +39,11 @@ test('annullamenti e input non validi non aprono il circuito del provider', asyn
   assert.equal(runtime.circuitStatus().chat.state, 'closed');
 });
 
-test('propaga anche un segnale esterno già annullato prima dell avvio provider', async () => {
+test('un segnale esterno già annullato impedisce l avvio del provider', async () => {
+  let calls = 0;
   const provider = new MockProvider();
   provider.chat = async (request) => {
+    calls++;
     assert.equal(request.signal.aborted, true);
     throw Object.assign(new Error('aborted'), { name: 'AbortError' });
   };
@@ -55,6 +57,7 @@ test('propaga anche un segnale esterno già annullato prima dell avvio provider'
     (error) => error.code === AI_ERROR_CODES.REQUEST_CANCELLED
   );
   assert.equal(runtime.requests.size, 0);
+  assert.equal(calls, 0);
 });
 
 test('non riusa un requestId finché il trasporto annullato non è terminato', async () => {
@@ -105,4 +108,83 @@ test('il pet riceve solo stati reali e resta attivo fino alla fine delle richies
   assert.deepEqual(states, ['thinking', 'responding', 'thinking', 'idle']);
   assert.deepEqual(tokens, ['private content']);
   unsubscribe(); await runtime.shutdown();
+});
+
+test('annullamento scarta anche una risposta completa di un provider che ignora il signal', async () => {
+  let release;
+  const provider = new MockProvider();
+  provider.chat = () => new Promise(resolve => { release = resolve; });
+  const runtime = new AIRuntime({ registry: new AIProviderRegistry().register('mock', () => provider) });
+  await runtime.initialize({ provider: 'mock' });
+  const pending = runtime.chat({ requestId: 'late-full', messages: [{ role: 'user', content: 'prima' }] });
+  runtime.cancel('late-full'); release({ message: { content: 'late answer' } });
+  await assert.rejects(pending, error => error.code === AI_ERROR_CODES.REQUEST_CANCELLED);
+  assert.equal(runtime.requests.size, 0); assert.equal(runtime.circuitStatus().chat.failures, 0);
+});
+
+test('token, ragionamento e completamento buffered dopo cancel non raggiungono UI o attività', async () => {
+  const provider = new MockProvider(), events = [], states = [];
+  provider.streamChat = async (_request, handlers) => {
+    handlers.onStart({}); handlers.onToken('first');
+    handlers.onThinking('late reasoning'); handlers.onToken('late');
+    handlers.onComplete({ message: { content: 'late complete' } }); handlers.onCancel();
+    return { message: { content: 'late result' } };
+  };
+  const runtime = new AIRuntime({ registry: new AIProviderRegistry().register('mock', () => provider) });
+  await runtime.initialize({ provider: 'mock' }); runtime.subscribeActivity(state => states.push(state));
+  await assert.rejects(runtime.streamChat({ requestId: 'buffered', messages: [{ role: 'user', content: 'hi' }] }, {
+    onStart: () => events.push('start'),
+    onToken: token => { events.push(token); runtime.cancel('buffered'); },
+    onThinking: () => events.push('thinking'), onComplete: () => events.push('complete'),
+    onCancel: () => events.push('cancel')
+  }), error => error.code === AI_ERROR_CODES.REQUEST_CANCELLED);
+  assert.deepEqual(events, ['start', 'first', 'cancel']);
+  assert.deepEqual(states, ['thinking', 'responding', 'idle']);
+});
+
+test('callback conservate dal provider dopo il finally non riattivano il core', async () => {
+  const provider = new MockProvider(), events = [], states = []; let saved;
+  provider.streamChat = async (_request, handlers) => { saved = handlers; return {}; };
+  const runtime = new AIRuntime({ registry: new AIProviderRegistry().register('mock', () => provider) });
+  await runtime.initialize({ provider: 'mock' }); runtime.subscribeActivity(state => states.push(state));
+  await runtime.streamChat({ requestId: 'finished', messages: [{ role: 'user', content: 'hi' }] }, {
+    onToken: () => events.push('token'), onThinking: () => events.push('thinking'),
+    onComplete: () => events.push('complete'), onError: () => events.push('error'), onCancel: () => events.push('cancel')
+  });
+  saved.onToken('late'); saved.onThinking('late'); saved.onComplete({}); saved.onError({}); saved.onCancel();
+  assert.deepEqual(events, []); assert.deepEqual(states, ['thinking', 'idle']); assert.equal(runtime.activity.size, 0);
+});
+
+test('i listener di abort esterni si liberano dopo successo, errore e shutdown', async () => {
+  const { getEventListeners } = require('node:events');
+  const provider = new MockProvider(), external = new AbortController();
+  const runtime = new AIRuntime({ registry: new AIProviderRegistry().register('mock', () => provider) });
+  await runtime.initialize({ provider: 'mock' });
+  const request = id => ({ requestId: id, signal: external.signal, messages: [{ role: 'user', content: 'hi' }] });
+  for (let i = 0; i < 20; i++) await runtime.chat(request('complete-' + i));
+  assert.equal(getEventListeners(external.signal, 'abort').length, 0);
+  provider.chat = async () => { throw new TypeError('fetch failed'); };
+  await assert.rejects(runtime.chat(request('failed'))); assert.equal(getEventListeners(external.signal, 'abort').length, 0);
+  let release; provider.chat = () => new Promise(resolve => { release = resolve; });
+  const pending = runtime.chat(request('shutdown')); assert.equal(getEventListeners(external.signal, 'abort').length, 1);
+  await runtime.shutdown(); assert.equal(getEventListeners(external.signal, 'abort').length, 0);
+  release({}); await assert.rejects(pending, error => error.code === AI_ERROR_CODES.REQUEST_CANCELLED);
+});
+
+test('finally ed errori della vecchia sessione non cancellano richieste o circuito della nuova', async () => {
+  const old = new MockProvider(), fresh = new MockProvider(); let rejectOld, resolveFresh, call = 0;
+  old.chat = () => new Promise((_resolve, reject) => { rejectOld = reject; });
+  fresh.chat = () => new Promise(resolve => { resolveFresh = resolve; });
+  const registry = new AIProviderRegistry().register('mock', () => call++ === 0 ? old : fresh);
+  const runtime = new AIRuntime({ registry, breakerOptions: { failureThreshold: 1 } });
+  await runtime.initialize({ provider: 'mock' });
+  const request = { requestId: 'shared-id', messages: [{ role: 'user', content: 'hi' }] };
+  const previous = runtime.chat(request); await runtime.initialize({ provider: 'mock' });
+  const next = runtime.chat(request), controller = runtime.requests.get('shared-id');
+  rejectOld(new TypeError('fetch failed'));
+  await assert.rejects(previous, error => error.code === AI_ERROR_CODES.REQUEST_CANCELLED);
+  assert.equal(runtime.requests.get('shared-id'), controller); assert.equal(runtime.activity.get('shared-id'), 'thinking');
+  assert.equal(runtime.circuitStatus().chat.state, 'closed');
+  resolveFresh({ message: { content: 'current' } }); assert.equal((await next).message.content, 'current');
+  assert.equal(runtime.requests.size, 0);
 });

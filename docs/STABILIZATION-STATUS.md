@@ -1,3 +1,47 @@
+## Lifecycle nativo e annullamento — 21 ottobre
+
+Il manager nativo candidato gestisce avvio singolo, probe autenticato del
+modello, recupero dopo crash e attesa della chiusura del solo processo posseduto.
+Se la terminazione fallisce conserva il riferimento e impedisce un secondo
+avvio. Porta occupata, uscita durante health, shutdown durante ammissione,
+timeout, configurazione immutabile e profilo evaluation non distribuibile sono
+coperti da regressioni. Il verificatore nativo predefinito rifiuta l'avvio:
+non sono state aggiunte deroghe, configurazioni pubbliche o promozioni.
+
+Primo smoke Vulkan reale PASS: avvio 6421 ms, chat, 401 senza token,
+annullamento, crash/recupero 6446 ms, nuova chat e shutdown senza orfani.
+Il primo confronto Deep con 768 token senza cap separato si interrompe senza
+risposta finale. La variante dichiarata con 768 totali e cap 512 completa
+100 casi raw e 100 pipeline: 88%/89%, mediana 6,7 secondi, due casi obbligatori
+ancora falliti nella pipeline. Quick 73/76/77% rimane
+un profilo diverso e più veloce. Nessuna variante ammessa; dettagli per categoria
+e limiti del confronto in MODEL_TRAINING.md.
+
+Supervisore IPC interno aggiunto dopo aver identificato il caso di morte brusca
+del proprietario: arresta il solo figlio nativo alla perdita del canale. Test
+con vero SIGKILL del parent e listener HTTP PASS, avvio standalone senza IPC
+rifiutato. Node usa IPC, Electron utilityProcess/MessagePort con RunAsNode:false
+preservato. Corretti anche rilascio tardivo della porta dopo crash e attesa di
+close quando exit aveva già confermato la terminazione. Smoke finale completo
+su Node: avvio 6,57s/recupero 6,65s; su Electron: 21,83s/25,60s, incluse le
+verifiche di integrità. Entrambi confermano arresto e assenza di processi
+posseduti rimasti. Il percorso Electron richiede profilazione. Non sostituisce
+l'ammissione del binario o le prove di produzione. Public e Control superano
+lintPreview e compilazione offline; prove fisiche Samsung rimandate dal
+proprietario. iOS non è stato compilato.
+
+Corretto anche il confine comune delle richieste: risultati/token tardivi
+vengono scartati dopo annullamento, i listener esterni vengono rimossi e una
+vecchia sessione non cancella una nuova richiesta con lo stesso ID né ne
+altera il circuito. Nessuna modifica del renderer o dipendenza aggiunta.
+Factory controllata nuovamente: 0 esempi e 0 preferenze approvati; nessun training.
+Distribuzione del motore, qualità e collaudo umano della voce restano aperti.
+
+Gate sorgenti finale: 1119 PASS, 2 SKIP, 0 FAIL; 64 test mirati PASS,
+cloud:check e check PASS. Smoke desktop isolato Electron/preload/CSP/IPC PASS;
+browser offline, impostazioni e reset cronologia PASS. Shell invariata a
+230565 byte. Nessun aggiornamento dei client installati o deploy pubblico.
+
 ## Tecnologia corrente e revisione nativa — 21 ottobre
 
 Verificate fonti primarie e metadati correnti, senza attivare cloud: build

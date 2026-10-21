@@ -15,11 +15,16 @@ function breakerFailure(error) {
     && error?.code !== AI_ERROR_CODES.MODEL_NOT_SELECTED;
 }
 
+function cancelledRequest(provider) {
+  return new AIError(AI_ERROR_CODES.REQUEST_CANCELLED, 'Richiesta AI annullata.', { provider, retryable: true });
+}
+
 // #region 01 — Lifecycle e catalogo
 
 class AIRuntime {
   constructor({ registry, logger = null, breakerOptions = {} } = {}) {
     this.registry = registry; this.logger = logger; this.provider = null; this.providerName = null; this.requests = new Map();
+    this.externalAbortCleanup = new Map();
     this.activityListeners = new Set(); this.activity = new Map(); this.lastActivity = 'idle';
     this.breakerOptions = breakerOptions;
     this.breakers = this.createBreakers();
@@ -36,9 +41,9 @@ class AIRuntime {
       provider: this.providerName || 'unknown', retryable: true, details: { retryAt }
     });
   }
-  record(operation, error = null) {
+  record(operation, error = null, expectedBreaker) {
     const breaker = this.breaker(operation);
-    if (!breaker) return;
+    if (!breaker || (expectedBreaker && breaker !== expectedBreaker)) return;
     if (!error) breaker.success();
     else if (breakerFailure(error)) breaker.failure();
   }
@@ -69,7 +74,11 @@ class AIRuntime {
       try { listener(state); } catch { /* Visual observers cannot break AI requests. */ }
     }
   }
-  finish(requestId) {
+  finish(requestId, controller) {
+    this.externalAbortCleanup.get(controller)?.();
+    this.externalAbortCleanup.delete(controller);
+    // Un vecchio finally non può liberare l'ID riusato dopo shutdown/initialize.
+    if (this.requests.get(requestId) !== controller) return;
     this.requests.delete(requestId); this.activity.delete(requestId); this.publishActivity();
   }
   begin(requestId, externalSignal) {
@@ -81,18 +90,72 @@ class AIRuntime {
     // sostituita di raggiungere comunque il provider e generare una seconda
     // risposta tardiva.
     if (externalSignal?.aborted) controller.abort(externalSignal.reason);
-    else externalSignal?.addEventListener('abort', () => controller.abort(externalSignal.reason), { once: true });
+    else if (externalSignal) {
+      const abort = () => controller.abort(externalSignal.reason);
+      externalSignal.addEventListener('abort', abort, { once: true });
+      this.externalAbortCleanup.set(controller, () => externalSignal.removeEventListener('abort', abort));
+    }
     this.requests.set(requestId, controller);
     this.activity.set(requestId, 'thinking'); this.publishActivity();
     return controller;
   }
-  async chat(request) { const valid = validateChatRequest(request); this.permit('chat'); const controller = this.begin(valid.requestId, valid.signal); try { const result = await this.requireProvider().chat({ ...valid, signal: controller.signal }); this.record('chat'); return result; } catch (error) { const normalized = normalizeAIError(error, this.providerName); this.record('chat', normalized); throw normalized; } finally { this.finish(valid.requestId); } }
-  async streamChat(request, handlers) { const valid = validateChatRequest(request); this.permit('stream'); const controller = this.begin(valid.requestId, valid.signal); try { const result = await this.requireProvider().streamChat({ ...valid, signal: controller.signal }, { ...handlers, onToken: (...args) => {
-      if (this.activity.get(valid.requestId) !== 'responding') {
-        this.activity.set(valid.requestId, 'responding'); this.publishActivity();
-      }
-      return handlers?.onToken?.(...args);
-    } }); this.record('stream'); return result; } catch (error) { const normalized = normalizeAIError(error, this.providerName); this.record('stream', normalized); throw normalized; } finally { this.finish(valid.requestId); } }
+  assertActive(requestId, controller) {
+    if (controller.signal.aborted || this.requests.get(requestId) !== controller) {
+      throw cancelledRequest(this.providerName);
+    }
+  }
+  async chat(request) {
+    const valid = validateChatRequest(request), breaker = this.permit('chat');
+    const controller = this.begin(valid.requestId, valid.signal), providerName = this.providerName;
+    try {
+      this.assertActive(valid.requestId, controller);
+      const result = await this.requireProvider().chat({ ...valid, signal: controller.signal });
+      this.assertActive(valid.requestId, controller);
+      this.record('chat', null, breaker); return result;
+    } catch (error) {
+      const normalized = controller.signal.aborted ? cancelledRequest(providerName) : normalizeAIError(error, providerName);
+      this.record('chat', normalized, breaker); throw normalized;
+    } finally { this.finish(valid.requestId, controller); }
+  }
+  async streamChat(request, handlers = {}) {
+    const valid = validateChatRequest(request), breaker = this.permit('stream');
+    const controller = this.begin(valid.requestId, valid.signal), providerName = this.providerName;
+    let closed = false, terminal = false;
+    const current = () => !closed && this.requests.get(valid.requestId) === controller;
+    const active = () => current() && !controller.signal.aborted && !terminal;
+    const emit = (name, args) => {
+      if (!active()) return;
+      if (name === 'onComplete' || name === 'onError') terminal = true;
+      return handlers[name]?.(...args);
+    };
+    const cancel = () => {
+      if (!current() || terminal) return;
+      terminal = true; handlers.onCancel?.();
+    };
+    try {
+      this.assertActive(valid.requestId, controller);
+      const result = await this.requireProvider().streamChat({ ...valid, signal: controller.signal }, {
+        ...handlers,
+        onStart: (...args) => emit('onStart', args),
+        onThinking: (...args) => emit('onThinking', args),
+        onToken: (...args) => {
+          if (!active()) return;
+          if (this.activity.get(valid.requestId) !== 'responding') {
+            this.activity.set(valid.requestId, 'responding'); this.publishActivity();
+          }
+          return emit('onToken', args);
+        },
+        onComplete: (...args) => emit('onComplete', args),
+        onError: (...args) => emit('onError', args), onCancel: cancel
+      });
+      this.assertActive(valid.requestId, controller);
+      this.record('stream', null, breaker); return result;
+    } catch (error) {
+      const normalized = controller.signal.aborted ? cancelledRequest(providerName) : normalizeAIError(error, providerName);
+      if (normalized.code === AI_ERROR_CODES.REQUEST_CANCELLED) cancel();
+      this.record('stream', normalized, breaker); throw normalized;
+    } finally { closed = true; this.finish(valid.requestId, controller); }
+  }
   async embed(input, options) { this.permit('embed'); try { const result = await this.requireProvider().embed(input, options); this.record('embed'); return result; } catch (error) { const normalized = normalizeAIError(error, this.providerName); this.record('embed', normalized); throw normalized; } }
   async transcribeVoiceAudio(audio, options = {}) {
     const provider = this.requireProvider();
@@ -114,7 +177,7 @@ class AIRuntime {
     this.provider?.cancel(requestId);
     return true;
   }
-  async shutdown() { for (const controller of this.requests.values()) controller.abort(); this.requests.clear(); this.activity.clear(); this.publishActivity(); if (this.provider) await this.provider.shutdown(); this.provider = null; this.providerName = null; }
+  async shutdown() { for (const controller of this.requests.values()) controller.abort(); for (const cleanup of this.externalAbortCleanup.values()) cleanup(); this.externalAbortCleanup.clear(); this.requests.clear(); this.activity.clear(); this.publishActivity(); if (this.provider) await this.provider.shutdown(); this.provider = null; this.providerName = null; }
 }
 module.exports = { AIRuntime };
 
