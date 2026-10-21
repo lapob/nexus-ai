@@ -1,5 +1,16 @@
 # Roadmap tecnica
 
+## Candidato nativo misurato — 21 ottobre 2026
+
+Trasporto candidato compatibile con AIRuntime verificato con token, streaming,
+annullamento e timeout. Non selezionabile in produzione. Confronto raw completo
+100casi Quick e100Deep sul14B esistente:75% in entrambi, gate fallito. Prima di
+promuovere: ammissione dipendenze/binario nativo, ownership/recupero e tutti gli
+ingressi pubblici; compatibilita immagini/embedding e ragionamento dichiarata;
+qualita della pipeline completa con strumenti/revisione esistenti e holdout
+separato. Nessuna diminuzione soglie o nuova raccolta di chat per il training.
+Readiness503 e voce umana ancora aperti: il nuovo adattatore non li dichiara risolti.
+
 ## Memoria locale e disponibilita — 10 ottobre 2026
 
 Preview29 pubblicata e servizio aggiornato: cronologia web locale senza account,

@@ -1,3 +1,39 @@
+## Confronto nativo completo — 21 ottobre
+
+Adattatore sperimentale llama.cpp attraverso lo stesso contratto AIRuntime,
+escluso da configurazione e bootstrap di produzione. Token privato, loopback
+numerico, redirect vietati, limiti JSON/SSE, cancellazione e timeout sul body;
+ragionamento separato dal testo finale. La review ha riprodotto e corretto
+timeout Deep incompatibili e token buffered emessi dopo abort. Sedici test del
+nuovo trasporto e ventidue dei contratti esistenti PASS prima del gate finale.
+Gate finale1090PASS/2SKIP/0FAIL, cloud:check/checkPASS e shell230565byte,
+WebGL differito invariato. Health200/ready503 locale e pubblico dopo le prove.
+Immagini, tool nativi, embedding e livelli granulari non sono supportati:
+vengono rifiutati esplicitamente, senza fingere equivalenza con altri prodotti.
+
+Pesi14B, archivio e inventario binari esistenti ricalcolati prima di ciascuna
+prova isolata. Holdout invariato100casi, nessun training o repair:75PASS/25FAIL
+in Quick e75PASS/25FAIL in Deep, sotto soglia80% e con cinque must-pass falliti.
+Mediana/p95 Quick184/868ms, Deep261/932ms sulla sola workstation misurata;
+questi sono roundtrip corti del modello, non latenza di voce, web o servizio.
+Nessuna prova di parita con Claude/ChatGPT. Le violazioni dei vincoli e le
+regex di prompt-security non provano automaticamente divulgazione di segreti.
+
+Due stream Deep distinti confermano ragionamento separato, token finali
+coerenti e circa10.4–10.6s fino al testo finale su una singola domanda breve.
+Annullamento reale PASS. Il primo assert di recupero richiedeva esattamente
+OK e falliva; il secondo conserva la risposta effettiva OK., dimostrando
+recupero del trasporto ma non rispetto letterale del formato. Entrambi i figli
+sono stati arrestati; nessun modello o servizio attivo sostituito.
+
+La provenienza ufficiale gia verificata e gli hash non ammettono da soli il
+runtime nativo. Copertura dipendenze C++, ammissione/ownership/recupero e
+compatibilita completa rimangono bloccanti, oltre al gate di qualita fallito.
+Ollama continua a essere rifiutato; readiness pubblica503, cloud disattivato.
+Nessun deploy, installatore o dichiarazione di prodotto finito. Prossimo passo:
+ammissione verificabile e confronto della pipeline completa con strumenti e
+revisione gia esistenti, senza usare gli assert del holdout come dati di training.
+
 ## Offline, ricerca e patch dipendenze — 21 ottobre
 
 Worker offline condiviso con il sito e servito anche senza tunnel AI, cache

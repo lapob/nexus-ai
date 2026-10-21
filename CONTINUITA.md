@@ -1,3 +1,33 @@
+# Native inference candidate — 21 October 2026
+
+Added an isolated llama.cpp adapter implementing the existing AIProvider
+contract. Production configuration and bootstrap still exclude it; no runtime
+admission, service update or cloud fallback is implied. Native unsupported
+images/tools/embeddings/effort levels fail explicitly. Existing research/action
+authorization is not replaced. Sixteen focused transport tests plus22 existing
+runtime/admission tests pass. Review reproduced and fixed Deep request-timeout
+compatibility and buffered SSE tokens arriving after cancellation.
+
+Completed separate raw100-case Quick and Deep comparisons with the existing
+14B weights and reviewed holdout:75/100 in each, below80% and failing five
+must-pass cases. Quick median/p95184/868ms, Deep261/932ms in these short local
+tasks. No repair, deterministic tools or training used. Exact final-format
+failures remain failures. This is not a production-pipeline or competitor score.
+Two real native streams confirm separate reasoning and matching final tokens;
+time to final text on one small Deep prompt was about10.4–10.6s. Cancellation
+works; the second recovery probe retains OK. rather than claiming exact OK.
+Both owned candidate processes were stopped. No binary/model downloads.
+
+Native dependency coverage and admission/ownership/recovery remain uncompleted;
+zero C++ scanner matches and verified origin do not substitute for admission.
+The selected candidate also fails quality. Public readiness is still503 and
+distribution of updated services/website remains blocked. Cloud stays off.
+See docs/SERVER_OPERATIONS.md and docs/STABILIZATION-STATUS.md for constraints.
+Final source verification:1090 pass,2 skip,0 fail;38 focused runtime/transport
+tests, cloud:check and check pass. Renderer startup remains230565 bytes with
+deferred WebGL; the experimental adapter adds no renderer startup import.
+Post-comparison loopback and public probes both return health200/ready503.
+
 # Offline recovery and dependency patches — 21 October 2026
 
 The canonical AI service worker now serves only root/index navigation, uses a

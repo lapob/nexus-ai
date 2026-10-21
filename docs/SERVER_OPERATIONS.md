@@ -116,6 +116,42 @@ findings, then verifies publication boundaries, dependencies, the SBOM,
 security regressions and bounded gateway load. The loopback exception used by
 local development is not sufficient evidence for a public service.
 
+### Native runtime candidate
+
+`src/ai/providers/llama-cpp-provider.js` implements the existing AIProvider
+contract for isolated local comparisons. It is intentionally absent from the
+production configuration allowlist and bootstrap registry. Importing it or
+obtaining a successful `health()` checks connectivity and the selected model;
+neither admits a binary for distribution. No cloud fallback is introduced.
+
+The candidate requires an explicit numeric loopback endpoint and a private
+bearer token, refuses HTTP redirects, bounds JSON/SSE consumption and keeps
+reasoning separate from the final answer. Cancellation belongs to AIRuntime;
+buffered events stop after abort and request timeouts cover response bodies.
+Deep supports the existing hardware-profile request budgets up to ten minutes.
+Only one loaded model is exposed: model download/creation, native tool calls,
+vision, embeddings and granular reasoning effort are explicitly unsupported.
+Do not silently discard an image or reinterpret a tool message as ordinary text.
+Existing application-level research and action permissions are separate from
+native tool calling; they must retain their existing authorization boundaries.
+
+The native server must use its separated reasoning parser, authenticated
+loopback binding and offline mode, with web UI, agent execution, MCP proxy and
+slot exposure disabled. This is a test setup, not a deployment recipe. See the
+[pinned server contract](https://github.com/ggml-org/llama.cpp/blob/b11707/tools/server/README.md).
+Before any production registration, implement admission for the exact native
+binary and its dependencies, executable ownership and recovery; preserve the
+public distribution gate on every request path. A C++ archive with zero Grype
+matches is not proof of dependency coverage. Official provenance and artifact
+hashes prove origin and integrity, not absence of vulnerabilities.
+
+Evaluation reuses the reviewed `config/evals/nexusnxs-core-v1.json` holdout,
+`buildInferencePayload`, `scoreCase` and `buildModelReport`. Keep raw-model
+results distinct from the application pipeline, deterministic tools or repair
+passes. Preserve failed cases, mode, exact sampling parameters, model/runtime
+hashes, resource/isolation checks and cancellation evidence. Do not train on
+the holdout, lower its thresholds or promote a model from a selected subset.
+
 ## Resource policy
 
 - The selected fast model warms after server readiness without delaying the
