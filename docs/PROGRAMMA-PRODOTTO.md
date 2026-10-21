@@ -1,5 +1,29 @@
 # Programma prodotto e criteri di completamento
 
+## Tecnologia e limiti misurati — 21 ottobre 2026
+
+Sorgenti del trasporto nativo isolato pubblicati, senza registrarlo nel servizio.
+Valutazioni complete:14Braw75% Quick/Deep; nuova candidata9B con build delgiorno
+73% raw,76% pipeline,77% raw con parametri ufficiali. Nessuna supera tutti i gate.
+Corretto un errore reale500 nella revisione con i template nativi moderni;
+protocollo/scoring/revisione riusano ora lo stesso eval lab. Non attribuire le
+differenze al solo modello: i confronti14B e9B usano anche build runtime diverse.
+Locale predefinito/cloud spento, nessun training o promozione automatica.
+
+Fonti primarie controllate il21ottobre per la successiva scelta delle candidate:
+
+| Tecnologia | Evidenza disponibile | Decisione corrente |
+| --- | --- | --- |
+| [llama.cpp b11789](https://github.com/ggml-org/llama.cpp/releases/tag/b11789) | Release del21ottobre; firma/provenienza e hash verificati per la prova | Candidata isolata; ammissione dipendenze/lifecycle ancora necessaria |
+| [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B) | Modello2026; provata conversioneGGUF Unsloth5.68GB con revisione/hash fissati | Tre varianti misurate sotto gate; nessuna selezione attiva |
+| [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) | Modello recente e card ufficiale; dimensioni piu impegnative | Non scaricato: richiede stima concreta memoria/quantizzazione e confronto isolato |
+| [Voxtral3](https://legal.mistral.ai/ai-governance/models/voxtral-3/) | Release20ottobre; disponibilita dei servizi ufficiali verificata | API non equivale disponibilita locale; cloud rimane disattivato |
+
+Restano prioritari ammissione sicura del motore, qualita della pipeline su tutti
+i criteri, recupero servizio e prove umane di voce. Dipendenze npm senza rilievi
+nei nuovi audit; versioni piu recenti vanno ammesse con test e rollback, senza
+scambiare il numero di versione per qualita o sicurezza dimostrate.
+
 ## Aggiornamento 17 ottobre 2026
 
 Control43 finale supera matrice fisica e interazioni non distruttive sullo

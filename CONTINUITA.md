@@ -1,3 +1,37 @@
+# Current native technology and shared evaluation — 21 October 2026
+
+The existing eval lab now shares one network-free inference core across trusted
+isolated transports. Its Ollama CLI retains endpoint/RAM/CPU checks. Raw mode
+does not use deterministic replies or repair; pipeline reports keep those
+separate from first-pass model quality. Three new source tests cover this
+contract without network, private data or models. Native MinP/presence penalty
+are explicit and validated; live defaults remain unchanged.
+
+A real native HTTP500 during internal response review was reproduced: current
+templates require an initial system message. Chat/stream payloads now join only
+existing system instructions at the beginning, preserving their order and all
+user/assistant content. The regression includes malicious-looking system tags
+in user text and verifies they are never promoted to system instructions.
+
+Tested the21October llama.cpp b11789 build with a pinned Qwen3.5-9B quantization.
+Official runtime provenance, archive and extracted-file integrity pass; the
+publisher's commit is recorded separately from the compiled-source commit.
+Downloaded one hash-addressed candidate weight, no aliases or production model
+changes, no vision projector. Full repeated holdout results: raw73/100,
+pipeline76/100 (nine deterministic cases,25 reviews), official-sampling raw77/100.
+Every variant fails a quality gate. The corrected pipeline completes without
+the original500. One Deep text stream finishes in4.33s with separate reasoning,
+matching final tokens, real cancellation and successful next request. This is
+not a voice or competitor benchmark. No automatic promotion or training.
+
+Fresh npm audits excluding optional dependencies report zero findings in both
+repositories. Native C++ dependency coverage/admission and lifecycle still need
+completion; signature checks and selected dependency advisories do not replace
+them. Public readiness stays503, no production deployment and cloud stays off.
+Final source gate after the template fix:1094 pass,2 skip,0 fail;39 focused
+checks, cloud:check/check and publication safety pass. No renderer changes or
+new dependencies; shell startup remains230565 bytes with deferred WebGL.
+
 # Native inference candidate — 21 October 2026
 
 Added an isolated llama.cpp adapter implementing the existing AIProvider

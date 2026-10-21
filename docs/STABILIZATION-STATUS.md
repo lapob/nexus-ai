@@ -1,3 +1,47 @@
+## Tecnologia corrente e revisione nativa — 21 ottobre
+
+Verificate fonti primarie e metadati correnti, senza attivare cloud: build
+llama.cpp b11789 del21ottobre, Qwen3.8-27B, Qwen3.5-9B e nuove API Voxtral3.
+Una disponibilita API non implica pesi locali o compatibilita sul dispositivo.
+La candidata9B quantizzata Unsloth e stata scaricata con revisione e SHA
+pinnati, una sola copia per hash, Apache2 dichiarata e nessun remote-code.
+Projector visivo e altri modelli non scaricati. Provenienza ufficiale del
+runtime Sigstore/TUF e alterazione rifiutata PASS; il commit del publisher
+e distinto dal commit del codice compilato, corroborato da tag/build/API/versione.
+Dipendenze selezionate source-pinned httplib0.62.0 e json3.12.0 controllate;
+snapshot advisory13/23/0, non una SBOM completa o audit di raggiungibilita.
+
+Il confronto9B iniziale si interrompeva con HTTP500 nella revisione: i template
+recenti richiedono il system iniziale, mentre la pipeline aggiungeva il proprio
+system di review in fondo. Corretto nel payload comune chat/stream, riunendo
+solo messaggi gia system in ordine e preservando utente/assistant e input.
+Regressione con falsi tag system nel contenuto utente PASS, senza elevazione.
+Dopo la correzione tutte le tre varianti100casi completano:73% raw,76% pipeline
+con9fast-path e25revisioni,77% raw con sampling ufficiale prespecificato.
+Tutte falliscono gate globale/categorie/must-pass; nessuna promozione.
+Un campione di streaming testuale Deep impiega4294ms fino al testo finale,
+4333ms complessivi,329eventi separati di ragionamento e token coerenti;
+annullamento e risposta successiva OK PASS. Non misura latenza o naturalezza vocale.
+
+Protocollo, scoring e revisione dell'eval lab ora condividono un unico nucleo
+iniettabile senza rete: CLI Ollama, isolamento/CPU/RAM e comportamento predefinito
+restano invariati. Tre nuovi test distinguono raw/pipeline, una sola revisione,
+assenza delle risposte attese nei payload e guasti senza fallback. MinP e presence
+penalty espliciti e validati consentono ricette del produttore riproducibili.
+Audit npm freschi senza optional:0rilievi in entrambi i repository; npm outdated
+segnala aggiornamenti disponibili, non un audit superato per ogni binario nativo.
+Non sono stati applicati upgrade maggiori indiscriminati. Un giro congiunto dei
+test aveva terminato il file provider senza diagnostica; TAP mirato16PASS e
+successivo completo1093PASS/2SKIP, causa non dimostrata e storico conservato.
+Questi conteggi precedono l'ultima regressione system; vedere checkpoint finale.
+Gate finale dopo fixsystem:1094PASS/2SKIP/0FAIL,39mirati,cloud:check/checkPASS;
+startup230565byte invariato, nessuna nuova dipendenza o modifica del renderer.
+
+Produzione e servizio invariati, readiness503 e cloud disattivato. Restano
+ammissione nativa con copertura reale, lifecycle/ownership e compatibilita,
+qualita sopra tutte le soglie e voce umana. Nessuna parita o superiorita su
+Claude/ChatGPT dimostrata; aggiornamento dei sorgenti distinto da rilascio operativo.
+
 ## Confronto nativo completo — 21 ottobre
 
 Adattatore sperimentale llama.cpp attraverso lo stesso contratto AIRuntime,

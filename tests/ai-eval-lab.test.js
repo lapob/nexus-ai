@@ -16,6 +16,7 @@ const {
   composeSystemPrompt,
   correctionDirective,
   evaluateFixture,
+  evaluateInferenceModel,
   extractAnswer,
   loadSuite,
   prepareEvaluation,
@@ -27,6 +28,54 @@ const {
 
 const root = path.resolve(__dirname, '..');
 const suitePath = path.join(root, 'config', 'evals', 'nexusnxs-core-v1.json');
+
+function selectedSuite(ids) {
+  const { suite } = loadSuite(suitePath);
+  suite.cases = suite.cases.filter(item => ids.includes(item.id));
+  const categories = new Set(suite.cases.map(item => item.category));
+  suite.gate.categoryMinimums = Object.fromEntries(Object.entries(suite.gate.categoryMinimums).filter(([category]) => categories.has(category)));
+  return suite;
+}
+
+test('eval raw usa lo stesso protocollo senza correzioni o strumenti deterministici', async () => {
+  const suite = selectedSuite(['math-percentuale-01']); let calls = 0;
+  const report = await evaluateInferenceModel({ suite, model: 'candidate', deep: false, raw: true,
+    infer: async (payload, meta) => {
+      calls++; assert.equal(payload.messages[1].content, suite.cases[0].prompt);
+      assert.equal(meta.stage, 'first'); assert.equal(payload.think, false);
+      return { message: { content: '12 MB' } };
+    } });
+  assert.equal(calls, 1); assert.equal(report.mode, 'quick-raw');
+  assert.equal(report.summary.gatePassed, false); assert.equal(report.summary.deterministicCases, 0);
+  assert.equal(report.summary.reviewedCases, 0); assert.equal(report.summary.modelFirstPassRate, 0);
+});
+
+test('eval condivisa mantiene una sola revisione senza passare al trasporto gli assert o la risposta attesa', async () => {
+  const suite = selectedSuite(['reason-contraddizione-01']); const inputs = [];
+  const report = await evaluateInferenceModel({ suite, model: 'candidate', deep: true,
+    infer: async (payload, meta) => {
+      inputs.push({ payload: structuredClone(payload), meta });
+      assert.ok(!Object.hasOwn(payload, 'assertions'));
+      return { message: { content: meta.stage === 'first' ? 'La specifica contiene contraddizioni.' : 'I valori 10 e 30 sono in contraddizione.' } };
+    } });
+  assert.equal(inputs.length, 2); assert.equal(inputs[0].payload.think, true);
+  assert.equal(inputs[1].meta.stage, 'review');
+  assert.equal(inputs[1].payload.messages.at(-2).content, 'La specifica contiene contraddizioni.');
+  assert.ok(!inputs[1].payload.messages.at(-1).content.includes('10.*30'));
+  assert.equal(report.summary.reviewedCases, 1); assert.equal(report.summary.modelFirstPassRate, 0);
+  assert.equal(report.summary.passRate, 100); assert.equal(report.mode, 'deep');
+});
+
+test('eval condivisa distingue il fast path dal modello e propaga guasti senza fallback', async () => {
+  const suite = selectedSuite(['code-js-output-01']); let calls = 0;
+  const report = await evaluateInferenceModel({ suite, model: 'candidate', deep: false,
+    infer: async () => { calls++; throw new Error('transport offline'); } });
+  assert.equal(calls, 0); assert.equal(report.summary.deterministicCases, 1);
+  assert.equal(report.summary.passRate, 100);
+  await assert.rejects(evaluateInferenceModel({ suite, model: 'candidate', deep: false, raw: true,
+    infer: async () => { throw new Error('transport offline'); } }), /transport offline/u);
+  await assert.rejects(evaluateInferenceModel({ suite, model: 'candidate', raw: 'yes', infer: async () => {} }), /modalita eval/u);
+});
 
 test('l eval lab rifiuta il servizio attivo prima di qualunque accesso di rete', async () => {
   let calls = 0;

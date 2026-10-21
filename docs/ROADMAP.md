@@ -2,6 +2,14 @@
 
 ## Candidato nativo misurato — 21 ottobre 2026
 
+Aggiornamento dello stesso giorno: provata anche build11789 conQwen3.5-9B
+pinnato, oltre alla baseline14B. Difetto500 durante revisione corretto nel
+payload chat/stream senza elevare contenuto utente. Nucleo eval condiviso e
+modalita raw/pipeline separate. Tre varianti complete73/76/77%, nessuna ammessa;
+lo stream testuale Deep4.33s e recupero/cancel PASS non sostituiscono la voce.
+Ammissione C++/lifecycle e qualita restano bloccanti, non aggiungere un provider
+pubblico per aggirare la readiness. Fonti e risultati inSTABILIZATION-STATUS.
+
 Trasporto candidato compatibile con AIRuntime verificato con token, streaming,
 annullamento e timeout. Non selezionabile in produzione. Confronto raw completo
 100casi Quick e100Deep sul14B esistente:75% in entrambi, gate fallito. Prima di

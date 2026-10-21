@@ -139,14 +139,23 @@ class LlamaCppProvider {
     const temperature = valid.temperature ?? 0.3;
     this.validateNumber(temperature, 0, 2);
     const sampling = { seed: valid.seed ?? 42, top_p: valid.topP ?? 0.8,
-      top_k: valid.topK ?? 20, repeat_penalty: valid.repeatPenalty ?? 1.05 };
+      top_k: valid.topK ?? 20, repeat_penalty: valid.repeatPenalty ?? 1.05,
+      min_p: valid.minP ?? 0, presence_penalty: valid.presencePenalty ?? 0 };
     this.validateNumber(sampling.seed, -2147483648, 2147483647, true);
     this.validateNumber(sampling.top_p, 0.01, 1);
     this.validateNumber(sampling.top_k, 0, 1000, true);
     this.validateNumber(sampling.repeat_penalty, 0, 2);
+    this.validateNumber(sampling.min_p, 0, 1);
+    this.validateNumber(sampling.presence_penalty, -2, 2);
     const thinking = valid.think !== undefined ? valid.think !== false : valid.mode === 'deep';
     const signal = this.signal(valid.signal, valid.timeoutMs ?? this.timeoutMs);
-    const body = { model: this.currentModel, messages: valid.messages, stream,
+    // I template recenti richiedono un solo system iniziale. Riuniamo solo
+    // messaggi gia privilegiati, in ordine; user/assistant restano separati e
+    // invariati. Una revisione interna tardiva non diventa un messaggio utente.
+    const systems = valid.messages.filter(message => message.role === 'system');
+    const messages = systems.length ? [{ role: 'system', content: systems.map(message => message.content).join('\n\n') },
+      ...valid.messages.filter(message => message.role !== 'system')] : valid.messages;
+    const body = { model: this.currentModel, messages, stream,
       max_tokens: maxTokens, temperature, ...sampling,
       reasoning_effort: thinking ? 'medium' : 'none', chat_template_kwargs: { enable_thinking: thinking },
       ...(stream ? { stream_options: { include_usage: true } } : {}),

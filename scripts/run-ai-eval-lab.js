@@ -355,30 +355,28 @@ async function prepareEvaluation(endpoint, models, { fetchImpl = fetch, activeEn
   return evaluationPlan({ endpoint, activeEndpoint, freeBytes, modelBytes: Math.max(...selected.map(item => Number(item.size))) });
 }
 
-async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs, inferenceOptions = {} }) {
+// Primitive senza rete: il chiamante possiede isolamento e ciclo di vita del
+// trasporto iniettato. Il CLI continua a verificare endpoint e risorse prima
+// di costruire il suo trasporto; questa funzione non ammette alcun runtime.
+async function evaluateInferenceModel({ suite, model, deep, infer, inferenceOptions = {}, raw = false }) {
+  validateSuite(suite);
+  if (typeof infer !== 'function' || typeof raw !== 'boolean') throw new Error('Trasporto o modalita eval non validi.');
   const results = [];
   for (const item of suite.cases) {
     const startedAt = performance.now();
-    const deterministicAnswer = productionFastPathReply(casePrompt(item));
+    const deterministicAnswer = raw ? null : productionFastPathReply(casePrompt(item));
     if (deterministicAnswer !== null) {
       results.push({ ...scoreCase(item, deterministicAnswer, performance.now() - startedAt), execution: 'deterministic' });
       continue;
     }
-    const response = await fetch(`${endpoint}/api/chat`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
-      body: JSON.stringify(buildInferencePayload({ suite, item, model, deep, inferenceOptions })),
-    });
-    if (!response.ok) throw new Error(`${model}/${item.id}: HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await infer(buildInferencePayload({ suite, item, model, deep, inferenceOptions }), { caseId: item.id, stage: 'first' });
     let answer = extractAnswer(payload);
     let scored = scoreCase(item, answer, performance.now() - startedAt);
     const firstPassPassed = scored.passed;
     // La pipeline reale esegue una revisione mirata quando un vincolo
     // osservabile fallisce. Il gate deve misurare quel prodotto completo, non
     // fermarsi alla prima decodifica grezza del provider.
-    if (!scored.passed) {
+    if (!raw && !scored.passed) {
       const repairPayload = buildInferencePayload({ suite, item, model, deep, inferenceOptions });
       const exactWords = strictWordCountSchema(casePrompt(item));
       if (exactWords && scored.assertions.some((assertion) => !assertion.passed && assertion.type === 'wordCount')) {
@@ -390,20 +388,24 @@ async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs, infe
           { role: 'system', content: correctionDirective(item, scored) },
         );
       }
-      const repairedResponse = await fetch(`${endpoint}/api/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: AbortSignal.timeout(timeoutMs),
-        body: JSON.stringify(repairPayload),
-      });
-      if (!repairedResponse.ok) throw new Error(`${model}/${item.id}/review: HTTP ${repairedResponse.status}`);
-      answer = extractAnswer(await repairedResponse.json());
+      answer = extractAnswer(await infer(repairPayload, { caseId: item.id, stage: 'review' }));
       if (exactWords) answer = strictWordCountAnswer(casePrompt(item), answer) || answer;
       scored = scoreCase(item, answer, performance.now() - startedAt);
     }
-    results.push({ ...scored, execution: 'model', firstPassPassed, reviewed: !firstPassPassed });
+    results.push({ ...scored, execution: 'model', firstPassPassed, reviewed: !raw && !firstPassPassed });
   }
-  return buildModelReport({ suite, model, mode: deep ? 'deep' : 'quick', results });
+  return buildModelReport({ suite, model, mode: `${deep ? 'deep' : 'quick'}${raw ? '-raw' : ''}`, results });
+}
+
+async function evaluateLiveModel({ suite, model, endpoint, deep, timeoutMs, inferenceOptions = {} }) {
+  return evaluateInferenceModel({ suite, model, deep, inferenceOptions, infer: async (payload, { caseId, stage }) => {
+    const response = await fetch(`${endpoint}/api/chat`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      signal: AbortSignal.timeout(timeoutMs), body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error(`${model}/${caseId}${stage === 'review' ? '/review' : ''}: HTTP ${response.status}`);
+    return response.json();
+  } });
 }
 
 function evaluateFixture({ suite, fixture }) {
@@ -477,6 +479,7 @@ module.exports = {
   composeSystemPrompt,
   correctionDirective,
   evaluateFixture,
+  evaluateInferenceModel,
   extractAnswer,
   loadSuite,
   prepareEvaluation,

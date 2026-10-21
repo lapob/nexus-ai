@@ -152,6 +152,24 @@ passes. Preserve failed cases, mode, exact sampling parameters, model/runtime
 hashes, resource/isolation checks and cancellation evidence. Do not train on
 the holdout, lower its thresholds or promote a model from a selected subset.
 
+`evaluateInferenceModel` in `scripts/run-ai-eval-lab.js` is the shared,
+network-free evaluation core. A trusted harness injects its isolated inference
+transport; the existing Ollama CLI retains its endpoint/RAM/CPU admission checks.
+This low-level function does not provision or admit a server. `raw: true` skips
+both deterministic tools and review, and reports `quick-raw`/`deep-raw`; default
+pipeline reports distinguish deterministic cases, first-pass quality and reviews.
+Do not expose the injected transport as a public endpoint or point it at the
+active service. The scorer's expected answers are not inference payload fields.
+
+Native templates that accept only one initial system message receive existing
+system instructions joined in their original order at the beginning. User and
+assistant turns remain separate and unchanged; text resembling system tags
+inside user content never gains a system role. This covers the application's
+late internal review instruction in both chat and streaming. It resolved a real
+native HTTP500 during evaluation without changing the Ollama transport.
+Explicit validated MinP and presence-penalty parameters allow reproducing a
+publisher's sampling recipe; they do not change the live service's defaults.
+
 ## Resource policy
 
 - The selected fast model warms after server readiness without delaying the
