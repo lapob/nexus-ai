@@ -1,3 +1,15 @@
+## Avvio candidato: costo hash misurato e ridotto — 21 ottobre
+
+La profilazione separa verifica integrità e caricamento: Electron impiegava
+20,38s nell'hash completo del modello, su 23,40s di avvio. Il lettore condiviso
+ora usa blocchi da 4 MiB senza saltare byte o accettare cache di fiducia.
+Dopo confronto dichiarato con 1 MiB e verifica SHA invariato: avvio isolato
+Node 5,16s ed Electron 8,56s; chat/arresto PASS senza processi rimasti. Test
+multi-blocco, ultimo byte e cancellazione coprono il cambiamento. Sono prove
+locali singole, senza controllo statistico di cache/varianza, non tempi del
+client installato né ripristino dell'AI pubblica. Nessun motore promosso.
+Gate finale: 1129 PASS, 2 SKIP, 0 FAIL; 30 mirati, cloud:check e check PASS.
+
 ## Inventario e policy di ammissione nativa — 21 ottobre
 
 Implementati lettura PE x64 senza esecuzione e verificatore predefinito per il

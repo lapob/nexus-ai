@@ -1,3 +1,19 @@
+# Native hashing startup cost reduced — 21 October 2026
+
+Profiling separated full model integrity checks from process spawn/loading.
+The initial isolated candidate startup measured 6.73s under Node and 23.40s
+under Electron; full model hashing accounted for 3.83s and 20.38s respectively.
+The shared verifier now reads bounded 4 MiB blocks while hashing every byte,
+preserving cancellation and avoiding trust caches. The final isolated starts
+measured 5.16s/8.56s, with model hashing at 2.35s/5.61s. A 1 MiB variant and a
+separate full-hash comparison were retained. These single local runs are not
+cold-start SLAs or packaged-client benchmarks; no production model was activated.
+
+Regression coverage checks a multi-block file, the final byte and cancellation.
+Real chat and shutdown passed, with no owned process left. Runtime admission
+and quality remain separate blockers. Final source gate: 1129 passed, two
+skipped, zero failures; 30 focused tests, cloud:check and workstation check pass.
+
 # Native inventory and admission policy — 21 October 2026
 
 Added a bounded, read-only Windows x64 PE inventory and a concrete default

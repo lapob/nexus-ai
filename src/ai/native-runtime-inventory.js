@@ -81,7 +81,10 @@ function inspectPeImports(bytes) {
 async function hashFile(file, signal) {
   signal?.throwIfAborted();
   const hash = crypto.createHash('sha256');
-  for await (const chunk of fs.createReadStream(file, { signal })) { signal?.throwIfAborted(); hash.update(chunk); }
+  // Limita gli attraversamenti fs/ASAR in Electron senza saltare byte o usare cache di fiducia.
+  for await (const chunk of fs.createReadStream(file, { signal, highWaterMark: 4 * 1024 * 1024 })) {
+    signal?.throwIfAborted(); hash.update(chunk);
+  }
   return hash.digest('hex');
 }
 

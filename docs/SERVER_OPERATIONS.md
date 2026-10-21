@@ -191,6 +191,17 @@ final smoke measured Node startup/recovery at 6.57s/6.65s and Electron at 21.83s
 25.60s, including the harness's full integrity verification. The Electron path
 needs further profiling; do not present Node timings as packaged-app timings.
 
+Follow-up profiling located most of the Electron startup cost in full model
+hashing: 20.38s of a 23.40s isolated start, compared with 3.83s of 6.73s under
+Node. The shared verifier now streams 4 MiB blocks, maintaining full SHA256 and
+cancellation without accepting cached trust verdicts. A declared 1 MiB variant
+and separate 1/4 MiB full-hash comparison preceded the choice. Final isolated
+startup measured 5.16s under Node and 8.56s under Electron, including model
+hashes at 2.35s and 5.61s; real chat/shutdown passed with no owned child left.
+The multi-block/final-byte regression preserves integrity across buffer boundaries.
+These are individual local measurements with uncontrolled cache/run variance,
+not cold-boot SLAs, a new recovery benchmark or an installed-app update.
+
 `src/ai/providers/llama-cpp-provider.js` implements the existing AIProvider
 contract for isolated local comparisons. It is intentionally absent from the
 production configuration allowlist and bootstrap registry. Importing it or

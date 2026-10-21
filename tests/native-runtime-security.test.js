@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { inspectPeImports, inspectNativeRuntime } = require('../src/ai/native-runtime-inventory');
+const { hashFile, inspectPeImports, inspectNativeRuntime } = require('../src/ai/native-runtime-inventory');
 const { createNativeRuntimeSecurityCheck, assertNativeRuntimeSecure } = require('../src/ai/native-runtime-security');
 
 function pe(normal = [], delayed = []) {
@@ -151,4 +151,16 @@ test('inventario rifiuta manifest locali, limiti e link invece di seguirli', asy
     fs.symlinkSync(f.executable, path.join(f.root, 'link.dll'));
     await assert.rejects(inspectNativeRuntime(f.executable), /collegamento/);
   }
+});
+
+test('hash completo multi-blocco rileva anche l’ultimo byte e rispetta abort', async t => {
+  const f = await fixture(t), file = path.join(f.root, 'large.gguf');
+  const bytes = Buffer.alloc(8 * 1024 * 1024 + 127, 0xa5);
+  fs.writeFileSync(file, bytes);
+  const expected = crypto.createHash('sha256').update(bytes).digest('hex');
+  assert.equal(await hashFile(file), expected);
+  bytes[bytes.length - 1] ^= 1; fs.writeFileSync(file, bytes);
+  assert.notEqual(await hashFile(file), expected);
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(hashFile(file, controller.signal), { name: 'AbortError' });
 });
