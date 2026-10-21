@@ -1,4 +1,47 @@
+# Offline installation and Vite patch — 21 October 2026
+
+The existing sync now publishes the canonical AI manifest and service worker
+alongside its HTML. GET/HEAD installation artifacts remain available at the
+edge without forwarding credentials or depending on the inference tunnel.
+The worker versions caches by shell content, preserves unrelated caches,
+intercepts only root/index navigation and never caches API/readiness data.
+Navigation timeout and quota failures retain the current usable shell.
+
+Vite8.2.4 replaces vulnerable8.2.2 within the existing release line. No other
+locked dependency version changed. Registry signature/attestation and npm audit
+checks pass, followed by 45 unit tests,31 browser tests, local Workers runtime,
+performance budgets and deployment dry run (894.06KiB Worker). Four offline
+browser scenarios on the current source and four on existing production also
+pass; live production still contains the previous settings, as recorded.
+
+On Windows, npm marks three locked optional WASM helper packages extraneous
+even after prune and a fresh lockfile install. These are reproducible optional
+platform dependencies, not proven abandoned application code. They remain in
+the lockfile for other platforms; strict TypeScript unused checks pass. Do not
+describe this npm diagnostic as an entirely clean dependency tree.
+
+This is source verification only. Public AI readiness is still503; the latest
+checked inference candidate remains blocked by the distribution security gate.
+No upload or production promotion occurred. Existing production and rollback
+remain unchanged. Cloud inference remains disabled.
+
 # Neutral web settings verified; production still held — 17 October 2026
+
+The next synchronized source adds collapsible conversation, voice/connection
+and device-data sections. Native pickers inherit neutral surfaces where the
+browser supports base-select; other systems retain their native picker.
+Status reads are bounded and discarded after close; voice availability is
+distinct from AI readiness. Local JSON export warns about its unencrypted
+download, and confirmed deletion calls the existing stream/memory reset.
+Five isolated viewport/text checks cover open pickers,200% text, expanded
+sections, CSP/keyboard, late status replies and synthetic history export/delete.
+The exact shell passes44 unit tests,31 browser checks, real local Workers
+runtime, audit/signature gates, budgets and deployment dry run.
+
+No production deployment or upload was performed: public AI readiness remains
+503 because the admitted inference runtime is unavailable. The local Vulkan
+alternative remains a candidate; source publication must not be described as
+service recovery. Existing production and rollback remain unchanged.
 
 Canonical AI settings now reuse the project design tokens for neutral surfaces,
 field backgrounds, text, borders and keyboard focus, with inherited Inter,

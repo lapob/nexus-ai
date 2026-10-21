@@ -1,6 +1,6 @@
 /** Cloudflare Worker entry point for the NexusNXS public site. */
 import handler from "./site-handler";
-import { publicAiShell } from "./public-ai-shell";
+import { publicAiShell, publicAiManifest, publicAiServiceWorker } from "./public-ai-shell";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -85,6 +85,13 @@ async function aiAsset(request: Request, env: Env, pathname: string): Promise<Re
 
 async function proxyAi(request: Request, env: Env, nonce: string): Promise<Response> {
   const url = new URL(request.url);
+  if ((request.method === "GET" || request.method === "HEAD") && ["/service-worker.js", "/manifest.webmanifest"].includes(url.pathname)) {
+    const worker = url.pathname === "/service-worker.js";
+    return secureAiResponse(new Response(request.method === "HEAD" ? null : worker ? publicAiServiceWorker : publicAiManifest, {
+      headers: { "Content-Type": worker ? "application/javascript; charset=utf-8" : "application/manifest+json; charset=utf-8",
+        "Cache-Control": "no-cache", ...(worker ? { "Service-Worker-Allowed": "/" } : {}) },
+    }), env.CF_VERSION_METADATA?.id);
+  }
   // One canonical UI for cold loads, reloads and offline recovery. The local
   // server still owns API readiness, authentication and every inference request.
   if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/index.html")) {

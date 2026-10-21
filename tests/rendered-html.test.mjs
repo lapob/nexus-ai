@@ -396,6 +396,27 @@ test("serves one canonical UI independently of the tunnel while readiness remain
   assert.deepEqual(await health.json(), { status: "offline", retryAfter: 8 });
 });
 
+test("offline installation artifacts stay available without forwarding credentials to the AI tunnel", async () => {
+  let forwarded = 0;
+  const env = { AI_UPSTREAM: { fetch: async () => { forwarded++; throw new Error('offline'); } } };
+  for (const method of ["GET", "HEAD"]) {
+    const serviceWorker = await fetchWorker("https://ai.nexusnxs.com/service-worker.js", { method, env });
+    assert.equal(serviceWorker.status, 200);
+    assert.equal(serviceWorker.headers.get("service-worker-allowed"), "/");
+    assert.equal(serviceWorker.headers.get("cache-control"), "no-cache");
+    assert.match(serviceWorker.headers.get("content-type"), /application\/javascript/);
+    const script = await serviceWorker.text();
+    if (method === "GET") assert.match(script, /nexusnxs-ai-shell-[\s\S]*v6-/);
+    else assert.equal(script, "");
+    const manifest = await fetchWorker("https://ai.nexusnxs.com/manifest.webmanifest", { method, env });
+    assert.equal(manifest.status, 200);
+    assert.match(manifest.headers.get("content-type"), /application\/manifest\+json/);
+    if (method === "GET") assert.equal((await manifest.json()).name, "NexusNXS AI");
+    else assert.equal(await manifest.text(), "");
+  }
+  assert.equal(forwarded, 0);
+});
+
 test("canonical AI navigation never forwards credentials and API responses remain upstream-owned", async () => {
   const requests = [];
   const upstream = { fetch: async request => { requests.push(request); return new Response('{"status":"not_ready"}', { status: 503 }); } };
