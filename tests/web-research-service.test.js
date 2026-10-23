@@ -11,6 +11,56 @@ function jsonResponse(payload, status = 200) {
   };
 }
 
+test('la versione stabile usa metadati del repository recuperato e cita la release diretta', async () => {
+  const calls = [];
+  const service = new WebResearchService({ searxngEndpoint: 'http://127.0.0.1:8080/', fetchImpl: async (url, options) => {
+    calls.push(String(url)); assert.equal(options.redirect, 'error'); assert.equal(options.headers.Authorization, undefined);
+    return String(url).startsWith('https://api.github.com/')
+      ? jsonResponse({ tag_name: 'v2.6.1', draft: false, prerelease: false, published_at: '2026-10-20T12:00:00Z', html_url: 'https://github.com/cedar/engine/releases/tag/v2.6.1', name: 'Stable release' })
+      : jsonResponse({ results: [{ title: 'Releases', url: 'https://github.com/cedar/engine/releases', content: 'Release index' }] });
+  } });
+  const result = await service.search('Cedar latest stable release official', { freshOnly: true });
+  assert.equal(calls.length, 2); assert.equal(calls[1], 'https://api.github.com/repos/cedar/engine/releases/latest');
+  assert.equal(result.results[0].url, 'https://github.com/cedar/engine/releases/tag/v2.6.1');
+  assert.match(result.results[0].snippet, /v2\.6\.1/); assert.match(result.results[0].snippet, /2026-10-20/);
+  assert.ok(result.results[0].retrievedAt);
+  await service.search('Cedar latest stable release official', { freshOnly: true }); assert.equal(calls.length, 2);
+});
+
+test('le fonti non possono scegliere host arbitrari per il recupero dei metadati', async () => {
+  for (const url of ['https://github.com.evil.invalid/cedar/engine/releases', 'https://127.0.0.1/cedar/engine/releases',
+    'https://github.com:444/cedar/engine/releases', 'https://github.com/cedar/engine/issues']) {
+    let calls = 0;
+    const service = new WebResearchService({ searxngEndpoint: 'http://127.0.0.1:8080/', fetchImpl: async () => {
+      calls++; assert.equal(calls, 1); return jsonResponse({ results: [{ title: 'Result', url, content: 'Untrusted result' }] });
+    } });
+    await service.search('Cedar latest stable release official'); assert.equal(calls, 1);
+  }
+});
+
+test('metadati incompleti, prerelease, repository diverso o API fallita non inventano una versione', async () => {
+  const baseline = { tag_name: 'v9', draft: false, prerelease: false, published_at: '2026-10-20T12:00:00Z', html_url: 'https://github.com/cedar/engine/releases/tag/v9' };
+  for (const metadata of [{}, { ...baseline, prerelease: true }, { ...baseline, draft: true }, { ...baseline, published_at: 'invalid' },
+    { ...baseline, html_url: 'https://github.com/other/repo/releases/tag/v9' }, { ...baseline, html_url: 'https://127.0.0.1/private' }, null]) {
+    let calls = 0;
+    const service = new WebResearchService({ searxngEndpoint: 'http://127.0.0.1:8080/', fetchImpl: async () => {
+      calls++; return calls === 1 ? jsonResponse({ results: [{ title: 'Index', url: 'https://github.com/cedar/engine/releases', content: 'No version in index' }] })
+        : jsonResponse(metadata, metadata === null ? 503 : 200);
+    } });
+    const result = await service.search('Cedar latest stable release official');
+    assert.equal(calls, 2); assert.equal(result.results[0].snippet, 'No version in index');
+  }
+});
+
+test('la cancellazione durante i metadati release interrompe la ricerca', async () => {
+  const controller = new AbortController(); let calls = 0;
+  const service = new WebResearchService({ searxngEndpoint: 'http://127.0.0.1:8080/', fetchImpl: async () => {
+    if (++calls === 1) return jsonResponse({ results: [{ title: 'Index', url: 'https://github.com/cedar/engine/releases', content: 'Index' }] });
+    controller.abort(); throw new Error('cancelled');
+  } });
+  await assert.rejects(service.search('Cedar latest stable release official', { signal: controller.signal }), /cancelled/);
+});
+
 test('le chiavi configurate non attivano provider cloud senza consenso esplicito', async () => {
   let calls = 0;
   const settings = { braveApiKey: 'synthetic-key', openAiApiKey: 'synthetic-key', openAiModel: 'search-model',

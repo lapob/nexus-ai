@@ -97,11 +97,60 @@ test('offre al loader Windows un alias senza parentesi mantenendo i modelli nel 
       aliasRoot: temporary,
       aliasName: 'NexusNXS-Models-Test'
     });
-    assert.equal(fs.realpathSync(alias), fs.realpathSync(library));
+    assert.equal(fs.lstatSync(alias).isSymbolicLink(), false);
+    assert.equal(fs.realpathSync(path.join(alias, 'blobs')), fs.realpathSync(path.join(library, 'blobs')));
     assert.equal(libraryModels(alias).includes('qwen3:8b'), true);
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
+});
+
+test('il catalogo conserva conversioni derivate e aggiorna solo modelli originali cambiati o rimossi', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-model-catalog-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const workspace = path.join(root, '[AI]'), library = createLibrary(workspace, ['qwen3:8b']);
+  const options = { projectRoot: workspace, platform: 'win32', aliasRoot: root, aliasName: 'catalog' };
+  fs.symlinkSync(library, path.join(root, 'catalog'), 'junction');
+  const alias = loaderSafeOllamaLibrary(library, options);
+  assert.equal(fs.lstatSync(alias).isSymbolicLink(), false);
+  const source = path.join(library, 'manifests/registry.ollama.ai/library/qwen3/8b');
+  const converted = path.join(alias, 'manifests-v2/ollama.com/library/qwen3/8b');
+  fs.mkdirSync(path.dirname(converted), { recursive: true }); fs.writeFileSync(converted, '{"converted":true}');
+  loaderSafeOllamaLibrary(library, options);
+  assert.equal(fs.readFileSync(converted, 'utf8'), '{"converted":true}');
+  fs.writeFileSync(source, '{"revision":2}'); loaderSafeOllamaLibrary(library, options);
+  assert.equal(fs.existsSync(converted), false);
+  assert.equal(fs.readFileSync(path.join(alias, 'manifests/registry.ollama.ai/library/qwen3/8b'), 'utf8'), '{"revision":2}');
+  fs.unlinkSync(source); loaderSafeOllamaLibrary(library, options);
+  assert.deepEqual(libraryModels(alias), []);
+});
+
+test('un catalogo non posseduto o un link manifest estraneo non cambia file esterni', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-model-catalog-scope-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const workspace = path.join(root, '[AI]'), library = createLibrary(workspace, ['qwen3:8b']);
+  const options = { projectRoot: workspace, platform: 'win32', aliasRoot: root, aliasName: 'foreign' };
+  const foreign = path.join(root, 'foreign'); fs.mkdirSync(foreign); fs.writeFileSync(path.join(foreign, 'keep'), 'keep');
+  assert.equal(loaderSafeOllamaLibrary(library, options), path.resolve(library));
+  assert.equal(fs.readFileSync(path.join(foreign, 'keep'), 'utf8'), 'keep');
+  const outside = path.join(root, 'outside.json'); fs.writeFileSync(outside, '{"private":true}');
+  const linked = path.join(library, 'manifests-v2/ollama.com/library/qwen3/8b'); fs.mkdirSync(path.dirname(linked), { recursive: true });
+  try { fs.symlinkSync(outside, linked, 'file'); } catch (error) { if (['EPERM', 'EACCES'].includes(error.code)) { t.skip('File symlinks unavailable'); return; } throw error; }
+  assert.equal(loaderSafeOllamaLibrary(library, { ...options, aliasName: 'new-catalog' }), path.resolve(library));
+  assert.equal(fs.existsSync(path.join(root, 'new-catalog')), false);
+});
+
+test('un link dentro il catalogo non consente di scrivere o eliminare fuori dal catalogo', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-model-catalog-parent-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const workspace = path.join(root, '[AI]'), library = createLibrary(workspace, ['qwen3:8b']);
+  const options = { projectRoot: workspace, platform: 'win32', aliasRoot: root, aliasName: 'catalog' };
+  const alias = loaderSafeOllamaLibrary(library, options);
+  const outside = path.join(root, 'outside'); fs.mkdirSync(outside); fs.writeFileSync(path.join(outside, 'keep'), 'untouched');
+  fs.symlinkSync(outside, path.join(alias, 'manifests-v2/ollama.com'), 'junction');
+  fs.writeFileSync(path.join(library, 'manifests/registry.ollama.ai/library/qwen3/8b'), '{"changed":true}');
+  assert.equal(loaderSafeOllamaLibrary(library, options), path.resolve(library));
+  assert.equal(fs.readFileSync(path.join(outside, 'keep'), 'utf8'), 'untouched');
 });
 
 test('usa configurazione esplicita e fallback standard dell’utente', () => {

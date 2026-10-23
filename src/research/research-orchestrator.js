@@ -27,8 +27,18 @@ function publicQuerySeed(question) {
     .replace(/^(?:che\s+cosa\s+significa|cosa\s+significa|che\s+cos['’]?è|cos['’]?è|qual\s+è|what\s+is|what\s+does)\b\s*/iu, '')
     .replace(/[,;]\s*(?:e\s+)?(?:spiega(?:mi|le)?|riassumi|descrivi|mostra|indica)\b[\s\S]*$/iu, '')
     .replace(/[,;]?\s*(?:e\s+)?cita\s+(?:la|le)?\s*font[ei]\b[\s\S]*$/iu, '')
+    .replace(/[,;]?\s*(?:e\s+)?cita\s+(?:la\s+pagina|il\s+sito)\s+ufficiale\b[\s\S]*$/iu, '')
     .replace(/^(?:le?\s+)?(?:ultim[aei]|pi[uù]\s+recenti)\s+(?:informazioni|notizie|dati)(?:\s+stabili)?\s+(?:su|di)\s+/iu, '')
     .replace(/[,;]?\s*\b(?:citando\s+(?:la|le)\s+font[ei]|con\s+(?:una|le)\s+font[ei]|with\s+(?:a\s+)?citation)\b[\s\S]*$/iu, '')) || original;
+}
+
+function softwareReleaseQuery(seed) {
+  seed = seed.replace(/^(?:qual\s+[eè]|what\s+is|dimmi|tell\s+me)\s+/iu, '').trim();
+  const match = seed.match(/^(?:la\s+)?(?:versione|release)\s+((?:(?:stabile|attuale|corrente|ultima)\s+)+)(?:di|per)\s+(.+?)[?.!]?$/iu);
+  const english = seed.match(/^(?:the\s+)?latest\s+stable\s+(?:version|release)\s+(?:of|for)\s+(.+?)[?.!]?$/iu);
+  const name = match && /\bstabile\b/iu.test(match[1]) ? match[2] : english?.[1];
+  if (!name || !/^[\p{L}\p{N}][\p{L}\p{N} ._+#-]{0,79}$/u.test(name)) return '';
+  return `${name.trim()} latest stable release official`;
 }
 
 function researchLanguage(question = '') {
@@ -47,7 +57,8 @@ function researchTimeRange(question = '') {
 }
 
 function deriveResearchQueries(question, maxQueries = 1) {
-  const original = publicQuerySeed(question);
+  const seed = publicQuerySeed(question);
+  const original = softwareReleaseQuery(seed) || seed;
   if (!original) return [];
   const queries = [original];
   if (maxQueries > 1) {
@@ -179,7 +190,7 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
   try {
     const batches = await Promise.all(queries.map((query) => service.search(query, {
       limit: Math.max(2, Math.ceil(policy.maxResults / queries.length)),
-      language,
+      language: softwareReleaseQuery(publicQuerySeed(question)) ? 'en' : language,
       signal,
       freshOnly: policy.reason === 'time-sensitive',
       timeRange: researchTimeRange(question)

@@ -6,6 +6,26 @@ valutazione e pubblicazione appartengono alla pipeline dello sviluppatore.
 
 ## Capacità misurate e stato del training — 21 ottobre 2026
 
+### Aggiornamento operativo del 23 ottobre
+
+Lo stesso modello baseline qwen3:14b, senza training o nuovi pesi, è stato
+provato sul runtime ufficiale Ollama0.40.9 in isolamento. Startup, caricamento
+GPU, chat, piano JSON, streaming annullato e richiesta successiva PASS.
+La pipeline Quick sulla stessa suite1.4.0 ottiene88/100: mediana170ms e
+p95833ms per i casi,9risposte deterministiche/91delmodello/15revisioni.
+Il primo caricamento misurato richiede24.1s; i tempi della suite non sono
+la latenza dell'intera web app o di una conversazione vocale.
+
+Il gate qualità resta FAIL: italiano6/10, codice7/11 e prompt-security9/10;
+un caso obbligatorio sulla necessità di nuovo consenso dopo un invio fallisce.
+Questo non dimostra un'azione non autorizzata: il confine dell'esecutore è
+deterministico e verificato separatamente. Non è stata cambiata alcuna soglia,
+né dichiarata una promozione o superiorità rispetto a concorrenti. La misura
+usa un runtime e un protocollo diversi dal confronto nativo9B sottostante,
+quindi non va letta come confronto controllato tra i due modelli.
+
+### Candidato nativo del 21 ottobre
+
 Il candidato Qwen3.5-9B quantizzato è stato valutato in isolamento su 100 casi
 revisionati della suite 1.4.0, con build nativa b11789. La tabella riporta casi
 superati, non un QI né una percentuale delle capacità delle AI commerciali.

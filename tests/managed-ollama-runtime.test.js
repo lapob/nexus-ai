@@ -49,7 +49,10 @@ test('il gate strict blocca il processo; sviluppo locale resta utilizzabile ma n
         if (options.usage !== 'development') throw Object.assign(new Error('finding'), { code: 'OLLAMA_RUNTIME_VULNERABLE' });
         return { blockingFindings: 1 };
       },
-      spawnProcess() { spawns++; return new EventEmitter(); }, terminateProcess() {}
+      spawnProcess(_executable, _args, options) {
+        assert.equal(options.env.OLLAMA_NO_CLOUD, '1');
+        spawns++; return new EventEmitter();
+      }, terminateProcess() {}
     });
     runtime.health = async () => spawns > 0;
     const result = await runtime.start();

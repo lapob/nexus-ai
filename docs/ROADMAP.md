@@ -8,10 +8,10 @@ presunti. Riutilizzare i runtime e i componenti esistenti.
 
 | Area | Risultato verificato | Parte ancora da completare |
 | --- | --- | --- |
-| Motore | Lifecycle isolato, integrità e startup misurati | Review completa nativa, capacità/configurazione e qualità ammessa; inferenza pubblica non ripristinata |
+| Motore | Baseline14B nuovamente operativa con Ollama0.40.9, readiness pubblica200 e chat reale verificata | Migliorare qualità del modello; alternativa nativa ancora non ammessa; firme e rollout stabile |
 | Compiti quotidiani | Scrittura/lettura con ricevute, riavvio dei runtime, ripresa e undo senza duplicati | Confronti di qualità del modello su incarichi reali oltre i contratti sintetici |
 | Ragionamento | Selettore fast/deep e scelta manuale coperti da regressioni | Calibrazione su modelli ammessi e tempi end-to-end |
-| Voce | Sessione continua sintetica su quattro formati; TTS locale sei frasi, 3373ms cold/918ms mediana warm | STT, eco e interruzione con voce umana e altoparlanti |
+| Voce | Sessione sintetica su quattro formati; TTS/STT viaHTTPS riusciti su una frase italiana | Ridurre latenze vocali; STT, eco e interruzione con voce umana e altoparlanti |
 | Memoria | Provenienza/scadenza/edit/export reali; correzione conserva retention; consolidamento atomico | Verifiche sui client fisici e contesti aggiuntivi prima di ampliare lo scope |
 | Azioni | Proposte scadute/perse rigenerate con nuovo consenso; esiti interrotti non ripetuti; undo escluso durante esecuzione o cambio workspace | Nuove integrazioni solo con esecutori, permessi e verifiche specifiche |
 | Grafica | UI di recupero, artefatti su tre layout, offline/reconnect e voce sintetica verificati | Nuovo collaudo Samsung e Apple; fluidità acustica non deducibile dai test browser |

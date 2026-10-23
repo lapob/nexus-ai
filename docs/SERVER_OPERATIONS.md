@@ -13,6 +13,42 @@ Source code lives in `.AI`. Mutable server state lives in the sibling
 configured portable Ollama location. The operating system contains only the
 scheduled-task registration required to start the server.
 
+On Windows, a portable library under square brackets uses the existing
+`NexusNXS-Models` name at the volume root. Its root is now a real directory:
+recent Ollama versions reject some manifest paths through a root junction.
+Only small catalogs are materialized; `blobs` links to the original weights.
+The owner marker records source-manifest hashes. Unchanged converted v2
+manifests survive restart; a changed or removed source invalidates its derived
+entry. Unowned directories and links outside the manifest/blob scope are
+rejected. Runtime-created tags and metadata in this catalog are persistent
+model state, not disposable files; retain them when backing up model aliases.
+Original manifests and weights are not moved or modified by this adapter.
+
+## Pinned local runtime
+
+`config/ollama-runtime.json` pins the official Windows and ROCm archives by
+version, URL, size and SHA256. Provisioning verifies both archives before
+extraction, verifies executable/library publishers and runs the distribution
+security gate before and after publication. Cached archives may be supplied
+with `-BaseArchivePath` and `-RocmArchivePath`; use `-KeepBackup` for rollback.
+The development loopback exception is not accepted by provisioning.
+
+Ollama 0.40.9 passed the existing distribution gate on 23 October: official
+Authenticode signature and zero High/Critical Grype matches. One Unknown
+module-level OpenPGP match remains in the diagnostic evidence. This is not
+proof that every native dependency or execution path is vulnerability-free.
+Malformed or incomplete scanner output is rejected. The owned runtime also
+sets `OLLAMA_NO_CLOUD=1`, independently of application-level preferences.
+Updating this runtime restores the selected baseline; it does not promote an
+experimental model or certify model quality, signatures or commercial readiness.
+
+Stable-release questions use a shorter product query, and a retrieved GitHub
+release index may be enriched from the fixed public GitHub API. Only one
+repository is looked up, without a token; draft/prerelease, mismatched links,
+invalid dates, API errors and cancellation do not invent a release. The source
+is the direct release page with publication/retrieval dates, within the normal
+cache budget. This is public web retrieval, not cloud model inference.
+
 ## Commands
 
 ```powershell

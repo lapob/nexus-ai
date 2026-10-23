@@ -216,6 +216,9 @@ class ManagedOllamaRuntime {
         ...sanitizedRuntimeEnvironment(),
         OLLAMA_HOST: `${this.host}:${this.port}`,
         OLLAMA_MODELS: this.modelsPath,
+        // Il backend deve rispettare il percorso locale anche se un alias
+        // remoto viene richiesto per errore: nessun fallback cloud implicito.
+        OLLAMA_NO_CLOUD: '1',
         // Il renderer non contatta Ollama direttamente: tutto passa dal main
         // process. Non impostiamo origin custom, che Ollama rifiuta perché il
         // protocollo app:// non è ammesso dalla propria validazione CORS.

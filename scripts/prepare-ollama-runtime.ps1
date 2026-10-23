@@ -3,6 +3,8 @@
 param(
   [string]$Destination = (Join-Path $PSScriptRoot '..\vendor\ollama\windows-x64'),
   [string]$SourceDirectory = '',
+  [string]$BaseArchivePath = '',
+  [string]$RocmArchivePath = '',
   [switch]$ReplaceBlocked,
   [switch]$ForceUpdate,
   [switch]$KeepBackup
@@ -16,8 +18,21 @@ $ErrorActionPreference = 'Stop'
 # con questo script di packaging e con Get-AuthenticodeSignature.
 $securityModule = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
 Import-Module -Name $securityModule -Force -ErrorAction Stop
-$baseUrl = 'https://ollama.com/download/ollama-windows-amd64.zip'
-$rocmUrl = 'https://ollama.com/download/ollama-windows-amd64-rocm.zip'
+$runtimeManifestPath = Join-Path $PSScriptRoot '..\config\ollama-runtime.json'
+$runtimeManifest = [IO.File]::ReadAllText($runtimeManifestPath) | ConvertFrom-Json
+if ($runtimeManifest.schemaVersion -ne 1 -or $runtimeManifest.version -notmatch '^\d+\.\d+\.\d+$') {
+  throw 'Manifest del runtime Ollama non valido.'
+}
+foreach ($archiveKind in @('base', 'rocm')) {
+  $archiveMetadata = $runtimeManifest.archives.$archiveKind
+  $assetName = if ($archiveKind -eq 'base') { 'ollama-windows-amd64.zip' } else { 'ollama-windows-amd64-rocm.zip' }
+  $expectedUrl = 'https://github.com/ollama/ollama/releases/download/v' + $runtimeManifest.version + '/' + $assetName
+  if ($archiveMetadata.url -cne $expectedUrl -or $archiveMetadata.sha256 -notmatch '^[a-f0-9]{64}$' -or $archiveMetadata.bytes -le 0) {
+    throw 'Origine o integrita del runtime Ollama non valida.'
+  }
+}
+if ($SourceDirectory -and ($BaseArchivePath -or $RocmArchivePath)) { throw 'Scegli una sorgente runtime oppure gli archivi verificati.' }
+if ([bool]$BaseArchivePath -ne [bool]$RocmArchivePath) { throw 'Servono entrambi gli archivi del runtime.' }
 $securityGate = Join-Path $PSScriptRoot 'check-ollama-runtime-security.js'
 $node = (Get-Command node -ErrorAction Stop).Source
 $destinationFull = [System.IO.Path]::GetFullPath($Destination)
@@ -49,6 +64,21 @@ function Expand-ArchiveLiteral([string]$LiteralArchive, [string]$LiteralDestinat
   $tar = (Get-Command tar.exe -ErrorAction Stop).Source
   & $tar -xf $LiteralArchive -C $LiteralDestination
   if ($LASTEXITCODE -ne 0) { throw "Estrazione non riuscita: $LiteralArchive" }
+}
+
+function Resolve-VerifiedRuntimeArchive([string]$InputArchive, [string]$RemoteUri, [string]$DownloadPath, [string]$ExpectedSha256, [long]$ExpectedBytes) {
+  $archivePath = if ($InputArchive) { [IO.Path]::GetFullPath($InputArchive) } else { $DownloadPath }
+  if (-not $InputArchive) { Save-RemoteFile -Uri $RemoteUri -LiteralDestination $archivePath }
+  if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) { throw 'Archivio runtime non disponibile.' }
+  if ((Get-Item -LiteralPath $archivePath).Length -ne $ExpectedBytes) { throw 'Dimensione archivio runtime non valida.' }
+  $stream = [IO.File]::OpenRead($archivePath)
+  $hasher = [Security.Cryptography.SHA256]::Create()
+  try { $actualSha256 = [BitConverter]::ToString($hasher.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+  finally { $stream.Dispose(); $hasher.Dispose() }
+  if ($actualSha256 -cne $ExpectedSha256) {
+    throw 'SHA256 archivio runtime non valido.'
+  }
+  return $archivePath
 }
 
 function Assert-OfficialRuntimeTree([string]$Root) {
@@ -86,7 +116,7 @@ if (-not $ForceUpdate -and (Test-Path -LiteralPath $existingExecutable) -and (Te
   $existingSignature = Get-AuthenticodeSignature -LiteralPath $existingExecutable
   if ($existingSignature.Status -eq 'Valid') {
     Assert-OfficialRuntimeTree -Root $Destination
-    & $node $securityGate ('--executable=' + $existingExecutable) --development-loopback
+    & $node $securityGate ('--executable=' + $existingExecutable)
     if ($LASTEXITCODE -eq 0) {
       if (-not $ReplaceBlocked) {
         Write-Host "Runtime AI completo già presente e verificato in $Destination"
@@ -127,18 +157,18 @@ try {
   }
   else {
     Write-Host 'Scarico il runtime AI ufficiale...'
-    Save-RemoteFile -Uri $baseUrl -LiteralDestination $baseArchive
-    Expand-ArchiveLiteral -LiteralArchive $baseArchive -LiteralDestination $extract
+    $verifiedBase = Resolve-VerifiedRuntimeArchive -InputArchive $BaseArchivePath -RemoteUri $runtimeManifest.archives.base.url -DownloadPath $baseArchive -ExpectedSha256 $runtimeManifest.archives.base.sha256 -ExpectedBytes $runtimeManifest.archives.base.bytes
+    $verifiedRocm = Resolve-VerifiedRuntimeArchive -InputArchive $RocmArchivePath -RemoteUri $runtimeManifest.archives.rocm.url -DownloadPath $rocmArchive -ExpectedSha256 $runtimeManifest.archives.rocm.sha256 -ExpectedBytes $runtimeManifest.archives.rocm.bytes
+    Expand-ArchiveLiteral -LiteralArchive $verifiedBase -LiteralDestination $extract
     Write-Host 'Aggiungo il backend AMD ROCm ufficiale...'
-    Save-RemoteFile -Uri $rocmUrl -LiteralDestination $rocmArchive
-    Expand-ArchiveLiteral -LiteralArchive $rocmArchive -LiteralDestination $extract
+    Expand-ArchiveLiteral -LiteralArchive $verifiedRocm -LiteralDestination $extract
   }
 
   Assert-OfficialRuntimeTree -Root $extract
   $executable = Get-Item -LiteralPath (Join-Path $extract 'ollama.exe')
   $signature = Get-AuthenticodeSignature -LiteralPath $executable.FullName
   if ($signature.Status -ne 'Valid') { throw "Firma digitale del runtime non valida: $($signature.Status)." }
-  & $node $securityGate ('--executable=' + $executable.FullName) --development-loopback
+  & $node $securityGate ('--executable=' + $executable.FullName)
   if ($LASTEXITCODE -ne 0) { throw 'Il nuovo runtime ufficiale non supera il gate di sicurezza.' }
 
   New-Item -ItemType Directory -Force -Path $destinationParent, $staging | Out-Null
@@ -148,7 +178,7 @@ try {
     Copy-Item -Destination $staging -Recurse -Force
   Assert-OfficialRuntimeTree -Root $staging
   $stagedExecutable = Join-Path $staging 'ollama.exe'
-  & $node $securityGate ('--executable=' + $stagedExecutable) --development-loopback
+  & $node $securityGate ('--executable=' + $stagedExecutable)
   if ($LASTEXITCODE -ne 0) { throw 'La copia staged del runtime non supera il gate di sicurezza.' }
 
   $movedExisting = $false
@@ -161,7 +191,7 @@ try {
     Move-Item -LiteralPath $staging -Destination $destinationFull
     $promoted = $true
     Assert-OfficialRuntimeTree -Root $destinationFull
-    & $node $securityGate ('--executable=' + (Join-Path $destinationFull 'ollama.exe')) --development-loopback
+    & $node $securityGate ('--executable=' + (Join-Path $destinationFull 'ollama.exe'))
     if ($LASTEXITCODE -ne 0) { throw 'Il runtime promosso non supera il gate di sicurezza.' }
   }
   catch {

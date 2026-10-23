@@ -139,12 +139,19 @@ function auditOllamaRuntime(executablePath, {
   let scan;
   try { scan = JSON.parse(String(scanResult.stdout || '')); }
   catch { throw runtimeSecurityError('Risposta Grype non valida.', 'OLLAMA_SECURITY_SCAN_FAILED'); }
+  const severities = new Set(['unknown', 'negligible', 'low', 'medium', 'high', 'critical']);
+  if (!Array.isArray(scan?.matches) || !scan.matches.every(match =>
+    typeof match?.vulnerability?.id === 'string' && match.vulnerability.id.trim()
+    && typeof match.vulnerability.severity === 'string' && severities.has(match.vulnerability.severity.toLowerCase())
+    && typeof match?.artifact?.name === 'string' && match.artifact.name.trim())) {
+    throw runtimeSecurityError('Risposta Grype incompleta o non valida.', 'OLLAMA_SECURITY_SCAN_FAILED');
+  }
   const blocking = blockingFindings(scan);
   const sha256 = crypto.createHash('sha256').update(fs.readFileSync(executable)).digest('hex');
   const developmentLoopback = usage === 'development' && isLoopbackHost(host);
   if (blocking.length && !developmentLoopback) {
     throw runtimeSecurityError(
-      `Runtime Ollama ${version} bloccato: ${blocking.length} vulnerabilità High/Critical rilevate.`,
+      `Runtime Ollama ${version} bloccato: ${blocking.length} segnalazioni High/Critical rilevate.`,
       'OLLAMA_RUNTIME_VULNERABLE',
       { executable, version, sha256, signature, findings: blocking.slice(0, 25) }
     );

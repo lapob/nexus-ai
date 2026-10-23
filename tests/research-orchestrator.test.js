@@ -38,6 +38,19 @@ test('mantiene query e lingua deterministiche', () => {
   assert.equal(researchLanguage('What is the current version?'), 'en');
 });
 
+test('le release stabili usano una query breve senza perdere il nome del prodotto', async () => {
+  const question = 'Cerca sul web la versione stabile attuale di Nebula Engine e cita la pagina ufficiale con il suo indirizzo.';
+  assert.deepEqual(deriveResearchQueries(question, 1), ['Nebula Engine latest stable release official']);
+  assert.deepEqual(deriveResearchQueries('Qual è la versione stabile di Lumen?', 1), ['Lumen latest stable release official']);
+  assert.deepEqual(deriveResearchQueries('What is the latest stable release of Cedar?', 1), ['Cedar latest stable release official']);
+  const calls = [];
+  await researchQuestion({ question, language: 'it', service: { search: async (query, options) => {
+    calls.push({ query, options }); return { provider: 'searxng', results: [] };
+  } } });
+  assert.equal(calls.length, 1); assert.equal(calls[0].options.language, 'en');
+  assert.equal(calls[0].options.freshOnly, true);
+});
+
 test('ricerca approfondita esegue due query e conserva data e filtro delle citazioni', async () => {
   const calls = [];
   const result = await researchQuestion({ question: 'Cerca le notizie delle ultime 24 ore', mode: 'deep', service: { search: async (query, options) => {

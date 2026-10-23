@@ -275,6 +275,41 @@ class WebResearchService {
     }).filter((item) => item.title && item.url && item.snippet);
   }
 
+  async enrichStableRelease(results, query, signal) {
+    if (!/\blatest stable release official$/iu.test(query)) return results;
+    let repository;
+    const index = results.findIndex(source => {
+      try {
+        const url = new URL(source.url);
+        const match = /^\/([A-Za-z0-9][A-Za-z0-9_-]{0,99})\/([A-Za-z0-9][A-Za-z0-9_.-]{0,99})\/releases(?:\/latest)?\/?$/u.exec(url.pathname);
+        if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.port || url.username || url.password || !match) return false;
+        repository = { owner: match[1], name: match[2] }; return true;
+      } catch { return false; }
+    });
+    if (index < 0) return results;
+    try {
+      // Host e percorso dell'API sono costruiti qui, mai presi da output web.
+      // Un solo repository pubblico, senza token o richieste a URL arbitrari.
+      const repo = `${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}`;
+      const release = await this.requestJson(`https://api.github.com/repos/${repo}/releases/latest`, { signal });
+      const sourceUrl = safePublicUrl(release?.html_url), published = Date.parse(release?.published_at);
+      const verified = sourceUrl && new URL(sourceUrl);
+      if (release?.draft !== false || release?.prerelease !== false || typeof release?.tag_name !== 'string'
+        || !release.tag_name.trim() || release.tag_name.length > 128 || !Number.isFinite(published)
+        || !verified || verified.hostname !== 'github.com' || verified.port
+        || !verified.pathname.toLowerCase().startsWith(`/${repository.owner}/${repository.name}/releases/tag/`.toLowerCase())) return results;
+      const enriched = [...results];
+      enriched[index] = { ...results[index], url: sourceUrl,
+        title: cleanText(`${repository.owner}/${repository.name} — ${release.tag_name}`, 220),
+        snippet: cleanText(`Latest stable release of ${repository.owner}/${repository.name}: ${release.tag_name}. Published: ${new Date(published).toISOString()}. ${release.name || ''}`, 1200) };
+      return enriched;
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      this.logger?.warn?.('Metadati release non disponibili; conservo i risultati della ricerca.');
+      return results;
+    }
+  }
+
   async search(query, { limit = 4, language = 'it', signal, freshOnly = false, timeRange = '' } = {}) {
     const normalizedQuery = cleanText(query, 500);
     if (!this.enabled || normalizedQuery.length < 2) return { provider: 'off', results: [] };
@@ -315,6 +350,7 @@ class WebResearchService {
       completedProvider = 'wikipedia';
       results = await this.searchWikipedia(normalizedQuery, { limit: boundedLimit, language, signal });
     }
+    if (['searxng', 'brave'].includes(completedProvider)) results = await this.enrichStableRelease(results, normalizedQuery, signal);
     const retrievedAt = new Date(this.now()).toISOString();
     results = results.map(source => ({ ...source, retrievedAt, ...(timeRange ? { timeRange } : {}) }));
     this.writeCache(key, results, completedProvider, retrievedAt);

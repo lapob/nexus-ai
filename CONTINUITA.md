@@ -1,3 +1,45 @@
+# Local service restored — 23 October 2026
+
+Final source checks: 1154 PASS, 3 SKIP, 0 FAIL; workstation check and
+cloud:check pass. Runtime and tooling npm audits report no known matches.
+Isolated offline drafts/attachments pass three layouts; personalization/CSP
+passes five viewport/text scenarios. Real browser cold load/reload samples
+show ready SVG icons and Inter at first visible controls, with no page errors;
+cached offline reload and reconnect pass on desktop/mobile. The Core motion
+budget passes on this workstation browser, not a physical-phone measurement.
+After the final service restart, both gateways and public readiness return200.
+Live release research returns the current official GitHub release and link.
+An official newer runtime release is available; it is a candidate requiring
+the same distribution and regression gates before replacing the verified pin.
+
+The existing qwen3:14b baseline is working again on the official Ollama0.40.9
+runtime. Both public/local readiness return200, and a real HTTPS Italian chat
+completed in3.08s with the first text after1.81s (single smoke, not an SLA).
+The full runtime tree passed publisher checks and the unchanged distribution
+gate: zeroHigh/Critical matches, with one Unknown module-level OpenPGP match
+retained in the evidence. The previous runtime is preserved for rollback.
+No experimental model, installer or APK was promoted; cloud remains disabled.
+
+Windows model roots through a junction failed manifest verification. The
+existing loader alias now materializes small indexed catalogs and links only
+the original blobs. Source manifests/weights are preserved; unchanged v2
+conversion metadata survives restart, and changed source entries invalidate
+their derived catalog. Unowned directories and out-of-scope links are rejected.
+The runtime itself sets OLLAMA_NO_CLOUD=1. Provisioning pins archive URL/size/SHA
+and uses the distribution gate; malformed scanner output is rejected.
+
+Live public TTS/STT on one synthetic Italian phrase passes (5.35s synthesis,
+12.43s transcription); microphone/echo/full-duplex human quality is unmeasured.
+Fresh desktop/mobile browser contexts pass real chat, layout, and offline/
+reconnect draft retention without automatic sending. These are smoke checks.
+SearXNG was restarted in the interactive account. Stable-release research
+now normalizes the query and verifies one retrieved GitHub repository through
+its fixed public API, citing a dated direct release. No inference cloud enabled.
+
+The baseline scores88/100 on the internal Quick pipeline and still fails the
+quality gate; detailed categories and limits are recorded in MODEL_TRAINING.
+This is restored availability, not demonstrated parity with a frontier model.
+
 # Daily assistant recovery and truthful evidence — 23 October 2026
 
 Source gate: 1144 PASS, 2 SKIP, 0 FAIL; 81 focused tests, cloud:check and

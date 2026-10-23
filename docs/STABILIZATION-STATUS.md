@@ -1,3 +1,34 @@
+## Ripristino locale e prove pubbliche — 23 ottobre
+
+Gate finale:1154PASS3SKIP0FAIL; check locale/cloud e auditnpm runtime/tooling
+PASS (nessuna segnalazione nota npm). Offline/allegati tre layout, impostazioni
+CSP cinque profili, primi frame visibili con iconeSVG e Inter pronti, reload
+offline da cache e riconnessione PASS. Budget animazioni Core PASS nel browser
+su questo PC; non implica fluidità equivalente su tutti i dispositivi.
+RicercaHTTPS dopo restart e avvioDocker restituisce release attuale con link
+ufficialeGitHub. Una versione runtime ufficiale successiva è candidata da
+verificare; resta il pin già collaudato, senza aggiornamento automatico cieco.
+
+Ollama0.40.9 ufficiale supera il gate esistente: firma valida e0High/Critical,
+un matchUnknownOpenPGP conservato. Archivibase/ROCm pinned perSHA e dimensioni;
+provisioning distribution ad ogni stadio e vecchio runtime conservato.
+Corretto l'accesso ai manifest Windows senza muovere i pesi: root del catalogo
+fisico, indice di provenienza e sola junctionblobs. Cloud disattivato anche
+nel backend; scannerJSON incompleto non equivale più a scansione pulita.
+
+Serverheadless riavviato senza desktop/PCrestart: readinessHTTPS e locale200,
+chat realeItalianacompleta3.08s/primo1.81s. Voceweb reale TTS/STT esatta su
+una frase sintetica, rispettivamente5.35s/12.43s; non una prova umana oSLA.
+Browser desktop1440x900/mobile390x844: chat reale/layout/offline/reconnectbozza
+PASS, zero errori pagina rilevati. ADB/iOS/microfono umano non collaudati oggi.
+La ricercaSearXNG richiede ancora DockerDesktop nella sessioneutente: la
+disponibilità prima del login non è garantita dall'attuale installazione.
+Ricerca release stabile: query minima e APIpubblicaGitHub a hostfisso per un
+repository recuperato, con tag/data/linkdiretto, fallback e abort verificati.
+
+Resta la stessa baseline14B:88/100Quick e gatequalitàFAIL, nessun training,
+nuovo modello, installer, APK, promozione9B o confronto conconcorrenti.
+
 ## Continuità degli incarichi e dati — 23 ottobre
 
 Gate sorgenti: 1144 PASS, 2 SKIP, 0 FAIL; 81 test mirati, cloud:check e check

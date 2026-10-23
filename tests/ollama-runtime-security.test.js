@@ -14,6 +14,60 @@ function fixtureRunner({ findings = [], signature = { Status: 'Valid', Signer: '
   };
 }
 
+test('il provisioning fissa origine, dimensioni e hash e non usa il profilo sviluppo', () => {
+  const root = path.resolve(__dirname, '..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'config/ollama-runtime.json'), 'utf8'));
+  assert.equal(manifest.schemaVersion, 1); assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+  for (const [kind, archive] of Object.entries(manifest.archives)) {
+    const asset = kind === 'base' ? 'ollama-windows-amd64.zip' : 'ollama-windows-amd64-rocm.zip';
+    assert.equal(archive.url, `https://github.com/ollama/ollama/releases/download/v${manifest.version}/${asset}`);
+    assert.ok(Number.isSafeInteger(archive.bytes) && archive.bytes > 0); assert.match(archive.sha256, /^[a-f0-9]{64}$/);
+  }
+  const script = fs.readFileSync(path.join(root, 'scripts/prepare-ollama-runtime.ps1'), 'utf8');
+  assert.doesNotMatch(script, /--development-loopback/);
+  assert.ok(script.indexOf('$verifiedRocm = Resolve-VerifiedRuntimeArchive') < script.indexOf('Expand-ArchiveLiteral -LiteralArchive $verifiedBase'));
+});
+
+test('gli archivi cached alterati o troncati sono rifiutati prima di qualsiasi estrazione', { skip: process.platform !== 'win32' }, t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-runtime-archive-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const script = `
+    $ErrorActionPreference = 'Stop'
+    $source = [IO.File]::ReadAllText('scripts/prepare-ollama-runtime.ps1')
+    $ast = [Management.Automation.Language.Parser]::ParseInput($source, [ref]$null, [ref]$null)
+    $definition = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Resolve-VerifiedRuntimeArchive' }, $true)
+    . ([scriptblock]::Create($definition.Extent.Text))
+    $file = Join-Path $env:NEXUS_ARCHIVE_TEST_ROOT 'fixture.zip'
+    [IO.File]::WriteAllText($file, 'fixture')
+    $expected = '${require('node:crypto').createHash('sha256').update('fixture').digest('hex')}'
+    $size = (Get-Item -LiteralPath $file).Length
+    function Save-RemoteFile { throw 'Unrequested download' }
+    $actual = Resolve-VerifiedRuntimeArchive $file '' '' $expected $size
+    if ($actual -ne $file) { throw 'Unexpected archive path' }
+    foreach ($kind in @('truncated', 'altered', 'missing')) {
+      $inputFile = $file
+      if ($kind -eq 'truncated') { [IO.File]::WriteAllText($file, 'x') }
+      if ($kind -eq 'altered') { [IO.File]::WriteAllText($file, 'changed') }
+      if ($kind -eq 'missing') { $inputFile = Join-Path $env:NEXUS_ARCHIVE_TEST_ROOT 'missing.zip' }
+      $rejected = $false
+      try { Resolve-VerifiedRuntimeArchive $inputFile '' '' $expected $size | Out-Null } catch { $rejected = $true }
+      if (-not $rejected) { throw ('Archive accepted: ' + $kind) }
+    }
+    function Save-RemoteFile([string]$Uri, [string]$LiteralDestination) {
+      if ($Uri -ne 'https://fixture.invalid/archive') { throw 'Unexpected URL' }
+      [IO.File]::WriteAllText($LiteralDestination, 'fixture')
+    }
+    $actual = Resolve-VerifiedRuntimeArchive '' 'https://fixture.invalid/archive' $file $expected $size
+    if ($actual -ne $file) { throw 'Downloaded fixture not verified' }
+    Write-Output 'PASS cached and downloaded archive integrity'
+  `;
+  const result = require('node:child_process').spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
+    cwd: path.resolve(__dirname, '..'), env: { ...process.env, NEXUS_ARCHIVE_TEST_ROOT: root }, encoding: 'utf8', windowsHide: true, timeout: 30000
+  });
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  assert.match(result.stdout, /PASS cached and downloaded archive integrity/);
+});
+
 test('estrae la versione client anche quando Ollama non raggiunge il server', () => {
   assert.equal(parseOllamaVersion('Warning: client version is 0.32.3'), '0.32.3');
   assert.equal(parseOllamaVersion('ollama version is 0.32.15'), '0.32.15');
@@ -143,6 +197,27 @@ test('il gate fallisce chiuso se firma o scanner non sono verificabili', (t) => 
     ) }),
     (error) => error.code === 'OLLAMA_SECURITY_SCAN_FAILED'
   );
+});
+
+test('un report scanner vuoto, troncato o privo di severita non viene scambiato per pulito', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-scanner-contract-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const executable = path.join(root, 'ollama.exe'); fs.writeFileSync(executable, 'fixture');
+  const baseline = fixtureRunner();
+  const malformed = ['', '{', '{}', 'null', '{"matches":{}}', ...[
+    { matches: [null] }, { matches: [{}] },
+    { matches: [{ vulnerability: { id: 'X', severity: '' }, artifact: { name: 'stdlib' } }] },
+    { matches: [{ vulnerability: { id: 'X', severity: 'unrecognized' }, artifact: { name: 'stdlib' } }] },
+    { matches: [{ vulnerability: { id: 'X', severity: 'High' } }] }
+  ].map(JSON.stringify)];
+  for (const stdout of malformed) assert.throws(() => auditOllamaRuntime(executable, {
+    platform: 'win32', runProcess(command, args, options) {
+      return command === 'grype' ? { status: 0, stdout } : baseline(command, args, options);
+    }
+  }), { code: 'OLLAMA_SECURITY_SCAN_FAILED' });
+  assert.equal(auditOllamaRuntime(executable, { platform: 'win32', runProcess: fixtureRunner({ findings: [
+    { vulnerability: { id: 'UNCLASSIFIED', severity: 'Unknown' }, artifact: { name: 'stdlib' } }
+  ] }) }).blockingFindings, 0);
 });
 
 test('il provisioning preserva backend GPU firmati, aggiornamento esplicito e rollback atomico', () => {
