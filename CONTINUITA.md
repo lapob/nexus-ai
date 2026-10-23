@@ -1,3 +1,17 @@
+# Production UI and live offline checks — 24 October 2026
+
+Website code8e1206e passes CI40040111018 and the complete release gate:
+45unit tests,31browser tests, dependency signatures/audits, Worker runtime,
+performance budgets and deployment dry run. Candidate cb8183a4 was verified
+before production promotion. Active Worker85384536-25ed-4302-ba33-206914569627
+passes14routes/header/navigation checks and independent AI readiness.
+
+Five settings/text/CSP profiles and four real cached offline/reconnect layouts
+pass after promotion. The previous Worker remains available for rollback.
+This documentation update records deployment of8e1206e, not a new bundle.
+The AI backend's later search-query patch awaits its separate runtime repair;
+no Windows installer or private Control artifact was published by this release.
+
 # Centered Core and recoverable voice candidate — 24 October 2026
 
 Canonical AI shell synchronized with the current application source. A grid
