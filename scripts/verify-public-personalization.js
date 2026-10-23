@@ -74,6 +74,7 @@ async function main() {
             visibleIcon:getComputedStyle(trigger.querySelector('svg')).display!=='none'&&trigger.querySelector('svg').getBoundingClientRect().width>=19,
             downloadIcon:getComputedStyle(download.querySelector('svg')).display!=='none',
             downloadTextHidden:getComputedStyle(download.querySelector('span')).display==='none',
+            sectionLabels:[...dialog.querySelectorAll('summary>span')].map(label=>({text:label.textContent,overflow:label.scrollWidth>label.clientWidth,wrap:getComputedStyle(label.parentElement).overflowWrap})),
             horizontalOverflow:box.left<0||box.right>innerWidth||dialog.scrollWidth>dialog.clientWidth,rows:rows.map(rect),box:rect(dialog)});
         }));
       })`);
@@ -84,11 +85,12 @@ async function main() {
       assert.equal(geometry.fieldSurface, rgb(colors.surfaceRaised));
       assert.equal(geometry.foreground, rgb(colors.ice));
       assert.match(geometry.font, /Inter/i);
-      assert.ok(geometry.closeSize.width >= 48 && geometry.closeSize.height >= 48);
+      assert.ok(geometry.closeSize.width >= 48 && geometry.closeSize.height >= 48, JSON.stringify({ width, height, textScale, close: geometry.closeSize }));
       assert.ok(geometry.titleBox.right + 12 <= geometry.closeSize.left, 'title and close action must not collide');
       assert.ok(geometry.closeSize.right <= geometry.box.right, 'close action must remain inside the dialog');
       assert.ok(geometry.visibleIcon && geometry.downloadIcon && geometry.downloadTextHidden);
       assert.equal(geometry.horizontalOverflow, false);
+      assert.ok(geometry.sectionLabels.every(label => !label.overflow && label.wrap === 'normal'), 'Section titles retain whole words without horizontal overflow at enlarged text sizes');
       for (let i = 1; i < geometry.rows.length; i++) assert.ok(geometry.rows[i].top >= geometry.rows[i - 1].bottom + 12);
       const screenshot = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       fs.writeFileSync(path.join(output, `public-personalization-${width}${textScale === 1 ? '' : '-text200'}.png`), Buffer.from(screenshot.data, 'base64'));

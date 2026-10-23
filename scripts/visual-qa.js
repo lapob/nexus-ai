@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { removeTemporaryPath } = require('./web-visual-regression');
 
 // #region Catalogo viewport e selezione
 
@@ -50,6 +51,7 @@ if (!requestedScales.length || requestedScales.some((value) => value < 75 || val
 // #endregion
 // #region Esecuzione e validazione PNG
 
+async function main() {
 fs.mkdirSync(output, { recursive: true });
 for (const [view, width, height] of selectedCases) {
  for (const scale of requestedScales) {
@@ -83,7 +85,7 @@ for (const [view, width, height] of selectedCases) {
         NEXUS_SCREENSHOT_PATH: screenshot
       }
     });
-    fs.rmSync(profile, { recursive: true, force: true });
+    await removeTemporaryPath(profile);
     if (result.status === 0 && fs.existsSync(screenshot)) break;
     if (attempt === 2) break;
     fs.rmSync(screenshot, { force: true });
@@ -117,5 +119,7 @@ for (const [view, width, height] of selectedCases) {
  }
 }
 process.stdout.write(`QA visivo completato: ${selectedCases.length} superfici × ${requestedScales.length} scale in ${output}\n`);
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });
 
 // #endregion

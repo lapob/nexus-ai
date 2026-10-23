@@ -14,7 +14,22 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   close.title = close.getAttribute('aria-label');
   close.innerHTML = closeIcon || '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>';
   controls.append(status, close); document.body.append(controls);
-  const state = (value, message) => { setState(value); status.textContent = message; };
+  const fitVoiceCore = () => {
+    if (!active || !controls.getBoundingClientRect) return;
+    const viewport = globalThis.visualViewport;
+    const top = (viewport?.offsetTop || 0) + 16;
+    const bottom = Math.min(controls.getBoundingClientRect().top, (viewport?.offsetTop || 0) + (viewport?.height || innerHeight));
+    const available = Math.max(64, bottom - top - 24);
+    const diameter = Math.max(64, Math.min(innerWidth - 16, available, 1100));
+    core.style.setProperty('--nxs-voice-core-size', diameter + 'px');
+    core.style.setProperty('--nxs-voice-core-top', top + available / 2 + 'px');
+  };
+  const layout = globalThis.ResizeObserver ? new ResizeObserver(fitVoiceCore) : null;
+  layout?.observe(controls);
+  addEventListener('resize', fitVoiceCore, { passive: true });
+  globalThis.visualViewport?.addEventListener('resize', fitVoiceCore, { passive: true });
+  globalThis.visualViewport?.addEventListener('scroll', fitVoiceCore, { passive: true });
+  const state = (value, message) => { setState(value); status.textContent = message; fitVoiceCore(); };
   const stopMedia = () => {
     controller?.abort(); finishCapture?.(); finishPlayback?.();
     stream?.getTracks().forEach(track => track.stop()); stream = null;
@@ -25,6 +40,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     if (!active) return;
     active = false; ++epoch; stopMedia(); controls.hidden = true;
     document.body.classList.remove('voice-session');
+    core.style?.removeProperty('--nxs-voice-core-size'); core.style?.removeProperty('--nxs-voice-core-top');
     for (const [element, inert] of background) element.inert = inert;
     background.clear(); if (!prompt.value && savedDraft) prompt.value = savedDraft;
     prompt.dispatchEvent(new Event('input', { bubbles: true }));
@@ -141,6 +157,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     state('requesting', copy('Autorizza il microfono', 'Allow microphone access'));
     try {
       await session(); if (!valid(id)) return;
+      if (runtime.capabilities?.['voice-input']?.state !== 'available') throw new Error(copy('Voce non disponibile. Tocca per riprovare.', 'Speech unavailable. Tap to retry.'));
       if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) throw new Error(copy('Microfono non disponibile in questo browser.', 'Microphone unavailable in this browser.'));
       const acquired = await navigator.mediaDevices.getUserMedia({ video: false, audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (!valid(id)) { acquired.getTracks().forEach(track => track.stop()); return; }

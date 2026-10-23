@@ -5,8 +5,9 @@ const { chromium } = require('../../.SITE/node_modules/@playwright/test');
 const { PUBLIC_AI_HTML } = require('../src/remote/remote-session-gateway');
 const assert = require('node:assert/strict');
 async function mediaFixture() {
-  globalThis.mediaStopped = 0; globalThis.spoken = 0; globalThis.speechLevel = false;
+  globalThis.mediaStopped = 0; globalThis.mediaRequested = 0; globalThis.spoken = 0; globalThis.speechLevel = false;
   navigator.mediaDevices.getUserMedia = async () => {
+    globalThis.mediaRequested++;
     if (globalThis.delayPermission) await new Promise(resolve => { globalThis.allowPermission = resolve; });
     if (globalThis.denyPermission) throw new DOMException('denied', 'NotAllowedError');
     return { getTracks: () => [{ stop() { globalThis.mediaStopped++; } }] };
@@ -29,6 +30,8 @@ async function mediaFixture() {
 }
 // #endregion
 // #region Session integration
+module.exports = { mediaFixture };
+if (require.main === module) {
 (async () => {
   const browser = await chromium.launch();
   try {
@@ -105,4 +108,5 @@ async function mediaFixture() {
     }
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
+}
 // #endregion

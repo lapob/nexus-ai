@@ -127,7 +127,7 @@ mostra soltanto risposta e risultati operativi relativi alla cartella scelta.
 - una sola azione per proposta;
 - nessuna automazione pianificata o autonoma;
 - nessun controllo GUI tramite coordinate, accessibilità o screen reading;
-- nessun download o browser remoto; Ollama resta loopback o LAN privata autorizzata;
+- nessun download o browser remoto; Ollama resta esclusivamente su loopback;
 - nessun permesso permanente;
 - nessun isolamento OS aggiuntivo oltre ai privilegi dell'account corrente.
 

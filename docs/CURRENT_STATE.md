@@ -1,6 +1,10 @@
 # Stato attuale
 
-NEXUSNXS 0.3.13 distingue due profili: il client pubblico usa il servizio
+Per versione sorgente e stato verificato consultare rispettivamente
+`package.json` e [CONTINUITA.md](../CONTINUITA.md). Questa pagina descrive
+l'architettura e non certifica una distribuzione pronta alla vendita.
+
+NEXUSNXS distingue due profili: il client pubblico usa il servizio
 NexusNXS Core via HTTPS, mentre la workstation dello sviluppatore può usare e
 valutare runtime locali senza includerli nell'installer pubblico.
 

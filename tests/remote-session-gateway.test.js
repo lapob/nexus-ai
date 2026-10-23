@@ -1664,7 +1664,7 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     // Local conversation preferences and data controls belong to the public
     // client; private PC administration and pairing must remain absent.
     assert.match(publicHtml, /Impostazioni/);
-    assert.match(publicHtml, /Dati sul dispositivo/);
+  assert.match(publicHtml, /Dati locali/);
     assert.doesNotMatch(publicHtml, /<nav|workstation|codice di collegamento|questa demo|\/api\/pair/i);
     const publicScripts = [...publicHtml.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
     assert.ok(publicScripts.length > 0);

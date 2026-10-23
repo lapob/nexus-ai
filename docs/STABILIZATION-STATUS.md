@@ -1,3 +1,25 @@
+# Responsive voice and runtime repair pending — 24 October 2026
+
+Current source passes cloud/workstation checks and1164 tests with3 skips and
+zero failures. Web checks cover24 Core layouts, voice availability/retry,
+microphone acquisition prevention, text/voice continuity and200% text without
+control collisions. Settings titles retain complete words in five profiles.
+An isolated Windows process-tree test cleanup now yields to pending process
+handle closure; its termination assertions remain intact and the suite passes.
+
+Electron43.8.3 is pinned for GHSA-jr5w-w6x2-84p9. Builder admission verifies
+consistent version metadata and forbids alternate runtime arguments. The
+local installation is still43.7.7, so doctor and a new Windows build remain
+blocked until dependency repair. No existing installer was overwritten or run.
+Dependency audit of the lockfile is not proof of an updated active executable.
+
+The completed static security report covers445 of961 tracked paths in its
+frozen snapshot, including executable product source and scripts. No confirmed
+source finding was retained, but remaining test/data/document/binary coverage,
+deployed host controls and subsequent UI edits are not certified by that scan.
+Control1.20.2 physical verification still needs an unlocked device. Real human
+voice/echo, iOS, production signing and commercial gates remain incomplete.
+
 # Preview 0.3.33 published and deployed — 24 October 2026
 
 Published immutable tag v0.3.33-preview.1 from code80563cc; eight remote asset

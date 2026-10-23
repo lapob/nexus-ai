@@ -1,3 +1,39 @@
+# Source security gates and responsive voice — 24 October 2026
+
+Source checks and renderer build pass; final suite: 1164 passed, 3 skipped,
+zero failures. Dependency audits report zero known vulnerabilities for the
+lockfile; ASVS evidence mapping passes. Electron is pinned to43.8.3 and the
+Windows builder rejects inconsistent runtime version metadata and alternate
+runtime/configuration arguments. This does not attest executable contents.
+
+The workstation still runs Electron43.7.7. Its dependency repair is pending;
+no new Windows build, installer installation or release is claimed. The old
+immutable Preview remains0.3.33 and must not be mistaken for this source patch.
+
+Web voice now checks recognition availability before requesting the microphone
+and refreshes an unavailable capability on retry. Browser checks confirm
+recovery in the same page, retained chat and cleanup. The Core stays centered
+in24 layout/preset combinations and avoids voice-control collisions on a
+compact screen with200% text. Settings pass five layout/text/CSP scenarios.
+The shared fixture also covers four voice layouts, interrupted/late synthesis
+and permission races; these synthetic checks do not measure real echo or WER.
+Desktop23 views plus12 enlarged-scale captures, six accessibility surfaces and
+three motion presets passed before the web-only layout changes.
+
+Codex Security completed a static audit of the preceding working-tree snapshot:
+445/961 tracked paths fully reviewed, covering executable product source and
+scripts, with no confirmed source finding. Coverage is partial: remaining tests,
+documentation, knowledge and binaries are explicitly retained. The subsequent
+voice/layout delta has regression tests; the sealed scan is not rewritten to
+claim it reviewed later edits. No impenetrability or commercial readiness claim.
+
+Control1.20.2 remains installed but its current physical matrix is blocked by
+the locked phone. Human microphone/echo, iOS compilation, production signing,
+external security assessment and the model quality gate remain open. Local
+inference and cloud-off defaults are preserved; no training was launched.
+Next: exact-commit CI, independent website release gate/live checks, owner
+dependency repair and unlocked-device verification. Preserve rollback assets.
+
 # Owner Control 1.20.2 state initialization — 24 October 2026
 
 The private Android patch initializes reconstructed application tiles from

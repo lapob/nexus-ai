@@ -16,7 +16,7 @@ const assert = require('node:assert/strict');
   const browser = await chromium.launch({ headless: true });
   const report = [];
   try {
-    for (const [width, height] of [[320,568],[390,568],[844,390],[1440,480],[1440,900],[1920,1080],[2560,1440]]) for (const seed of [.1,.5,.99]) {
+    for (const [width, height] of [[320,568],[390,568],[390,844],[844,390],[1440,480],[1440,900],[1920,1080],[2560,1440]]) for (const seed of [.1,.5,.99]) {
       const page = await browser.newPage({ viewport: { width, height }, serviceWorkers: 'block' });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       await page.addInitScript(() => {
@@ -34,6 +34,10 @@ const assert = require('node:assert/strict');
         return { core: core.toJSON(), title: title.toJSON(), controls, overflow: document.documentElement.scrollWidth > innerWidth, ...nexusCosmicMetrics.renderer() };
       });
       assert.equal(framing.overflow, false);
+      if (!(height <= 540 && width >= 600)) {
+        assert.ok(framing.core.left >= 0 && framing.core.right <= width, 'Idle Core stays inside the viewport');
+        assert.ok(Math.abs(framing.core.x + framing.core.width / 2 - width / 2) < 2, 'The vertical idle Core is centered');
+      }
       assert.equal(framing.backend, 'webgl');
       assert.equal(framing.planetOnly, width < 960, 'Compact screens use only the ringless planet');
       assert.equal(framing.preset, width < 960 ? 'saturn-experimental' : seed < .3 ? 'neural' : seed < .8 ? 'jarvis-reactor' : 'saturn-experimental');
@@ -136,7 +140,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.evaluate(() => document.querySelector('canvas').getContext('2d').getImageData(0,0,390,568).data.some((value,index)=>index%4===3&&value>0)),false);
     report.push({ fallbackHiddenClearsCanvas:true });
     fs.writeFileSync('qa-artifacts/core-framing-report.json',JSON.stringify(report,null,2));
-    console.log('PASS 21 layouts, Core/title/control separation, composer bounds, responsive switch, touch tablet, cold start and reduced motion; software fallback clears hidden Core.');
+    console.log('PASS 24 layouts, centered vertical Core, Core/title/control separation, composer bounds, responsive switch, touch tablet, cold start and reduced motion; software fallback clears hidden Core.');
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
 // #endregion

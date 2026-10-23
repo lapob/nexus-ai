@@ -122,7 +122,7 @@ npm start                 # Start the desktop application
 npm run server            # Start the headless AI server in the background
 npm run server:foreground # Diagnostic foreground mode
 npm run server:dashboard  # Open a minimized live technical monitor
-npm run server:install    # Start the headless server automatically at sign-in
+npm run server:install    # Register the headless server at boot (administrator setup)
 npm run server:start      # Start it manually without a visible window
 npm run server:stop       # Stop the background server
 npm run server:restart    # Restart it and wait for the health check
@@ -142,10 +142,16 @@ on the external SSD.
 
 ## Headless server operation
 
-The scheduled task starts after the owner signs in and restarts after failures.
+The default scheduled task starts at boot as the owner with Limited privileges
+and S4U, without storing a Windows password, and restarts after failures.
+Registering boot startup requires administrator setup. Services that depend on
+an interactive session, including Docker Desktop search, require separate
+pre-login verification; a running server task alone does not prove they are ready.
 It runs only `scripts/start-electron.js --server`, which suppresses every
-desktop UI surface and starts the model runtime and protected gateways. The
-desktop assistant and Presence remain off until the user runs `npm start`,
+desktop UI surface and starts the model runtime and protected gateways. A
+separate owner-session bridge provides private desktop controls after sign-in
+without owning the AI runtime or public gateway. The visible desktop assistant
+and pet remain off until the user runs `npm start`,
 `npm run nexus:start`, or requests an approved launch from NexusNXS Control.
 
 If automatic startup is unavailable, open PowerShell in this directory and run:

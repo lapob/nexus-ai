@@ -8,6 +8,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { resolveVaultPath } = require('../src/infrastructure/storage/portable-paths');
 const { loadRuntimeConfig } = require('../src/core/config');
+const { verifyElectronRuntime } = require('./lib/installer-artifacts');
 
 const appRoot = path.resolve(__dirname, '..');
 const checks = [];
@@ -36,7 +37,7 @@ check('npm command targets', () => {
 });
 check('Electron development runtime', () => {
   fs.accessSync(path.join(appRoot, 'node_modules', 'electron', 'cli.js'), fs.constants.R_OK);
-  return 'CLI disponibile';
+  return `Electron ${verifyElectronRuntime(appRoot)}: pacchetto, lock e versione della distribuzione coerenti`;
 });
 check('PowerShell 7', () => {
   if (process.platform !== 'win32') return 'non richiesto su questo sistema';

@@ -313,10 +313,11 @@ test('shutdown termina realmente anche i processi figli di un comando autorizzat
   const item = fixture();
   const pidFile = path.join(item.root, 'owned-pids.json');
   let owned = {};
-  t.after(() => {
+  t.after(async () => {
     terminateTestProcess(owned.child);
     terminateTestProcess(owned.parent);
-    item.cleanup();
+    // Let pending child-process close callbacks release their Windows handles.
+    await fs.promises.rm(item.root, { recursive: true, force: true, maxRetries: 12, retryDelay: 100 });
   });
   fs.writeFileSync(item.script, [
     "const fs = require('node:fs');",

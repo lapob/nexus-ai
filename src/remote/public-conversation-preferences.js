@@ -20,7 +20,7 @@ const PUBLIC_PROFILE_STYLE = `<style>
 .profile-fields option{background:${colors.surfaceRaised};color:${colors.ice}}
 @supports(appearance:base-select){.profile-fields select,.profile-fields select::picker(select){appearance:base-select}.profile-fields select::picker(select){max-width:calc(100vw - 32px);max-height:min(320px,50dvh);padding:6px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;box-shadow:0 18px 48px #0008}.profile-fields option{min-height:48px;padding:10px 12px;border-radius:9px;white-space:normal;overflow-wrap:anywhere}.profile-fields option:hover,.profile-fields option:focus{background:${colors.surface};color:${colors.ice}}.profile-fields option:focus{outline:none}.profile-fields option:focus-visible{outline:1px solid ${colors.cyan};outline-offset:-2px}.profile-fields option:checked{font-weight:650}.profile-fields option::checkmark{color:${colors.cyan}}.profile-fields select::picker-icon{content:"";width:7px;height:7px;flex:0 0 7px;margin-inline:auto 2px;border-right:1.5px solid ${colors.mist};border-bottom:1.5px solid ${colors.mist};transform:rotate(45deg)}.profile-fields select:open::picker-icon{transform:rotate(225deg)}}
 .profile-section{border:1px solid ${colors.hairline}70;border-radius:18px;margin-top:14px;padding:0 16px;background:${colors.surfaceRaised}66}
-.profile-section summary{display:grid;grid-template-columns:24px minmax(0,1fr) 12px;align-items:center;gap:12px;min-height:60px;padding:12px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:anywhere}
+.profile-section summary{display:grid;grid-template-columns:24px minmax(0,1fr) 12px;align-items:center;gap:12px;min-height:60px;padding:12px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:normal}
 .profile-section summary>.nxs-symbol{width:22px;height:22px;color:${colors.mist}}
 .profile-section summary::-webkit-details-marker{display:none}.profile-section summary::after{content:'';width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .17s ease}.profile-section[open] summary::after{transform:rotate(225deg)}
 .profile-section summary:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px;border-radius:8px}
@@ -64,7 +64,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
     const summary = document.createElement('summary'), label = document.createElement('span');
     summary.innerHTML = icons[icon]; label.textContent = heading; summary.append(label); element.append(summary); return element;
   };
-  const conversation = section('profileConversation', copy('Conversazione', 'Conversation'), 'Chat', true);
+  const conversation = section('profileConversation', 'Chat', 'Chat', true);
   const fields = document.createElement('div'); fields.className = 'profile-fields';
   const selects = new Map();
   const definitions = [
@@ -89,7 +89,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   reset.innerHTML = icons.Restore;
   reset.onclick = () => { profile = normalize({}); save(); refresh(); };
   actions.append(reset); conversation.append(fields, note, actions);
-  const services = section('profileServices', copy('Voce e connessione', 'Voice and connection'), 'Mic');
+  const services = section('profileServices', copy('Voce e servizi', 'Voice and services'), 'Mic');
   const serviceStates = new Map();
   for (const [id, label] of [['engine', copy('Motore AI', 'AI engine')], ['voice-input', copy('Riconoscimento vocale', 'Speech recognition')], ['voice-output', copy('Voce', 'Voice')]]) {
     const row = document.createElement('div'); row.className = 'profile-service-row';
@@ -128,7 +128,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
     }
   };
   retry.onclick = () => void checkServices(); services.addEventListener('toggle', () => { if (services.open && dialog.open) void checkServices(); else { ++statusEpoch; statusController?.abort(); retry.disabled = false; services.removeAttribute('aria-busy'); } });
-  const data = section('profileData', copy('Dati sul dispositivo', 'Data on this device'), 'Lock');
+  const data = section('profileData', copy('Dati locali', 'Local data'), 'Lock');
   const dataNote = document.createElement('p'); dataNote.textContent = copy('La cronologia è salvata in questo browser. Il file esportato non è cifrato e resta separato dalla cancellazione.', 'History is saved in this browser. Exported files are not encrypted and remain separate from deletion.'); data.append(dataNote);
   dataNote.id = 'profileDataDisclosure';
   const dataActions = document.createElement('div'); dataActions.className = 'profile-actions';

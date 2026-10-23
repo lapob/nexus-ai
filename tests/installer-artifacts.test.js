@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { verifyInstallerArtifacts } = require('../scripts/lib/installer-artifacts');
+const { verifyInstallerArtifacts, verifyElectronRuntime, verifyElectronBuildTarget } = require('../scripts/lib/installer-artifacts');
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-installer-gate-'));
@@ -23,6 +23,39 @@ function fixture(t) {
   }
   return { root, version, files, source, archive, extractFile: (_archive, relative) => archive.get(relative.replaceAll('\\', '/')) };
 }
+
+test('la build richiede il runtime effettivo aggiornato anche quando npm dichiara il lock nuovo', t => {
+  const { root } = fixture(t);
+  const write = (relative, value) => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, value);
+  };
+  write('package.json', JSON.stringify({ devDependencies: { electron: '43.8.3' } }));
+  write('package-lock.json', JSON.stringify({ packages: { 'node_modules/electron': { version: '43.8.3' } } }));
+  write('node_modules/electron/package.json', JSON.stringify({ version: '43.7.7' }));
+  write('node_modules/electron/dist/version', '43.7.7\n');
+  assert.throws(() => verifyElectronRuntime(root), /Runtime Electron incoerente/);
+  write('node_modules/electron/package.json', JSON.stringify({ version: '43.8.3' }));
+  assert.throws(() => verifyElectronRuntime(root), /Runtime Electron incoerente/);
+  write('node_modules/electron/dist/version', 'v43.8.3\n');
+  assert.equal(verifyElectronRuntime(root), '43.8.3');
+  write('package-lock.json', JSON.stringify({ packages: { 'node_modules/electron': { version: '43.7.7' } } }));
+  assert.throws(() => verifyElectronRuntime(root), /Runtime Electron incoerente/);
+  write('package.json', JSON.stringify({ devDependencies: { electron: '^43.8.3' } }));
+  assert.throws(() => verifyElectronRuntime(root), /Runtime Electron incoerente/);
+});
+
+test('i target supportati non permettono runtime alternativi o pacchetti precedenti', () => {
+  for (const args of [['--dir'], ['--win', 'nsis']]) assert.doesNotThrow(() => verifyElectronBuildTarget(args));
+  for (const args of [[], ['--win', 'nsis', '--config.electronVersion=43.7.7'], ['--dir', '--config', 'old.json'],
+    ['--prepackaged', 'previous'], ['--projectDir=previous'], ['-c.electronDist=previous']]) {
+    assert.throws(() => verifyElectronBuildTarget(args), /Target Electron non ammesso/);
+  }
+  for (const key of ['electronDist', 'electronDownload', 'extends']) {
+    assert.throws(() => verifyElectronBuildTarget(['--dir'], { [key]: 'previous' }), /Configurazione runtime Electron non ammessa/);
+  }
+});
 
 test('il gate richiede una build completa della revisione corrente', t => {
   const state = fixture(t);
