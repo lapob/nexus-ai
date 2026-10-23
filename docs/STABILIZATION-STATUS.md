@@ -1,3 +1,24 @@
+# Real service probes and remaining latency — 24 October 2026
+
+Source gates pass1166 tests/3 skips/zero failures. A natural research question
+previously included its requested link format in the search terms, leading to
+zero results and a misleading service-unavailable answer. Query cleanup is now
+narrowly bounded and retains topic constraints; zero sources remain a safe
+verification failure with a distinct explanation. The exact natural question
+returns four sources in a live source-module probe. Active backend deployment
+still awaits the owner dependency repair/restart; no hot reload is implied.
+
+An end-to-end short public research request returns four citations in9.829s.
+Public synthesis/transcription round-trip one synthetic2.657s Italian phrase
+correctly. Transcription11.611s remains too slow for an immediate conversation;
+warm/repeated synthesis196ms is not a cold-start benchmark or human WER test.
+No training, human recording or cloud inference was used.
+
+Production UI Worker85384536-25ed-4302-ba33-206914569627 from website8e1206e
+passes14route/readiness checks and live five-profile/four-offline browser
+checks, after the complete45unit/31browser release gate. These do not resolve
+the known local Electron43.7.7 mismatch or the locked-device Control matrix.
+
 # Responsive voice and runtime repair pending — 24 October 2026
 
 Current source passes cloud/workstation checks and1164 tests with3 skips and

@@ -38,6 +38,36 @@ test('mantiene query e lingua deterministiche', () => {
   assert.equal(researchLanguage('What is the current version?'), 'en');
 });
 
+test('separa le istruzioni per link e fonti dai termini di ricerca', async () => {
+  const question = 'Cerca sul web la documentazione ufficiale di JavaScript Promise.allSettled e indicami un link verificato.';
+  assert.deepEqual(deriveResearchQueries(question, 1), ['la documentazione ufficiale di JavaScript Promise.allSettled']);
+  assert.deepEqual(deriveResearchQueries('Search Promise.allSettled documentation and give me a verified link.', 1), ['Promise.allSettled documentation']);
+  assert.equal(publicQuerySeed('Cerca fonti di diritto e citazioni giudiziarie'), 'fonti di diritto e citazioni giudiziarie');
+  assert.equal(publicQuerySeed('Search stars and show sources of light'), 'stars and show sources of light');
+  assert.equal(publicQuerySeed('Cerca Promise.allSettled e indicami un link sulla gestione errori'), 'Promise.allSettled e indicami un link sulla gestione errori');
+  const calls = [];
+  const result = await researchQuestion({ question, service: { search: async query => {
+    calls.push(query);
+    return { provider: 'searxng', results: [{ title: 'Documentazione', url: 'https://example.com/docs', snippet: 'Fonte verificata dal provider', sourceKind: 'web' }] };
+  } } });
+  assert.deepEqual(calls, ['la documentazione ufficiale di JavaScript Promise.allSettled']);
+  assert.equal(result.unavailable, false);
+  assert.equal(result.citations.length, 1);
+});
+
+test('distingue nessun risultato da un provider guasto senza inventare fonti', async () => {
+  const question = 'Cerca sul web un dato attuale';
+  const empty = await researchQuestion({ question, service: { search: async () => ({ provider: 'searxng', results: [] }) } });
+  assert.equal(empty.unavailable, true);
+  assert.equal(empty.emptyResults, true);
+  assert.equal(empty.provider, 'searxng');
+  assert.deepEqual(empty.citations, []);
+  const failed = await researchQuestion({ question, service: { search: async () => { throw new Error('offline'); } } });
+  assert.equal(failed.unavailable, true);
+  assert.equal(failed.emptyResults, false);
+  assert.equal(failed.provider, 'unavailable');
+});
+
 test('le release stabili usano una query breve senza perdere il nome del prodotto', async () => {
   const question = 'Cerca sul web la versione stabile attuale di Nebula Engine e cita la pagina ufficiale con il suo indirizzo.';
   assert.deepEqual(deriveResearchQueries(question, 1), ['Nebula Engine latest stable release official']);

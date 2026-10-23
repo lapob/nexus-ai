@@ -172,7 +172,14 @@ function buildPublicResearchPrompt(sources, unavailable = false) {
   return '';
 }
 
-function publicResearchUnavailableAnswer(question = '') {
+function publicResearchUnavailablePhase(research) {
+  return research.emptyResults ? 'Nessuna fonte verificabile: evito dati non verificati…' : 'Ricerca web non disponibile: evito dati non verificati…';
+}
+
+function publicResearchUnavailableAnswer(question = '', emptyResults = false) {
+  if (emptyResults) return researchLanguage(question) === 'it'
+    ? 'Non ho trovato fonti verificabili per questa ricerca. Prova con termini più precisi: non presenterò informazioni non verificate come attuali.'
+    : 'I found no verifiable sources for this search. Try more specific terms; I will not present unverified information as current.';
   return researchLanguage(question) === 'it'
     ? 'Non posso verificare questa informazione in tempo reale perché il servizio di ricerca web non è disponibile. Non ti darò un dato potenzialmente superato come se fosse attuale: riprova tra poco.'
     : 'I cannot verify this information in real time because web search is unavailable. I will not present a potentially outdated fact as current; please try again shortly.';
@@ -656,7 +663,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     });
     assertActive();
     if (research.unavailable && research.policy.level === 'required') {
-      logger.warn('Ricerca web richiesta ma non disponibile.', { provider: research.provider, reason: research.policy.reason });
+      logger.warn(research.emptyResults ? 'Ricerca web senza fonti verificabili.' : 'Ricerca web richiesta ma non disponibile.', { provider: research.provider, reason: research.policy.reason });
     }
     const researchDirective = buildPublicResearchPrompt(research.sources, research.unavailable && research.policy.level === 'required');
     if (publicGuest) {
@@ -1574,7 +1581,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       const attachmentContext = resolveAttachmentContext(attachmentIds, event.sender.id);
       const prepared = await prepare({ question, mode, history, settings, signal: controller.signal, attachmentContext });
       if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
-        return { answer: publicResearchUnavailableAnswer(question), sources: [], mode, requestId, usage: { promptTokens: 0, completionTokens: 0 } };
+        return { answer: publicResearchUnavailableAnswer(question, prepared.research.emptyResults), sources: [], mode, requestId, usage: { promptTokens: 0, completionTokens: 0 } };
       }
       await ensureRuntime(settings);
       const selectedModel = shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
@@ -1690,13 +1697,13 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       preparedAt = performance.now();
       const bufferModelOutput = prepared.security.promptInjection || prepared.security.sensitiveLiterals.length > 0 || prepared.publicSources.length > 0 || hasStrictOutputConstraint(question);
       if (prepared.research?.searched) {
-        emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: prepared.research.unavailable ? 'Ricerca web non disponibile: procedo senza inventare dati' : `Confronto ${prepared.publicSources.length} fonti pubbliche` } });
+        emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: prepared.research.unavailable ? publicResearchUnavailablePhase(prepared.research) : `Confronto ${prepared.publicSources.length} fonti pubbliche` } });
         if (prepared.publicSources.length) emit(event, { type: 'sources', requestId, sources: prepared.publicSources });
       } else {
         emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: 'Preparo il contesto utile' } });
       }
       if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
-        const answer = publicResearchUnavailableAnswer(question);
+        const answer = publicResearchUnavailableAnswer(question, prepared.research.emptyResults);
         const result = { requestId, message: { role: 'assistant', content: answer }, finishReason: 'unavailable', sources: [], usage: { promptTokens: 0, completionTokens: 0 } };
         emit(event, { type: 'start', requestId, metadata: { mode: 'verified-unavailable' } });
         emit(event, { type: 'token', requestId, token: answer });
@@ -1952,10 +1959,10 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       remotePreparedAt = performance.now();
       const bufferModelOutput = prepared.security.promptInjection || prepared.security.sensitiveLiterals.length > 0 || prepared.publicSources.length > 0 || hasStrictOutputConstraint(parsed.question);
       if (prepared.research?.searched) {
-        report(prepared.research.unavailable ? 'Ricerca web non disponibile: evito dati non verificati…' : `Confronto ${prepared.publicSources.length} fonti pubbliche…`);
+        report(prepared.research.unavailable ? publicResearchUnavailablePhase(prepared.research) : `Confronto ${prepared.publicSources.length} fonti pubbliche…`);
       } else report('Preparo l’intelligenza più adatta…');
       if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
-        const answer = publicResearchUnavailableAnswer(parsed.question);
+        const answer = publicResearchUnavailableAnswer(parsed.question, prepared.research.emptyResults);
         publishRemoteToken(answer);
         report('Risposta pronta');
         const now = Date.now();

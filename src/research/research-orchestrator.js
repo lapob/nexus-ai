@@ -28,6 +28,8 @@ function publicQuerySeed(question) {
     .replace(/[,;]\s*(?:e\s+)?(?:spiega(?:mi|le)?|riassumi|descrivi|mostra|indica)\b[\s\S]*$/iu, '')
     .replace(/[,;]?\s*(?:e\s+)?cita\s+(?:la|le)?\s*font[ei]\b[\s\S]*$/iu, '')
     .replace(/[,;]?\s*(?:e\s+)?cita\s+(?:la\s+pagina|il\s+sito)\s+ufficiale\b[\s\S]*$/iu, '')
+    .replace(/[,;]?\s+(?:e\s+)?(?:indicami|indica|mostrami|mostra|forniscimi|fornisci|dammi|aggiungi|includi)\s+(?:(?:un[ao]?|il|la|i|le|delle?|alcun[ei])\s+)?(?:link|collegament[oi]|font[ei]|citazion[ei]|riferiment[oi])(?:\s+(?:verificat[oaie]|ufficial[ei]|autorevol[ei]|affidabil[ei]))*[.!?]*$/iu, '')
+    .replace(/[,;]?\s+(?:and\s+)?(?:give|show|provide|include|add)\s+(?:me\s+)?(?:(?:a|the|some)\s+)?(?:(?:verified|official|reliable)\s+)?(?:links?|sources?|citations?|references?)[.!?]*$/iu, '')
     .replace(/^(?:le?\s+)?(?:ultim[aei]|pi[uù]\s+recenti)\s+(?:informazioni|notizie|dati)(?:\s+stabili)?\s+(?:su|di)\s+/iu, '')
     .replace(/[,;]?\s*\b(?:citando\s+(?:la|le)\s+font[ei]|con\s+(?:una|le)\s+font[ei]|with\s+(?:a\s+)?citation)\b[\s\S]*$/iu, '')) || original;
 }
@@ -203,11 +205,12 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
       citations: publicCitations(sources),
       searched: true,
       unavailable: sources.length === 0,
+      emptyResults: sources.length === 0,
       provider: batches.find((batch) => batch.provider)?.provider || 'off'
     };
   } catch (error) {
     if (signal?.aborted) throw error;
-    return { policy, queries: queries.length, sources: [], citations: [], searched: true, unavailable: true, provider: 'unavailable', error };
+    return { policy, queries: queries.length, sources: [], citations: [], searched: true, unavailable: true, emptyResults: false, provider: 'unavailable', error };
   }
 }
 

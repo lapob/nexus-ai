@@ -1,3 +1,28 @@
+# Real research and voice checks — 24 October 2026
+
+Final source suite now passes1166 tests,3 skipped,zero failures; cloud and
+workstation checks pass. Search query preparation removes narrowly identified
+link/citation formatting tails without dropping topical constraints. Empty
+results are distinguished from provider failure while mandatory verification
+still prevents unsupported current claims. The natural-query regression returns
+four sources against the real local SearXNG in a separate source probe.
+The active server still needs the pending dependency repair/restart to load
+this backend delta; it is not claimed deployed merely because source is pushed.
+
+A short end-to-end public web query returns four real source artifacts and
+an answer in9.829s; this is one smoke check, not a benchmark or SLA.
+Real public speech endpoints round-trip a synthetic2.657s phrase correctly.
+Transcription takes11.611s; repeated/warm synthesis196ms is not cold-start
+performance. Human microphone/echo and conversational latency remain open.
+No human recording, training or cloud model use was introduced.
+
+Website UI code8e1206e is deployed as Worker85384536-25ed-4302-ba33-206914569627.
+Its complete release gate passes45 unit/31 browser tests, audits/signatures,
+runtime, performance and dry run. Production passes14 routes/readiness,
+five real settings profiles and four live cached offline/reconnect scenarios.
+Rollback is retained. Windows still requires local Electron repair before a
+new verified package; Control still needs its unlocked-device matrix.
+
 # Source security gates and responsive voice — 24 October 2026
 
 Source checks and renderer build pass; final suite: 1164 passed, 3 skipped,
