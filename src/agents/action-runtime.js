@@ -598,6 +598,11 @@ class ActionRuntime {
 
   workspaceIdentity() { return workspaceFingerprint(this.vaultPath); }
 
+  hasPendingProposal(ticketId) {
+    const ticket = this.tickets.get(String(ticketId || '').trim());
+    return Boolean(this.acceptingActions && ticket && ticket.expiresAt >= this.now());
+  }
+
   cancelProposal(ticketId, { transactionId = '' } = {}) {
     const id = asText(ticketId, 'Il ticket', 128);
     const ticket = this.tickets.get(id);

@@ -81,6 +81,7 @@ function publicWorkflow(workflow) {
     cursor: workflow.cursor,
     stepCount: workflow.steps.length,
     currentStep: current ? { id: current.id, tool: current.tool, status: current.status } : null,
+    ...(workflow.recoveryRequired ? { recoveryRequired: true } : {}),
     steps: workflow.steps.map((step) => ({
       id: step.id,
       tool: step.tool,
@@ -103,6 +104,7 @@ class WorkflowRuntime {
     this.actionRuntime = actionRuntime;
     this.checkpointDirectory = path.resolve(checkpointDirectory);
     this.now = now;
+    this.runtimeSessionId = randomUUID();
     this.accepting = true;
     this.activeControllers = new Map();
   }
@@ -122,6 +124,7 @@ class WorkflowRuntime {
       createdAt: this.now(),
       updatedAt: this.now(),
       status: 'pending',
+      runtimeSessionId: this.runtimeSessionId,
       cursor: 0,
       ownerSubjectId: String(subjectId || '').trim().slice(0, 128),
       workspaceId: this.actionRuntime.workspaceIdentity?.() || '',
@@ -173,7 +176,17 @@ class WorkflowRuntime {
   status(id, context = {}) {
     const workflow = this.load(id);
     this.assertOwner(workflow, context.subjectId, context.requireSubject === true);
-    return publicWorkflow(workflow);
+    return publicWorkflow({ ...workflow, recoveryRequired: this.needsRecovery(workflow) });
+  }
+
+  needsRecovery(workflow) {
+    return workflow.status === 'executing' && !this.activeControllers.has(workflow.id);
+  }
+
+  pendingProposal(workflow, step) {
+    return workflow.runtimeSessionId === this.runtimeSessionId && step.proposal && step.ticket
+      && (!step.proposal.expiresAt || step.proposal.expiresAt >= this.now())
+      && (typeof this.actionRuntime.hasPendingProposal !== 'function' || this.actionRuntime.hasPendingProposal(step.ticket));
   }
 
   proposeNext(value, context = {}) {
@@ -182,11 +195,16 @@ class WorkflowRuntime {
     this.assertOwner(workflow, context.subjectId, context.requireSubject === true);
     this.assertWorkspace(workflow);
     if (TERMINAL_STATUSES.has(workflow.status)) return null;
+    if (this.needsRecovery(workflow)) throw workflowFailure('L’azione è stata interrotta. Verifica il risultato prima di ripeterla.', 'WORKFLOW_RECOVERY_REQUIRED', 409);
     const step = workflow.steps[workflow.cursor];
     if (!step) return null;
     assertRemoteToolAllowed(step.tool, Boolean(workflow.ownerSubjectId || context.subjectId || context.deviceIdentity || context.requireSubject));
     if (step.status === 'awaiting-approval' && step.proposal) {
-      return { workflow: publicWorkflow(workflow), step: { id: step.id, tool: step.tool }, proposal: { ...step.proposal } };
+      if (this.pendingProposal(workflow, step)) {
+        return { workflow: publicWorkflow(workflow), step: { id: step.id, tool: step.tool }, proposal: { ...step.proposal } };
+      }
+      this.actionRuntime.cancelProposal?.(step.ticket, { transactionId: workflow.id });
+      delete step.ticket; delete step.proposal; step.status = 'pending';
     }
     if (step.status !== 'pending') throw workflowFailure('Il passaggio corrente non può essere pianificato.', 'WORKFLOW_STATE_CONFLICT', 409);
     const proposal = this.actionRuntime.propose({
@@ -198,6 +216,7 @@ class WorkflowRuntime {
       deviceIdentity: context.deviceIdentity
     });
     step.status = 'awaiting-approval';
+    workflow.runtimeSessionId = this.runtimeSessionId;
     step.ticket = proposal.id;
     step.proposal = publicProposal(proposal);
     workflow.status = 'awaiting-approval';
@@ -224,6 +243,9 @@ class WorkflowRuntime {
       throw workflowFailure('Nessun passaggio attende approvazione.', 'WORKFLOW_NOT_AWAITING_APPROVAL', 409);
     }
     const approved = typeof decision === 'boolean' ? decision : decision?.approved === true;
+    if (approved && !this.pendingProposal(workflow, step)) {
+      throw workflowFailure('La proposta non è più valida. Apri una nuova anteprima.', 'WORKFLOW_PROPOSAL_EXPIRED', 409);
+    }
     if (approved) assertRemoteToolAllowed(step.tool, Boolean(workflow.ownerSubjectId || context.subjectId || context.deviceIdentity || context.requireSubject));
     const suppliedTicket = typeof decision === 'object' ? String(decision?.ticketId || '').trim() : step.ticket;
     if (!suppliedTicket || suppliedTicket !== step.ticket) {
@@ -291,6 +313,7 @@ class WorkflowRuntime {
       active.abort();
       return { workflow: publicWorkflow(workflow), result: { status: 'cancellation-requested' } };
     }
+    if (this.needsRecovery(workflow)) throw workflowFailure('Verifica l’esito dell’azione interrotta prima di chiuderla.', 'WORKFLOW_RECOVERY_REQUIRED', 409);
     const step = workflow.steps[workflow.cursor];
     let result = null;
     if (step?.status === 'awaiting-approval' && step.ticket) {
@@ -323,6 +346,10 @@ class WorkflowRuntime {
   undo(value, context = {}) {
     const workflow = this.resolve(value);
     this.assertOwner(workflow, context.subjectId, context.requireSubject === true);
+    this.assertWorkspace(workflow);
+    if (this.activeControllers.has(workflow.id) || workflow.status === 'executing') {
+      throw workflowFailure('Verifica la conclusione dell’azione prima di annullarne gli effetti.', 'WORKFLOW_RECOVERY_REQUIRED', 409);
+    }
     const result = this.actionRuntime.undoTransaction(workflow.id);
     if (result.status === 'restored') {
       workflow.status = 'reverted';

@@ -17,7 +17,7 @@ export function LocalWorkflowRecipe({ workspace, onSelectWorkspace }: { workspac
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [readOutput, setReadOutput] = useState<string | null>(null);
-  const active = workflow && !terminal.has(workflow.status);
+  const active = workflow && !terminal.has(workflow.status) && !workflow.recoveryRequired;
   useEffect(() => {
     let disposed = false;
     try {
@@ -51,7 +51,8 @@ export function LocalWorkflowRecipe({ workspace, onSelectWorkspace }: { workspac
         finally { setBusy(false); }
       }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></button>
     </div>}
-    {workflow && <div className="local-workflow-state" role="status"><strong>{statusLabel[workflow.status] || workflow.status}</strong><small>{workflow.cursor} / {workflow.stepCount}</small></div>}
+    {workflow && <div className="local-workflow-state" role="status"><strong>{workflow.recoveryRequired ? 'Esito da verificare' : statusLabel[workflow.status] || workflow.status}</strong><small>{workflow.cursor} / {workflow.stepCount}</small></div>}
+    {workflow?.recoveryRequired && <p role="status">L’attività è stata interrotta. Controlla il risultato prima di ripeterla.</p>}
     {proposal && active && <div className="local-workflow-preview"><strong>{proposal.summary}</strong><pre>{proposal.preview}</pre><button className="settings-quiet-action" type="button" disabled={busy} aria-label="Approva questo passaggio" onClick={async () => {
       if (!workflow) return; setBusy(true); setError('');
       try { const value = await window.nexus.decideWorkflowStep(workflow.id, proposal.id, true); setWorkflow(value.workflow); setProposal(null); if (typeof value.result?.stdout === 'string') setReadOutput(value.result.stdout.slice(0, 48_000)); if (value.error) setError(value.error.message); }

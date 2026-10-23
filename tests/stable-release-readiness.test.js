@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { runBackupRecoveryDrill } = require('../scripts/run-backup-recovery-drill');
+const { runBackupRecoveryDrill, validApplicationRecoveryReport } = require('../scripts/run-backup-recovery-drill');
 const { artifactCheck, androidMatrixCheck } = require('../scripts/check-stable-release-readiness');
 
 const root = path.resolve(__dirname, '..');
@@ -78,6 +78,15 @@ test('il drill ripristina snapshot e archivio cifrato senza usare dati reali', (
     assert.equal(report.passed, true);
     assert.equal(report.restoredFiles, 4);
     assert.equal(report.dataClass, 'synthetic-only');
+    assert.equal(report.applicationStoresRoundTrip, true);
+    assert.equal(report.liveWalSnapshot, true);
+    assert.equal(report.artifactRevisionsPreserved, true);
+    assert.equal(report.memoryExpiryAndProvenancePreserved, true);
+    assert.equal(validApplicationRecoveryReport(report), true);
+    for (const key of ['applicationStoresRoundTrip', 'liveWalSnapshot', 'artifactRevisionsPreserved', 'memoryExpiryAndProvenancePreserved']) {
+      assert.equal(validApplicationRecoveryReport({ ...report, [key]: false }), false);
+    }
+    assert.equal(validApplicationRecoveryReport({ ...report, schemaVersion: 1 }), false);
     assert.equal(JSON.parse(fs.readFileSync(output, 'utf8')).encryptedArchiveRoundTrip, true);
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 });

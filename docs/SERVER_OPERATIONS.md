@@ -311,6 +311,34 @@ round trip. Its privacy-safe receipt is written to
 `qa-artifacts/backup-recovery-drill.json`; no real conversation or workstation
 path is included.
 
+The v2 drill uses the actual ConversationStore and PersonalMemoryStore schemas,
+with synthetic turns, incomplete conversation state, artifact revisions,
+memory provenance/expiry and a forgotten record. It snapshots while source
+stores remain open in WAL mode, then opens the restored stores and compares
+application records. Founder/Stable require this evidence; the old two-table
+demonstration is no longer sufficient.
+
+Restore stages and validates all selected files before publishing any. On an
+I/O error it rolls published files back and preserves original SQLite sidecars.
+If rollback itself fails, it raises an aggregate error and retains `.previous`
+files for recovery. Stop the service and close stores before a real restore.
+This is not a cross-file filesystem transaction across power loss: after abrupt
+termination, keep remaining `.restore`/`.previous` files and recover against
+the verified snapshot with the service stopped; never delete them blindly.
+
+Workflow proposals are session-bound. After a runtime restart or ticket expiry,
+request a fresh preview and approval; completed steps and receipts remain in
+the checkpoint. An executing checkpoint with no active controller is flagged
+as requiring outcome verification. It is not replayed or reported cancelled.
+Prepare a separate activity only after checking the effect of the old one.
+
+`ai:eval:continuous:plan` writes `planned`, not `pass`. `ai:eval:continuous`
+executes schema, knowledge and synthetic voice-runtime checks; `checks-passed`
+means only those checks succeeded. The v2 report always marks the product gate
+unmeasured and lists model quality, human voice, public readiness and physical
+clients separately. Child stdout/stderr content is excluded. Use the actual
+model/SLO and platform gates before promotion, not this command's exit code.
+
 The resident availability sampler also records only genuine `online` to
 `degraded` and `degraded` to `online` transitions in the private security
 journal. It never stores endpoint URLs, prompts, responses, IP addresses, or

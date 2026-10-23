@@ -1,5 +1,27 @@
 # Roadmap tecnica
 
+## Assistente operativo quotidiano — verifica del 23 ottobre
+
+L'obiettivo Jarvis è un flusso verificabile: contesto, piano, strumenti,
+risultato osservato e ripresa. Non autorizza azioni illimitate o risultati
+presunti. Riutilizzare i runtime e i componenti esistenti.
+
+| Area | Risultato verificato | Parte ancora da completare |
+| --- | --- | --- |
+| Motore | Lifecycle isolato, integrità e startup misurati | Review completa nativa, capacità/configurazione e qualità ammessa; inferenza pubblica non ripristinata |
+| Compiti quotidiani | Scrittura/lettura con ricevute, riavvio dei runtime, ripresa e undo senza duplicati | Confronti di qualità del modello su incarichi reali oltre i contratti sintetici |
+| Ragionamento | Selettore fast/deep e scelta manuale coperti da regressioni | Calibrazione su modelli ammessi e tempi end-to-end |
+| Voce | Sessione continua sintetica su quattro formati; TTS locale sei frasi, 3373ms cold/918ms mediana warm | STT, eco e interruzione con voce umana e altoparlanti |
+| Memoria | Provenienza/scadenza/edit/export reali; correzione conserva retention; consolidamento atomico | Verifiche sui client fisici e contesti aggiuntivi prima di ampliare lo scope |
+| Azioni | Proposte scadute/perse rigenerate con nuovo consenso; esiti interrotti non ripetuti; undo escluso durante esecuzione o cambio workspace | Nuove integrazioni solo con esecutori, permessi e verifiche specifiche |
+| Grafica | UI di recupero, artefatti su tre layout, offline/reconnect e voce sintetica verificati | Nuovo collaudo Samsung e Apple; fluidità acustica non deducibile dai test browser |
+| Recupero | Snapshot WAL degli archivi applicativi reali, revisioni e memorie; rollback su errori di pubblicazione | Installazione firmata, interruzione brutale del processo/PC e rollout operativo |
+
+I report continuous-eval v2 distinguono piano, controlli eseguiti e qualità
+non misurata: validare lo schema della suite non valuta il modello. Il drill
+backup v2 deve provare gli archivi reali; un vecchio roundtrip su tabelle
+dimostrative non soddisfa più i gate Founder/Stable.
+
 ## Lifecycle verificato, produzione ancora da ammettere — 21 ottobre
 
 Completato il manager del processo nativo in isolamento, con autenticazione,

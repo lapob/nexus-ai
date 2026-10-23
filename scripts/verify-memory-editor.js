@@ -148,6 +148,34 @@ conversations.save({ id: 'artifact-fixture', title: 'Documento Aurora', turns: [
     assert.equal(await recipe.getByRole('button', { name: 'Copia ID ricevuta', exact: true }).first().evaluate(button => getComputedStyle(button).backgroundColor), 'rgba(0, 0, 0, 0)');
     await page.screenshot({ path: path.join(root, 'qa-artifacts/local-workflow-recipe.png') });
     console.log('PASS real local recipe: preview without execution, separate approvals, source preserved, reload/checkpoint, copied text and two actual receipts');
+    // Simulate an interrupted checkpoint only inside this disposable profile.
+    const interrupted = await page.evaluate(async () => {
+      const value = await window.nexus.createWorkflow({ summary: 'Fixture di recupero', steps: [
+        { id: 'copy-document', tool: 'copy_path', arguments: { source: 'source.md', destination: 'not-executed.md' } }
+      ] });
+      localStorage.setItem('nexus.document-workflow.v1', value.id);
+      return value.id;
+    });
+    const checkpointPath = path.join(profile, 'data/workflow-checkpoints', `${interrupted}.json`);
+    const checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));
+    checkpoint.status = 'executing'; checkpoint.steps[0].status = 'executing';
+    fs.writeFileSync(checkpointPath, JSON.stringify(checkpoint));
+    await page.reload(); await page.keyboard.press('Control+,'); await page.locator('#settings-tab-permissions').click();
+    await recipe.getByText('Esito da verificare', { exact: true }).waitFor();
+    await recipe.getByText('L’attività è stata interrotta. Controlla il risultato prima di ripeterla.', { exact: true }).waitFor();
+    for (const name of ['Approva questo passaggio', 'Anteprima prossimo passaggio', 'Interrompi ricetta']) {
+      assert.equal(await recipe.getByRole('button', { name, exact: true }).count(), 0);
+    }
+    assert.equal(await recipe.getByRole('textbox', { name: 'Documento da copiare' }).count(), 1);
+    assert.equal((await page.evaluate(id => window.nexus.workflowStatus(id), interrupted)).recoveryRequired, true);
+    assert.equal(fs.existsSync(path.join(documents, 'not-executed.md')), false);
+    await recipe.getByText('Esito da verificare', { exact: true }).scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => ['.settings-scrim', '.settings-overlay'].every(selector => {
+      const element = document.querySelector(selector);
+      return element && getComputedStyle(element).opacity === '1';
+    }));
+    await page.screenshot({ path: path.join(root, 'qa-artifacts/local-workflow-recovery.png') });
+    console.log('PASS real recovery UI: interrupted outcome visible, no replay/approval/cancellation, new recipe available and no side effects');
   } finally {
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     if (app) await app.close();

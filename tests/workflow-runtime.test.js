@@ -7,6 +7,95 @@ const { WorkflowRuntime, validateSteps } = require('../src/agents/workflow-runti
 const { ActionRuntime } = require('../src/agents/action-runtime');
 const { documentCopyRecipe } = require('../src/shared/local-workflow-recipes.mjs');
 
+test('incarico reale ripreso dopo riavvio: nuova approvazione, nessuna scrittura duplicata e undo', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-restart-'));
+  const actions = [], workflows = [];
+  t.after(async () => { for (const workflow of workflows) workflow.shutdown(); for (const action of actions) await action.shutdown(); fs.rmSync(root, { recursive: true, force: true }); });
+  const create = () => {
+    const action = new ActionRuntime({ vaultPath: root, auditPath: path.join(root, 'audit.jsonl'),
+      checkpointDirectory: path.join(root, 'checkpoints'), shell: { openPath: async () => '', trashItem: async () => {} },
+      logger: { warn() {} }, platform: 'linux', applicationProbe: () => false });
+    actions.push(action);
+    const workflow = new WorkflowRuntime({ actionRuntime: action, checkpointDirectory: path.join(root, 'workflows') });
+    workflows.push(workflow); return { action, workflow };
+  };
+  fs.writeFileSync(path.join(root, 'source.md'), '# Documento sintetico');
+  const first = create(), job = first.workflow.create({ summary: 'Prepara e controlla un documento', steps: [
+    { id: 'write-document', tool: 'write_file', arguments: { path: 'copy.md', content: '# Documento sintetico' } },
+    { id: 'read-document', tool: 'read_file', arguments: { path: 'copy.md' } }
+  ] });
+  const copy = first.workflow.next(job.id);
+  const copied = await first.workflow.decide(job.id, { ticketId: copy.proposal.id, approved: true });
+  const receiptId = copied.result.receipt.id, timestamp = fs.statSync(path.join(root, 'copy.md')).mtimeMs;
+  const oldRead = first.workflow.next(job.id);
+  first.workflow.shutdown(); await first.action.shutdown();
+  const second = create();
+  await assert.rejects(second.workflow.decide(job.id, { ticketId: oldRead.proposal.id, approved: true }), { code: 'WORKFLOW_PROPOSAL_EXPIRED' });
+  const read = second.workflow.next(job.id);
+  assert.notEqual(read.proposal.id, oldRead.proposal.id); assert.equal(read.step.tool, 'read_file');
+  const completed = await second.workflow.decide(job.id, { ticketId: read.proposal.id, approved: true });
+  assert.equal(completed.workflow.status, 'complete'); assert.match(completed.result.stdout, /Documento sintetico/);
+  assert.equal(completed.workflow.steps[0].result.receipt.id, receiptId);
+  assert.equal(fs.statSync(path.join(root, 'copy.md')).mtimeMs, timestamp);
+  assert.equal(second.workflow.undo(job.id).result.status, 'restored');
+  assert.equal(fs.existsSync(path.join(root, 'copy.md')), false);
+  assert.equal(fs.readFileSync(path.join(root, 'source.md'), 'utf8'), '# Documento sintetico');
+});
+
+test('una proposta scaduta si rigenera senza eseguire o fallire definitivamente l’incarico', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-refresh-'));
+  let time = 100;
+  const action = new ActionRuntime({ vaultPath: root, auditPath: path.join(root, 'audit.jsonl'),
+    checkpointDirectory: path.join(root, 'checkpoints'), shell: {}, logger: { warn() {} }, platform: 'linux', now: () => time });
+  const workflow = new WorkflowRuntime({ actionRuntime: action, checkpointDirectory: path.join(root, 'workflows'), now: () => time });
+  t.after(async () => { workflow.shutdown(); await action.shutdown(); fs.rmSync(root, { recursive: true, force: true }); });
+  fs.writeFileSync(path.join(root, 'source.md'), 'synthetic');
+  const job = workflow.create({ steps: [{ tool: 'read_file', arguments: { path: 'source.md' } }] });
+  const old = workflow.next(job.id); time = old.proposal.expiresAt + 1;
+  await assert.rejects(workflow.decide(job.id, { approved: true, ticketId: old.proposal.id }), { code: 'WORKFLOW_PROPOSAL_EXPIRED' });
+  assert.equal(workflow.status(job.id).status, 'awaiting-approval');
+  const next = workflow.next(job.id);
+  assert.notEqual(next.proposal.id, old.proposal.id); assert.equal(action.hasPendingProposal(old.proposal.id), false);
+  assert.equal((await workflow.decide(job.id, { approved: true, ticketId: next.proposal.id })).workflow.status, 'complete');
+});
+
+test('un’azione interrotta con esito sconosciuto non viene ripetuta o dichiarata annullata', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-uncertain-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  let calls = 0;
+  const actionRuntime = { propose: () => ({ id: 'test' }), execute: async () => { calls++; return { status: 'completed' }; } };
+  const first = new WorkflowRuntime({ actionRuntime, checkpointDirectory: root });
+  const job = first.create({ steps: [{ tool: 'read_file' }] });
+  job.status = 'executing'; job.steps[0].status = 'executing'; first.save(job);
+  const second = new WorkflowRuntime({ actionRuntime, checkpointDirectory: root });
+  assert.equal(second.status(job.id).recoveryRequired, true);
+  assert.throws(() => second.next(job.id), { code: 'WORKFLOW_RECOVERY_REQUIRED' });
+  await assert.rejects(second.cancel(job.id), { code: 'WORKFLOW_RECOVERY_REQUIRED' });
+  assert.throws(() => second.undo(job.id), { code: 'WORKFLOW_RECOVERY_REQUIRED' });
+  assert.equal(calls, 0); assert.equal(second.load(job.id).status, 'executing');
+});
+
+test('undo non concorre con un passo ancora attivo, né cambia lo spazio di lavoro', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-undo-boundary-'));
+  let finish, reverted = 0, workspace = 'first';
+  const runtime = new WorkflowRuntime({ checkpointDirectory: root, actionRuntime: {
+    propose: () => ({ id: 'ticket' }), workspaceIdentity: () => workspace,
+    execute: () => new Promise(resolve => { finish = resolve; }),
+    undoTransaction: () => { reverted++; return { status: 'restored' }; }
+  } });
+  t.after(() => { runtime.shutdown(); fs.rmSync(root, { recursive: true, force: true }); });
+  const workflow = runtime.create({ steps: [{ tool: 'read_file' }] });
+  runtime.next(workflow.id);
+  const running = runtime.decide(workflow.id, true);
+  assert.throws(() => runtime.undo(workflow.id), { code: 'WORKFLOW_RECOVERY_REQUIRED' });
+  assert.equal(reverted, 0);
+  finish({ status: 'completed' }); await running;
+  workspace = 'second';
+  assert.throws(() => runtime.undo(workflow.id), { code: 'WORKFLOW_WORKSPACE_CHANGED' });
+  assert.equal(reverted, 0);
+  workspace = 'first'; assert.equal(runtime.undo(workflow.id).workflow.status, 'reverted');
+});
+
 test('document recipe uses the actual executor, preserves the source and requires approval for both steps', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-document-recipe-'));
   const other = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-document-other-'));

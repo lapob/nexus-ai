@@ -5,6 +5,36 @@ const path = require('node:path');
 const test = require('node:test');
 const { PersonalMemoryStore, explicitMemoryInstruction } = require('../src/infrastructure/storage/personal-memory-store');
 
+test('correggere il testo preserva la scadenza scelta e la provenienza', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-retention-'));
+  const store = new PersonalMemoryStore({ filePath: path.join(root, 'memory.sqlite3') });
+  t.after(() => { store.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  const expiry = Date.now() + 86400000;
+  const memory = store.remember({ content: 'Il progetto Aurora usa Java', sourceId: 'turn-1', expiresAt: expiry });
+  store.updateById(memory.id, 'Il progetto Aurora usa Rust');
+  assert.equal(store.list()[0].expiresAt, expiry); assert.equal(store.list()[0].sourceId, 'turn-1');
+  store.updateById(memory.id, 'Il progetto Aurora usa Go', { expiresAt: null });
+  assert.equal(store.list()[0].expiresAt, null);
+  store.updateById(memory.id, 'Oggi ho una riunione Aurora');
+  assert.equal(store.list()[0].type, 'episodic');
+  assert.equal(store.list()[0].expiresAt, null, 'Una correzione non deve inventare una scadenza al cambio di tipo');
+});
+
+test('ricordo e sostituzione sono atomici anche se il consolidamento fallisce', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-transaction-'));
+  const store = new PersonalMemoryStore({ filePath: path.join(root, 'memory.sqlite3') });
+  t.after(() => { store.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  store.remember({ content: 'La mia lingua è italiano' });
+  store.database.exec("CREATE TRIGGER fail_consolidation BEFORE UPDATE ON memories WHEN NEW.status='superseded' BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;");
+  assert.throws(() => store.remember({ content: 'La mia lingua è francese' }), /synthetic failure/);
+  assert.deepEqual(store.list().map(item => item.content), ['La mia lingua è italiano']);
+  assert.equal(store.stats().total, 1);
+  store.database.exec('DROP TRIGGER fail_consolidation; BEGIN');
+  store.remember({ content: 'Il progetto temporaneo usa Go' });
+  store.database.exec('ROLLBACK');
+  assert.equal(store.stats().total, 1, 'Il savepoint non deve confermare la transazione esterna');
+});
+
 test('correzione esplicita aggiorna solo il ricordo attivo indicato', () => {
   assert.deepEqual(explicitMemoryInstruction('Correggi il ricordo #12: Il progetto usa Rust'), { action: 'update', id: 12, content: 'Il progetto usa Rust' });
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-memory-edit-'));

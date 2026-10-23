@@ -179,42 +179,69 @@ function restoreSnapshot(snapshotPath, userDataPath, { unprotect = null } = {}) 
     ['personal-memory.sqlite3', path.join('data', 'database', 'personal-memory.sqlite3')],
     ['training-examples.jsonl', path.join('data', 'database', 'training-examples.jsonl')]
   ]);
-  let restored = 0;
-  for (const entry of verification.files) {
-    const protectedFile = entry.name.endsWith('.protected');
-    const logicalName = protectedFile ? entry.name.slice(0, -10) : entry.name;
-    const relative = destinations.get(logicalName);
-    if (!relative) continue;
-    const source = path.join(snapshotPath, entry.name);
-    const bytes = protectedFile
-      ? (typeof unprotect === 'function' ? unprotect(fs.readFileSync(source)) : null)
-      : fs.readFileSync(source);
-    if (!Buffer.isBuffer(bytes)) throw new Error('Lo snapshot protetto richiede la cifratura di sistema originale.');
-    const destination = path.join(userDataPath, relative);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    const temporary = `${destination}.${process.pid}.restore`;
-    let published = false;
-    try {
-      fs.writeFileSync(temporary, bytes, { mode: 0o600, flush: true });
+  const staged = [], destinationsSeen = new Set(), transaction = crypto.randomUUID();
+  let committed = false;
+  try {
+    // Una decifratura o un database non valido non deve alterare parte dei dati correnti.
+    for (const entry of verification.files) {
+      const protectedFile = entry.name.endsWith('.protected');
+      const logicalName = protectedFile ? entry.name.slice(0, -10) : entry.name;
+      const relative = destinations.get(logicalName);
+      if (!relative) continue;
+      if (destinationsSeen.has(relative)) throw new Error('Lo snapshot contiene destinazioni duplicate.');
+      destinationsSeen.add(relative);
+      const source = path.join(snapshotPath, entry.name);
+      const bytes = protectedFile
+        ? (typeof unprotect === 'function' ? unprotect(fs.readFileSync(source)) : null)
+        : fs.readFileSync(source);
+      if (!Buffer.isBuffer(bytes)) throw new Error('Lo snapshot protetto richiede la cifratura di sistema originale.');
+      const destination = path.join(userDataPath, relative);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      const temporary = `${destination}.${transaction}.restore`;
+      const record = { destination, temporary, previous: [], published: false, sqlite: logicalName.endsWith('.sqlite3') };
+      staged.push(record);
+      fs.writeFileSync(temporary, bytes, { mode: 0o600, flush: true, flag: 'wx' });
       if (logicalName.endsWith('.sqlite3')) {
         let database;
         try {
           database = new DatabaseSync(temporary, { readOnly: true });
           quickCheckDatabase(database);
         } finally { if (database) database.close(); }
-        removeSqliteSidecars(destination);
       }
-      fs.renameSync(temporary, destination);
-      published = true;
-      restored += 1;
-    } finally {
-      if (!published) {
-        fs.rmSync(temporary, { force: true });
-        removeSqliteSidecars(temporary);
+    }
+    for (const record of staged) {
+      // I sidecar appartengono alla precedente versione del DB: conservarli
+      // fino al commit per non perdere il WAL se un file successivo fallisce.
+      for (const original of [record.destination, ...(record.sqlite ? [`${record.destination}-wal`, `${record.destination}-shm`] : [])]) {
+        if (!fs.existsSync(original)) continue;
+        const previous = `${original}.${transaction}.previous`;
+        fs.renameSync(original, previous); record.previous.push({ original, previous });
+      }
+      fs.renameSync(record.temporary, record.destination); record.published = true;
+    }
+    committed = true;
+    return { restored: staged.length };
+  } catch (error) {
+    const failures = [];
+    for (const record of [...staged].reverse()) {
+      try {
+        if (record.published) fs.rmSync(record.destination, { force: true });
+        for (const saved of [...record.previous].reverse()) fs.renameSync(saved.previous, saved.original);
+      } catch (rollbackError) { failures.push(rollbackError); }
+    }
+    if (failures.length) {
+      throw new AggregateError([error, ...failures], 'Ripristino non completato: conservate le copie precedenti per il recupero.', { cause: error });
+    }
+    throw error;
+  } finally {
+    for (const record of staged) {
+      fs.rmSync(record.temporary, { force: true }); removeSqliteSidecars(record.temporary);
+      // Dopo un rollback fallito non eliminare le copie necessarie al recupero.
+      if (committed) for (const saved of record.previous) {
+        try { fs.rmSync(saved.previous, { force: true }); } catch { /* copia precedente conservata */ }
       }
     }
   }
-  return { restored };
 }
 
 // #endregion

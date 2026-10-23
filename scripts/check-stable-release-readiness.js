@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validAndroidMatrix } = require('./android-matrix-evidence');
+const { validApplicationRecoveryReport } = require('./run-backup-recovery-drill');
 
 const root = path.resolve(__dirname, '..');
 const policy = JSON.parse(fs.readFileSync(path.join(root, 'config', 'stable-release-policy.json'), 'utf8'));
@@ -64,7 +65,7 @@ function buildStableReadinessReport() {
   const checks = [
     ...signingChecks(),
     artifactCheck('product-slo', 'qa-artifacts/product-slo-report.json', policy.artifactMaximumAgeHours.productSlo, (artifact) => artifact.releaseReady === true && artifact.onlineReadinessVerified === true, 'SLO automatici recenti e readiness pubblica verificata online'),
-    artifactCheck('backup-recovery', 'qa-artifacts/backup-recovery-drill.json', policy.artifactMaximumAgeHours.backupRecoveryDrill, (artifact) => artifact.passed === true && artifact.snapshotIntegrity === true && artifact.encryptedArchiveRoundTrip === true, 'Ripristino e cifratura provati con dati sintetici'),
+    artifactCheck('backup-recovery', 'qa-artifacts/backup-recovery-drill.json', policy.artifactMaximumAgeHours.backupRecoveryDrill, validApplicationRecoveryReport, 'Ripristino di conversazioni, memorie e revisioni con dati sintetici negli archivi reali'),
     androidMatrixCheck('android-control-device', 'qa-artifacts/android-control-matrix/manifest.json', 'release-android/NexusNXS-Control.apk'),
     androidMatrixCheck('android-public-device', 'qa-artifacts/android-public-matrix/manifest.json', 'release-android/NexusNXS-Android.apk'),
     ...policy.externalControls.map((control) => check(control.id, String(process.env[control.environment] || '').trim().toLowerCase() === 'true', control.description))

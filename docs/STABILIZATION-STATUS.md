@@ -1,3 +1,32 @@
+## Continuità degli incarichi e dati — 23 ottobre
+
+Gate sorgenti: 1144 PASS, 2 SKIP, 0 FAIL; 81 test mirati, cloud:check e check
+locale PASS. Drill backup v2: quattro file ripristinati. UI Electron/IPC
+memoria, artefatti, ricetta e stato «Esito da verificare» PASS. L'undo rifiuta
+esecuzioni attive/esiti sconosciuti e cambi di workspace. La correzione di un
+ricordo conserva anche una scadenza esplicitamente assente. Nessuna nuova
+dipendenza o versione. Verifica pubblica di sola lettura: task server Running,
+healthz200 e readyz503; nessun riavvio o aggiornamento del servizio.
+
+Risolti difetti reali: correzione del testo memoria che perdeva la scadenza,
+consolidamento non atomico, report del piano valutazioni erroneamente verde e
+restore che lasciava file mescolati dopo un errore tardivo. Il drill v2 usa
+gli archivi applicativi reali con dati sintetici e WAL aperto; Founder/Stable
+non accettano più la sola prova con tabelle dimostrative.
+
+Incarichi ripresi dopo ricostruzione dei runtime conservano i passi completati
+e richiedono una nuova proposta/approvazione. Provati scrittura, lettura,
+ricevute e undo senza duplicare la scrittura. Un esito interrotto sconosciuto
+non viene rieseguito né dichiarato annullato. Restore: rollback su errori I/O
+e copie precedenti conservate su doppio guasto; nessuna garanzia di transazione
+tra file durante power loss. Il servizio deve essere chiuso per restore reale.
+
+Il 21 ottobre: browser offline/reconnect e voce sintetica quattro formati PASS. UI Electron
+reale memoria, artefatti tre layout e ricetta con approvazioni separate PASS.
+TTS locale sei frasi: cold3373ms/warm mediana918ms; non misura STT/eco o qualità
+umana. Nessun aggiornamento dei binari/installazione, deploy o modello attivo.
+Readiness pubblica e qualità del candidato restano requisiti aperti.
+
 ## Avvio candidato: costo hash misurato e ridotto — 21 ottobre
 
 La profilazione separa verifica integrità e caricamento: Electron impiegava

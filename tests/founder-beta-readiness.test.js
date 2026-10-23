@@ -27,7 +27,9 @@ function fixture() {
     externalControls: [{ id: 'privacy', environment: 'PRIVACY_OK', description: 'privacy' }, { id: 'support', environment: 'SUPPORT_OK', description: 'support' }]
   });
   write('qa-artifacts/product-slo-report.json', { generatedAt: new Date(now).toISOString(), releaseReady: true, onlineReadinessVerified: true });
-  write('qa-artifacts/backup-recovery-drill.json', { generatedAt: new Date(now).toISOString(), passed: true, snapshotIntegrity: true, encryptedArchiveRoundTrip: true });
+  write('qa-artifacts/backup-recovery-drill.json', { generatedAt: new Date(now).toISOString(), schemaVersion: 2,
+    dataClass: 'synthetic-only', restoredFiles: 4, passed: true, snapshotIntegrity: true, encryptedArchiveRoundTrip: true,
+    applicationStoresRoundTrip: true, liveWalSnapshot: true, artifactRevisionsPreserved: true, memoryExpiryAndProvenancePreserved: true });
   write('qa-artifacts/ai-eval-lab-gate.json', { generatedAt: new Date(now).toISOString(), gatePassed: true, models: [{ summary: { mustPassFailures: [] } }] });
   write('qa-artifacts/desktop-motion-qa.json', { generatedAt: new Date(now).toISOString(), cores: [{ failures: [] }] });
   return { projectRoot, write, now };

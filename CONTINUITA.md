@@ -1,3 +1,38 @@
+# Daily assistant recovery and truthful evidence — 23 October 2026
+
+Source gate: 1144 PASS, 2 SKIP, 0 FAIL; 81 focused tests, cloud:check and
+workstation check pass. The v2 application recovery drill restores all four
+files. Real Electron memory/artifact/recipe IPC and interrupted-outcome UI
+pass, with screenshots captured after the opening transition completes.
+Undo is blocked while execution is active or its outcome is unknown, and
+cannot cross a workspace change. Memory edits preserve explicit no-expiry.
+No dependency, package version, installed client or production runtime changed.
+Read-only production check: server task Running, healthz 200, readyz 503.
+
+Continuous evaluation v2 distinguishes an unexecuted plan from completed light
+checks, explicitly leaving model quality, human voice, public readiness and
+physical clients unmeasured. Child output is not copied into the report.
+Personal-memory correction preserves the chosen expiry and provenance, and
+remember/consolidation is atomic through a composable SQLite savepoint.
+
+The recovery drill now uses real application schemas and live WAL snapshots,
+including conversation state, artifact revisions, memory expiry/provenance and
+forgotten records. Founder/Stable require the v2 application evidence. Restore
+preflights every file, rejects duplicate destinations and rolls back I/O
+publication failures without discarding old DB sidecars. A failed rollback
+retains recovery copies; abrupt power loss is not a cross-file atomic restore.
+
+Workflow previews lost or expired across sessions are regenerated with fresh
+approval, preserving completed steps and receipts. An interrupted execution
+with unknown outcome is shown as requiring verification and is never replayed
+or falsely reported cancelled. A real write/read/restart/undo journey passes.
+
+On 21 October, source browser offline and four synthetic voice layouts passed. Real Electron
+memory/artifact/recipe IPC checks pass. Six fixed Italian TTS phrases measured
+3373ms cold and 918ms warm median; this does not measure STT/echo or human voice
+quality. No model promotion, installer or production deployment occurred.
+The eight-area status table in ROADMAP records remaining operational blockers.
+
 # Native hashing startup cost reduced — 21 October 2026
 
 Profiling separated full model integrity checks from process spawn/loading.

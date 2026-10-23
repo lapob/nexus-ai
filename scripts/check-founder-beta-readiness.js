@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validAndroidMatrix } = require('./android-matrix-evidence');
+const { validApplicationRecoveryReport } = require('./run-backup-recovery-drill');
 
 const root = path.resolve(__dirname, '..');
 
@@ -50,7 +51,7 @@ function buildFounderBetaReport({ projectRoot = root, environment = process.env,
   if (!policy || policy.schemaVersion !== 1) throw new Error('Policy Founder Beta non valida.');
   const automatic = [
     artifactCheck({ projectRoot, id: 'product-slo', relativePath: 'qa-artifacts/product-slo-report.json', maximumAgeHours: policy.artifactMaximumAgeHours.productSlo, now, detail: 'Qualità, latenza e readiness pubblica recenti', predicate: (artifact) => artifact.releaseReady === true && artifact.onlineReadinessVerified === true }),
-    artifactCheck({ projectRoot, id: 'backup-recovery', relativePath: 'qa-artifacts/backup-recovery-drill.json', maximumAgeHours: policy.artifactMaximumAgeHours.backupRecovery, now, detail: 'Ripristino sintetico e archivio cifrato verificati', predicate: (artifact) => artifact.passed === true && artifact.snapshotIntegrity === true && artifact.encryptedArchiveRoundTrip === true }),
+    artifactCheck({ projectRoot, id: 'backup-recovery', relativePath: 'qa-artifacts/backup-recovery-drill.json', maximumAgeHours: policy.artifactMaximumAgeHours.backupRecovery, now, detail: 'Ripristino verificato con gli archivi applicativi reali e dati sintetici', predicate: validApplicationRecoveryReport }),
     artifactCheck({ projectRoot, id: 'ai-evaluation', relativePath: 'qa-artifacts/ai-eval-lab-gate.json', maximumAgeHours: policy.artifactMaximumAgeHours.aiEvaluation, now, detail: 'Eval AI versionate senza fallimenti obbligatori', predicate: (artifact) => artifact.gatePassed === true && (artifact.models || []).every((model) => (model.summary?.mustPassFailures || []).length === 0) }),
     artifactCheck({ projectRoot, id: 'desktop-motion', relativePath: 'qa-artifacts/desktop-motion-qa.json', maximumAgeHours: policy.artifactMaximumAgeHours.desktopMotion, now, detail: 'Core e transizioni desktop dentro il budget', predicate: (artifact) => (artifact.cores || []).length > 0 && artifact.cores.every((core) => (core.failures || []).length === 0) })
   ];

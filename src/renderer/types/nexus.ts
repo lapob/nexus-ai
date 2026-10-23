@@ -409,6 +409,7 @@ export interface OperationalArtifact {
 
 export interface LocalWorkflowSnapshot {
   id: string; summary: string; status: string; cursor: number; stepCount: number;
+  recoveryRequired?: boolean;
   steps: Array<{ id: string; tool: string; status: string; result?: { receipt?: { id: string; outcome?: string } } }>;
 }
 

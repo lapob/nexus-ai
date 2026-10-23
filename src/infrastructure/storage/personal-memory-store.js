@@ -101,17 +101,24 @@ class PersonalMemoryStore {
     const subjectKey = exclusiveMemorySubject(clean, resolvedType) || null;
     const now = Date.now();
     const resolvedExpiry = Number.isFinite(expiresAt) ? Math.max(now, expiresAt) : resolvedType === 'episodic' ? now + 30 * 86_400_000 : null;
-    this.database.prepare(`INSERT INTO memories(memory_key,type,content,status,confidence,source_kind,source_id,subject_key,created_at,updated_at,expires_at)
-      VALUES(?,?,?,'active','user-confirmed','explicit-user-statement',?,?,?,?,?)
-      ON CONFLICT(memory_key) DO UPDATE SET type=excluded.type, content=excluded.content, status='active',
-      confidence='user-confirmed', source_id=excluded.source_id, subject_key=excluded.subject_key,
-      superseded_by=NULL, updated_at=excluded.updated_at, expires_at=excluded.expires_at`).run(key, resolvedType, clean, sourceId, subjectKey, now, now, resolvedExpiry);
-    const current = this.database.prepare('SELECT * FROM memories WHERE memory_key=?').get(key);
-    if (subjectKey) {
-      this.database.prepare("UPDATE memories SET status='superseded', superseded_by=?, updated_at=? WHERE subject_key=? AND id<>? AND status='active'")
-        .run(current.id, now, subjectKey, current.id);
+    this.database.exec('SAVEPOINT nexus_memory_remember');
+    try {
+      this.database.prepare(`INSERT INTO memories(memory_key,type,content,status,confidence,source_kind,source_id,subject_key,created_at,updated_at,expires_at)
+        VALUES(?,?,?,'active','user-confirmed','explicit-user-statement',?,?,?,?,?)
+        ON CONFLICT(memory_key) DO UPDATE SET type=excluded.type, content=excluded.content, status='active',
+        confidence='user-confirmed', source_id=excluded.source_id, subject_key=excluded.subject_key,
+        superseded_by=NULL, updated_at=excluded.updated_at, expires_at=excluded.expires_at`).run(key, resolvedType, clean, sourceId, subjectKey, now, now, resolvedExpiry);
+      const current = this.database.prepare('SELECT * FROM memories WHERE memory_key=?').get(key);
+      if (subjectKey) {
+        this.database.prepare("UPDATE memories SET status='superseded', superseded_by=?, updated_at=? WHERE subject_key=? AND id<>? AND status='active'")
+          .run(current.id, now, subjectKey, current.id);
+      }
+      this.database.exec('RELEASE nexus_memory_remember');
+      return current;
+    } catch (error) {
+      this.database.exec('ROLLBACK TO nexus_memory_remember; RELEASE nexus_memory_remember');
+      throw error;
     }
-    return current;
   }
 
   expireStale(now = Date.now()) {
@@ -188,7 +195,7 @@ class PersonalMemoryStore {
     const clean = normalizeText(content);
     if (!Number.isSafeInteger(id) || id < 1 || clean.length < 3) throw new Error('Ricordo non valido.');
     this.expireStale();
-    const existing = this.database.prepare("SELECT id FROM memories WHERE id=? AND status='active'").get(id);
+    const existing = this.database.prepare("SELECT id,expires_at FROM memories WHERE id=? AND status='active'").get(id);
     if (!existing) throw new Error('Ricordo non disponibile.');
     const key = memoryKey(clean);
     const duplicate = this.database.prepare('SELECT id FROM memories WHERE memory_key=? AND id<>?').get(key, id);
@@ -198,7 +205,8 @@ class PersonalMemoryStore {
     const customExpiry = Object.hasOwn(options, 'expiresAt');
     if (customExpiry && options.expiresAt !== null && (!Number.isSafeInteger(options.expiresAt)
       || options.expiresAt <= now || options.expiresAt > now + 10 * 366 * 86_400_000)) throw new Error('Scadenza del ricordo non valida.');
-    const expiresAt = customExpiry ? options.expiresAt : type === 'episodic' ? now + 30 * 86_400_000 : null;
+    // Correggere il testo non rinnova una scadenza già scelta dall'utente.
+    const expiresAt = customExpiry ? options.expiresAt : existing.expires_at;
     const subject = exclusiveMemorySubject(clean, type) || null;
     this.database.exec('BEGIN IMMEDIATE');
     try {
