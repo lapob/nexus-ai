@@ -1,3 +1,17 @@
+# Web settings and Control regression fixes — 23 October 2026
+
+Control1.20.1/code45 passes release/lint and five Samsung display profiles.
+Switching Applications/Games/back preserves the exact top-tab bounds; the
+server-stop action is full-width on phone, and its confirmation hides the
+dock. Confirmation was cancelled; no server or PC power command executed.
+Bottom blur uses a32dp progressive fade with cached mask shaders.
+Web settings pass five viewport/text profiles with CSP, shared symbols and
+adjacent header actions; four cached offline/reconnect scenarios also pass.
+The icon catalog/license are included in Windows packaging and verified.
+Source suite1159PASS/3SKIP/0FAIL; final cloud/build/release checks in progress.
+Preview0.3.32 remains immutable;0.3.33 will carry the new web/package changes.
+The public Android APK6.5.25 is unchanged. Owner Control is never public.
+Human voice/echo, iOS, production signing and broader model quality remain open.
 # Android refinement and Preview 0.3.32 — 23 October 2026
 
 Public Android 6.5.25 and owner-only Control 1.20.0 share 42 pinned official

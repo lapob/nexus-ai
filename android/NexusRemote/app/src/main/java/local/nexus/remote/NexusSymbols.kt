@@ -60,4 +60,8 @@ internal object NexusSymbols {
     val Dashboard: ImageVector get() = vector("Dashboard")
     val Apps: ImageVector get() = vector("Apps")
     val Services: ImageVector get() = vector("Services")
+    val Download: ImageVector get() = vector("Download")
+    val Check: ImageVector get() = vector("Check")
+    val ThumbUp: ImageVector get() = vector("ThumbUp")
+    val ThumbDown: ImageVector get() = vector("ThumbDown")
 }

@@ -47,6 +47,18 @@ async function main() {
     for (const [width, height, textScale = 1] of [[320, 568], [390, 844], [844, 390], [390, 844, 2], [1440, 900]]) {
       await client.command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
       await client.evaluate(`document.documentElement.style.fontSize=${JSON.stringify(`${textScale * 100}%`)};true`);
+      const header = await client.evaluate(`(()=>{
+        const body=document.body,saved=body.dataset.serviceReadiness,active=body.classList.contains('request-active');
+        body.classList.remove('request-active','conversation-active');body.dataset.serviceReadiness='ready';
+        const state=document.querySelector('.identity .state'),settings=document.querySelector('#profileSettings'),download=document.querySelector('#download');
+        const a=settings.getBoundingClientRect(),b=download.getBoundingClientRect();
+        const result={stateHidden:getComputedStyle(state).display==='none',gap:b.left-a.right,
+          sharedIcons:[settings,download].every(button=>button.querySelector('svg.nxs-symbol path[fill="currentColor"]'))};
+        body.dataset.serviceReadiness=saved;if(active)body.classList.add('request-active');return result;
+      })()`);
+      assert.equal(header.stateHidden, true, 'Idle service status must not leave a vacant header slot');
+      assert.ok(header.gap >= 0 && header.gap <= 16, 'Settings and download remain adjacent');
+      assert.equal(header.sharedIcons, true, 'Header symbols match the shared native catalog');
       const geometry = await evaluateWhenReady(client, `new Promise(resolve=>{
         const trigger=document.querySelector('#profileSettings'),dialog=document.querySelector('#profileSheet');
         if(dialog.open)dialog.close(); trigger.click();

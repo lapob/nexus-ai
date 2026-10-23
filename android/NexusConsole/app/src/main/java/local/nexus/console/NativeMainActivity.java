@@ -403,8 +403,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             if ("App".equals(dashboardSection) && !appFolder.isEmpty()) {
                 rememberDashboardPosition();
                 appFolder = "";
-                content.removeAllViews();
-                renderDashboard(lastDashboardSnapshot);
+                renderApplicationsPanel(dashboardPanels.get("App"));
+                restoreDashboardPosition();
+                updateBackNavigation();
                 return;
             }
             if (!"Panoramica".equals(dashboardSection)) {
@@ -781,21 +782,18 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         JSONObject requests = nexusService == null ? null : nexusService.optJSONObject("requests");
         services.addView(divider());
         LinearLayout activityMetrics = new LinearLayout(this);
-        activityMetrics.setOrientation(LinearLayout.HORIZONTAL);
+        boolean stackedMetrics = getResources().getConfiguration().fontScale >= 1.3f;
+        activityMetrics.setOrientation(stackedMetrics ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
         activityMetrics.setPadding(0, dp(12), 0, 0);
-        activityMetrics.addView(serviceMetric("RICHIESTE", requestCount(requests), "requests"), new LinearLayout.LayoutParams(0, -2, 1));
-        activityMetrics.addView(serviceMetric("SESSIONI", nexusService == null ? 0 : nexusService.optInt("anonymousSessions"), "sessions"), spacedServiceMetric());
-        activityMetrics.addView(serviceMetric("STREAM LIVE", nexusService == null ? 0 : nexusService.optInt("connectedStreams"), "streams"), spacedServiceMetric());
+        activityMetrics.addView(serviceMetric("RICHIESTE", requestCount(requests), "requests"), serviceMetricParams(stackedMetrics, true));
+        activityMetrics.addView(serviceMetric("SESSIONI", nexusService == null ? 0 : nexusService.optInt("anonymousSessions"), "sessions"), serviceMetricParams(stackedMetrics, false));
+        activityMetrics.addView(serviceMetric("STREAM LIVE", nexusService == null ? 0 : nexusService.optInt("connectedStreams"), "streams"), serviceMetricParams(stackedMetrics, false));
         services.addView(activityMetrics);
         // Service values can wrap when the device uses a larger font scale.
         // Let the card measure its content instead of clipping the final rows.
         service.addView(services, wrapBlock());
 
-        TextView quickActions = eyebrow("LE TUE APP");
-        quickActions.setPadding(0, dp(16), 0, dp(9));
-        apps.addView(quickActions);
-        apps.addView(applicationFolders());
-        apps.addView(foregroundCloseAction(), wrapBlock());
+        renderApplicationsPanel(apps);
         service.addView(serverActions());
 
         LinearLayout history = card();
@@ -982,8 +980,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 rememberDashboardPosition();
                 appFolder = name;
                 dashboardPositions.put(navigationKey(), 0);
-                content.removeAllViews();
-                renderDashboard(lastDashboardSnapshot);
+                renderApplicationsPanel(dashboardPanels.get("App"));
+                restoreDashboardPosition();
+                updateBackNavigation();
                 animateSectionEntry(dashboardPanels.get("App"));
             });
             folder.setMinHeight(dp(64));
@@ -1008,17 +1007,35 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         return area;
     }
 
+    private void renderApplicationsPanel(LinearLayout panel) {
+        if (panel == null) return;
+        panel.removeAllViews();
+        TextView heading = eyebrow("LE TUE APP");
+        heading.setPadding(0, dp(16), 0, dp(9));
+        panel.addView(heading);
+        panel.addView(applicationFolders());
+        panel.addView(foregroundCloseAction(), wrapBlock());
+    }
+
     private LinearLayout serverActions() {
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
+        boolean stacked = getResources().getConfiguration().screenWidthDp < 420
+            || getResources().getConfiguration().fontScale >= 1.3f;
+        row.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
         Button verify = button("Verifica server", false, false);
         decorateButton(verify, "pulse", Color.rgb(142, 211, 211));
         verify.setOnClickListener(v -> verifyServer());
         Button stop = button("Arresta server", false, true);
         decorateButton(stop, "stop", Color.rgb(244, 193, 178));
         stop.setOnClickListener(v -> planServerStop());
-        row.addView(verify, new LinearLayout.LayoutParams(0, dp(50), 1));
-        row.addView(stop, spaced(1));
+        for (Button action : new Button[]{verify, stop}) {
+            action.setMinHeight(dp(56));
+            action.setPadding(dp(16), dp(12), dp(16), dp(12));
+            LinearLayout.LayoutParams params = stacked
+                ? new LinearLayout.LayoutParams(-1, -2) : new LinearLayout.LayoutParams(0, -2, 1);
+            if (row.getChildCount() > 0) params.setMargins(stacked ? 0 : dp(8), stacked ? dp(8) : 0, 0, 0);
+            row.addView(action, params);
+        }
         return row;
     }
 
@@ -1713,13 +1730,10 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         return metric;
     }
 
-    private LinearLayout.LayoutParams spacedServiceMetric() {
-        return spacedServiceMetric(-2);
-    }
-
-    private LinearLayout.LayoutParams spacedServiceMetric(int height) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, height, 1);
-        params.setMargins(dp(7), 0, 0, 0);
+    private LinearLayout.LayoutParams serviceMetricParams(boolean stacked, boolean first) {
+        LinearLayout.LayoutParams params = stacked
+            ? new LinearLayout.LayoutParams(-1, -2) : new LinearLayout.LayoutParams(0, -2, 1);
+        if (!first) params.setMargins(stacked ? 0 : dp(7), stacked ? dp(7) : 0, 0, 0);
         return params;
     }
 

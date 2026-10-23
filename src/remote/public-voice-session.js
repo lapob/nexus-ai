@@ -1,6 +1,6 @@
 /** @module remote/public-voice-session Shared chat history and cancellable browser media. */
 // #region Session controls and capture
-function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, getPreferences = () => ({}), duplex = false }) {
+function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, getPreferences = () => ({}), closeIcon = '', duplex = false }) {
   const copy = (it, en) => /^it\b/i.test(navigator.language) ? it : en;
   let active = false, epoch = 0, stream = null, recorder = null;
   let controller = null, finishCapture = null, finishPlayback = null;
@@ -12,7 +12,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   const close = document.createElement('button'); close.type = 'button';
   close.setAttribute('aria-label', copy('Torna alla conversazione scritta', 'Return to text conversation'));
   close.title = close.getAttribute('aria-label');
-  close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>';
+  close.innerHTML = closeIcon || '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>';
   controls.append(status, close); document.body.append(controls);
   const state = (value, message) => { setState(value); status.textContent = message; };
   const stopMedia = () => {

@@ -14,6 +14,9 @@ final class ControlBackdropView extends View {
     private final View source;
     private final Paint mask = new Paint();
     private final float fade;
+    private final float bottomFade;
+    private Shader topMask, bottomMask;
+    private float topMaskStart = Float.NaN, topMaskEnd, bottomMaskStart = Float.NaN, bottomMaskEnd;
     private int topBand;
     private int bottomBand;
     private HardwareBackdrop hardware;
@@ -22,6 +25,7 @@ final class ControlBackdropView extends View {
         super(context);
         this.source = source;
         fade = 20f * getResources().getDisplayMetrics().density;
+        bottomFade = 32f * getResources().getDisplayMetrics().density;
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         setClickable(false);
         setFocusable(false);
@@ -51,15 +55,27 @@ final class ControlBackdropView extends View {
         int layer = canvas.saveLayer(0, top, getWidth(), bottom, null);
         hardware.draw(canvas, upper);
         float start = upper ? Math.max(top, bottom - fade) : top;
-        float end = upper ? bottom : Math.min(bottom, top + fade);
+        float end = upper ? bottom : Math.min(bottom, top + bottomFade);
         if (end > start) {
-            mask.setShader(new LinearGradient(0, start, 0, end,
-                upper ? Color.BLACK : Color.TRANSPARENT,
-                upper ? Color.TRANSPARENT : Color.BLACK, Shader.TileMode.CLAMP));
+            if (upper && (topMask == null || start != topMaskStart || end != topMaskEnd)) {
+                topMaskStart = start; topMaskEnd = end;
+                topMask = edgeMask(start, end, true);
+            } else if (!upper && (bottomMask == null || start != bottomMaskStart || end != bottomMaskEnd)) {
+                bottomMaskStart = start; bottomMaskEnd = end;
+                bottomMask = edgeMask(start, end, false);
+            }
+            mask.setShader(upper ? topMask : bottomMask);
             canvas.drawRect(0, top, getWidth(), bottom, mask);
         }
         canvas.restoreToCount(layer);
         canvas.restoreToCount(clip);
+    }
+
+    private Shader edgeMask(float start, float end, boolean upper) {
+        int[] alpha = upper ? new int[]{255, 215, 128, 40, 0} : new int[]{0, 40, 128, 215, 255};
+        int[] colors = new int[alpha.length];
+        for (int i = 0; i < alpha.length; i++) colors[i] = Color.argb(alpha[i], 0, 0, 0);
+        return new LinearGradient(0, start, 0, end, colors, null, Shader.TileMode.CLAMP);
     }
 
     @Override protected void onDetachedFromWindow() {

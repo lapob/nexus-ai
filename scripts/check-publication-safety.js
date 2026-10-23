@@ -65,6 +65,8 @@ const allowedPackagedConfig = new Set([
   'config/nexus-design-tokens.json',
   'config/nexus-interaction-states.json',
   'config/access-profiles.json',
+  // Public, pinned icon geometry and its Apache license; never user settings.
+  'config/android-symbols.json',
   'config/portable.json',
   'config/public-client.json',
   'config/public-client.release.json',

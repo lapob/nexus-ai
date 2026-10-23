@@ -1,7 +1,7 @@
 {
   "name": "nexusnxs",
   "productName": "NexusNXS",
-  "version": "0.3.32",
+  "version": "0.3.33",
   "private": true,
   "description": "Privacy-focused AI assistant for Windows with native Android clients, voice, projects and consent-based computer actions.",
   "author": "NexusNXS",
@@ -257,6 +257,8 @@
       "config/nexus-design-tokens.json",
       "config/nexus-interaction-states.json",
       "config/access-profiles.json",
+      "config/android-symbols.json",
+      "android/NexusRemote/app/src/main/assets/material-symbols-license.txt",
       "config/portable.json",
       "config/public-client.json",
       "config/public-client.release.json",

@@ -18,22 +18,27 @@ const PUBLIC_PROFILE_STYLE = `<style>
 .profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:${layout.touchTargetDp}px;padding:10px 14px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;font-weight:450;color-scheme:dark}
 .profile-fields select:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px}
 .profile-fields option{background:${colors.surfaceRaised};color:${colors.ice}}
-@supports(appearance:base-select){.profile-fields select,.profile-fields select::picker(select){appearance:base-select}.profile-fields select::picker(select){max-width:calc(100vw - 32px);max-height:min(320px,50dvh);padding:6px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;box-shadow:0 18px 48px #0008}.profile-fields option{min-height:48px;padding:10px 12px;border-radius:9px;white-space:normal;overflow-wrap:anywhere}.profile-fields option:hover,.profile-fields option:focus{background:${colors.surface};color:${colors.ice}}.profile-fields option:focus{outline:none}.profile-fields option:focus-visible{outline:1px solid ${colors.cyan};outline-offset:-2px}.profile-fields option:checked{font-weight:650}.profile-fields option::checkmark{color:${colors.cyan}}.profile-fields select::picker-icon{content:"";width:7px;height:7px;flex:0 0 7px;margin-inline:14px 2px;border-right:1.5px solid ${colors.mist};border-bottom:1.5px solid ${colors.mist};transform:rotate(45deg)}.profile-fields select:open::picker-icon{transform:rotate(225deg)}}
-.profile-section{border-top:1px solid ${colors.hairline}55;margin-top:18px;padding-top:4px}
-.profile-section summary{display:grid;grid-template-columns:minmax(0,1fr) 12px;align-items:center;gap:14px;min-height:52px;padding:10px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:anywhere}
+@supports(appearance:base-select){.profile-fields select,.profile-fields select::picker(select){appearance:base-select}.profile-fields select::picker(select){max-width:calc(100vw - 32px);max-height:min(320px,50dvh);padding:6px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;box-shadow:0 18px 48px #0008}.profile-fields option{min-height:48px;padding:10px 12px;border-radius:9px;white-space:normal;overflow-wrap:anywhere}.profile-fields option:hover,.profile-fields option:focus{background:${colors.surface};color:${colors.ice}}.profile-fields option:focus{outline:none}.profile-fields option:focus-visible{outline:1px solid ${colors.cyan};outline-offset:-2px}.profile-fields option:checked{font-weight:650}.profile-fields option::checkmark{color:${colors.cyan}}.profile-fields select::picker-icon{content:"";width:7px;height:7px;flex:0 0 7px;margin-inline:auto 2px;border-right:1.5px solid ${colors.mist};border-bottom:1.5px solid ${colors.mist};transform:rotate(45deg)}.profile-fields select:open::picker-icon{transform:rotate(225deg)}}
+.profile-section{border:1px solid ${colors.hairline}70;border-radius:18px;margin-top:14px;padding:0 16px;background:${colors.surfaceRaised}66}
+.profile-section summary{display:grid;grid-template-columns:24px minmax(0,1fr) 12px;align-items:center;gap:12px;min-height:60px;padding:12px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:anywhere}
+.profile-section summary>.nxs-symbol{width:22px;height:22px;color:${colors.mist}}
 .profile-section summary::-webkit-details-marker{display:none}.profile-section summary::after{content:'';width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .17s ease}.profile-section[open] summary::after{transform:rotate(225deg)}
 .profile-section summary:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px;border-radius:8px}
 .profile-section .profile-fields{margin-block:12px 20px}
 .profile-service-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:10px 0;font-size:.85rem;line-height:1.5;overflow-wrap:anywhere}.profile-service-row output{text-align:right;color:${colors.mist}}
 #profileSheet .profile-section p{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 .profile-confirm[hidden]{display:none}.profile-confirm{margin-top:12px;padding:12px;border:1px solid ${colors.hairline};border-radius:14px}
-@media(prefers-reduced-motion:reduce){.profile-section summary::after{transition:none}}
+.profile-section[open]{padding-bottom:16px}.profile-section[open] summary{margin-bottom:4px}
+#profileSheet[open]{animation:profile-reveal .2s cubic-bezier(.2,0,0,1)}
+@keyframes profile-reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:380px){.profile-section{padding-inline:12px}.profile-section summary{gap:8px}}
+@media(prefers-reduced-motion:reduce){.profile-section summary::after{transition:none}#profileSheet[open]{animation:none}}
 .profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:16px}
 #profileSheet .profile-note{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 </style>`;
 // #endregion
 // #region 02 — Local preferences, service status and data actions
-function createPublicConversationPreferences(normalize, { getHistory = () => [], clearHistory = () => {} } = {}) {
+function createPublicConversationPreferences(normalize, { getHistory = () => [], clearHistory = () => {}, icons } = {}) {
   const namespace = 'nexusnxs.conversation.preferences.v1';
   const copy = (it, en) => /^it\b/i.test(document.documentElement.lang || navigator.language) ? it : en;
   let profile;
@@ -42,8 +47,8 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const trigger = document.createElement('button');
   trigger.type = 'button'; trigger.id = 'profileSettings'; trigger.className = 'download-trigger profile-trigger';
   trigger.setAttribute('aria-label', copy('Impostazioni NexusNXS', 'NexusNXS settings'));
-  trigger.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-.6 2.4-2 .9L5 5.7 3 9.2l1.8 1.7v2.2L3 14.8 5 18.3l2.4-.6 2 .9L10 21h4l.6-2.4 2-.9 2.4.6 2-3.5-1.8-1.7v-2.2L21 9.2 19 5.7l-2.4.6-2-.9L14 3Z"/><circle cx="12" cy="12" r="3"/></svg>';
-  document.querySelector('.identity-actions')?.prepend(trigger);
+  trigger.innerHTML = icons.Settings;
+  document.querySelector('#download')?.before(trigger);
   const dialog = document.createElement('dialog');
   dialog.id = 'profileSheet'; dialog.className = 'download-sheet';
   dialog.setAttribute('aria-labelledby', 'profileTitle');
@@ -52,13 +57,14 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const title = document.createElement('strong'); title.id = 'profileTitle'; title.textContent = copy('Impostazioni', 'Settings');
   const close = document.createElement('button'); close.type = 'button'; close.className = 'sheet-close';
   close.setAttribute('aria-label', copy('Chiudi', 'Close'));
-  close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>';
+  close.innerHTML = icons.Close;
   close.onclick = () => dialog.close(); top.append(title, close);
-  const section = (id, heading, open = false) => {
+  const section = (id, heading, icon, open = false) => {
     const element = document.createElement('details'); element.id = id; element.className = 'profile-section'; element.open = open;
-    const summary = document.createElement('summary'); summary.textContent = heading; element.append(summary); return element;
+    const summary = document.createElement('summary'), label = document.createElement('span');
+    summary.innerHTML = icons[icon]; label.textContent = heading; summary.append(label); element.append(summary); return element;
   };
-  const conversation = section('profileConversation', copy('Conversazione', 'Conversation'), true);
+  const conversation = section('profileConversation', copy('Conversazione', 'Conversation'), 'Chat', true);
   const fields = document.createElement('div'); fields.className = 'profile-fields';
   const selects = new Map();
   const definitions = [
@@ -80,10 +86,10 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const actions = document.createElement('div'); actions.className = 'profile-actions';
   const reset = document.createElement('button'); reset.type = 'button'; reset.id = 'profileReset'; reset.className = 'sheet-close';
   reset.setAttribute('aria-label', copy('Ripristina preferenze', 'Reset preferences'));
-  reset.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></svg>';
+  reset.innerHTML = icons.Restore;
   reset.onclick = () => { profile = normalize({}); save(); refresh(); };
   actions.append(reset); conversation.append(fields, note, actions);
-  const services = section('profileServices', copy('Voce e connessione', 'Voice and connection'));
+  const services = section('profileServices', copy('Voce e connessione', 'Voice and connection'), 'Mic');
   const serviceStates = new Map();
   for (const [id, label] of [['engine', copy('Motore AI', 'AI engine')], ['voice-input', copy('Riconoscimento vocale', 'Speech recognition')], ['voice-output', copy('Voce', 'Voice')]]) {
     const row = document.createElement('div'); row.className = 'profile-service-row';
@@ -92,11 +98,11 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
     row.append(name, value); services.append(row); serviceStates.set(id, value);
   }
   const voiceNote = document.createElement('p'); voiceNote.textContent = copy('Le risposte vocali richiedono anche il motore AI operativo.', 'Voice replies also require an available AI engine.'); services.append(voiceNote);
-  const iconAction = (id, label, path) => {
+  const iconAction = (id, label, icon) => {
     const button = document.createElement('button'); button.id = id; button.type = 'button'; button.className = 'sheet-close'; button.setAttribute('aria-label', label);
-    button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`; return button;
+    button.innerHTML = icons[icon]; return button;
   };
-  const retry = iconAction('profileServiceRetry', copy('Ricontrolla servizi', 'Recheck services'), 'M4 10a8 8 0 1 1 1 7M4 4v6h6');
+  const retry = iconAction('profileServiceRetry', copy('Ricontrolla servizi', 'Recheck services'), 'Restore');
   const serviceActions = document.createElement('div'); serviceActions.className = 'profile-actions'; serviceActions.append(retry); services.append(serviceActions);
   let statusController = null, statusEpoch = 0;
   const checkServices = async () => {
@@ -122,19 +128,19 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
     }
   };
   retry.onclick = () => void checkServices(); services.addEventListener('toggle', () => { if (services.open && dialog.open) void checkServices(); else { ++statusEpoch; statusController?.abort(); retry.disabled = false; services.removeAttribute('aria-busy'); } });
-  const data = section('profileData', copy('Dati sul dispositivo', 'Data on this device'));
+  const data = section('profileData', copy('Dati sul dispositivo', 'Data on this device'), 'Lock');
   const dataNote = document.createElement('p'); dataNote.textContent = copy('La cronologia è salvata in questo browser. Il file esportato non è cifrato e resta separato dalla cancellazione.', 'History is saved in this browser. Exported files are not encrypted and remain separate from deletion.'); data.append(dataNote);
   dataNote.id = 'profileDataDisclosure';
   const dataActions = document.createElement('div'); dataActions.className = 'profile-actions';
-  const exportData = iconAction('profileExport', copy('Esporta conversazione', 'Export conversation'), 'M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4');
+  const exportData = iconAction('profileExport', copy('Esporta conversazione', 'Export conversation'), 'Download');
   exportData.setAttribute('aria-describedby', dataNote.id);
-  const deleteData = iconAction('profileDelete', copy('Elimina cronologia e preferenze', 'Delete history and preferences'), 'M4 7h16M9 3h6l1 4M6 7l1 14h10l1-14M10 11v6m4-6v6');
+  const deleteData = iconAction('profileDelete', copy('Elimina cronologia e preferenze', 'Delete history and preferences'), 'DeleteOutline');
   const confirmation = document.createElement('div'); confirmation.className = 'profile-confirm'; confirmation.hidden = true;
   const warning = document.createElement('p'); warning.textContent = copy('Eliminare cronologia e preferenze da questo dispositivo? La generazione in corso verrà interrotta.', 'Delete history and preferences from this device? Any active response will be stopped.'); confirmation.append(warning);
   warning.id = 'profileDeleteWarning'; confirmation.setAttribute('role', 'group'); confirmation.setAttribute('aria-labelledby', warning.id);
   const confirmActions = document.createElement('div'); confirmActions.className = 'profile-actions';
-  const confirmDelete = iconAction('profileDeleteConfirm', copy('Conferma eliminazione', 'Confirm deletion'), 'm5 12 4 4L19 6');
-  const cancelDelete = iconAction('profileDeleteCancel', copy('Annulla eliminazione', 'Cancel deletion'), 'm7 7 10 10M17 7 7 17');
+  const confirmDelete = iconAction('profileDeleteConfirm', copy('Conferma eliminazione', 'Confirm deletion'), 'Check');
+  const cancelDelete = iconAction('profileDeleteCancel', copy('Annulla eliminazione', 'Cancel deletion'), 'Close');
   confirmDelete.setAttribute('aria-describedby', warning.id); cancelDelete.setAttribute('aria-describedby', warning.id);
   confirmActions.append(cancelDelete, confirmDelete); confirmation.append(confirmActions); dataActions.append(exportData, deleteData); data.append(dataActions, confirmation);
   const history = () => {

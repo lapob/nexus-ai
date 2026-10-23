@@ -18,6 +18,10 @@ setting and existing frame-health/reduced-motion policy.
 Control's horizontal navigation uses native fading edges, with no screenshot
 or per-frame blur, and centers the selected tab inside the readable area.
 View icons cache parsed paths, avoiding allocations on animation frames.
+The web header, composer and settings reuse the same 46-symbol catalog and
+include its license without an external icon font. Folder changes update only
+the App panel; server actions and metrics adapt to large text. Bottom backdrop
+uses a 32dp progressive edge and caches mask shaders until bounds change.
 
 References: [Android icons](https://developer.android.com/develop/ui/compose/graphics/images/material),
 [accessible targets](https://developer.android.com/develop/ui/compose/accessibility/api-defaults),

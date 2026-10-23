@@ -1,3 +1,9 @@
+### Novita 0.3.33
+
+- Web app: icone Material Symbols condivise con Android, incorporate offline con licenza; impostazioni raggruppate in sezioni coerenti, picker leggibili e animazione rispettosa del movimento ridotto. Lo stato inattivo non riserva piu uno spazio vuoto fra impostazioni e download.
+- Control 1.20.1 (solo proprietario): il cambio Applicazioni/Giochi aggiorna solo il pannello, mantenendo ferma la navigazione. Azioni server adattive con altezza naturale; blur inferiore raccordato su 32 dp e shader riutilizzati.
+- Collaudo: cinque profili Control sul Samsung, posizione identica della scheda App fra tre cambi cartella, apertura/annullamento della conferma arresto senza esecuzione; cinque profili impostazioni web e quattro scenari offline. Le prove non certificano tutti i dispositivi.
+- Android pubblico resta 6.5.25. Preview manuale, firme commerciali e collaudo vocale umano ancora aperti; modello locale e gate di qualita invariati.
 ### Novita 0.3.32
 
 - Android 6.5.25: icone Material Symbols arrotondate e incluse offline, Inter in tutti i ruoli tipografici, impostazioni con transizioni direzionali e gesto Indietro predittivo. Annullare il gesto conserva la pagina. Area copia codice da 48 dp.

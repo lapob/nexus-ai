@@ -5,6 +5,7 @@ const path = require('node:path');
 const { validateManifest, render } = require('../scripts/generate-android-symbols');
 const root = path.resolve(__dirname, '..');
 const manifest = require('../config/android-symbols.json');
+const { symbolSvg, symbolLicenseNotice } = require('../src/shared/symbols');
 
 test('both Android icon consumers are generated from the pinned offline symbol catalog', () => {
   assert.doesNotThrow(() => validateManifest(manifest));
@@ -22,4 +23,12 @@ test('tampered symbol paths, unpinned origins and invalid vector syntax fail off
     m => { m.icons.Settings.path += 'M0 0'; }, m => { m.icons.Settings.path = '<script/>'; }]) {
     const value = structuredClone(manifest); mutate(value); assert.throws(() => validateManifest(value));
   }
+});
+
+test('web symbols reuse the pinned path, include the license and reject unknown names', () => {
+  assert.ok(symbolSvg('Settings').includes(manifest.icons.Settings.path));
+  assert.match(symbolSvg('Settings'), /aria-hidden="true"/);
+  assert.match(symbolLicenseNotice, /Apache License/);
+  assert.throws(() => symbolSvg('__proto__'));
+  assert.throws(() => symbolSvg('<script>'));
 });
