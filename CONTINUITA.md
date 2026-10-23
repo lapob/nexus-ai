@@ -1,3 +1,18 @@
+# Centered Core and recoverable voice candidate — 24 October 2026
+
+Canonical AI shell synchronized with the current application source. A grid
+constraint keeps the idle Core centered while preserving the extended desktop
+field. Voice checks recognition availability before acquiring the microphone,
+refreshes an unavailable capability on retry and fits above actual controls,
+including compact200% text. Settings use shorter headings without broken words.
+
+Application checks pass24 Core layouts, voice availability/recovery and five
+settings/CSP profiles; these are separate from site release qualification.
+The final site release gate, exact-commit CI, production promotion and live
+offline/readiness checks follow this source commit. Existing deployment and
+rollback remain unchanged until those operations succeed. Public downloads
+still point to immutable Preview0.3.33; no new Windows installer is implied.
+
 # Production promotion verified — 24 October 2026
 
 Codee0dd5e8 passed Security verification CI40031204504 and release:prepare:
