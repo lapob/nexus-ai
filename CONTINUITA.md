@@ -1,3 +1,31 @@
+# Web/app alignment and Preview 0.3.33 — 24 October 2026
+
+The canonical AI shell now matches main80563cc: rounded shared offline symbols,
+no vacant idle status slot between settings/download, and coherent collapsible
+settings cards. The Apache symbol license ships with the shell. Browser checks
+cover five profile/text layouts in the AI source and31 complete site scenarios,
+including first streamed paint and reload; all pass before final preparation.
+
+Public release metadata0.3.33 is synchronized from the published GitHub manifest
+and remote asset digests: Windows0.3.33 and Android6.5.25. Control remains private.
+Transitive tooling Zod4.4.3 was replaced with4.6.7 in the existing supported
+range; registry signatures/attestations and npm audit pass. No findings ignored.
+Source publication, final release:prepare and production promotion follow;
+none of these source checks alone certifies deployment or every device.
+# Preview 0.3.32 synchronization — 23 October 2026
+
+Canonical public AI shell synchronized from main 890093b. This includes the
+current neutral settings, collapsible conversation/voice/device-data sections
+and offline installation artifacts. Production promotion is still pending.
+
+The release audit found GHSA-mrhx-c7xc-m3w5 in transitive development dependency
+zod4.4.3. Updating within the existing supported range changed only zod to4.6.7;
+no advisory suppression or severity change. Registry verification now passes
+349 signatures and96 attestations; npm audit reports no known vulnerabilities.
+Lint, TypeScript, build/performance budgets and all45 unit tests pass. Full
+runtime/browser/deployment gates and metadata sync follow published Preview
+asset verification. Source checks alone do not establish deployment readiness.
+Local inference/cloud-off policy and existing rollback remain unchanged.
 # Offline installation and Vite patch — 21 October 2026
 
 The existing sync now publishes the canonical AI manifest and service worker
