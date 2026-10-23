@@ -1,3 +1,18 @@
+# Production promotion verified — 24 October 2026
+
+Codee0dd5e8 passed Security verification CI40031204504 and release:prepare:
+45unit tests,31browser tests, dependency signatures/attestations and audit,
+local Worker runtime, performance budgets and917.02KiB deployment dry run.
+Production Worker ea79602c-059e-44b5-955d-e1efa904703c was promoted and verified
+across14routes, navigation/headers and independent AI readiness. Its source
+contains main80563cc canonical AI shell and verified Preview0.3.33 downloads.
+
+After promotion the AI settings/header pass five viewport/text scenarios;
+cached reload/history/drafts/attachments/font/reconnect pass four live layouts.
+The server is ready and one real non-arithmetic Italian chat succeeds. These
+are measured smoke checks, not a guarantee for every device or service SLA.
+The existing rollback is retained. Production signing, human voice/echo and
+commercial readiness remain separate; no Control APK or private data published.
 # Web/app alignment and Preview 0.3.33 — 24 October 2026
 
 The canonical AI shell now matches main80563cc: rounded shared offline symbols,
