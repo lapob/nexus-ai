@@ -1,3 +1,29 @@
+# Preview 0.3.33 published and deployed — 24 October 2026
+
+Published immutable tag v0.3.33-preview.1 from code80563cc; eight remote asset
+digests verified. Windows0.3.33 installer verification and unpacked smoke pass;
+public Android6.5.25 remains unchanged. Owner-only Control1.20.1 is installed
+on the test Samsung and is excluded from public release assets.
+Code CI40030650947 passes Windows/Linux/secrets and audits. Local source gate:
+1159PASS,3SKIP,zero failures; cloud:check and workstation check pass.
+
+Website codee0dd5e8 passes CI40031204504 and the complete release gate:
+45unit/31browser tests, dependency audit/signatures, Worker runtime, performance
+and deployment dry run. Production Worker ea79602c-059e-44b5-955d-e1efa904703c
+passes14route/header checks and public readiness. After deployment, five real
+browser profile/text scenarios and four cached offline/reconnect scenarios
+pass. One real non-arithmetic chat completes in3.647s, first text1.977s; not SLA.
+Control passes five display profiles, stable folder/tab geometry, adaptive stop
+and cancelled confirmation, plus200% text. No power/stop command executed.
+
+The server is ready after controlled headless restart; this cold restart took
+about4m30 including runtime security scan and preload. Optimizing that delay
+remains work. Windows installer was published, not installed on the workstation.
+Preview signing remains incomplete for production. Human microphone/echo tests,
+iOS verification, pre-login search availability and broader commercial gates
+remain open. The14B baseline retains88/100Quick and a failed quality gate;
+no training or cloud inference enabled. Next: measured startup optimization
+and human voice validation when available, preserving baseline and rollback.
 # Web settings and Control regression fixes — 23 October 2026
 
 Control1.20.1/code45 passes release/lint and five Samsung display profiles.
