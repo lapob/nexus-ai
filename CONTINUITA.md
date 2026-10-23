@@ -1,6 +1,6 @@
 # Local service restored — 23 October 2026
 
-Final source checks: 1154 PASS, 3 SKIP, 0 FAIL; workstation check and
+Final source checks: 1156 PASS, 3 SKIP, 0 FAIL; workstation check and
 cloud:check pass. Runtime and tooling npm audits report no known matches.
 Isolated offline drafts/attachments pass three layouts; personalization/CSP
 passes five viewport/text scenarios. Real browser cold load/reload samples
@@ -11,6 +11,14 @@ After the final service restart, both gateways and public readiness return200.
 Live release research returns the current official GitHub release and link.
 An official newer runtime release is available; it is a candidate requiring
 the same distribution and regression gates before replacing the verified pin.
+
+Visual regression now waits for complete home/Core assembly, selects the
+visible responsive logo, and verifies named icon actions rather than requiring
+filler text in the minimal AI shell. Negative tests reject missing/hidden
+icons, missing accessible names, incomplete fonts/boot and an empty Core.
+The baseline was reviewed against all four desktop/mobile screenshots and
+refreshed for the intentional centered header and full-viewport Core already
+deployed. No production layout change or relaxed comparison threshold.
 
 The existing qwen3:14b baseline is working again on the official Ollama0.40.9
 runtime. Both public/local readiness return200, and a real HTTPS Italian chat

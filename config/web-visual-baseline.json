@@ -7,18 +7,19 @@
     },
     "overflowX": 0,
     "logo": {
-      "x": 0.015277777777777777,
+      "x": 0.2625759548611111,
       "y": 0.024444444444444446,
-      "width": 0.02638888888888889,
-      "height": 0.042222222222222223,
+      "width": 0.019444444444444445,
+      "height": 0.03111111111111111,
       "loaded": true,
       "ratio": 1
     },
     "core": null,
-    "interactiveCount": 20,
-    "undersizedTargets": 0,
-    "bodyTextLength": 2310,
-    "screenshotBytes": 314493
+    "interactiveCount": 29,
+    "publicUi": null,
+    "undersizedTargets": 1,
+    "bodyTextLength": 2285,
+    "screenshotBytes": 409519
   },
   "site-mobile": {
     "title": "NexusNXS — AI privata, protetta e connessa",
@@ -28,18 +29,19 @@
     },
     "overflowX": 0,
     "logo": {
-      "x": 0.04487179487179487,
-      "y": 0.020734597156398103,
-      "width": 0.08974358974358974,
-      "height": 0.041469194312796206,
+      "x": 0.05025641123453776,
+      "y": 0.023222749267144224,
+      "width": 0.07897436190874149,
+      "height": 0.03649289235119571,
       "loaded": true,
       "ratio": 1
     },
     "core": null,
-    "interactiveCount": 20,
+    "interactiveCount": 24,
+    "publicUi": null,
     "undersizedTargets": 0,
-    "bodyTextLength": 2303,
-    "screenshotBytes": 127821
+    "bodyTextLength": 2228,
+    "screenshotBytes": 195134
   },
   "ai-desktop": {
     "title": "NexusNXS AI",
@@ -50,22 +52,60 @@
     "overflowX": 0,
     "logo": {
       "x": 0.12083333333333333,
-      "y": 0.024444444444444446,
-      "width": 0.025,
-      "height": 0.04,
+      "y": 0.02,
+      "width": 0.027777777777777776,
+      "height": 0.044444444444444446,
       "loaded": true,
       "ratio": 1
     },
     "core": {
-      "x": 0.4173611111111111,
-      "y": 0.17883680555555556,
-      "width": 0.16527777777777777,
-      "height": 0.2644444444444444
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1
     },
-    "interactiveCount": 7,
-    "undersizedTargets": 3,
-    "bodyTextLength": 296,
-    "screenshotBytes": 178129
+    "interactiveCount": 6,
+    "publicUi": {
+      "ready": true,
+      "fontReady": true,
+      "heading": "Chiedi. NexusNXS agisce.",
+      "assembled": true,
+      "controls": [
+        {
+          "id": "core",
+          "label": "Attiva NexusNXS",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "attachment",
+          "label": "Allega file",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "keyboard",
+          "label": "Apri o chiudi la tastiera",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "profileSettings",
+          "label": "Impostazioni NexusNXS",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "download",
+          "label": "Scarica NexusNXS AI",
+          "visible": true,
+          "iconReady": true
+        }
+      ]
+    },
+    "undersizedTargets": 0,
+    "bodyTextLength": 36,
+    "screenshotBytes": 309198
   },
   "ai-mobile": {
     "title": "NexusNXS AI",
@@ -73,24 +113,62 @@
       "width": 390,
       "height": 844
     },
-    "overflowX": 0,
+    "overflowX": 2,
     "logo": {
       "x": 0.046153846153846156,
-      "y": 0.027251184834123223,
-      "width": 0.08717948717948718,
-      "height": 0.04028436018957346,
+      "y": 0.022511848341232227,
+      "width": 0.09743589743589744,
+      "height": 0.045023696682464455,
       "loaded": true,
       "ratio": 1
     },
     "core": {
-      "x": 0.26001602564102566,
-      "y": 0.20829013625592416,
-      "width": 0.47996794871794873,
-      "height": 0.22178613744075829
+      "x": 0,
+      "y": 0,
+      "width": 1,
+      "height": 1
     },
-    "interactiveCount": 7,
-    "undersizedTargets": 3,
-    "bodyTextLength": 288,
-    "screenshotBytes": 96892
+    "interactiveCount": 6,
+    "publicUi": {
+      "ready": true,
+      "fontReady": true,
+      "heading": "Chiedi. NexusNXS agisce.",
+      "assembled": true,
+      "controls": [
+        {
+          "id": "core",
+          "label": "Attiva NexusNXS",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "attachment",
+          "label": "Allega file",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "keyboard",
+          "label": "Apri o chiudi la tastiera",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "profileSettings",
+          "label": "Impostazioni NexusNXS",
+          "visible": true,
+          "iconReady": true
+        },
+        {
+          "id": "download",
+          "label": "Scarica NexusNXS AI",
+          "visible": true,
+          "iconReady": true
+        }
+      ]
+    },
+    "undersizedTargets": 0,
+    "bodyTextLength": 36,
+    "screenshotBytes": 215553
   }
 }

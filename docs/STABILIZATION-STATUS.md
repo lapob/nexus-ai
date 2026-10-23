@@ -1,6 +1,6 @@
 ## Ripristino locale e prove pubbliche — 23 ottobre
 
-Gate finale:1154PASS3SKIP0FAIL; check locale/cloud e auditnpm runtime/tooling
+Gate finale:1156PASS3SKIP0FAIL; check locale/cloud e auditnpm runtime/tooling
 PASS (nessuna segnalazione nota npm). Offline/allegati tre layout, impostazioni
 CSP cinque profili, primi frame visibili con iconeSVG e Inter pronti, reload
 offline da cache e riconnessione PASS. Budget animazioni Core PASS nel browser
@@ -8,6 +8,14 @@ su questo PC; non implica fluidità equivalente su tutti i dispositivi.
 RicercaHTTPS dopo restart e avvioDocker restituisce release attuale con link
 ufficialeGitHub. Una versione runtime ufficiale successiva è candidata da
 verificare; resta il pin già collaudato, senza aggiornamento automatico cieco.
+
+Harness grafico aggiornato per la UI attuale: attende forma/Core assemblati,
+sceglie il logo visibile e richiede icone, nomi accessibili, font e controlli
+reali. Il minimo di testo resta sul sito; la web app richiede le cinque azioni.
+Due test positivi/negativi impediscono che testo lungo nasconda UI incompleta.
+Baseline rivista sui quattro screenshot, con header centrato e Core fullscreen
+già intenzionali; soglie di confronto invariate, nessuna modifica grafica al
+prodotto per soddisfare il test.
 
 Ollama0.40.9 ufficiale supera il gate esistente: firma valida e0High/Critical,
 un matchUnknownOpenPGP conservato. Archivibase/ROCm pinned perSHA e dimensioni;

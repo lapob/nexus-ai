@@ -138,7 +138,12 @@ const METRICS_EXPRESSION = `new Promise((resolve) => {
       const value = element.getBoundingClientRect();
       return { x: value.x / innerWidth, y: value.y / innerHeight, width: value.width / innerWidth, height: value.height / innerHeight };
     };
-    const logo = [...document.images].find((image) => /nexus/i.test(image.src + image.alt)) || document.querySelector('header img, .brand-mark');
+    const visibleImage = image => {
+      const box = image.getBoundingClientRect(), style = getComputedStyle(image);
+      return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+    };
+    const logo = [...document.querySelectorAll('header img,.nxs-floating-brand img,.brand-mark')].find(visibleImage)
+      || [...document.images].find(image => /nexus/i.test(image.src + image.alt) && visibleImage(image));
     // Il canvas globale del sito e un fondale ambientale, non il Core del
     // prodotto. Il fallback generico al canvas resta valido solo in NexusNXS AI.
     const core = location.hostname.startsWith('ai.')
@@ -156,6 +161,19 @@ const METRICS_EXPRESSION = `new Promise((resolve) => {
       logo: logo ? { ...rect(logo), loaded: logo.complete && logo.naturalWidth > 0, ratio: logo.naturalWidth / Math.max(1, logo.naturalHeight) } : null,
       core: rect(core),
       interactiveCount: interactive.length,
+      publicUi: location.hostname.startsWith('ai.') ? {
+        ready: document.documentElement.dataset.nxsBoot === 'ready',
+        fontReady: document.fonts.check('16px Inter'),
+        heading: document.querySelector('h1')?.textContent.trim() || '',
+        assembled: globalThis.nexusCosmicMetrics?.renderer?.().arrival === 1,
+        controls: ['core', 'attachment', 'keyboard', 'profileSettings', 'download'].map(id => {
+          const element = document.getElementById(id), icon = element?.querySelector('svg');
+          const box = element?.getBoundingClientRect();
+          return { id, label: element?.getAttribute('aria-label')?.trim() || '',
+            visible: !!box && box.width >= 32 && box.height >= 32 && getComputedStyle(element).visibility !== 'hidden' && getComputedStyle(element).display !== 'none',
+            iconReady: id === 'core' ? !!document.querySelector('#coreCanvas') && globalThis.nexusCosmicMetrics?.renderer?.().draws > 0 : (icon?.getBoundingClientRect().width || 0) >= 16 };
+        })
+      } : null,
       undersizedTargets: interactive.filter((element) => { const value = element.getBoundingClientRect(); return value.width < 32 || value.height < 32; }).length,
       bodyTextLength: document.body.innerText.trim().length
     });
@@ -186,6 +204,25 @@ async function capture(entry) {
       screenHeight: entry.height
     });
     await client.command('Page.reload', { ignoreCache: true });
+    if (entry.id.startsWith('ai-')) await evaluateWhenReady(client, `new Promise((resolve, reject) => {
+      const deadline = performance.now() + 30000;
+      function check() {
+        if (document.documentElement.dataset.nxsBoot === 'ready' && document.fonts.check('16px Inter')
+          && globalThis.nexusCosmicMetrics?.renderer?.().arrival === 1) return resolve(true);
+        if (performance.now() >= deadline) return reject(new Error('Interfaccia e Core non pronti per il confronto visivo'));
+        setTimeout(check, 50);
+      }
+      check();
+    })`, 35000);
+    else await evaluateWhenReady(client, `new Promise((resolve, reject) => {
+      const deadline = performance.now() + 30000;
+      function check() {
+        if (Number(document.querySelector('canvas[data-arrival]')?.dataset.arrival) >= 1) return resolve(true);
+        if (performance.now() >= deadline) return reject(new Error('Forma home non ancora assemblata'));
+        setTimeout(check, 50);
+      }
+      check();
+    })`, 35000);
     const metrics = await evaluateWhenReady(client, METRICS_EXPRESSION);
     const screenshot = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     const bytes = Buffer.from(screenshot.data, 'base64');
@@ -214,10 +251,17 @@ function validate(entry, metrics) {
   const failures = [];
   if (!/nexusnxs/i.test(metrics.title)) failures.push('titolo non coerente');
   if (metrics.overflowX > 2) failures.push(`overflow orizzontale ${metrics.overflowX}px`);
-  if (!metrics.logo?.loaded || Math.abs(metrics.logo.ratio - 1) > 0.08) failures.push('logo mancante o deformato');
+  if (!metrics.logo?.loaded || metrics.logo.width <= 0 || metrics.logo.height <= 0 || Math.abs(metrics.logo.ratio - 1) > 0.08) failures.push('logo mancante o deformato');
   if (metrics.interactiveCount < 1) failures.push('nessun controllo interattivo');
-  if (metrics.bodyTextLength < 40) failures.push('contenuto insufficiente');
-  if (entry.id.startsWith('ai-') && !metrics.core) failures.push('Core non visibile');
+  if (entry.id.startsWith('ai-')) {
+    if (!metrics.core || metrics.core.width <= 0 || metrics.core.height <= 0) failures.push('Core non visibile');
+    const ui = metrics.publicUi;
+    if (!ui?.ready || !ui.fontReady || !ui.assembled || !ui.heading) failures.push('interfaccia incompleta');
+    for (const id of ['core', 'attachment', 'keyboard', 'profileSettings', 'download']) {
+      const control = ui?.controls?.find(item => item.id === id);
+      if (!control?.label || !control.visible || !control.iconReady) failures.push(`controllo ${id} incompleto`);
+    }
+  } else if (metrics.bodyTextLength < 40) failures.push('contenuto insufficiente');
   if (failures.length) throw new Error(`${entry.id}: ${failures.join(', ')}`);
 }
 
@@ -246,6 +290,7 @@ async function main() {
     const results = {};
     for (const entry of cases) {
       results[entry.id] = await capture(entry);
+      fs.writeFileSync(path.join(output, 'report.json'), `${JSON.stringify(results, null, 2)}\n`);
       validate(entry, results[entry.id]);
       console.log(`OK ${entry.id}: ${results[entry.id].viewport.width}x${results[entry.id].viewport.height}`);
     }
