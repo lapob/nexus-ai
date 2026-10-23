@@ -1,3 +1,17 @@
+# Tooling advisory refresh — 24 October 2026
+
+The latest clean CI passed source/tests/runtime audit but detected newly
+updated tooling advisories. Only three compatible lock entries changed:
+fast-uri3.1.9, node-gyp's Undici6.29.1 and optional Undici7.30.1.
+Fresh lockfile audits return zero known vulnerabilities; independent source/
+range review found no unrelated changes. CI on a clean installation follows.
+No audit threshold, alert or security check was disabled.
+
+The workstation dependency tree remains unrepaired, including Electron43.7.7;
+these lock updates do not attest installed packages or fix the active runtime.
+Owner repair is still required before rebuilding/installing Windows artifacts.
+Existing1166 passing source tests remain separate from that installation gate.
+
 # Real research and voice checks — 24 October 2026
 
 Final source suite now passes1166 tests,3 skipped,zero failures; cloud and
