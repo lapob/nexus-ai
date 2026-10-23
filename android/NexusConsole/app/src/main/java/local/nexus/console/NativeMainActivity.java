@@ -1377,7 +1377,11 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             if ("chatgpt".equals(id)) { if (Boolean.TRUE.equals(open)) closeChatGpt(); else openChatGpt(); return; }
             controlCatalogApplication(id, label);
         });
-        updateApplicationTile(tile, id, label, null, true);
+        Boolean knownState = "nexusnxs".equals(id) ? nexusAppOpen
+            : "chatgpt".equals(id) ? chatGptAppOpen : applicationStates.get(id);
+        Boolean knownAvailability = "nexusnxs".equals(id) || "chatgpt".equals(id)
+            ? Boolean.TRUE : applicationAvailability.get(id);
+        updateApplicationTile(tile, id, label, knownState, knownAvailability);
         return tile;
     }
 

@@ -1,3 +1,18 @@
+# Owner Control 1.20.2 state initialization — 24 October 2026
+
+The private Android patch initializes reconstructed application tiles from
+already-known state/availability instead of temporarily resetting them to
+unknown/available. Native release build/lint, cloud:check, workstation checks
+and1159tests/3skips pass. The public0.3.33 installer integrity still passes;
+its packaged runtime and the deployed website are unchanged by this patch.
+
+Control1.20.2 is installed on the Samsung. Its repeated display matrix stopped
+at the first profile because the phone locked automatically; no outside-app
+touches or power commands. The last fully completed geometry/gesture/font
+checks belong to1.20.1. Do not treat that older manifest as evidence for1.20.2.
+Next when unlocked: repeat the five-profile matrix, folder/nav/stop-confirmation
+regression and200%text check; restore device preferences. Public deployment,
+chat/readiness and four live offline scenarios remain verified as recorded below.
 # Preview 0.3.33 published and deployed — 24 October 2026
 
 Published immutable tag v0.3.33-preview.1 from code80563cc; eight remote asset
