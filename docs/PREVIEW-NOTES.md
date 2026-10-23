@@ -1,3 +1,11 @@
+### Novita 0.3.32
+
+- Android 6.5.25: icone Material Symbols arrotondate e incluse offline, Inter in tutti i ruoli tipografici, impostazioni con transizioni direzionali e gesto Indietro predittivo. Annullare il gesto conserva la pagina. Area copia codice da 48 dp.
+- NexusNXS Control 1.20.0 (solo proprietario): icone coerenti per browser, note, terminale, giochi, servizi e alimentazione; cartelle animate conservate. Scheda selezionata centrata e bordi laterali sfumati nativi, senza blur calcolato ad ogni fotogramma.
+- Entrambe le app compilate con lint e shrinking; cinque profili di schermo per app su un Samsung, 24 test SQLite/Keystore/continuita e verifiche gesture/IME. Sono prove sul Samsung disponibile, non una certificazione di tutti i dispositivi.
+- Il servizio locale usa il runtime verificato Ollama 0.40.9 con cloud disattivato; ricerca di release con fonte ufficiale e recupero del catalogo Windows senza spostare i pesi. Il modello resta la baseline 14B: 88/100 nella suite interna, gate qualita non superato.
+- Preview con aggiornamenti manuali: Windows senza certificato editore, Android con firma di collaudo. Voce umana, riduzione della latenza STT, ricerca prima del login e requisiti Stable/commerciali restano distinti. Nessuna installazione Windows eseguita da questo aggiornamento.
+
 ### Novita 0.3.31
 
 - Desktop: descrizioni, note e categoria selezionata nelle impostazioni piu leggibili, usando il colore secondario condiviso e lo stesso font.

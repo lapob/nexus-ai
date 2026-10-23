@@ -1,7 +1,7 @@
 {
   "name": "nexusnxs",
   "productName": "NexusNXS",
-  "version": "0.3.31",
+  "version": "0.3.32",
   "private": true,
   "description": "Privacy-focused AI assistant for Windows with native Android clients, voice, projects and consent-based computer actions.",
   "author": "NexusNXS",
@@ -41,7 +41,7 @@
     "connections:audit": "pwsh -NoProfile -File scripts/audit-connections.ps1",
     "connections:audit:json": "pwsh -NoProfile -File scripts/audit-connections.ps1 -Json",
     "connections:verify": "pwsh -NoProfile -File scripts/audit-connections.ps1 -Strict",
-    "check:overlap": "node scripts/check-code-overlap.js",
+    "check:overlap": "node scripts/check-code-overlap.js && node scripts/generate-android-symbols.js --check",
     "funnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-tailscale-funnel.ps1 -Action enable",
     "funnel:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-tailscale-funnel.ps1 -Action status",
     "funnel:disable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage-tailscale-funnel.ps1 -Action disable",

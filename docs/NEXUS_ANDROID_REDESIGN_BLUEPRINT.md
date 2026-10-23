@@ -1,5 +1,28 @@
 # NexusNXS Instant Android blueprint
 
+## Shared native refinement — 23 October 2026
+
+Both clients use a pinned, offline catalog of rounded Google Material Symbols.
+`config/android-symbols.json` records the official source revision, SVG/path
+hashes and license hash. `scripts/generate-android-symbols.js --check` verifies
+the Java/Compose adapters and bundled Apache license without network access;
+`--refresh` is an explicit maintainer operation. The deprecated extended icon
+artifact is removed. The cosmic brand and open-folder animation remain custom.
+
+All fifteen Material typography roles use the bundled Inter font. Public
+settings use the existing directional transition and Android predictive back;
+cancelling restores the same page. Native Control delegates root back to
+Android and previews internal back gestures. Both respect the device animation
+setting and existing frame-health/reduced-motion policy.
+
+Control's horizontal navigation uses native fading edges, with no screenshot
+or per-frame blur, and centers the selected tab inside the readable area.
+View icons cache parsed paths, avoiding allocations on animation frames.
+
+References: [Android icons](https://developer.android.com/develop/ui/compose/graphics/images/material),
+[accessible targets](https://developer.android.com/develop/ui/compose/accessibility/api-defaults),
+[official symbol sources](https://github.com/google/material-design-icons/tree/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7).
+
 ## Product role
 
 The Android public client is the smallest possible doorway to NexusNXS. The

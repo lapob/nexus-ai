@@ -88,6 +88,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private final Set<HttpURLConnection> activeConnections = ConcurrentHashMap.newKeySet();
     private final Handler main = new Handler(Looper.getMainLooper());
     private LinearLayout content;
+    private androidx.activity.OnBackPressedCallback backNavigation;
+    private HorizontalScrollView dashboardTabScroll;
+    private final java.util.Map<String, Path> symbolPaths = new java.util.HashMap<>();
     private LinearLayout powerDock;
     private ScrollView dashboardScroll;
     private LinearLayout dashboardNavigation;
@@ -361,9 +364,34 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void registerSystemBackNavigation() {
-        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
-            @Override public void handleOnBackPressed() { navigateBack(); }
-        });
+        backNavigation = new androidx.activity.OnBackPressedCallback(false) {
+            @Override public void handleOnBackStarted(androidx.activity.BackEventCompat event) {
+                content.animate().cancel();
+            }
+            @Override public void handleOnBackProgressed(androidx.activity.BackEventCompat event) {
+                if (!animationsEnabled()) return;
+                float progress = Math.max(0f, Math.min(1f, event.getProgress()));
+                content.setScaleX(1f - .025f * progress);
+                content.setScaleY(1f - .025f * progress);
+                content.setTranslationX(dp(16) * progress * (event.getSwipeEdge() == 0 ? 1 : -1));
+            }
+            @Override public void handleOnBackCancelled() {
+                content.animate().scaleX(1f).scaleY(1f).translationX(0f)
+                    .setDuration(motionDuration(NexusMotion.EXIT)).setInterpolator(standardInterpolator()).start();
+            }
+            @Override public void handleOnBackPressed() {
+                content.animate().cancel();
+                content.setScaleX(1f); content.setScaleY(1f); content.setTranslationX(0f);
+                navigateBack();
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, backNavigation);
+        updateBackNavigation();
+    }
+
+    private void updateBackNavigation() {
+        if (backNavigation != null) backNavigation.setEnabled(currentScreen == SCREEN_POWER
+            || (currentScreen == SCREEN_DASHBOARD && (!"Panoramica".equals(dashboardSection) || !appFolder.isEmpty())));
     }
 
     private void navigateBack() {
@@ -384,7 +412,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 return;
             }
         }
-        finishWithMaterialization();
+        backNavigation.setEnabled(false);
+        getOnBackPressedDispatcher().onBackPressed();
     }
 
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
@@ -684,12 +713,19 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         dashboardNavigation.addView(title);
         dashboardPanels.clear(); dashboardTabs.clear();
         HorizontalScrollView tabs = new HorizontalScrollView(this);
+        dashboardTabScroll = tabs;
         tabs.setHorizontalScrollBarEnabled(false);
+        // Android modulates each transparent edge only while more tabs exist
+        // beyond it. No bitmap capture or blur work in the scroll callback.
+        tabs.setHorizontalFadingEdgeEnabled(true);
+        tabs.setFadingEdgeLength(dp(24));
+        tabs.setOverScrollMode(View.OVER_SCROLL_NEVER);
         LinearLayout tabRow = new LinearLayout(this);
         for (String name : new String[]{"Panoramica", "Sistema", "App", "Servizi"}) {
             LinearLayout panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL);
             dashboardPanels.put(name, panel);
             Button tab = button(name, false, false);
+            decorateButton(tab, dashboardGlyph(name), TEXT);
             tab.setOnClickListener(v -> selectDashboardSection(name));
             dashboardTabs.put(name, tab);
             LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(-2, -2);
@@ -888,8 +924,36 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             Button tab = dashboardTabs.get(key);
             tab.setSelected(selected);
             tab.setTextColor(selected ? BG : TEXT);
+            decorateButton(tab, dashboardGlyph(key), selected ? BG : TEXT);
             tab.setBackground(rounded(selected ? TEXT : SURFACE, 16, Color.TRANSPARENT));
         }
+        revealSelectedDashboardTab();
+        updateBackNavigation();
+    }
+
+    private String dashboardGlyph(String section) {
+        switch (section) {
+            case "Panoramica": return "dashboard";
+            case "Sistema": return "system";
+            case "Servizi": return "services";
+            default: return "apps";
+        }
+    }
+
+    private void revealSelectedDashboardTab() {
+        HorizontalScrollView strip = dashboardTabScroll;
+        Button selected = dashboardTabs.get(dashboardSection);
+        if (strip == null || selected == null) return;
+        strip.post(() -> {
+            if (strip != dashboardTabScroll || !selected.isSelected() || selected.getWidth() == 0) return;
+            int start = strip.getScrollX(), width = strip.getWidth();
+            int available = Math.max(0, strip.getChildAt(0).getWidth() - width);
+            int target = Math.min(available, Math.max(0, selected.getLeft() - (width - selected.getWidth()) / 2));
+            if (target != start) {
+                if (animationsEnabled()) strip.smoothScrollTo(Math.max(0, target), 0);
+                else strip.scrollTo(Math.max(0, target), 0);
+            }
+        });
     }
 
     private void animateSectionEntry(View panel) {
@@ -937,8 +1001,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             TextView heading = eyebrow(appFolder.toUpperCase(Locale.ROOT)); area.addView(heading, wrapBlock());
             if ("Applicazioni".equals(appFolder)) area.addView(applicationGrid());
             else {
-                area.addView(applicationTile("steam", "Steam", "game"), wrapBlock());
-                area.addView(applicationTile("epic", "Epic Games", "game"), wrapBlock());
+                area.addView(applicationTile("steam", "Steam"), wrapBlock());
+                area.addView(applicationTile("epic", "Epic Games"), wrapBlock());
             }
         }
         return area;
@@ -962,7 +1026,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         Button close = button("Chiudi app in primo piano", false, false);
         close.setTag("foreground-close");
         close.setContentDescription("Chiudi sul PC l'ultima applicazione autorizzata lasciata in primo piano");
-        decorateButton(close, "stop", Color.rgb(151, 190, 191));
+        decorateButton(close, "close-app", Color.rgb(151, 190, 191));
         close.setOnClickListener(v -> closeForegroundApplication());
         return close;
     }
@@ -1227,6 +1291,18 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         applyDesktopControlState();
     }
 
+    private String applicationGlyph(String id) {
+        switch (id) {
+            case "nexusnxs": return "nexus";
+            case "chatgpt": return "chat";
+            case "brave": return "browser";
+            case "notepad": return "note";
+            case "steam": case "epic": return "game";
+            case "terminal": case "supremo": return id;
+            default: return "apps";
+        }
+    }
+
     private void applyDesktopControlState() {
         updateApplicationTile("nexusnxs", "NexusNXS", nexusAppOpen, true);
         updateApplicationTile("chatgpt", "ChatGPT", chatGptAppOpen, true);
@@ -1241,9 +1317,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private LinearLayout applicationGrid() {
         String[][] applications = new String[][] {
-            { "nexusnxs", "NexusNXS", "nexus" }, { "chatgpt", "ChatGPT", "chat" },
-            { "brave", "Brave", "browser" }, { "terminal", "Terminale", "terminal" },
-            { "supremo", "Supremo", "supremo" }, { "notepad", "Note", "note" }
+            { "nexusnxs", "NexusNXS" }, { "chatgpt", "ChatGPT" },
+            { "brave", "Brave" }, { "terminal", "Terminale" },
+            { "supremo", "Supremo" }, { "notepad", "Note" }
         };
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
@@ -1258,14 +1334,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 LinearLayout.LayoutParams params = column == 0
                     ? new LinearLayout.LayoutParams(0, -2, 1)
                     : spacedApplicationTile();
-                row.addView(applicationTile(application[0], application[1], application[2]), params);
+                row.addView(applicationTile(application[0], application[1]), params);
             }
             grid.addView(row, wrapBlock());
         }
         return grid;
     }
 
-    private Button applicationTile(String id, String label, String glyph) {
+    private Button applicationTile(String id, String label) {
         Button tile = button("", false, false);
         tile.setTag("app-tile:" + id);
         tile.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
@@ -1273,7 +1349,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         tile.setMinHeight(dp(80));
         tile.setTextSize(14);
         tile.setMaxLines(2);
-        Drawable icon = new NexusGlyphDrawable(glyph, Color.rgb(151, 190, 191), dp(20));
+        Drawable icon = new NexusGlyphDrawable(applicationGlyph(id), Color.rgb(151, 190, 191), dp(24));
         tile.setCompoundDrawables(icon, null, null, null);
         tile.setCompoundDrawablePadding(dp(12));
         tile.setContentDescription(label + ", stato in verifica");
@@ -1318,8 +1394,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         GradientDrawable surface = rounded(fill, 19, stroke);
         tile.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(42, 109, 224, 221)), surface, null));
         tile.setTextColor(Boolean.TRUE.equals(open) ? Color.rgb(226, 247, 246) : Color.rgb(190, 211, 211));
-        String glyph = "nexusnxs".equals(id) ? "nexus" : "chatgpt".equals(id) ? "chat" : ("steam".equals(id) || "epic".equals(id)) ? "game" : id;
-        Drawable icon = new NexusGlyphDrawable(glyph, Boolean.TRUE.equals(open) ? ACCENT : Color.rgb(151, 190, 191), dp(20));
+        String glyph = applicationGlyph(id);
+        Drawable icon = new NexusGlyphDrawable(glyph, Boolean.TRUE.equals(open) ? ACCENT : Color.rgb(151, 190, 191), dp(24));
         tile.setCompoundDrawables(icon, null, null, null);
         if (pending && animationsEnabled()) tile.animate().alpha(.58f).setDuration(motionDuration(NexusMotion.STATUS_PULSE)).withEndAction(() -> {
             if (launchCommandInFlight && id.equals(pendingApplicationId) && tile.isAttachedToWindow()) tile.animate().alpha(1f).setDuration(motionDuration(NexusMotion.STATUS_PULSE)).start();
@@ -1947,23 +2023,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         returnToDashboard();
     }
 
-    /** Uscita coerente con l'ingresso cosmico, senza rallentare il Back di sistema. */
-    private void finishWithMaterialization() {
-        if (!animationsEnabled() || materializationOverlay == null) {
-            finishAfterTransition();
-            return;
-        }
-        content.animate().cancel();
-        content.animate()
-            .alpha(.2f)
-            .scaleX(.985f)
-            .scaleY(.985f)
-            .setDuration(motionDuration(NexusMotion.EXIT))
-            .setInterpolator(standardInterpolator())
-            .start();
-        materializationOverlay.materialize(this::finishAfterTransition);
-    }
-
     private void swapContent(Runnable render) {
         int generation = ++contentSwapGeneration;
         boolean reverse = reverseContentTransition;
@@ -2029,6 +2088,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void setState(String value, boolean offline) {
+        updateBackNavigation();
         if (dashboardNavigation != null && (currentScreen != SCREEN_DASHBOARD || !dashboardVisible)
                 && dashboardNavigation.getVisibility() != View.GONE) {
             dashboardNavigation.setVisibility(View.GONE);
@@ -2311,7 +2371,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void decorateButton(Button button, String glyph, int color) {
-        Drawable icon = new NexusGlyphDrawable(glyph, color, dp(17));
+        Drawable icon = new NexusGlyphDrawable(glyph, color, dp(22));
         button.setCompoundDrawables(icon, null, null, null);
         button.setCompoundDrawablePadding(dp(9));
         button.setGravity(Gravity.CENTER);
@@ -2469,84 +2529,93 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private final class NexusGlyphDrawable extends Drawable {
         private final String glyph;
         private final Runnable nextIconFrame = this::invalidateSelf;
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path symbol;
+        private final RectF page = new RectF();
+        private final RectF orbit = new RectF(4, 4, 20, 20);
         private final int size;
 
         NexusGlyphDrawable(String glyph, int color, int size) {
             this.glyph = glyph;
             this.size = size;
-            paint.setColor(color);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(getResources().getDisplayMetrics().density * .96f);
-            paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setStrokeJoin(Paint.Join.ROUND);
+            fill.setColor(color);
+            stroke.setColor(color);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeWidth(1.35f);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            stroke.setStrokeJoin(Paint.Join.ROUND);
+            if ("nexus".equals(glyph)) symbol = null;
+            else {
+                String name = symbolName(glyph);
+                Path cached = symbolPaths.get(name);
+                if (cached == null) {
+                    cached = androidx.core.graphics.PathParser.createPathFromPathData(local.nexus.motion.NexusSymbolPaths.path(name));
+                    android.graphics.Matrix matrix = new android.graphics.Matrix();
+                    matrix.setScale(1f / 40f, 1f / 40f);
+                    matrix.postTranslate(0, 24);
+                    cached.transform(matrix);
+                    symbolPaths.put(name, cached);
+                }
+                symbol = cached;
+            }
             setBounds(0, 0, size, size);
         }
 
+        private String symbolName(String value) {
+            switch (value) {
+                case "folder-open": return "FolderOpen";
+                case "folder": return "Folder";
+                case "game": return "Game";
+                case "chat": return "Chat";
+                case "browser": return "Browser";
+                case "terminal": return "Terminal";
+                case "supremo": return "RemoteDesktop";
+                case "note": return "Description";
+                case "restart": return "Restart";
+                case "power": return "Power";
+                case "stop": return "Stop";
+                case "close-app": return "Close";
+                case "pulse": return "Pulse";
+                case "dashboard": return "Dashboard";
+                case "system": return "Memory";
+                case "services": return "Services";
+                default: return "Apps";
+            }
+        }
+
         @Override public void draw(Canvas canvas) {
-            RectF b = new RectF(getBounds());
-            float scale = Math.min(b.width(), b.height()) / 24f;
+            android.graphics.Rect bounds = getBounds();
+            float edge = Math.min(bounds.width(), bounds.height());
             canvas.save();
-            canvas.translate(b.left, b.top);
-            canvas.scale(scale, scale);
-            Path path = new Path();
+            canvas.translate(bounds.exactCenterX() - edge / 2f, bounds.exactCenterY() - edge / 2f);
+            canvas.scale(edge / 24f, edge / 24f);
             if ("folder-open".equals(glyph)) {
-                boolean moving = foreground && animationsEnabled() && !lowMotionBudget;
+                boolean moving = foreground && isVisible() && animationsEnabled() && !lowMotionBudget;
                 float phase = moving ? (android.os.SystemClock.uptimeMillis() % 2400L) / 2400f : 0f;
-                float lift = (float) Math.sin(phase * Math.PI * 2) * 1.2f;
-                canvas.drawRoundRect(new RectF(7, 4 + lift, 16, 16 + lift), 1, 1, paint);
-                canvas.drawRoundRect(new RectF(10, 6 - lift, 19, 18 - lift), 1, 1, paint);
-                canvas.drawLine(12, 9 - lift, 17, 9 - lift, paint);
-                canvas.drawLine(12, 12 - lift, 16, 12 - lift, paint);
-                path.moveTo(3, 11); path.lineTo(9, 11); path.lineTo(11, 13);
-                path.lineTo(22, 13); path.lineTo(19, 21); path.lineTo(3, 21); path.close();
-                canvas.drawPath(path, paint);
+                float lift = (float) Math.sin(phase * Math.PI * 2) * .65f;
+                page.set(7, 2 + lift, 15, 14 + lift); canvas.drawRoundRect(page, 1, 1, stroke);
+                page.set(10, 4 - lift, 18, 16 - lift); canvas.drawRoundRect(page, 1, 1, stroke);
+                canvas.drawLine(12, 7 - lift, 16, 7 - lift, stroke);
+                canvas.drawLine(12, 10 - lift, 16, 10 - lift, stroke);
                 if (moving) scheduleSelf(nextIconFrame, android.os.SystemClock.uptimeMillis() + 33);
-            } else if ("folder".equals(glyph)) {
-                path.moveTo(3, 7); path.lineTo(9, 7); path.lineTo(11, 10); path.lineTo(21, 10); path.lineTo(21, 20); path.lineTo(3, 20); path.close(); canvas.drawPath(path, paint);
-            } else if ("game".equals(glyph)) {
-                canvas.drawRoundRect(new RectF(3, 7, 21, 18), 4, 4, paint);
-                canvas.drawLine(6, 12, 12, 12, paint); canvas.drawLine(9, 9, 9, 15, paint);
-                canvas.drawCircle(16, 11, .7f, paint); canvas.drawCircle(18, 14, .7f, paint);
-            } else if ("nexus".equals(glyph)) {
-                canvas.drawCircle(12, 12, 2.1f, paint);
-                canvas.drawArc(new RectF(4, 4, 20, 20), -38, 84, false, paint);
-                canvas.drawArc(new RectF(4, 4, 20, 20), 82, 80, false, paint);
-                canvas.drawArc(new RectF(4, 4, 20, 20), 202, 84, false, paint);
-            } else if ("chat".equals(glyph)) {
-                canvas.drawRoundRect(new RectF(3.5f, 4.5f, 20.5f, 17.5f), 5, 5, paint);
-                path.moveTo(8, 17); path.lineTo(6.5f, 21); path.lineTo(12, 17.5f); canvas.drawPath(path, paint);
-                canvas.drawCircle(9, 11, .55f, paint); canvas.drawCircle(12, 11, .55f, paint); canvas.drawCircle(15, 11, .55f, paint);
-            } else if ("browser".equals(glyph)) {
-                canvas.drawCircle(12, 12, 8.2f, paint);
-                canvas.drawOval(new RectF(8.2f, 3.8f, 15.8f, 20.2f), paint);
-                canvas.drawLine(4, 12, 20, 12, paint);
-            } else if ("terminal".equals(glyph)) {
-                path.moveTo(4.5f, 7); path.lineTo(9.5f, 12); path.lineTo(4.5f, 17); canvas.drawPath(path, paint);
-                canvas.drawLine(11.5f, 17, 19.5f, 17, paint);
-            } else if ("supremo".equals(glyph)) {
-                canvas.drawRoundRect(new RectF(3.5f, 5, 13.5f, 15.5f), 2.2f, 2.2f, paint);
-                canvas.drawRoundRect(new RectF(10.5f, 8.5f, 20.5f, 19), 2.2f, 2.2f, paint);
-                path.moveTo(8.2f, 12.2f); path.lineTo(11, 12.2f); path.lineTo(13.6f, 14.8f); canvas.drawPath(path, paint);
-                canvas.drawLine(7, 18.2f, 17, 18.2f, paint);
-            } else if ("note".equals(glyph)) {
-                canvas.drawRoundRect(new RectF(5, 3.5f, 19, 20.5f), 2.4f, 2.4f, paint);
-                canvas.drawLine(8, 8, 16, 8, paint); canvas.drawLine(8, 12, 16, 12, paint); canvas.drawLine(8, 16, 14, 16, paint);
-            } else if ("restart".equals(glyph)) {
-                canvas.drawArc(new RectF(4.5f, 4.5f, 19.5f, 19.5f), -55, 292, false, paint);
-                path.moveTo(4, 6); path.lineTo(9, 6); path.lineTo(6.5f, 10); canvas.drawPath(path, paint);
-            } else if ("power".equals(glyph)) {
-                canvas.drawLine(12, 3.5f, 12, 12, paint); canvas.drawArc(new RectF(4.5f, 5, 19.5f, 20), -48, 276, false, paint);
-            } else if ("stop".equals(glyph)) {
-                canvas.drawRoundRect(new RectF(6, 6, 18, 18), 2.2f, 2.2f, paint);
-            } else {
-                path.moveTo(3.5f, 12); path.lineTo(7, 12); path.lineTo(9, 7); path.lineTo(13, 17); path.lineTo(16, 10); path.lineTo(20.5f, 10); canvas.drawPath(path, paint);
+            }
+            if (symbol != null) canvas.drawPath(symbol, fill);
+            else {
+                canvas.drawCircle(12, 12, 2.1f, stroke);
+                canvas.drawArc(orbit, -38, 84, false, stroke);
+                canvas.drawArc(orbit, 82, 80, false, stroke);
+                canvas.drawArc(orbit, 202, 84, false, stroke);
             }
             canvas.restore();
         }
 
-        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); invalidateSelf(); }
-        @Override public void setColorFilter(android.graphics.ColorFilter colorFilter) { paint.setColorFilter(colorFilter); invalidateSelf(); }
+        @Override public boolean setVisible(boolean visible, boolean restart) {
+            if (!visible) unscheduleSelf(nextIconFrame);
+            return super.setVisible(visible, restart);
+        }
+        @Override public void setAlpha(int alpha) { fill.setAlpha(alpha); stroke.setAlpha(alpha); invalidateSelf(); }
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) { fill.setColorFilter(filter); stroke.setColorFilter(filter); invalidateSelf(); }
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
         @Override public int getIntrinsicWidth() { return size; }
         @Override public int getIntrinsicHeight() { return size; }

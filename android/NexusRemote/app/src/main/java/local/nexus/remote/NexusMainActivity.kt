@@ -91,14 +91,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.systemGestureExclusion
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.automirrored.outlined.CallSplit
-import androidx.compose.material.icons.automirrored.outlined.EventNote
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Immutable
@@ -2842,15 +2834,21 @@ private fun JSONArray?.toTurns() = buildList {
     CompositionLocalProvider(LocalNexusMetrics provides metrics, LocalCosmicScene provides cosmicScene) { MaterialTheme(
     colorScheme = darkColorScheme(primary = Cyan, background = Ink, surface = Surface, surfaceVariant = Surface2, outline = Hairline, onPrimary = Color(0xFF002223), onBackground = Ice, onSurface = Ice, onSurfaceVariant = Mist),
     typography = Typography(
+        displayLarge = TextStyle(fontFamily = NexusSans, fontSize = 57.sp, lineHeight = 64.sp, fontWeight = FontWeight.SemiBold),
+        displayMedium = TextStyle(fontFamily = NexusSans, fontSize = 45.sp, lineHeight = 52.sp, fontWeight = FontWeight.SemiBold),
         displaySmall = TextStyle(fontFamily = NexusSans, fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.72).sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
+        headlineLarge = TextStyle(fontFamily = NexusSans, fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.SemiBold),
         headlineMedium = TextStyle(fontFamily = NexusSans, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.52).sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
+        headlineSmall = TextStyle(fontFamily = NexusSans, fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold),
         titleLarge = TextStyle(fontFamily = NexusSans, fontSize = 23.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.34).sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
         titleMedium = TextStyle(fontFamily = NexusSans, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-.12).sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
+        titleSmall = TextStyle(fontFamily = NexusSans, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
         bodyLarge = TextStyle(fontFamily = NexusSans, fontSize = 16.sp, lineHeight = 25.sp, letterSpacing = 0.sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
         bodyMedium = TextStyle(fontFamily = NexusSans, fontSize = 14.sp, lineHeight = 21.sp, letterSpacing = 0.sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
         bodySmall = TextStyle(fontFamily = NexusSans, fontSize = 12.sp, lineHeight = 18.sp, letterSpacing = 0.sp, platformStyle = PlatformTextStyle(includeFontPadding = false)),
         labelLarge = TextStyle(fontFamily = NexusSans, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, platformStyle = PlatformTextStyle(includeFontPadding = false)),
-        labelMedium = TextStyle(fontFamily = NexusSans, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium, platformStyle = PlatformTextStyle(includeFontPadding = false))
+        labelMedium = TextStyle(fontFamily = NexusSans, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium, platformStyle = PlatformTextStyle(includeFontPadding = false)),
+        labelSmall = TextStyle(fontFamily = NexusSans, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
     ),
     content = content
     ) }
@@ -2868,8 +2866,6 @@ private fun JSONArray?.toTurns() = buildList {
     var menuPreferences by rememberSaveable { mutableStateOf(false) }
     var menuSection by rememberSaveable { mutableStateOf("") }
     var menuSearchOpen by rememberSaveable { mutableStateOf(false) }
-    val settingsScroll = rememberScrollState()
-    LaunchedEffect(menuSection, menuPreferences) { settingsScroll.scrollTo(0) }
     LaunchedEffect(settingsOpen, menuPreferences, menuSection) { menuSearchOpen = false }
     LaunchedEffect(settingsOpen) { if (!settingsOpen) { menuPreferences = false; menuSection = "" } }
     var remoteSettingsOpen by rememberSaveable { mutableStateOf(false) }
@@ -3116,7 +3112,7 @@ private fun JSONArray?.toTurns() = buildList {
                                 ) {
                                     val cancelAttachmentLabel = nexusCopy("Annulla importazione allegato", "Cancel attachment import")
                                     if (state.attachmentLoading) CircularProgressIndicator(Modifier.size(20.dp).semantics { contentDescription = cancelAttachmentLabel }, color = Cyan, strokeWidth = 1.5.dp)
-                                    else Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice, modifier = Modifier.size(21.dp))
+                                    else Icon(NexusSymbols.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice, modifier = Modifier.size(21.dp))
                                 }
                                 BasicTextField(
                                     value = state.draft,
@@ -3157,7 +3153,7 @@ private fun JSONArray?.toTurns() = buildList {
                                     enabled = state.busy || (interactionAvailable && !state.attachmentLoading && state.draft.isNotBlank()),
                                     modifier = Modifier.size(42.dp),
                                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Cyan, contentColor = Color(0xFF002223), disabledContainerColor = Surface2, disabledContentColor = Mist)
-                                ) { Icon(if (state.busy) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward, if (state.busy) nexusCopy("Interrompi", "Stop") else nexusCopy("Invia", "Send"), Modifier.size(20.dp)) }
+                                ) { Icon(if (state.busy) NexusSymbols.Stop else NexusSymbols.ArrowUpward, if (state.busy) nexusCopy("Interrompi", "Stop") else nexusCopy("Invia", "Send"), Modifier.size(20.dp)) }
                             }
                         }
                             } else Box(Modifier.fillMaxWidth().height(54.dp)) {
@@ -3165,7 +3161,7 @@ private fun JSONArray?.toTurns() = buildList {
                                     onClick = { textMode = true },
                                     enabled = true,
                                     modifier = Modifier.align(Alignment.CenterStart).size(50.dp).clip(CircleShape).background(Surface.copy(alpha = .9f))
-                                ) { Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice, modifier = Modifier.size(22.dp)) }
+                                ) { Icon(NexusSymbols.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice, modifier = Modifier.size(22.dp)) }
                             }
                         }
                     } else Box(Modifier.fillMaxSize()) {
@@ -3232,18 +3228,38 @@ private fun JSONArray?.toTurns() = buildList {
                             onClick = { typedSession = true; textMode = true },
                             enabled = true,
                             modifier = Modifier.align(Alignment.BottomStart).size(52.dp).clip(CircleShape).background(Surface.copy(alpha = .9f))
-                        ) { Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice, modifier = Modifier.size(23.dp)) }
+                        ) { Icon(NexusSymbols.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice, modifier = Modifier.size(23.dp)) }
                     }
                 }
             }
         }
     }
         }
-        BackHandler(enabled = settingsOpen) { if (menuSearchOpen) { menuSearchOpen = false; keyboard?.hide() } else if (menuSection.isNotEmpty()) menuSection = "" else if (menuPreferences) menuPreferences = false else settingsOpen = false }
+        val menuBackProgress = remember { Animatable(0f) }
+        PredictiveBackHandler(enabled = settingsOpen) { events ->
+            try {
+                events.collect { event -> menuBackProgress.snapTo(if (reduceMotion) 0f else event.progress) }
+                if (menuSearchOpen) { menuSearchOpen = false; keyboard?.hide() }
+                else if (menuSection.isNotEmpty()) menuSection = ""
+                else if (menuPreferences) menuPreferences = false
+                else settingsOpen = false
+            } catch (_: CancellationException) {
+                // A cancelled Android back gesture preserves the current page.
+            } finally {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    menuBackProgress.animateTo(0f, tween(if (reduceMotion) 0 else NexusFlow.EXIT, easing = NexusFlow.standard))
+                }
+            }
+        }
         if (drawerFraction > 0f || settingsOpen || drawerDragging) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f * drawerFraction)).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { settingsOpen = false })
             Surface(color = Ink, shape = RoundedCornerShape(topEnd = menuCorner, bottomEnd = menuCorner), modifier = Modifier.fillMaxHeight().width(menuWidth)
                 .offset { IntOffset(((drawerFraction - 1f) * drawerWidthPx).toInt(), 0) }
+                .graphicsLayer {
+                    scaleX = 1f - .025f * menuBackProgress.value
+                    scaleY = scaleX
+                    translationX = size.width * .035f * menuBackProgress.value
+                }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                 .pointerInput(drawerWidthPx, menuPreferences) {
                     // Settings own the full screen; sliders and back navigation
@@ -3260,7 +3276,7 @@ private fun JSONArray?.toTurns() = buildList {
                     )
                 }) {                Column(Modifier.statusBarsPadding().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        if (menuPreferences) IconButton({ if (menuSection.isNotEmpty()) menuSection = "" else menuPreferences = false }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
+                        if (menuPreferences) IconButton({ if (menuSection.isNotEmpty()) menuSection = "" else menuPreferences = false }) { Icon(NexusSymbols.ArrowBack, nexusCopy("Indietro", "Back"), tint = Mist) }
                         Text(when (menuSection) {
                             "appearance" -> nexusCopy("Aspetto", "Appearance")
                             "personalization" -> nexusCopy("Personalizzazione", "Personalization")
@@ -3269,41 +3285,45 @@ private fun JSONArray?.toTurns() = buildList {
                             "privacy" -> nexusCopy("Privacy e dati", "Privacy and data")
                             else -> if (menuPreferences) nexusCopy("Impostazioni", "Settings") else "NexusNXS"
                         }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ice, modifier = Modifier.weight(1f))
-                        if (menuSection.isEmpty()) IconButton({ menuSearchOpen = !menuSearchOpen; if (!menuSearchOpen) keyboard?.hide() }) { Icon(Icons.Rounded.Search, nexusCopy("Cerca", "Search"), tint = if (menuSearchOpen) Cyan else Mist) }
+                        if (menuSection.isEmpty()) IconButton({ menuSearchOpen = !menuSearchOpen; if (!menuSearchOpen) keyboard?.hide() }) { Icon(NexusSymbols.Search, nexusCopy("Cerca", "Search"), tint = if (menuSearchOpen) Cyan else Mist) }
                     }
                     if (!menuPreferences) {
                     TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { voiceMode = false; dispatch("stopSpeech", ""); dispatch("new", ""); settingsOpen = false; typedSession = true; textMode = true }, enabled = !state.busy, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)) {
-                        Icon(Icons.Rounded.Add, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        Icon(NexusSymbols.Add, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp)); Text(nexusCopy("Nuova conversazione", "New conversation"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     }
                     InstantHistory(state, dispatch, Modifier.weight(1f), searchVisible = menuSearchOpen) { chat ->
                         voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
                         settingsOpen = false; typedSession = true; textMode = false
                     }
-                    IconButton(onClick = { keyboard?.hide(); focusManager.clearFocus(force = true); menuPreferences = true }, modifier = Modifier.align(Alignment.Start)) { Icon(Icons.Rounded.Settings, nexusCopy("Impostazioni", "Settings"), tint = Mist) }
-                    } else Column(Modifier.weight(1f).align(Alignment.CenterHorizontally).widthIn(max = 720.dp).fillMaxWidth().verticalScroll(settingsScroll), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    if (menuSection.isEmpty()) {
+                    IconButton(onClick = { keyboard?.hide(); focusManager.clearFocus(force = true); menuPreferences = true }, modifier = Modifier.align(Alignment.Start)) { Icon(NexusSymbols.Settings, nexusCopy("Impostazioni", "Settings"), tint = Mist) }
+                    } else AnimatedContent(targetState = menuSection,
+                        transitionSpec = { nexusScreenTransform(back = targetState.isEmpty(), reduced = reduceMotion) },
+                        contentAlignment = Alignment.TopCenter,
+                        modifier = Modifier.weight(1f).fillMaxWidth(), label = "settingsSection") { visibleSection ->
+                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (visibleSection.isEmpty()) {
                         InstantSettingsNavigation(searchVisible = menuSearchOpen) { section ->
                             keyboard?.hide(); focusManager.clearFocus(force = true); menuSection = section
                         }
                     }
-                    if (menuSection == "personalization") ConversationPreferencesSettings(state, dispatch)
-                    if (menuSection == "appearance") SettingsGroup {
-            CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
-            CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
+                    if (visibleSection == "personalization") ConversationPreferencesSettings(state, dispatch)
+                    if (visibleSection == "appearance") SettingsGroup {
+            CompactSetting(NexusSymbols.Animation, nexusCopy("Riduci movimento", "Reduce motion"), nexusCopy("Segue anche le preferenze del dispositivo", "Also respects device preferences"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }
+            CompactSetting(NexusSymbols.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), "", { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") }
                     }
-                    if (menuSection == "devices") SettingsGroup {
+                    if (visibleSection == "devices") SettingsGroup {
             CompactSetting(
-                Icons.Outlined.Computer,
+                NexusSymbols.Computer,
                 nexusCopy("Controllo remoto", "Remote control"),
                 when {
                     state.remoteWorkAvailable -> nexusCopy("Workstation associata", "Workstation paired")
                     state.pairingAvailable -> nexusCopy("Associa e autorizza azioni sul PC", "Pair and authorize actions on your PC")
                     else -> nexusCopy("Non disponibile su questo server", "Unavailable on this server")
                 },
-                { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }
+                { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }
             ) { settingsOpen = false; remoteSettingsOpen = true }
                     }
-                    if (menuSection == "voice") Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (visibleSection == "voice") Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             TextButton(onClick = {
                 val role = if (android.os.Build.VERSION.SDK_INT >= 29) context.getSystemService(android.app.role.RoleManager::class.java) else null
                 val request = if (Build.VERSION.SDK_INT >= 29 && role?.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT) == true && !role.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT)) role.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT) else Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
@@ -3312,12 +3332,13 @@ private fun JSONArray?.toTurns() = buildList {
             Text(nexusCopy("Il richiamo con il tasto laterale dipende dalle impostazioni del telefono. Il microfono resta sotto il tuo controllo.", "Side-button activation depends on your phone settings. The microphone remains under your control."), style = MaterialTheme.typography.bodySmall, color = Mist)
 
                     }
-                    if (menuSection == "privacy") Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CompactSetting(Icons.Rounded.Lock, nexusCopy("Schermata privata", "Private screen"), nexusCopy("Protegge le anteprime e le catture", "Protects previews and screenshots"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }
-                    CompactSetting(Icons.Rounded.VisibilityOff, nexusCopy("Chat temporanea", "Temporary chat"), nexusCopy("Non viene salvata nella cronologia", "Not saved in history"), { Switch(state.temporary, { if (!state.busy) dispatch("temporary", "") }, enabled = !state.busy) }) { if (!state.busy) dispatch("temporary", "") }
-                    DrawerItem(Icons.Rounded.Backup, nexusCopy("Esporta backup cifrato", "Export encrypted backup")) { dispatch("exportBackup", "") }
-                    DrawerItem(Icons.Rounded.Restore, nexusCopy("Importa backup", "Import backup")) { dispatch("importBackup", "") }
+                    if (visibleSection == "privacy") Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CompactSetting(NexusSymbols.Lock, nexusCopy("Schermata privata", "Private screen"), nexusCopy("Protegge le anteprime e le catture", "Protects previews and screenshots"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }
+                    CompactSetting(NexusSymbols.VisibilityOff, nexusCopy("Chat temporanea", "Temporary chat"), nexusCopy("Non viene salvata nella cronologia", "Not saved in history"), { Switch(state.temporary, { if (!state.busy) dispatch("temporary", "") }, enabled = !state.busy) }) { if (!state.busy) dispatch("temporary", "") }
+                    DrawerItem(NexusSymbols.Backup, nexusCopy("Esporta backup cifrato", "Export encrypted backup")) { dispatch("exportBackup", "") }
+                    DrawerItem(NexusSymbols.Restore, nexusCopy("Importa backup", "Import backup")) { dispatch("importBackup", "") }
                     Text(nexusCopy("La cronologia è conservata sul dispositivo. Lingua e dimensioni del testo seguono Android.", "History is stored on this device. Language and text size follow Android."), color = Mist, style = MaterialTheme.typography.bodySmall)
+                    }
                     }
                     }
                 }
@@ -3326,7 +3347,7 @@ private fun JSONArray?.toTurns() = buildList {
     }
     if (remoteSettingsOpen) AlertDialog(
         onDismissRequest = { remoteSettingsOpen = false },
-        icon = { Icon(Icons.Outlined.Computer, null, tint = Cyan) },
+        icon = { Icon(NexusSymbols.Computer, null, tint = Cyan) },
         title = { Text(nexusCopy("Controllo remoto", "Remote control")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -3389,7 +3410,7 @@ private fun JSONArray?.toTurns() = buildList {
     )
     if (state.remoteWorkAvailable && state.workTicketId.isNotBlank()) AlertDialog(
         onDismissRequest = { dispatch("cancelWork", "") },
-        icon = { Icon(Icons.Outlined.VerifiedUser, null, tint = Cyan) },
+        icon = { Icon(NexusSymbols.VerifiedUser, null, tint = Cyan) },
         title = { Text(nexusCopy("Autorizza il Core", "Authorize Core")) },
         text = {
             Column {
@@ -3457,10 +3478,10 @@ private fun JSONArray?.toTurns() = buildList {
             )
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
                 IconButton({ openApp("attachment") }, modifier = Modifier.size(52.dp).clip(CircleShape).background(Surface2.copy(alpha = .9f))) {
-                    Icon(Icons.Rounded.AttachFile, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                    Icon(NexusSymbols.AttachFile, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
                 }
                 IconButton({ openApp("text") }, modifier = Modifier.size(52.dp).clip(CircleShape).background(Surface2.copy(alpha = .9f))) {
-                    Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                    Icon(NexusSymbols.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
                 }
             }
         }
@@ -3685,8 +3706,10 @@ private class StreamingMarkdownAccumulator {
         if (previous.isEmpty()) return true
         if (value.length < previous.length) return false
         val probe = minOf(32, previous.length)
-        return value.regionMatches(0, previous, 0, probe) &&
-            value.regionMatches(previous.length - probe, previous, previous.length - probe, probe)
+        return (
+            value.regionMatches(0, previous, 0, probe) &&
+                value.regionMatches(previous.length - probe, previous, previous.length - probe, probe)
+        )
     }
 }
 
@@ -3707,7 +3730,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
             if (index % 2 == 1) {
                 val code = raw.substringAfter('\n', raw).trimEnd()
                 Surface(color = Color(0xFF0B1217), shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF9CB5FF).copy(alpha = .14f)), modifier = Modifier.fillMaxWidth()) {
-                    Column { Row(Modifier.fillMaxWidth().background(Color(0xFF141D25)).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text(raw.lineSequence().firstOrNull()?.takeIf { !it.contains(' ') }.orEmpty().ifBlank { nexusCopy("codice", "code") }.uppercase(), color = Color(0xFF8298B2), fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); IconButton({ context.copyToClipboard(code) }, Modifier.size(32.dp)) { Icon(Icons.Rounded.ContentCopy, nexusCopy("Copia codice", "Copy code"), tint = Color(0xFFA8B8C8), modifier = Modifier.size(15.dp)) } }; HighlightedCodeText(code, Modifier.padding(13.dp)) }
+                    Column { Row(Modifier.fillMaxWidth().background(Color(0xFF141D25)).padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text(raw.lineSequence().firstOrNull()?.takeIf { !it.contains(' ') }.orEmpty().ifBlank { nexusCopy("codice", "code") }.uppercase(), color = Color(0xFF8298B2), fontSize = 9.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); IconButton({ context.copyToClipboard(code) }, Modifier.size(48.dp)) { Icon(NexusSymbols.ContentCopy, nexusCopy("Copia codice", "Copy code"), tint = Color(0xFFA8B8C8), modifier = Modifier.size(15.dp)) } }; HighlightedCodeText(code, Modifier.padding(13.dp)) }
                 }
             } else normalizeMathBlocks(raw).lines().forEach { line ->
                 when {
@@ -3859,24 +3882,24 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     }.value
     Surface(color = Surface, shape = RoundedCornerShape(18.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Hairline), modifier = Modifier.padding(bottom = 8.dp).widthIn(max = 260.dp).then(if (bitmap != null) Modifier.clickable { expanded = true } else Modifier)) {
         Row(Modifier.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(54.dp).clip(RoundedCornerShape(13.dp)).background(Surface2), contentAlignment = Alignment.Center) { if (bitmap != null) Image(bitmap, state.attachment.orEmpty(), Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else Icon(Icons.Outlined.Description, null, tint = Cyan, modifier = Modifier.size(25.dp)) }
+            Box(Modifier.size(54.dp).clip(RoundedCornerShape(13.dp)).background(Surface2), contentAlignment = Alignment.Center) { if (bitmap != null) Image(bitmap, state.attachment.orEmpty(), Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else Icon(NexusSymbols.Description, null, tint = Cyan, modifier = Modifier.size(25.dp)) }
             Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(state.attachment.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp, fontWeight = FontWeight.Medium); Text(if (bitmap != null) nexusCopy("Immagine pronta", "Image ready") else nexusCopy("Documento pronto", "Document ready"), color = Mist, fontSize = 12.sp) }
-            IconButton(remove, Modifier.size(48.dp)) { Icon(Icons.Rounded.Close, nexusCopy("Rimuovi allegato", "Remove attachment"), modifier = Modifier.size(19.dp)) }
+            IconButton(remove, Modifier.size(48.dp)) { Icon(NexusSymbols.Close, nexusCopy("Rimuovi allegato", "Remove attachment"), modifier = Modifier.size(19.dp)) }
         }
     }
-    if (expanded && bitmap != null) Dialog(onDismissRequest = { expanded = false }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) { Box(Modifier.fillMaxSize().background(Ink).statusBarsPadding().navigationBarsPadding()) { Image(bitmap, state.attachment.orEmpty(), Modifier.fillMaxSize().padding(18.dp), contentScale = ContentScale.Fit); IconButton({ expanded = false }, Modifier.align(Alignment.TopEnd).padding(16.dp).size(50.dp).background(Surface.copy(alpha = .92f), CircleShape)) { Icon(Icons.Rounded.Close, "Chiudi anteprima", modifier = Modifier.size(26.dp)) } } }
+    if (expanded && bitmap != null) Dialog(onDismissRequest = { expanded = false }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) { Box(Modifier.fillMaxSize().background(Ink).statusBarsPadding().navigationBarsPadding()) { Image(bitmap, state.attachment.orEmpty(), Modifier.fillMaxSize().padding(18.dp), contentScale = ContentScale.Fit); IconButton({ expanded = false }, Modifier.align(Alignment.TopEnd).padding(16.dp).size(50.dp).background(Surface.copy(alpha = .92f), CircleShape)) { Icon(NexusSymbols.Close, "Chiudi anteprima", modifier = Modifier.size(26.dp)) } } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun AttachmentPicker(close: () -> Unit, gallery: () -> Unit, camera: () -> Unit, document: () -> Unit, remoteWorkAvailable: Boolean, planMode: () -> Unit) = ModalBottomSheet(onDismissRequest = close, containerColor = Surface, shape = NexusSheetShape, dragHandle = { BottomSheetDefaults.DragHandle(color = Mist) }) {
     Column(Modifier.padding(horizontal = 18.dp).padding(bottom = 28.dp)) {
         Text(nexusCopy("Aggiungi alla conversazione", "Add to conversation"), fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
-        SheetAction(Icons.Rounded.PhotoLibrary, nexusCopy("Carica foto", "Upload photo"), nexusCopy("Scegli un’immagine dalla galleria", "Choose an image from your gallery"), gallery)
-        SheetAction(Icons.Rounded.PhotoCamera, nexusCopy("Fotocamera", "Camera"), nexusCopy("Scatta una foto adesso", "Take a photo now"), camera)
-        if (remoteWorkAvailable) SheetAction(Icons.Outlined.Checklist, nexusCopy("Modalità Cuore", "Core mode"), nexusCopy("Pianifica, verifica e autorizza ogni azione", "Plan, review, and authorize every action"), planMode)
+        SheetAction(NexusSymbols.PhotoLibrary, nexusCopy("Carica foto", "Upload photo"), nexusCopy("Scegli un’immagine dalla galleria", "Choose an image from your gallery"), gallery)
+        SheetAction(NexusSymbols.PhotoCamera, nexusCopy("Fotocamera", "Camera"), nexusCopy("Scatta una foto adesso", "Take a photo now"), camera)
+        if (remoteWorkAvailable) SheetAction(NexusSymbols.Checklist, nexusCopy("Modalità Cuore", "Core mode"), nexusCopy("Pianifica, verifica e autorizza ogni azione", "Plan, review, and authorize every action"), planMode)
         HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Hairline.copy(alpha = .55f))
         Text(nexusCopy("File", "Files"), color = Mist, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-        SheetAction(Icons.Rounded.Description, nexusCopy("Documento", "Document"), nexusCopy("PDF o file di testo", "PDF or text file"), document)
+        SheetAction(NexusSymbols.Description, nexusCopy("Documento", "Document"), nexusCopy("PDF o file di testo", "PDF or text file"), document)
     }
 }
 
@@ -4120,10 +4143,10 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
                         IconButton({ openAttachment?.invoke() }, enabled = openAttachment != null && connection == NexusConnection.ONLINE, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                            Icon(Icons.Rounded.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
+                            Icon(NexusSymbols.Add, nexusCopy("Allega foto o documento", "Attach photo or document"), tint = Ice)
                         }
                         IconButton({ haltCapture(false, false); openKeyboard?.invoke() }, enabled = openKeyboard != null, modifier = Modifier.size(52.dp).background(Surface2, CircleShape)) {
-                            Icon(Icons.Rounded.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
+                            Icon(NexusSymbols.Keyboard, nexusCopy("Scrivi", "Type"), tint = Ice)
                         }
                     }
                 }
@@ -4140,7 +4163,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 IconButton(
                     onClick = { haltCapture(false, false); close() },
                     modifier = Modifier.align(Alignment.TopEnd).size(48.dp).clip(CircleShape).background(Surface.copy(alpha = .72f))
-                ) { Icon(Icons.Rounded.Close, nexusCopy("Chiudi", "Close"), modifier = Modifier.size(23.dp)) }
+                ) { Icon(NexusSymbols.Close, nexusCopy("Chiudi", "Close"), modifier = Modifier.size(23.dp)) }
                 Column(Modifier.align(Alignment.Center).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.fillMaxWidth().height(238.dp), contentAlignment = Alignment.Center) {
 
@@ -4182,7 +4205,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
 @Composable private fun ConversationPreferenceChoice(title: String, value: String, options: List<Pair<String, String>>, select: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
-        CompactSetting(Icons.Rounded.Tune, title, options.firstOrNull { it.first == value }?.second.orEmpty(), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { expanded = true }
+        CompactSetting(NexusSymbols.Tune, title, options.firstOrNull { it.first == value }?.second.orEmpty(), { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }) { expanded = true }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = Surface) {
             options.forEach { (id, label) -> DropdownMenuItem(text = { Text(label, color = if (id == value) Cyan else Ice) }, onClick = { expanded = false; select(id) }) }
         }
@@ -4194,7 +4217,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
         ConversationPreferenceChoice(nexusCopy("Dettaglio", "Detail"), state.responseStyle, listOf("concise" to nexusCopy("Conciso", "Concise"), "natural" to nexusCopy("Naturale", "Natural"), "detailed" to nexusCopy("Approfondito", "Detailed"))) { dispatch("responseStyle", it) }
         ConversationPreferenceChoice(nexusCopy("Tono", "Tone"), state.conversationTone, listOf("neutral" to nexusCopy("Equilibrato", "Balanced"), "warm" to nexusCopy("Caloroso", "Warm"), "direct" to nexusCopy("Diretto", "Direct"))) { dispatch("conversationTone", it) }
         ConversationPreferenceChoice(nexusCopy("Lingua delle risposte", "Response language"), state.responseLanguage, listOf("auto" to nexusCopy("Automatico", "Automatic"), "it" to "Italiano", "en" to "English", "es" to "Español", "fr" to "Français", "de" to "Deutsch")) { dispatch("responseLanguage", it) }
-        CompactSetting(Icons.Rounded.Restore, nexusCopy("Ripristina preferenze", "Reset preferences"), "", {}) { dispatch("resetConversationPreferences", "") }
+        CompactSetting(NexusSymbols.Restore, nexusCopy("Ripristina preferenze", "Reset preferences"), "", {}) { dispatch("resetConversationPreferences", "") }
     }
     Text(nexusCopy("Salvate su questo dispositivo. Solo queste scelte accompagnano le richieste al servizio NexusNXS.", "Saved on this device. Only these choices accompany requests to the NexusNXS service."), color = Mist, style = MaterialTheme.typography.bodySmall)
 }
@@ -4214,8 +4237,8 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     val matches = sections.filter { (_, title, detail) -> terms.all { (title + " " + detail).contains(it, ignoreCase = true) } }
     if (searchVisible) OutlinedTextField(value = query, onValueChange = { query = it.take(120) }, singleLine = true,
         placeholder = { Text(nexusCopy("Cerca impostazioni", "Search settings"), style = MaterialTheme.typography.bodyMedium) },
-        leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
-        trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
+        leadingIcon = { Icon(NexusSymbols.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
+        trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(NexusSymbols.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
         shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().focusRequester(searchFocus))
     if (matches.isEmpty()) Text(nexusCopy("Nessuna impostazione trovata", "No settings found"), color = Mist, style = MaterialTheme.typography.bodySmall)
@@ -4229,8 +4252,8 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 modifier = Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp))
             SettingsGroup {
                 rows.forEach { (id, title, _) ->
-                    val icon = when (id) { "appearance" -> Icons.Rounded.Animation; "personalization" -> Icons.Rounded.Tune; "voice" -> Icons.Rounded.Mic; "devices" -> Icons.Outlined.Computer; else -> Icons.Rounded.Lock }
-                    CompactSetting(icon, title, "", { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { open(id) }
+                    val icon = when (id) { "appearance" -> NexusSymbols.Animation; "personalization" -> NexusSymbols.Tune; "voice" -> NexusSymbols.Mic; "devices" -> NexusSymbols.Computer; else -> NexusSymbols.Lock }
+                    CompactSetting(icon, title, "", { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }) { open(id) }
                 }
             }
         }
@@ -4248,8 +4271,8 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     var menuChatId by remember { mutableStateOf<String?>(null) }
     if (searchVisible) OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
         placeholder = { Text(nexusCopy("Cerca conversazioni", "Search conversations"), style = MaterialTheme.typography.bodyMedium) },
-        leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
-        trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(Icons.Rounded.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
+        leadingIcon = { Icon(NexusSymbols.Search, null, tint = Mist, modifier = Modifier.size(20.dp)) },
+        trailingIcon = { if (query.isNotEmpty()) IconButton({ query = "" }) { Icon(NexusSymbols.Close, nexusCopy("Cancella ricerca", "Clear search"), tint = Mist, modifier = Modifier.size(18.dp)) } },
         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Cyan.copy(alpha = .3f), unfocusedBorderColor = Color.Transparent, focusedContainerColor = Ice.copy(alpha = .04f), unfocusedContainerColor = Ice.copy(alpha = .04f)),
         shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().focusRequester(searchFocus))
     val chats = state.chats.filter { query.isBlank() || it.title.contains(query, true) || it.preview.contains(query, true) }
@@ -4270,7 +4293,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
                 }
                 Box {
                 IconButton(onClick = { menuChatId = chat.id }, enabled = !state.busy) {
-                    Icon(Icons.Rounded.MoreVert, nexusCopy("Gestisci conversazione", "Manage conversation"), tint = Mist)
+                    Icon(NexusSymbols.MoreVert, nexusCopy("Gestisci conversazione", "Manage conversation"), tint = Mist)
                 }
                 DropdownMenu(expanded = menuChatId == chat.id, onDismissRequest = { menuChatId = null }, containerColor = Surface) {
                     DropdownMenuItem(text = { Text(if (chat.pinned) nexusCopy("Non fissare più", "Unpin") else nexusCopy("Fissa", "Pin")) }, onClick = { menuChatId = null; dispatch("pinChat", chat.id) }, enabled = !state.busy)
@@ -4318,7 +4341,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
 @Composable private fun Page(title: String, dispatch: (String, String) -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val metrics = LocalNexusMetrics.current
     val scrollState = rememberSaveable(title, saver = androidx.compose.foundation.ScrollState.Saver) { androidx.compose.foundation.ScrollState(0) }
-    Column(Modifier.fillMaxHeight().fillMaxWidth().widthIn(max = metrics.contentMaxWidth).wrapContentWidth(Alignment.CenterHorizontally).statusBarsPadding().verticalScroll(scrollState).padding(horizontal = metrics.horizontalPadding, vertical = 8.dp)) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton({ dispatch("back", "") }, Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, nexusCopy("Torna alla chat", "Back to chat"), tint = Ice) }; Text(title, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp)) }; Spacer(Modifier.height(18.dp)); content() }
+    Column(Modifier.fillMaxHeight().fillMaxWidth().widthIn(max = metrics.contentMaxWidth).wrapContentWidth(Alignment.CenterHorizontally).statusBarsPadding().verticalScroll(scrollState).padding(horizontal = metrics.horizontalPadding, vertical = 8.dp)) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { IconButton({ dispatch("back", "") }, Modifier.size(48.dp)) { Icon(NexusSymbols.ArrowBack, nexusCopy("Torna alla chat", "Back to chat"), tint = Ice) }; Text(title, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp)) }; Spacer(Modifier.height(18.dp)); content() }
 }
 
 private fun historyGroupLabel(updatedAt: Long, italian: Boolean = true): String {
@@ -4359,9 +4382,9 @@ private fun historyGroupLabel(updatedAt: Long, italian: Boolean = true): String 
     }
 }
 
-@Composable private fun SettingsNexusGroup(state: NexusUiState, dispatch: (String, String) -> Unit) { SectionLabel("NEXUSNXS"); SettingsGroup { CompactSetting(Icons.Rounded.Memory, nexusCopy("Modello predefinito", "Default model"), state.model, { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { dispatch("modelSheet", "") }; CompactSetting(Icons.Rounded.Animation, nexusCopy("Riduci animazioni", "Reduce motion"), nexusCopy("Transizioni e pulsazioni più discrete", "Subtler transitions and pulses"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }; if (android.os.Build.VERSION.SDK_INT >= 31) CompactSetting(Icons.Rounded.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), nexusCopy("Conferme discrete per gesture e cambi modalità", "Subtle feedback for gestures and mode changes"), { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") } } }
+@Composable private fun SettingsNexusGroup(state: NexusUiState, dispatch: (String, String) -> Unit) { SectionLabel("NEXUSNXS"); SettingsGroup { CompactSetting(NexusSymbols.Memory, nexusCopy("Modello predefinito", "Default model"), state.model, { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }) { dispatch("modelSheet", "") }; CompactSetting(NexusSymbols.Animation, nexusCopy("Riduci animazioni", "Reduce motion"), nexusCopy("Transizioni e pulsazioni più discrete", "Subtler transitions and pulses"), { Switch(state.reduceMotion, { dispatch("reduceMotion", "") }) }) { dispatch("reduceMotion", "") }; if (android.os.Build.VERSION.SDK_INT >= 31) CompactSetting(NexusSymbols.Vibration, nexusCopy("Feedback aptico", "Haptic feedback"), nexusCopy("Conferme discrete per gesture e cambi modalità", "Subtle feedback for gestures and mode changes"), { Switch(state.hapticsEnabled, { dispatch("haptics", "") }) }) { dispatch("haptics", "") } } }
 
-@Composable private fun SettingsPrivacyGroup(state: NexusUiState, dispatch: (String, String) -> Unit, clear: () -> Unit) { SectionLabel(nexusCopy("PRIVACY E DATI", "PRIVACY AND DATA")); SettingsGroup { CompactSetting(Icons.Rounded.VisibilityOff, nexusCopy("Modalità privacy", "Privacy mode"), nexusCopy("Nasconde anteprime, schermate recenti e notifiche sensibili", "Hides previews, recent screens, and sensitive notifications"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }; CompactSetting(Icons.Outlined.HealthAndSafety, nexusCopy("Diagnostica NexusNXS", "NexusNXS diagnostics"), nexusCopy("Connessione, sessione, coda e protezioni locali", "Connection, session, queue, and local protections"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { dispatch("diagnostics", "") }; CompactSetting(Icons.Rounded.Backup, nexusCopy("Esporta backup cifrato", "Export encrypted backup"), nexusCopy("Archivio leggibile soltanto su questo dispositivo", "Archive readable only on this device"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { dispatch("exportBackup", "") }; CompactSetting(Icons.Rounded.Restore, nexusCopy("Ripristina backup", "Restore backup"), nexusCopy("Importa conversazioni senza sovrascrivere quelle presenti", "Import conversations without replacing existing ones"), { Icon(Icons.Rounded.ChevronRight, null, tint = Mist) }) { dispatch("importBackup", "") }; CompactSetting(Icons.Rounded.DeleteOutline, nexusCopy("Cancella chat locali", "Delete local chats"), nexusCopy("Rimuove la cronologia dal telefono", "Removes history from this phone"), {}, clear) } }
+@Composable private fun SettingsPrivacyGroup(state: NexusUiState, dispatch: (String, String) -> Unit, clear: () -> Unit) { SectionLabel(nexusCopy("PRIVACY E DATI", "PRIVACY AND DATA")); SettingsGroup { CompactSetting(NexusSymbols.VisibilityOff, nexusCopy("Modalità privacy", "Privacy mode"), nexusCopy("Nasconde anteprime, schermate recenti e notifiche sensibili", "Hides previews, recent screens, and sensitive notifications"), { Switch(state.privacyMode, { dispatch("privacyMode", "") }) }) { dispatch("privacyMode", "") }; CompactSetting(NexusSymbols.HealthAndSafety, nexusCopy("Diagnostica NexusNXS", "NexusNXS diagnostics"), nexusCopy("Connessione, sessione, coda e protezioni locali", "Connection, session, queue, and local protections"), { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }) { dispatch("diagnostics", "") }; CompactSetting(NexusSymbols.Backup, nexusCopy("Esporta backup cifrato", "Export encrypted backup"), nexusCopy("Archivio leggibile soltanto su questo dispositivo", "Archive readable only on this device"), { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }) { dispatch("exportBackup", "") }; CompactSetting(NexusSymbols.Restore, nexusCopy("Ripristina backup", "Restore backup"), nexusCopy("Importa conversazioni senza sovrascrivere quelle presenti", "Import conversations without replacing existing ones"), { Icon(NexusSymbols.ChevronRight, null, tint = Mist) }) { dispatch("importBackup", "") }; CompactSetting(NexusSymbols.DeleteOutline, nexusCopy("Cancella chat locali", "Delete local chats"), nexusCopy("Rimuove la cronologia dal telefono", "Removes history from this phone"), {}, clear) } }
 
 @Composable private fun DiagnosticLine(label: String, value: String, healthy: Boolean) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(9.dp).background(if (healthy) Color(0xFF69DCAE) else Color(0xFFF0C76A), CircleShape)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium); Text(value, color = Mist, fontSize = 12.sp) } }
 

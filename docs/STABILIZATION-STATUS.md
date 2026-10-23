@@ -1,3 +1,23 @@
+# Android refinement and Preview 0.3.32 — 23 October 2026
+
+Public Android 6.5.25 and owner-only Control 1.20.0 share 42 pinned official
+Material Symbols vectors, offline generation and Apache licensing. All public
+text roles use Inter. Settings support directional/predictive back; Control
+uses native back progress, centered selected tabs and soft horizontal fading
+edges. The obsolete extended icon dependency and unused custom exit were removed.
+
+Both release builds and lint pass. On one Samsung: five display profiles per
+app, 24 isolated native tests, settings back cancellation/completion and a
+single attachment tap with the keyboard open pass. Control's short cancelled
+back gesture preserves the folder. Display/font/timeout settings restored.
+Observed janky frames: Control 0.73–2.35%, public 3.77–7.88%; these are sampled
+workflows on one physical phone, not a guarantee for every device.
+Windows 0.3.32 build, offline installer verification and unpacked smoke pass.
+Final source gates pass: 1158 tests, 3 skipped, zero failures; cloud:check and workstation check pass. SBOM and six-artifact bundle integrity pass. Publication awaits exact-commit CI and immutable remote asset verification.
+No desktop installer was executed. Android signing is Preview/debug; Windows
+commercial signing, human voice/echo tests and iOS remain incomplete.
+The existing 14B baseline and its failed quality gate are unchanged; no training
+or inference cloud enabled. Search before interactive login is not guaranteed.
 ## Ripristino locale e prove pubbliche — 23 ottobre
 
 Gate finale:1156PASS3SKIP0FAIL; check locale/cloud e auditnpm runtime/tooling
