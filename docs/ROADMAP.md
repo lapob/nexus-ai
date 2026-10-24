@@ -3,7 +3,7 @@
 ## Uso quotidiano: stato verificato del 24 ottobre
 
 Ricerca Deep resistente ai guasti parziali, lettura streaming limitata e target
-del preriscaldamento vocale corretti nei sorgenti. Suite 1177 PASS/3 SKIP;
+del preriscaldamento vocale corretti nei sorgenti. Suite 1178 PASS/3 SKIP;
 offline e sessioni vocali simulate passano quattro formati. I tre Core e le
 interazioni full/reduced passano il collaudo isolato. I gate di rilascio ora
 rifiutano prove motion incomplete, anche se le singole misure presenti passano.

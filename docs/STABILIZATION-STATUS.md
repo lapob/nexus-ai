@@ -1,6 +1,6 @@
 # Daily-use reliability — 24 October 2026
 
-Current source passes 1177 tests with 3 skips and zero failures. Deep research
+Current source passes 1178 tests with 3 skips and zero failures. Deep research
 retains successful sources when another query fails; cancellation still
 invalidates partial results. Research responses reuse bounded streaming
 ingestion, including body timeout and cancellation, instead of allocating
@@ -35,6 +35,12 @@ The fallback now returns a neutral, bounded list of retrieved pages when the
 answer has no valid citations, instead of presenting the first page as proof.
 Already cited answers remain unchanged. This does not establish semantic
 correctness of every cited claim or admit the model's general quality.
+
+Official-documentation requests now normalize navigational wording while
+preserving the subject, version and language constraints. No product/domain
+is hardcoded and the query budget is unchanged. Live provider comparisons
+and the normalized public request recover the specific reference page;
+the original request still needs verification after applying this revision.
 
 # Recovery and visual refinement — 24 October 2026
 

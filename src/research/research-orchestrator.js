@@ -43,6 +43,14 @@ function softwareReleaseQuery(seed) {
   return `${name.trim()} latest stable release official`;
 }
 
+function documentationQuery(seed) {
+  const match = seed.match(/^(?:la\s+)?documentazione\s+ufficiale\s+(?:di|per|su)\s+(.+?)[?.!]?$/iu)
+    || seed.match(/^(?:the\s+)?official\s+documentation\s+(?:for|of|on)\s+(.+?)[?.!]?$/iu);
+  // Conserva soggetto, versione e vincoli di lingua senza scegliere un sito
+  // o un prodotto a priori. Le query descrittive diverse restano inalterate.
+  return match && match[1].length <= 180 ? `${match[1].trim()} official documentation` : '';
+}
+
 function researchLanguage(question = '') {
   const text = String(question || '');
   return /\b(?:il|lo|la|gli|le|che|come|cosa|perch[eé]|quale|quando|dove|cerca|ricerca|oggi|ultimo|ultima)\b/iu.test(text) ? 'it' : 'en';
@@ -60,7 +68,7 @@ function researchTimeRange(question = '') {
 
 function deriveResearchQueries(question, maxQueries = 1) {
   const seed = publicQuerySeed(question);
-  const original = softwareReleaseQuery(seed) || seed;
+  const original = softwareReleaseQuery(seed) || documentationQuery(seed) || seed;
   if (!original) return [];
   const queries = [original];
   if (maxQueries > 1) {

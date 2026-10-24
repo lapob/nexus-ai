@@ -1,6 +1,6 @@
 # Daily-use service reliability — 24 October 2026
 
-Source passes 1177 tests/3 skips/zero failures. Research now preserves successful
+Source passes 1178 tests/3 skips/zero failures. Research now preserves successful
 Deep-query results during a partial provider failure and uses shared bounded
 response streaming with body cancellation and timeout. The headless warm-up
 selects the gateway's dedicated neural engine instead of the desktop engine.
@@ -25,6 +25,12 @@ cannot cite a retrieved page, the fallback now shows only a neutral list of
 the retrieved pages, without attesting an unsupported answer. Recheck the
 exact public probe after applying this last source change. Semantic grounding
 and general model-quality admission still require further measured work.
+
+Navigation wording for official-documentation queries is normalized without
+hardcoded products/sites or extra requests. Subject, version and language
+constraints remain in the query. Provider comparisons and a normalized public
+request retrieve the exact reference page. Verify the original wording after
+applying this revision; preserve the neutral fallback when grounding fails.
 
 # Startup recovery and refined settings — 24 October 2026
 

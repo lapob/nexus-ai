@@ -40,7 +40,7 @@ test('mantiene query e lingua deterministiche', () => {
 
 test('separa le istruzioni per link e fonti dai termini di ricerca', async () => {
   const question = 'Cerca sul web la documentazione ufficiale di JavaScript Promise.allSettled e indicami un link verificato.';
-  assert.deepEqual(deriveResearchQueries(question, 1), ['la documentazione ufficiale di JavaScript Promise.allSettled']);
+  assert.deepEqual(deriveResearchQueries(question, 1), ['JavaScript Promise.allSettled official documentation']);
   assert.deepEqual(deriveResearchQueries('Search Promise.allSettled documentation and give me a verified link.', 1), ['Promise.allSettled documentation']);
   assert.equal(publicQuerySeed('Cerca fonti di diritto e citazioni giudiziarie'), 'fonti di diritto e citazioni giudiziarie');
   assert.equal(publicQuerySeed('Search stars and show sources of light'), 'stars and show sources of light');
@@ -50,9 +50,16 @@ test('separa le istruzioni per link e fonti dai termini di ricerca', async () =>
     calls.push(query);
     return { provider: 'searxng', results: [{ title: 'Documentazione', url: 'https://example.com/docs', snippet: 'Fonte verificata dal provider', sourceKind: 'web' }] };
   } } });
-  assert.deepEqual(calls, ['la documentazione ufficiale di JavaScript Promise.allSettled']);
+  assert.deepEqual(calls, ['JavaScript Promise.allSettled official documentation']);
   assert.equal(result.unavailable, false);
   assert.equal(result.citations.length, 1);
+});
+
+test('normalizza la richiesta di documentazione senza perdere prodotto, versione o lingua', () => {
+  assert.deepEqual(deriveResearchQueries('Cerca la documentazione ufficiale di Blender 4.5 in italiano', 1), ['Blender 4.5 in italiano official documentation']);
+  assert.deepEqual(deriveResearchQueries('Search official documentation for SQLite WAL.', 1), ['SQLite WAL official documentation']);
+  assert.deepEqual(deriveResearchQueries('Cerca documentazione storica di SQLite', 1), ['documentazione storica di SQLite']);
+  assert.deepEqual(deriveResearchQueries('Cerca la documentazione ufficiale e le critiche a SQLite', 1), ['la documentazione ufficiale e le critiche a SQLite']);
 });
 
 test('distingue nessun risultato da un provider guasto senza inventare fonti', async () => {
