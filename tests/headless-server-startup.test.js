@@ -24,6 +24,74 @@ function functions(names, file = manager) {
     }`;
 }
 
+test('startup progress separates missing ports, warming and readiness without changing the boolean gate', { skip: !windows }, () => {
+  const result = run(`${functions(['Wait-ForGateway'])}
+    $gatewayPorts=@(32145,32147);$script:step=0;$script:reports=@();
+    function Write-Host {param($Object) $script:reports += [string]$Object}
+    function Start-Sleep {}
+    function Get-NetTCPConnection {param($State,$ErrorAction)
+      $script:step++; [pscustomobject]@{LocalPort=32145};
+      if($script:step -ge 2){[pscustomobject]@{LocalPort=32147}}
+    }
+    function Get-GatewayReadiness {param($Port) if($script:step -lt 3){'warming'}else{'ready'}}
+    $ready=Wait-ForGateway $true 3 -ReportProgress;
+    function Get-GatewayReadiness {param($Port) if($Port -eq 32145){'ready'}else{'warming'}}
+    $partial=Wait-ForGateway $true 0;
+    @{ready=$ready;partial=$partial;reports=$script:reports}|ConvertTo-Json -Compress`);
+  assert.equal(result.status, 0, result.stderr);
+  const data = JSON.parse(result.stdout);
+  assert.equal(data.ready, true);
+  assert.equal(data.partial, false);
+  assert.equal(data.reports.length, 3);
+  assert.match(data.reports[0], /Avvio processo/);
+  assert.match(data.reports[1], /preparazione del motore AI/);
+  assert.match(data.reports[2], /Server pronto/);
+});
+
+test('manual server start recovers only an enabled existing owner bridge in an interactive session', { skip: !windows }, () => {
+  const result = run(`${functions(['Start-OwnerDesktopBridge'])}
+    $desktopBridgeTaskName='Owner Bridge';$script:session=0;$script:started=@();
+    $script:bridge=[pscustomobject]@{Settings=@{Enabled=$true};State='Ready'};
+    function Get-Process {param($Id) [pscustomobject]@{SessionId=$script:session}}
+    function Get-ScheduledTask {param($TaskName,$ErrorAction) $script:bridge}
+    function Start-ScheduledTask {param($TaskName) $script:started += $TaskName;$script:bridge.State='Running'}
+    function Write-Host {}
+    Start-OwnerDesktopBridge;
+    $script:session=1;$script:bridge.Settings.Enabled=$false;Start-OwnerDesktopBridge;
+    $script:bridge.Settings.Enabled=$true;Start-OwnerDesktopBridge;Start-OwnerDesktopBridge;
+    $script:bridge=$null;Start-OwnerDesktopBridge;
+    ConvertTo-Json -InputObject @($script:started) -Compress`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), ['Owner Bridge']);
+});
+
+test('optional service bootstrap preserves literal manager paths and starts without waiting for readiness', { skip: !windows }, () => {
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-optional-'));
+  try {
+    const managerPath = path.join(fixture, "manager [owner's].ps1");
+    const marker = path.join(fixture, 'started.json');
+    const logPath = path.join(fixture, "manager [owner's].startup.log");
+    fs.writeFileSync(managerPath, `param([string]$Action)
+      Start-Sleep -Seconds 1
+      @{action=$Action;directory=(Get-Location).Path}|ConvertTo-Json -Compress|Set-Content -LiteralPath ${quote(marker)}
+      Write-Output 'fixture-ready'`);
+    const result = run(`${functions(['Start-NexusOptionalService'], path.join(root, 'scripts/lib/development-paths.ps1'))}
+      Start-NexusOptionalService -ProjectRoot ${quote(fixture)} -Manager ${quote(managerPath)} -LogDirectory ${quote(fixture)};
+      $returnedBeforeReady=-not(Test-Path -LiteralPath ${quote(marker)});
+      $deadline=[DateTime]::UtcNow.AddSeconds(5);
+      while((-not(Test-Path -LiteralPath ${quote(marker)}) -or -not(Test-Path -LiteralPath ${quote(logPath)})) -and [DateTime]::UtcNow -lt $deadline){Start-Sleep -Milliseconds 100}
+      @{asynchronous=$returnedBeforeReady;service=(Get-Content -LiteralPath ${quote(marker)} -Raw|ConvertFrom-Json)}|ConvertTo-Json -Compress`);
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout);
+    assert.equal(data.asynchronous, true);
+    assert.deepEqual(data.service, { action: 'start', directory: fixture });
+    assert.match(fs.readFileSync(logPath, 'utf8'), /fixture-ready/);
+  } finally {
+    assert.equal(path.dirname(path.resolve(fixture)), path.resolve(os.tmpdir()));
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('connection gate rejects absent private access, missing ports and network listeners', { skip: !windows }, () => {
   const result = run(`${functions(['Test-AuditReady'], path.join(root, 'scripts/audit-connections.ps1'))}
     $report=@{Public=@(@{Status=200});LocalGateway=@{Status=200};Tailscale=@{Installed=$true;State='Running'};

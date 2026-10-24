@@ -56,18 +56,33 @@ function Get-GatewayReadiness([int]$Port) {
   }
 }
 
-function Wait-ForGateway([bool]$Expected, [int]$TimeoutSeconds = 20) {
+function Wait-ForGateway([bool]$Expected, [int]$TimeoutSeconds = 20, [switch]$ReportProgress) {
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $started = [Diagnostics.Stopwatch]::StartNew()
+  $lastPhase = ''
+  $lastReportSeconds = -15
   do {
     $activePorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
       Where-Object LocalPort -in $gatewayPorts |
       Select-Object -ExpandProperty LocalPort -Unique)
     $portsReady = @($gatewayPorts | Where-Object { $_ -in $activePorts }).Count -eq $gatewayPorts.Count
     $ready = $false
+    $readiness = @()
     if ($portsReady) {
-      $ready = @($gatewayPorts | Where-Object {
-        (Get-GatewayReadiness -Port $_) -in @('ready', 'legacy')
-      }).Count -eq $gatewayPorts.Count
+      $readiness = @($gatewayPorts | ForEach-Object { Get-GatewayReadiness -Port $_ })
+      $ready = @($readiness | Where-Object { $_ -in @('ready', 'legacy') }).Count -eq $gatewayPorts.Count
+    }
+    if ($Expected -and $ReportProgress) {
+      $phase = if ($ready) { 'Server pronto' }
+        elseif (-not $portsReady) { 'Avvio processo e verifica del runtime' }
+        elseif ('warming' -in $readiness) { 'Gateway raggiungibile, preparazione del motore AI' }
+        else { 'Gateway attivo, verifica disponibilita del servizio' }
+      $elapsed = [int]$started.Elapsed.TotalSeconds
+      if ($phase -ne $lastPhase -or ($elapsed - $lastReportSeconds) -ge 15) {
+        Write-Host "NexusNXS: $phase ($elapsed s)."
+        $lastPhase = $phase
+        $lastReportSeconds = $elapsed
+      }
     }
     $stopped = $activePorts.Count -eq 0
     if (($Expected -and $ready) -or (-not $Expected -and $stopped)) { return $true }
@@ -81,6 +96,22 @@ function Get-InstalledTaskName {
     if (Get-ScheduledTask -TaskName $candidate -ErrorAction SilentlyContinue) { return $candidate }
   }
   return $null
+}
+
+function Start-OwnerDesktopBridge {
+  # Session 0 must never try to create an interactive desktop. At login the
+  # existing owner-only task owns this bridge; manual server starts can recover
+  # it after the owner exited the pet for an update, without opening the pet.
+  if ((Get-Process -Id $PID).SessionId -le 0) { return }
+  try {
+    $bridge = Get-ScheduledTask -TaskName $desktopBridgeTaskName -ErrorAction SilentlyContinue
+    if ($bridge -and $bridge.Settings.Enabled -and $bridge.State -ne 'Running') {
+      Start-ScheduledTask -TaskName $desktopBridgeTaskName
+      Write-Host 'NexusNXS: collegamento desktop privato richiesto in background.'
+    }
+  } catch {
+    Write-Warning 'Il server AI e pronto, ma il collegamento desktop privato non e stato avviato. Verifica il task NexusNXS Desktop Bridge.'
+  }
 }
 
 function Stop-HeadlessProcessesForced {
@@ -290,9 +321,10 @@ if ($Action -in @('start', 'stop', 'restart')) {
     # AI sull'SSD e la scansione antivirus del binario. Il gateway resta nascosto
     # e supervisionato, ma il gestore non deve dichiarare un falso errore mentre
     # l'avvio a freddo sta ancora procedendo correttamente.
-    if (-not (Wait-ForGateway $true $coldStartTimeoutSeconds)) {
-      throw "NexusNXS Server did not become ready within $coldStartTimeoutSeconds seconds."
+    if (-not (Wait-ForGateway $true $coldStartTimeoutSeconds -ReportProgress)) {
+      throw "NexusNXS Server did not become ready within $coldStartTimeoutSeconds seconds. Inspect .nexus-data/logs/headless-launcher.log and nexus.log before retrying."
     }
+    Start-OwnerDesktopBridge
   }
   Write-Output "NexusNXS Server $($Action) completed."
   exit 0

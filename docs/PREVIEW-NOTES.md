@@ -1,3 +1,11 @@
+### Prossimo aggiornamento — sorgenti verificati, build pubblica da completare
+
+- Windows: Electron43.8.3, con controllo di coerenza fra versione richiesta, lock e runtime impacchettato; argomenti alternativi del builder rifiutati. Corrette le dipendenze compatibili fast-uri e Undici segnalate dagli audit.
+- Server: avanzamento esplicito durante verifiche e caricamento del modello; recupero del collegamento desktop privato gia abilitato dopo un aggiornamento, soltanto nella sessione interattiva del proprietario, senza aprire il pet. Il pannello di monitoraggio resta separato dal servizio.
+- Control1.20.3, solo proprietario: selettori e comando inferiore conservati nei cambi cartella, transizione dopo il layout, righe delle applicazioni uniformi senza allineamento delle baseline multilinea. Il testo lungo conserva la descrizione accessibile completa.
+- Web: Core centrato anche con testo ingrandito, recupero della voce e microfono acquisito soltanto quando il servizio risulta disponibile. Ricerca naturale con termini ripuliti dalle sole richieste finali di formattazione; risultati vuoti distinti dal guasto del provider.
+- Preview manuale: firme commerciali, voce umana/eco, latenza vocale, iOS e requisiti Stable restano aperti. Android pubblico6.5.25 e modello locale invariati; nessun training o cloud inference attivato.
+
 ### Novita 0.3.33
 
 - Web app: icone Material Symbols condivise con Android, incorporate offline con licenza; impostazioni raggruppate in sezioni coerenti, picker leggibili e animazione rispettosa del movimento ridotto. Lo stato inattivo non riserva piu uno spazio vuoto fra impostazioni e download.

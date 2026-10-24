@@ -239,3 +239,38 @@ function Resolve-NexusOllamaExecutable {
 }
 
 #endregion
+
+#region 04 - Avvio asincrono servizi opzionali
+
+function Start-NexusOptionalService {
+  param(
+    [Parameter(Mandatory)][string]$ProjectRoot,
+    [Parameter(Mandatory)][string]$Manager,
+    [string]$LogDirectory = ''
+  )
+
+  # Literal paths preserve brackets in portable volume names. Each manager
+  # owns its readiness; an unavailable auxiliary service must not block Core.
+  $serviceStart = [Diagnostics.ProcessStartInfo]::new()
+  $serviceStart.FileName = (Get-Command pwsh.exe -ErrorAction Stop).Source
+  $serviceStart.WorkingDirectory = [IO.Path]::GetFullPath($ProjectRoot)
+  $serviceStart.UseShellExecute = $false
+  $serviceStart.CreateNoWindow = $true
+  $serviceStart.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  if (-not $LogDirectory) { $LogDirectory = Join-Path (Split-Path $serviceStart.WorkingDirectory -Parent) '.nexus-data\logs' }
+  [IO.Directory]::CreateDirectory($LogDirectory) | Out-Null
+  $managerLiteral = "'" + [IO.Path]::GetFullPath($Manager).Replace("'", "''") + "'"
+  $logPath = Join-Path $LogDirectory (([IO.Path]::GetFileNameWithoutExtension($Manager)) + '.startup.log')
+  $logLiteral = "'" + [IO.Path]::GetFullPath($logPath).Replace("'", "''") + "'"
+  $command = '$ErrorActionPreference = ''Stop''; try { & ' + $managerLiteral +
+    ' -Action start *>&1 | Out-File -LiteralPath ' + $logLiteral +
+    ' -Append -Encoding utf8; exit $LASTEXITCODE } catch { $_ | Out-File -LiteralPath ' + $logLiteral +
+    ' -Append -Encoding utf8; exit 1 }'
+  foreach ($argument in @('-NoProfile', '-Command', $command)) {
+    $serviceStart.ArgumentList.Add($argument)
+  }
+  try { [Diagnostics.Process]::Start($serviceStart) | Out-Null }
+  catch { Write-Warning "Avvio servizio opzionale non riuscito: $($_.Exception.Message)" }
+}
+
+#endregion

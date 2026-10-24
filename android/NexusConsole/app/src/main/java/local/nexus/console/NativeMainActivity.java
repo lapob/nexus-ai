@@ -162,6 +162,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private int reconnectAttempt;
     private int lastCriticalCount = -1;
     private int contentSwapGeneration;
+    private int sectionEntryGeneration;
+    private final Map<View, Integer> sectionEntryGenerations = new java.util.WeakHashMap<>();
     private boolean reverseContentTransition;
     private boolean materializeNextContent;
     private boolean materializeOnResume;
@@ -956,55 +958,81 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private void animateSectionEntry(View panel) {
         if (panel == null) return;
+        int generation = ++sectionEntryGeneration;
+        sectionEntryGenerations.put(panel, generation);
         panel.animate().cancel();
         panel.setAlpha(1f);
         panel.setTranslationY(0f);
         if (!animationsEnabled()) return;
         panel.setAlpha(0f);
-        panel.setTranslationY(dp(8));
-        panel.animate().alpha(1f).translationY(0f).setDuration(motionDuration(NexusMotion.ENTER))
-            .setInterpolator(standardInterpolator()).start();
+        // Folder contents have a different height. Animate only after their new
+        // bounds are laid out, never the stale bounds from the previous folder.
+        panel.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                panel.getViewTreeObserver().removeOnPreDrawListener(this);
+                if (destroyed || !Integer.valueOf(generation).equals(sectionEntryGenerations.get(panel)) || !panel.isShown()) return true;
+                panel.setTranslationY(dp(8));
+                panel.animate().alpha(1f).translationY(0f).setDuration(motionDuration(NexusMotion.ENTER))
+                    .setInterpolator(standardInterpolator()).start();
+                return true;
+            }
+        });
     }
 
     private LinearLayout applicationFolders() {
         LinearLayout area = new LinearLayout(this); area.setOrientation(LinearLayout.VERTICAL);
         LinearLayout folders = new LinearLayout(this);
+        LinearLayout entries = new LinearLayout(this); entries.setOrientation(LinearLayout.VERTICAL);
+        Map<String, Button> folderActions = new HashMap<>();
         boolean stacked = getResources().getConfiguration().fontScale >= 1.3f
             || getResources().getConfiguration().screenWidthDp < 360;
         folders.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
         for (String name : new String[]{"Applicazioni", "Giochi"}) {
             Button folder = button(name, false, false);
-            decorateButton(folder, name.equals(appFolder) ? "folder-open" : "folder", ACCENT);
+            folderActions.put(name, folder);
             folder.setOnClickListener(v -> {
                 if (name.equals(appFolder)) return;
                 rememberDashboardPosition();
                 appFolder = name;
                 dashboardPositions.put(navigationKey(), 0);
-                renderApplicationsPanel(dashboardPanels.get("App"));
+                for (String key : folderActions.keySet()) updateApplicationFolderButton(folderActions.get(key), key);
+                populateApplicationFolder(entries);
                 restoreDashboardPosition();
                 updateBackNavigation();
-                animateSectionEntry(dashboardPanels.get("App"));
+                animateSectionEntry(entries);
             });
             folder.setMinHeight(dp(64));
-            folder.setSelected(name.equals(appFolder));
-            folder.setTextColor(name.equals(appFolder) ? TEXT : MUTED);
-            folder.setBackground(rounded(name.equals(appFolder) ? Color.rgb(7, 35, 36) : SURFACE, 19,
-                name.equals(appFolder) ? ACCENT : Color.TRANSPARENT));
+            updateApplicationFolderButton(folder, name);
             LinearLayout.LayoutParams folderParams = stacked
                 ? new LinearLayout.LayoutParams(-1, -2) : new LinearLayout.LayoutParams(0, -2, 1);
             if (folders.getChildCount() > 0) folderParams.setMargins(stacked ? 0 : dp(8), stacked ? dp(8) : 0, 0, 0);
             folders.addView(folder, folderParams);
         }
         area.addView(folders, wrapBlock());
+        area.addView(entries, new LinearLayout.LayoutParams(-1, -2));
+        populateApplicationFolder(entries);
+        return area;
+    }
+
+    private void updateApplicationFolderButton(Button folder, String name) {
+        boolean selected = name.equals(appFolder);
+        decorateButton(folder, selected ? "folder-open" : "folder", ACCENT);
+        folder.setSelected(selected);
+        folder.setTextColor(selected ? TEXT : MUTED);
+        folder.setBackground(rounded(selected ? Color.rgb(7, 35, 36) : SURFACE, 19,
+            selected ? ACCENT : Color.TRANSPARENT));
+    }
+
+    private void populateApplicationFolder(LinearLayout entries) {
+        entries.removeAllViews();
         if (!appFolder.isEmpty()) {
-            TextView heading = eyebrow(appFolder.toUpperCase(Locale.ROOT)); area.addView(heading, wrapBlock());
-            if ("Applicazioni".equals(appFolder)) area.addView(applicationGrid());
+            TextView heading = eyebrow(appFolder.toUpperCase(Locale.ROOT)); entries.addView(heading, wrapBlock());
+            if ("Applicazioni".equals(appFolder)) entries.addView(applicationGrid());
             else {
-                area.addView(applicationTile("steam", "Steam"), wrapBlock());
-                area.addView(applicationTile("epic", "Epic Games"), wrapBlock());
+                entries.addView(applicationTile("steam", "Steam"), wrapBlock());
+                entries.addView(applicationTile("epic", "Epic Games"), wrapBlock());
             }
         }
-        return area;
     }
 
     private void renderApplicationsPanel(LinearLayout panel) {
@@ -1346,10 +1374,12 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         for (int index = 0; index < applications.length; index += columns) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setBaselineAligned(false);
+            row.setGravity(Gravity.TOP);
             for (int column = 0; column < columns && index + column < applications.length; column++) {
                 String[] application = applications[index + column];
                 LinearLayout.LayoutParams params = column == 0
-                    ? new LinearLayout.LayoutParams(0, -2, 1)
+                    ? new LinearLayout.LayoutParams(0, -1, 1)
                     : spacedApplicationTile();
                 row.addView(applicationTile(application[0], application[1]), params);
             }
@@ -1366,6 +1396,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         tile.setMinHeight(dp(80));
         tile.setTextSize(14);
         tile.setMaxLines(2);
+        tile.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Drawable icon = new NexusGlyphDrawable(applicationGlyph(id), Color.rgb(151, 190, 191), dp(24));
         tile.setCompoundDrawables(icon, null, null, null);
         tile.setCompoundDrawablePadding(dp(12));
@@ -1424,7 +1455,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private LinearLayout.LayoutParams spacedApplicationTile() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -1, 1);
         params.setMargins(dp(8), 0, 0, 0);
         return params;
     }

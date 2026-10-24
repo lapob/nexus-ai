@@ -1,3 +1,26 @@
+# Recovery and visual refinement — 24 October 2026
+
+Current source passes1169 tests/3 skips/zero failures, installed Electron43.8.3
+doctor10/10 and both npm audits. The Windows installer remains the previously
+published Preview; the next artifact is not built or installed.
+
+Startup progress distinguishes process checks, gateway warming and ready.
+An existing enabled owner bridge can recover on manual start; optional search
+and image launchers share asynchronous literal-path handling and separate logs.
+Docker Desktop can still require owner login before local search is available.
+No PC power cycle or pre-login auxiliary-service availability was certified.
+
+Control1.20.3/code47 passes build/lint/signature and five physical layouts;
+six recorded folder switches keep navigation stable and show no Supremo
+overlap. Public Android6.5.25 passes the five-profile matrix. Web settings
+remove nested panels, retain native controls and shared symbols, and adapt
+at enlarged text. Website45unit/32browser checks include dialog accessibility.
+
+Real public chat and four-source research complete, but the baseline model's
+quality gate remains open. Synthetic speech is recognized exactly;11.375s
+recognition and4.670s synthesis in one sample do not meet conversational
+performance. Human speech/echo, iOS, signing and Stable requirements remain.
+
 # Real service probes and remaining latency — 24 October 2026
 
 Source gates pass1166 tests/3 skips/zero failures. A natural research question

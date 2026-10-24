@@ -138,6 +138,10 @@ if ($Action -eq 'start') {
     [IO.File]::WriteAllText($settingsPath, $template.Replace('__NEXUS_SEARXNG_SECRET__', $secret), [Text.UTF8Encoding]::new($false))
   }
   if (-not (Test-DockerReady)) {
+    if ((Get-Process -Id $PID).SessionId -eq 0) {
+      Write-Warning 'Docker Desktop attende la sessione interattiva del proprietario; ricerca locale non ancora disponibile. Il Core AI resta indipendente.'
+      exit 1
+    }
     # The portable per-user installation may retain its uninstall record but
     # lose the launcher registration. Restore only the verified existing path.
     $launcherKey = 'HKCU:\Software\Docker Inc.\Docker Desktop'

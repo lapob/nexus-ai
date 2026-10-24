@@ -1,3 +1,32 @@
+# Startup recovery and refined settings — 24 October 2026
+
+Source checks pass1169 tests,3 explicit skips and zero failures. Installed
+Electron package, distribution metadata and executable agree on43.8.3;
+doctor passes10/10 and runtime/tooling audits report zero vulnerabilities.
+This does not update the previously published Windows installer. The next
+Windows Preview has not been built; public download links retain the verified
+existing release. Do not overwrite its immutable assets.
+
+Server startup now reports progress and recovers only the existing enabled
+owner desktop bridge from an interactive session. Shared optional-service
+startup preserves literal paths, records failures and retries search/images
+at owner login without opening the pet. Docker Desktop pre-login availability
+remains a separate limitation. Public chat, recovered search with four sources
+and synthetic speech round-trip pass; recognition11.375s is still too slow
+for a natural conversation, and human microphone/echo remain unverified.
+
+Control1.20.3/code47 passes build/lint/Preview signature and five physical
+display profiles. Folder selectors and the lower action persist while only
+the newly measured folder contents animate. Six recorded switches show no
+observed Supremo overlap; this is not certification of every device/state.
+Five public Android profiles pass with the unchanged6.5.25 client.
+
+Web preferences now use one surface, compact adaptive rows, shared icons,
+native pickers and the existing Inter font. Five profile/CSP scenarios pass.
+Website release checks pass45 unit and32 browser tests, including WCAG A/AA
+checks on the open dialog and enlarged text. Source publication, web promotion,
+Windows artifact creation and commercial readiness remain distinct operations.
+
 # Verified release and settled visual QA — 24 October 2026
 
 Main1f4d8dc passed clean Windows/Linux CI40042620475, including runtime

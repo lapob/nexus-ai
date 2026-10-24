@@ -4,8 +4,8 @@ const { colors, cosmicGlass, layout } = require('../../config/nexus-design-token
 // Present at response generation so the gateway adds its style-src nonce.
 // Dynamically appended inline styles are rejected by the public CSP.
 const PUBLIC_PROFILE_STYLE = `<style>
-#profileSheet{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;color-scheme:dark}
-#profileSheet .sheet-body{padding:clamp(20px,4vw,28px)}
+#profileSheet{width:min(480px,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow-y:auto;color-scheme:dark;box-shadow:0 24px 80px #0006}
+#profileSheet .sheet-body{padding:clamp(20px,4vw,28px);container: nxs-profile / inline-size}
 #profileSheet .sheet-top{position:sticky;top:0;z-index:2;isolation:isolate;padding-top:clamp(20px,4vw,28px);padding-bottom:12px;margin-top:calc(-1 * clamp(20px,4vw,28px))}
 #profileSheet .sheet-top::before{content:'';position:absolute;z-index:-1;inset:0 calc(-1 * clamp(20px,4vw,28px)) -16px;background:${colors.surface};backdrop-filter:blur(${cosmicGlass.blurPx.preferred}px);-webkit-backdrop-filter:blur(${cosmicGlass.blurPx.preferred}px);mask-image:linear-gradient(#000 calc(100% - 16px),transparent);-webkit-mask-image:linear-gradient(#000 calc(100% - 16px),transparent);pointer-events:none}
 #profileSheet .sheet-close:focus-visible{outline:2px solid ${colors.cyan};outline-offset:2px}
@@ -13,27 +13,29 @@ const PUBLIC_PROFILE_STYLE = `<style>
 .identity .profile-trigger{width:44px;height:44px;padding:0;display:grid;place-items:center;flex:0 0 44px}
 .identity .profile-trigger svg{display:block;width:20px;height:20px}
 #profileTitle{min-width:0;font-size:1.05rem;font-weight:650;line-height:1.3;overflow-wrap:anywhere}
-.profile-fields{display:grid;gap:20px;margin-block:24px}
-.profile-fields label{display:grid;gap:8px;font-size:.85rem;font-weight:600;color:${colors.ice}}
-.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:${layout.touchTargetDp}px;padding:10px 14px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;font-weight:450;color-scheme:dark}
+.profile-fields{display:grid;gap:12px;margin-block:12px}
+.profile-fields label{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);align-items:center;gap:12px;padding-block:4px;font-size:.875rem;line-height:1.45;font-weight:500;color:${colors.mist}}
+.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:${layout.touchTargetDp}px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;font-weight:500;color-scheme:dark}
 .profile-fields select:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px}
 .profile-fields option{background:${colors.surfaceRaised};color:${colors.ice}}
 @supports(appearance:base-select){.profile-fields select,.profile-fields select::picker(select){appearance:base-select}.profile-fields select::picker(select){max-width:calc(100vw - 32px);max-height:min(320px,50dvh);padding:6px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;box-shadow:0 18px 48px #0008}.profile-fields option{min-height:48px;padding:10px 12px;border-radius:9px;white-space:normal;overflow-wrap:anywhere}.profile-fields option:hover,.profile-fields option:focus{background:${colors.surface};color:${colors.ice}}.profile-fields option:focus{outline:none}.profile-fields option:focus-visible{outline:1px solid ${colors.cyan};outline-offset:-2px}.profile-fields option:checked{font-weight:650}.profile-fields option::checkmark{color:${colors.cyan}}.profile-fields select::picker-icon{content:"";width:7px;height:7px;flex:0 0 7px;margin-inline:auto 2px;border-right:1.5px solid ${colors.mist};border-bottom:1.5px solid ${colors.mist};transform:rotate(45deg)}.profile-fields select:open::picker-icon{transform:rotate(225deg)}}
-.profile-section{border:1px solid ${colors.hairline}70;border-radius:18px;margin-top:14px;padding:0 16px;background:${colors.surfaceRaised}66}
-.profile-section summary{display:grid;grid-template-columns:24px minmax(0,1fr) 12px;align-items:center;gap:12px;min-height:60px;padding:12px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:normal}
+.profile-section{border:0;border-bottom:1px solid ${colors.hairline}70;border-radius:0;margin-top:0;padding:0;background:transparent}
+.profile-section:last-child{border-bottom:0}
+.profile-section summary{display:grid;grid-template-columns:24px minmax(0,1fr) 12px;align-items:center;gap:12px;min-height:64px;padding:14px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:normal}
 .profile-section summary>.nxs-symbol{width:22px;height:22px;color:${colors.mist}}
 .profile-section summary::-webkit-details-marker{display:none}.profile-section summary::after{content:'';width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .17s ease}.profile-section[open] summary::after{transform:rotate(225deg)}
 .profile-section summary:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px;border-radius:8px}
-.profile-section .profile-fields{margin-block:12px 20px}
+.profile-section .profile-fields{margin-block:4px 12px}
 .profile-service-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:10px 0;font-size:.85rem;line-height:1.5;overflow-wrap:anywhere}.profile-service-row output{text-align:right;color:${colors.mist}}
 #profileSheet .profile-section p{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 .profile-confirm[hidden]{display:none}.profile-confirm{margin-top:12px;padding:12px;border:1px solid ${colors.hairline};border-radius:14px}
-.profile-section[open]{padding-bottom:16px}.profile-section[open] summary{margin-bottom:4px}
+.profile-section[open]{padding-bottom:18px}.profile-section[open] summary{margin-bottom:4px}
 #profileSheet[open]{animation:profile-reveal .2s cubic-bezier(.2,0,0,1)}
 @keyframes profile-reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@media(max-width:380px){.profile-section{padding-inline:12px}.profile-section summary{gap:8px}}
+@container nxs-profile (max-width:18rem){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}}
+@media(max-width:340px){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}.profile-section summary{gap:8px}}
 @media(prefers-reduced-motion:reduce){.profile-section summary::after{transition:none}#profileSheet[open]{animation:none}}
-.profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:16px}
+.profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:12px}
 #profileSheet .profile-note{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 </style>`;
 // #endregion
