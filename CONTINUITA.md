@@ -1,3 +1,24 @@
+# Verified release and settled visual QA — 24 October 2026
+
+Main1f4d8dc passed clean Windows/Linux CI40042620475, including runtime
+and tooling audits. Website08851f0 passed CI40042909190 and is deployed as
+Worker3e035638-242d-4dd1-9d7e-dd0ef4d16af7. Fourteen route/header checks,
+independent AI readiness, five profile/CSP layouts and four cached offline/
+reconnection layouts pass. Rollback remains available.
+
+A post-deployment QA race measured a translated 48px button as47.999996px.
+The profile verifier now awaits actual reveal animation completion before
+measuring settled hitboxes; the48px requirement is unchanged. Source gates
+pass1166 tests with3 explicit skips and zero failures. No product code or
+animation was changed for this verifier fix.
+
+Installed workstation Electron remains43.7.7 versus pinned43.8.3 and requires
+owner repair before Windows rebuilding. The latest backend query improvement
+is published in source but not loaded in the existing server process. Current
+physical Android completion, human microphone/echo checks, iOS device/build
+and commercial signing/reliability gates remain open. Synthetic recognition
+latency11.611s is not accepted as conversational performance.
+
 # Tooling advisory refresh — 24 October 2026
 
 The latest clean CI passed source/tests/runtime audit but detected newly

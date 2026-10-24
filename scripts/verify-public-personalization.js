@@ -62,7 +62,8 @@ async function main() {
       const geometry = await evaluateWhenReady(client, `new Promise(resolve=>{
         const trigger=document.querySelector('#profileSettings'),dialog=document.querySelector('#profileSheet');
         if(dialog.open)dialog.close(); trigger.click();
-        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        // Measure settled hitboxes: the reveal translation can introduce floating-point rect subtraction below 48px.
+        Promise.all(dialog.getAnimations().map(animation=>animation.finished.catch(()=>{}))).then(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
           const fields=document.querySelector('.profile-fields'),download=document.querySelector('#download'),
             rows=[...fields.querySelectorAll('label')],selects=[...fields.querySelectorAll('select')],box=dialog.getBoundingClientRect();
           const rect=node=>{const b=node.getBoundingClientRect();return {left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height}};
@@ -76,7 +77,7 @@ async function main() {
             downloadTextHidden:getComputedStyle(download.querySelector('span')).display==='none',
             sectionLabels:[...dialog.querySelectorAll('summary>span')].map(label=>({text:label.textContent,overflow:label.scrollWidth>label.clientWidth,wrap:getComputedStyle(label.parentElement).overflowWrap})),
             horizontalOverflow:box.left<0||box.right>innerWidth||dialog.scrollWidth>dialog.clientWidth,rows:rows.map(rect),box:rect(dialog)});
-        }));
+        })));
       })`);
       assert.equal(geometry.title, 'Impostazioni');
       assert.equal(geometry.layout, 'grid');
