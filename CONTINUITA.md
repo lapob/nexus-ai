@@ -1,3 +1,13 @@
+## Voice turn corrections prepared — 24 October 2026
+
+Canonical public UI synchronized from main: preserve detected/selected speech
+language for numeric answers; crop waiting silence with pre-roll/tail; reject
+overlong speech without truncated commands; suppress late audio after spoken
+or Core interruption. Duplex stays local opt-in pending human acceptance.
+No model, cloud setting or download target changed. Run the full release
+gate, exact-commit CI and candidate/production verification before promotion.
+Existing production b7892ef8 and rollback remain available.
+
 ## Adaptive settings promoted — 24 October 2026
 
 Website code6fe054da7fd8a6e8e74b1243c040517ec28937ab passed CI40076772235
