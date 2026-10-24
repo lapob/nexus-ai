@@ -1,3 +1,12 @@
+## Progressive voice candidate — 24 October 2026
+
+Canonical public UI synchronized from main8940d5e: progressive bounded audio,
+complete segment playback, cancellation of prefetched clips and explicit
+browser echo-cancellation admission. Duplex remains local opt-in pending
+physical microphone/speaker validation. Source check and45unit tests pass;
+full release gate and exact-commit CI must precede promotion. Preserve the
+current Worker1ebc5850 and rollback. No model or native installer change.
+
 ## Voice corrections deployed — 24 October 2026
 
 Code9dfe4241f5cc498923bd895a1c1aea58ca418026 passed CI40086306065
