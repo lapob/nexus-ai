@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 
@@ -61,6 +62,8 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     await page.locator('#profileSettings').click();
     await expect(page.locator('#profileSheet')).toBeVisible();
+    const settingsAudit = await new AxeBuilder({ page }).include('#profileSheet').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    expect(settingsAudit.violations).toEqual([]);
     await page.locator('#profileSheet .sheet-close').first().click();
     await page.locator('#keyboard').click();
     await expect(page.locator('#prompt')).toBeFocused();
@@ -74,6 +77,26 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     expect(errors).toEqual([]);
   });
 }
+
+test('AI settings preserve readable controls and reachable close at 200 percent text', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(origin);
+  await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await page.locator('#profileSettings').click();
+  const sheet = page.locator('#profileSheet');
+  await expect(sheet).toBeVisible();
+  const audit = await new AxeBuilder({ page }).include('#profileSheet').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(audit.violations).toEqual([]);
+  expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  for (const select of await sheet.locator('select').all()) {
+    expect((await select.boundingBox()).height).toBeGreaterThanOrEqual(48);
+  }
+  await sheet.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await sheet.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await expect(sheet).not.toBeVisible();
+  await expect(page.locator('#profileSettings')).toBeFocused();
+});
 
 test('reload restores a slow local conversation before revealing its controls', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

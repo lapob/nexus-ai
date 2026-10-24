@@ -1,3 +1,14 @@
+## Adaptive settings candidate — 24 October 2026
+
+Canonical AI settings shell synchronized from main source: one surface,
+compact preference rows, container-based enlarged-text adaptation, native
+pickers and the existing shared font/icons. No extra dependency or font added.
+Full local release gate passes45unit/32browser tests, including WCAG A/AA
+on the open settings dialog and reachable controls at200% text. Current
+production remains3e035638 until the candidate passes CI and promotion.
+Windows public downloads still reference the existing verified release;
+no new Windows installer is implied by this web update.
+
 ## Tooling patch promoted — 24 October 2026
 
 Website source 08851f001a20ff3fa73aaa29829991589d5657ca passed the full
