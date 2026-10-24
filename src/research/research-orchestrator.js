@@ -164,20 +164,29 @@ function enforcePublicCitationUrls(text, citations = []) {
 function ensurePublicCitation(text, citations = []) {
   const checked = enforcePublicCitationUrls(text, citations);
   if (!citations.length || checked.accepted > 0) return { ...checked, added: false };
-  const source = citations.find((candidate) => canonicalCitationUrl(candidate.url));
-  if (!source) return { ...checked, added: false };
-  const label = String(source.title || 'Fonte pubblica').replace(/[\[\]]/g, '').trim() || 'Fonte pubblica';
-  // Un'attribuzione finale non presente tra le fonti recuperate viene rimossa
-  // prima di allegare il riferimento reale; il contenuto non viene riscritto.
-  const withoutUnsupportedAttribution = checked.text.replace(
-    /,?\s*(?:come\s+(?:definito|riportato|spiegato)\s+da|secondo|according\s+to)\s+[^.,;\n]{1,120}(?:\([^)]{1,40}\))?\.?\s*$/iu,
-    ''
-  ).trim();
+  const sources = [];
+  const seen = new Set();
+  for (const source of citations) {
+    const url = canonicalCitationUrl(source.url);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const label = String(source.title || new URL(url).hostname).replace(/[\[\]\r\n]/g, ' ').trim();
+    sources.push(`- [${label}](${source.url})`);
+    if (sources.length === 6) break;
+  }
+  if (!sources.length) return { ...checked, added: false };
+  // La presenza di un risultato non dimostra che sostenga il testo generato.
+  // Dopo una correzione senza citazioni restituiamo solo i riferimenti trovati,
+  // senza attribuire arbitrariamente l'intera risposta alla prima fonte.
+  const introduction = researchLanguage(checked.text) === 'it'
+    ? 'Ho recuperato queste pagine, ma non posso confermare la risposta con citazioni puntuali:'
+    : 'I retrieved these pages, but could not confirm the answer with specific citations:';
   return {
     ...checked,
-    text: `${withoutUnsupportedAttribution}\n\nFonte: [${label}](${source.url})`,
+    text: `${introduction}\n\n${sources.join('\n')}`,
     changed: true,
-    added: true
+    added: true,
+    fallback: true
   };
 }
 

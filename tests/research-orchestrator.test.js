@@ -157,12 +157,27 @@ test('non pubblica URL inventati quando la ricerca non restituisce fonti', () =>
   assert.equal(result.rejected, 2);
 });
 
-test('aggiunge una fonte reale quando il modello omette il link', () => {
+test('un elenco di fonti non certifica una risposta che il modello non riesce a citare', () => {
   const result = ensurePublicCitation('Risposta verificata.', [{ title: 'Documento', url: 'https://example.com/docs' }]);
   assert.equal(result.added, true);
-  assert.match(result.text, /Fonte: \[Documento\]\(https:\/\/example\.com\/docs\)/);
+  assert.equal(result.fallback, true);
+  assert.match(result.text, /- \[Documento\]\(https:\/\/example\.com\/docs\)/);
+  assert.doesNotMatch(result.text, /Risposta verificata/);
   assert.equal(ensurePublicCitation('[Documento](https://example.com/docs)', [{ title: 'Documento', url: 'https://example.com/docs' }]).added, false);
   assert.doesNotMatch(ensurePublicCitation('Una definizione, come definito da IBM (2023).', [{ title: 'Documento', url: 'https://example.com/docs' }]).text, /IBM/);
+});
+
+test('il ripiego non attribuisce un editore nominato dal modello alla prima fonte', () => {
+  const result = ensurePublicCitation('La documentazione è disponibile sul sito Atlas. Ecco il link verificato:', [
+    { title: 'Una guida indipendente', url: 'https://example.com/tutorial' },
+    { title: 'Riferimento generale', url: 'https://reference.example/api' },
+    { title: 'Duplicato', url: 'https://example.com/tutorial#anchor' },
+    { title: 'Non valida', url: 'http://insecure.example/' }
+  ]);
+  assert.doesNotMatch(result.text, /Atlas|link verificato|Duplicato|insecure/);
+  assert.match(result.text, /non posso confermare/);
+  assert.match(result.text, /reference\.example\/api/);
+  assert.equal((result.text.match(/^- /gm) || []).length, 2);
 });
 
 test('normalizza le citazioni testuali senza duplicare la fonte', () => {

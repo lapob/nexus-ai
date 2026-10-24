@@ -1,11 +1,12 @@
 # Daily-use service reliability — 24 October 2026
 
-Source passes 1176 tests/3 skips/zero failures. Research now preserves successful
+Source passes 1177 tests/3 skips/zero failures. Research now preserves successful
 Deep-query results during a partial provider failure and uses shared bounded
 response streaming with body cancellation and timeout. The headless warm-up
 selects the gateway's dedicated neural engine instead of the desktop engine.
-Verify actual first synthesis after restarting the service before claiming
-that startup preparation is effective. No decoder/model change is included.
+The first public synthesis after restart takes1431ms for4.45s of synthetic
+audio; exact transcription takes1033ms. Startup readiness takes85s in this
+sample. No decoder/model change or admission-control reduction is included.
 
 Fresh synthetic recognition measurements are837ms local and1047/984ms public;
 these are samples, not human speech acceptance or a percentile benchmark.
@@ -18,6 +19,12 @@ from this source-only update; do not retry previously rejected operations.
 Full isolated motion passes three cores and full/reduced interactions. Shared
 SLO/Founder validation rejects incomplete, failed or malformed motion evidence;
 the runner invalidates the previous green report before starting a new run.
+
+The live research probe reproduces a mismatched attribution. When the model
+cannot cite a retrieved page, the fallback now shows only a neutral list of
+the retrieved pages, without attesting an unsupported answer. Recheck the
+exact public probe after applying this last source change. Semantic grounding
+and general model-quality admission still require further measured work.
 
 # Startup recovery and refined settings — 24 October 2026
 

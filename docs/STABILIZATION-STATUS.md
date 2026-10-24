@@ -1,6 +1,6 @@
 # Daily-use reliability — 24 October 2026
 
-Current source passes 1176 tests with 3 skips and zero failures. Deep research
+Current source passes 1177 tests with 3 skips and zero failures. Deep research
 retains successful sources when another query fails; cancellation still
 invalidates partial results. Research responses reuse bounded streaming
 ingestion, including body timeout and cancellation, instead of allocating
@@ -8,7 +8,9 @@ an entire remote response before checking its size.
 
 The headless voice warm-up now targets the dedicated gateway synthesizer.
 Warming the independent desktop engine did not prepare the first public
-voice request. Live confirmation after service restart is still required.
+voice request. The first public synthesis after restart produces 4.45s of
+synthetic audio in1431ms; its transcription takes1033ms and is exact. The
+service becomes ready in85s in this run, without reducing admission controls.
 The unchanged recognizer correctly transcribes the same synthetic phrase
 locally in837ms and publicly in1047/984ms in fresh measurements. The earlier
 11.375s sample is not a constant latency or evidence for changing decoders;
@@ -26,6 +28,13 @@ interaction modes. A prior missing neural screenshot did not recur; its cause
 is unproven. Motion release evidence now requires the complete successful
 report, all three distinct cores, both interaction modes and finite metrics.
 A new run invalidates an old green report before launching any renderer.
+
+A daily-use research probe reproduces an unsupported attribution: the model
+names one publisher while the final fallback appends another retrieved page.
+The fallback now returns a neutral, bounded list of retrieved pages when the
+answer has no valid citations, instead of presenting the first page as proof.
+Already cited answers remain unchanged. This does not establish semantic
+correctness of every cited claim or admit the model's general quality.
 
 # Recovery and visual refinement — 24 October 2026
 

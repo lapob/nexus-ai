@@ -3,10 +3,12 @@
 ## Uso quotidiano: stato verificato del 24 ottobre
 
 Ricerca Deep resistente ai guasti parziali, lettura streaming limitata e target
-del preriscaldamento vocale corretti nei sorgenti. Suite 1176 PASS/3 SKIP;
+del preriscaldamento vocale corretti nei sorgenti. Suite 1177 PASS/3 SKIP;
 offline e sessioni vocali simulate passano quattro formati. I tre Core e le
 interazioni full/reduced passano il collaudo isolato. I gate di rilascio ora
 rifiutano prove motion incomplete, anche se le singole misure presenti passano.
+Il ripiego della ricerca non associa più la prima pagina recuperata a una
+risposta priva di citazioni: mostra le pagine trovate e dichiara il limite.
 
 La scheda ufficiale [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B)
 descrive un candidato recente, non una promozione per questo hardware. Il
