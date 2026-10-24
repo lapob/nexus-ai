@@ -97,6 +97,47 @@ test('ricerca approfondita esegue due query e conserva data e filtro delle citaz
   assert.equal(researchTimeRange('ultimo anno'), 'year');
 });
 
+test('ricerca deep conserva le fonti riuscite se una query fallisce anche sincronicamente', async () => {
+  for (const failedQuery of [1, 2]) {
+    let calls = 0;
+    const result = await researchQuestion({ question: 'Cerca informazioni sul telescopio Webb', mode: 'deep', service: { search(query) {
+      calls += 1;
+      if (calls === failedQuery) throw new Error('Provider temporaneamente offline');
+      return Promise.resolve({ provider: 'searxng', results: [{ title: 'Webb', url: 'https://example.com/webb', snippet: 'Risultato recuperato', sourceKind: 'web' }] });
+    } } });
+    assert.equal(calls, 2);
+    assert.equal(result.partial, true);
+    assert.equal(result.unavailable, false);
+    assert.equal(result.provider, 'searxng');
+    assert.deepEqual(result.citations.map(source => source.url), ['https://example.com/webb']);
+  }
+});
+
+test('ricerca deep distingue il guasto totale da una risposta vuota', async () => {
+  const failed = await researchQuestion({ question: 'Cerca informazioni sul telescopio Webb', mode: 'deep', service: { search: async () => { throw new Error('offline'); } } });
+  assert.equal(failed.unavailable, true);
+  assert.equal(failed.emptyResults, false);
+  assert.deepEqual(failed.citations, []);
+  let calls = 0;
+  const empty = await researchQuestion({ question: 'Cerca informazioni sul telescopio Webb', mode: 'deep', service: { search: async () => {
+    if (++calls === 1) throw new Error('offline');
+    return { provider: 'searxng', results: [] };
+  } } });
+  assert.equal(empty.partial, true);
+  assert.equal(empty.unavailable, true);
+  assert.equal(empty.emptyResults, true);
+});
+
+test('lo stop invalida anche le fonti completate durante una ricerca deep parziale', async () => {
+  const controller = new AbortController();
+  const reason = new Error('stop utente');
+  let calls = 0;
+  await assert.rejects(researchQuestion({ question: 'Cerca informazioni sul telescopio Webb', mode: 'deep', signal: controller.signal, service: { search: async () => {
+    if (++calls === 2) { controller.abort(reason); throw reason; }
+    return { provider: 'searxng', results: [{ title: 'Webb', url: 'https://example.com/webb', snippet: 'Dato', sourceKind: 'web' }] };
+  } } }), error => error === reason);
+});
+
 test('mantiene soltanto URL realmente restituiti dal provider', () => {
   const result = enforcePublicCitationUrls(
     'Vedi [fonte valida](https://example.com/a#section) e [fonte inventata](https://evil.example/x).',

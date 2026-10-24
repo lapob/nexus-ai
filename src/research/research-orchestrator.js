@@ -190,13 +190,19 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
   if (policy.level === 'none') return { policy, sources: [], citations: [], searched: false, unavailable: false, provider: 'off' };
   const queries = deriveResearchQueries(question, policy.maxQueries);
   try {
-    const batches = await Promise.all(queries.map((query) => service.search(query, {
+    const outcomes = await Promise.allSettled(queries.map((query) => Promise.resolve().then(() => service.search(query, {
       limit: Math.max(2, Math.ceil(policy.maxResults / queries.length)),
       language: softwareReleaseQuery(publicQuerySeed(question)) ? 'en' : language,
       signal,
       freshOnly: policy.reason === 'time-sensitive',
       timeRange: researchTimeRange(question)
-    })));
+    }))));
+    // Una query secondaria non deve cancellare le fonti della prima. Lo stop
+    // dell'utente, invece, invalida anche un risultato arrivato nel frattempo.
+    if (signal?.aborted) throw signal.reason || new Error('Ricerca annullata.');
+    const batches = outcomes.filter((outcome) => outcome.status === 'fulfilled').map((outcome) => outcome.value);
+    const failures = outcomes.filter((outcome) => outcome.status === 'rejected');
+    if (!batches.length && failures.length) throw failures[0].reason;
     const sources = deduplicateSources(batches.map((batch) => batch.results), policy.maxResults);
     return {
       policy,
@@ -206,6 +212,7 @@ async function researchQuestion({ question, mode = 'fast', hasAttachment = false
       searched: true,
       unavailable: sources.length === 0,
       emptyResults: sources.length === 0,
+      partial: failures.length > 0,
       provider: batches.find((batch) => batch.provider)?.provider || 'off'
     };
   } catch (error) {

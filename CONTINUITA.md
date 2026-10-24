@@ -1,3 +1,24 @@
+# Daily-use service reliability — 24 October 2026
+
+Source passes 1176 tests/3 skips/zero failures. Research now preserves successful
+Deep-query results during a partial provider failure and uses shared bounded
+response streaming with body cancellation and timeout. The headless warm-up
+selects the gateway's dedicated neural engine instead of the desktop engine.
+Verify actual first synthesis after restarting the service before claiming
+that startup preparation is effective. No decoder/model change is included.
+
+Fresh synthetic recognition measurements are837ms local and1047/984ms public;
+these are samples, not human speech acceptance or a percentile benchmark.
+Backup recovery on application stores passes with synthetic records. Knowledge
+provenance/duplicate checks and ASVS evidence mapping pass within their scope.
+Signing, model admission, human voice, iOS and sustained availability remain
+unresolved. Windows artifact creation and old-installer cleanup stay excluded
+from this source-only update; do not retry previously rejected operations.
+
+Full isolated motion passes three cores and full/reduced interactions. Shared
+SLO/Founder validation rejects incomplete, failed or malformed motion evidence;
+the runner invalidates the previous green report before starting a new run.
+
 # Startup recovery and refined settings — 24 October 2026
 
 Source checks pass1169 tests,3 explicit skips and zero failures. Installed

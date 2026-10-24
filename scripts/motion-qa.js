@@ -471,6 +471,9 @@ async function measureInteraction(motion) {
 // #region 04 - Gate e report
 
 (async () => {
+  // Un crash non deve lasciare riutilizzabile il vecchio report verde.
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, JSON.stringify({ generatedAt: new Date().toISOString(), passed: false, cores: [], interactions: [] }));
   const cores = [];
   if (!process.argv.includes('--interactions-only')) {
     for (const view of Object.keys(coreAppearances)) {

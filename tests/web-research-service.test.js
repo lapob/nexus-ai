@@ -3,13 +3,30 @@ const assert = require('node:assert/strict');
 const { WebResearchService, safeProviderEndpoint, safePublicUrl, safeSelfHostedEndpoint } = require('../src/research/web-research-service');
 
 function jsonResponse(payload, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: { get: () => 'application/json; charset=utf-8' },
-    text: async () => JSON.stringify(payload)
-  };
+  return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
+
+test('interrompe il flusso troppo grande prima di consumare tutta la risposta', async () => {
+  let reads = 0;
+  let cancelled = false;
+  const service = new WebResearchService({ fetchImpl: async () => new Response(new ReadableStream({
+    pull(controller) { reads += 1; controller.enqueue(new Uint8Array(600_000)); },
+    cancel() { cancelled = true; }
+  }), { headers: { 'Content-Type': 'application/json' } }) });
+  await assert.rejects(service.requestJson('https://example.com/search'), /troppo grande/);
+  assert.equal(cancelled, true);
+  assert.ok(reads <= 3, 'il provider non deve essere consumato senza limite');
+});
+
+test('il timeout interrompe anche un body JSON che non termina', async () => {
+  let cancelled = false;
+  const service = new WebResearchService({ timeoutMs: 800, fetchImpl: async () => new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode('{')); },
+    cancel() { cancelled = true; }
+  }), { headers: { 'Content-Type': 'application/json' } }) });
+  await assert.rejects(service.requestJson('https://example.com/search'), /Timeout ricerca web/);
+  assert.equal(cancelled, true);
+});
 
 test('la versione stabile usa metadati del repository recuperato e cita la release diretta', async () => {
   const calls = [];

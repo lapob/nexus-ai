@@ -4,6 +4,7 @@
  */
 
 const { createHash } = require('node:crypto');
+const { boundedResponseText } = require('../security/bounded-response');
 
 // #region 01 — Normalizzazione e cancellazione
 
@@ -151,8 +152,7 @@ class WebResearchService {
       if (!response.ok) throw new Error(`Ricerca web non disponibile (${response.status}).`);
       const contentType = String(response.headers?.get?.('content-type') || '');
       if (contentType && !/json/i.test(contentType)) throw new Error('Il provider di ricerca non ha restituito JSON.');
-      const raw = await response.text();
-      if (Buffer.byteLength(raw, 'utf8') > MAX_RESPONSE_BYTES) throw new Error('Risposta del provider di ricerca troppo grande.');
+      const raw = await boundedResponseText(response, MAX_RESPONSE_BYTES, 'Risposta del provider di ricerca', controller.signal);
       return JSON.parse(raw);
     } finally {
       clearTimeout(timer);

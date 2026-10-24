@@ -862,7 +862,9 @@ function bootstrapElectron({ env = process.env } = {}) {
       // secondi su questa workstation) al primo utente. Solo il profilo Lite
       // conserva il fallback senza runtime neurale residente.
       speechWarmup = hardwareProfile.tier === 'lite' ? null : scheduleIdleTask(() => {
-        neuralSpeechService.warmUp();
+        // Il gateway ha un motore dedicato: preparare quello desktop lasciava
+        // comunque al primo utente web l'intero caricamento della voce.
+        (headlessMode ? remoteNeuralSpeech : neuralSpeechService).warmUp();
       }, speechWarmupDelay, { idleSeconds: 1, retryMs: 1_000, maxWaitMs: 30_000 });
 
       // Il confronto usa solo percorso, dimensione e mtime: una cache invariata

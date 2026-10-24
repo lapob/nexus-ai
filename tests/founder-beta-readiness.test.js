@@ -31,9 +31,22 @@ function fixture() {
     dataClass: 'synthetic-only', restoredFiles: 4, passed: true, snapshotIntegrity: true, encryptedArchiveRoundTrip: true,
     applicationStoresRoundTrip: true, liveWalSnapshot: true, artifactRevisionsPreserved: true, memoryExpiryAndProvenancePreserved: true });
   write('qa-artifacts/ai-eval-lab-gate.json', { generatedAt: new Date(now).toISOString(), gatePassed: true, models: [{ summary: { mustPassFailures: [] } }] });
-  write('qa-artifacts/desktop-motion-qa.json', { generatedAt: new Date(now).toISOString(), cores: [{ failures: [] }] });
+  write('qa-artifacts/desktop-motion-qa.json', { generatedAt: new Date(now).toISOString(), passed: true,
+    cores: ['saturn', 'jarvis', 'neural'].map(view => ({ view, p95Ms: 8, slowFrameRatio: 0, failures: [] })),
+    interactions: ['full', 'reduced'].map(motion => ({ motion, surfaces: { composerFrameP95Ms: 8 }, failures: [] })) });
   return { projectRoot, write, now };
 }
+
+test('la Founder Beta rifiuta un report motion parziale anche se i Core presenti passano', () => {
+  const item = fixture();
+  try {
+    item.write('qa-artifacts/desktop-motion-qa.json', { generatedAt: new Date(item.now).toISOString(), passed: true,
+      cores: [{ view: 'saturn', p95Ms: 8, slowFrameRatio: 0, failures: [] }], interactions: [] });
+    const report = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
+    assert.equal(report.checks.find(entry => entry.id === 'desktop-motion').status, 'blocked');
+    assert.equal(report.technicalPreviewReady, false);
+  } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
+});
 
 test('la Preview tecnica non finge che firma e dispositivi reali siano gia pronti', () => {
   const item = fixture();

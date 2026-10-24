@@ -1,3 +1,32 @@
+# Daily-use reliability — 24 October 2026
+
+Current source passes 1176 tests with 3 skips and zero failures. Deep research
+retains successful sources when another query fails; cancellation still
+invalidates partial results. Research responses reuse bounded streaming
+ingestion, including body timeout and cancellation, instead of allocating
+an entire remote response before checking its size.
+
+The headless voice warm-up now targets the dedicated gateway synthesizer.
+Warming the independent desktop engine did not prepare the first public
+voice request. Live confirmation after service restart is still required.
+The unchanged recognizer correctly transcribes the same synthetic phrase
+locally in837ms and publicly in1047/984ms in fresh measurements. The earlier
+11.375s sample is not a constant latency or evidence for changing decoders;
+human speech, echo, interruption and concurrency still need acceptance tests.
+
+Backup recovery passes on the actual application store implementations using
+synthetic data. Knowledge governance finds provenance for all indexed notes
+and no internal duplicates; this is not factual validation of every note.
+The ASVS evidence map is consistent, not external security certification.
+Production signing/update credentials, model quality admission, iOS and a
+measured availability window remain open. No model or training is promoted.
+
+The isolated desktop motion run passes all three cores and both full/reduced
+interaction modes. A prior missing neural screenshot did not recur; its cause
+is unproven. Motion release evidence now requires the complete successful
+report, all three distinct cores, both interaction modes and finite metrics.
+A new run invalidates an old green report before launching any renderer.
+
 # Recovery and visual refinement — 24 October 2026
 
 Current source passes1169 tests/3 skips/zero failures, installed Electron43.8.3

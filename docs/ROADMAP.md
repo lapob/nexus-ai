@@ -1,5 +1,26 @@
 # Roadmap tecnica
 
+## Uso quotidiano: stato verificato del 24 ottobre
+
+Ricerca Deep resistente ai guasti parziali, lettura streaming limitata e target
+del preriscaldamento vocale corretti nei sorgenti. Suite 1176 PASS/3 SKIP;
+offline e sessioni vocali simulate passano quattro formati. I tre Core e le
+interazioni full/reduced passano il collaudo isolato. I gate di rilascio ora
+rifiutano prove motion incomplete, anche se le singole misure presenti passano.
+
+La scheda ufficiale [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B)
+descrive un candidato recente, non una promozione per questo hardware. Il
+quantizzato Q4_K_S verificato nei metadati pesa circa 15,36 GB, prima di cache,
+contesto e runtime: non presumere che rientri interamente in 16 GB di VRAM.
+La baseline resta attiva; confronto isolato, ammissione runtime e tutti i casi
+obbligatori precedono qualsiasi sostituzione. Il dataset ha zero esempi
+approvati: non addestrare da chat, knowledge o voti senza revisione autorizzata.
+
+Restano aperti voce umana/eco, avvio ricerca prima del login, modello ammesso,
+integrazioni MCP/n8n realmente eseguite e revocabili, distribuzione firmata,
+iOS e disponibilità misurata. Memoria/artefatti non hanno ancora parità completa
+fra tutti i client. Conservare locale come predefinito e cloud disattivato.
+
 ## Assistente operativo quotidiano — verifica del 23 ottobre
 
 L'obiettivo Jarvis è un flusso verificabile: contesto, piano, strumenti,

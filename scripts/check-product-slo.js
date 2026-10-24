@@ -19,6 +19,20 @@ function result(id, status, observed, target, releaseBlocking = true) {
   return { id, status, observed, target, releaseBlocking };
 }
 
+function validDesktopMotionReport(report, limits = {}) {
+  if (report?.passed !== true || !Number.isFinite(Date.parse(report.generatedAt))
+    || !Array.isArray(report.cores) || report.cores.length !== 3
+    || !Array.isArray(report.interactions) || report.interactions.length !== 2) return false;
+  const clean = entry => Array.isArray(entry?.failures) && entry.failures.length === 0;
+  const frameWithinBudget = value => Number.isFinite(value) && value > 0 && value <= (limits.maximumFrameP95Ms ?? Infinity);
+  return ['saturn', 'jarvis', 'neural'].every(view => report.cores.filter(core => core?.view === view).length === 1)
+    && report.cores.every(core => clean(core) && frameWithinBudget(core.p95Ms)
+      && Number.isFinite(core.slowFrameRatio) && core.slowFrameRatio >= 0
+      && core.slowFrameRatio <= (limits.maximumSlowFrameRatio ?? 1))
+    && ['full', 'reduced'].every(motion => report.interactions.filter(item => item?.motion === motion).length === 1)
+    && report.interactions.every(item => clean(item) && frameWithinBudget(item.surfaces?.composerFrameP95Ms));
+}
+
 function measuredLabModels(lab, windowDays) {
   if (!Array.isArray(lab?.models) || lab.models.length === 0) return [];
   const { suite } = loadSuite(path.join(root, 'config/evals/nexusnxs-core-v1.json'));
@@ -107,9 +121,7 @@ function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifac
 
   const motion = readJson(path.join(artifactsRoot, 'desktop-motion-qa.json'));
   const cores = Array.isArray(motion?.cores) ? motion.cores : [];
-  const motionOk = cores.length > 0 && cores.every((entry) => Number(entry.p95Ms) <= objectives.desktopMotion.maximumFrameP95Ms
-    && Number(entry.slowFrameRatio) <= objectives.desktopMotion.maximumSlowFrameRatio
-    && (entry.failures || []).length === 0);
+  const motionOk = validDesktopMotionReport(motion, objectives.desktopMotion);
   checks.push(motion
     ? result('desktop-motion', motionOk ? 'pass' : 'fail', { cores: cores.map((entry) => ({ view: entry.view, p95Ms: entry.p95Ms, slowFrameRatio: entry.slowFrameRatio, failures: (entry.failures || []).length })) }, objectives.desktopMotion)
     : result('desktop-motion', 'not-measured', null, objectives.desktopMotion));
@@ -207,6 +219,6 @@ async function main() {
 
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1; });
 
-module.exports = { buildReport, evaluateArtifacts, evaluateReadiness, readJson };
+module.exports = { buildReport, evaluateArtifacts, evaluateReadiness, readJson, validDesktopMotionReport };
 
 // #endregion

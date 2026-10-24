@@ -7,7 +7,34 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { buildReport, evaluateArtifacts, evaluateReadiness } = require('../scripts/check-product-slo');
+const { buildReport, evaluateArtifacts, evaluateReadiness, validDesktopMotionReport } = require('../scripts/check-product-slo');
+
+function motionReport() {
+  return { generatedAt: new Date().toISOString(), passed: true,
+    cores: ['saturn', 'jarvis', 'neural'].map(view => ({ view, p95Ms: 8.4, slowFrameRatio: 0, failures: [] })),
+    interactions: ['full', 'reduced'].map(motion => ({ motion, surfaces: { composerFrameP95Ms: 8.4 }, failures: [] })) };
+}
+
+test('il gate motion rifiuta prove parziali, fallite o con misure mancanti', () => {
+  const limits = { maximumFrameP95Ms: 16.7, maximumSlowFrameRatio: 0.02 };
+  assert.equal(validDesktopMotionReport(motionReport(), limits), true);
+  for (const invalidate of [
+    report => { report.passed = false; },
+    report => { report.generatedAt = ''; },
+    report => { report.cores.pop(); },
+    report => { report.cores[2].view = 'saturn'; },
+    report => { report.interactions.pop(); },
+    report => { report.interactions[1].motion = 'full'; },
+    report => { report.interactions[0].failures.push('overlay fuori viewport'); },
+    report => { report.cores[0].p95Ms = null; },
+    report => { report.cores[0].p95Ms = 20; },
+    report => { report.cores[0].slowFrameRatio = -1; },
+    report => { report.interactions[0].surfaces.composerFrameP95Ms = 20; }
+  ]) {
+    const report = motionReport(); invalidate(report);
+    assert.equal(validDesktopMotionReport(report, limits), false);
+  }
+});
 const { inspectControls } = require('../scripts/check-asvs-controls');
 const { inspectPolicy, parseHujson } = require('../scripts/check-tailscale-policy');
 const { loadSuite, buildModelReport, buildReport: buildLabReport } = require('../scripts/run-ai-eval-lab');
@@ -58,7 +85,7 @@ test('la policy SLO distingue prove conformi dalla disponibilita non misurata', 
     writeJson('ai-eval-lab-gate.json', measuredLabReport());
     writeJson('local-voice-evaluation.json', { backend: 'fixture', coldStartMs: 1200, warmMedianMs: 420 });
     writeJson('gateway-load-test.json', { clients: 20, p95LatencyMs: 180, passed: true });
-    writeJson('desktop-motion-qa.json', { cores: [{ view: 'fixture', p95Ms: 8.4, slowFrameRatio: 0, failures: [] }] });
+    writeJson('desktop-motion-qa.json', motionReport());
     for (const file of [
       'android/NexusRemote/app/src/main/baseline-prof.txt',
       'android/NexusConsole/app/src/main/baseline-prof.txt'
