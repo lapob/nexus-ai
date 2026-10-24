@@ -135,3 +135,13 @@ test('stop desktop e sintetizzatore guest dedicato rimangono indipendenti', asyn
   desktop.stop(); await rejected;
   assert.equal(remote.stops, 0); remote.finish(); await guest; queue.shutdown();
 });
+
+test('a streamed multi-segment answer holds one owner slot and cancellation prevents subsequent inference',async()=>{
+  const neural=controlledEngine(),expressive=controlledEngine(),queue=new RemoteSpeechQueue({neural,expressive});const controller=new AbortController(),chunks=[];
+  const first=queue.synthesize({owner:'first',text:'Un segmento completo. '.repeat(40),signal:controller.signal,onChunk:async(result,index)=>chunks.push(index)});
+  const rejected=assert.rejects(first,{code:'VOICE_CANCELLED'});
+  const second=queue.synthesize({owner:'second',text:'Segue'});
+  neural.finish();await tick();assert.deepEqual(chunks,[0]);assert.equal(neural.calls.length,2);assert.notEqual(neural.calls[1].text,'Segue');
+  controller.abort();await rejected;await tick();assert.equal(expressive.calls.length,0);
+  assert.equal(neural.calls.at(-1).text,'Segue');neural.finish();await second;assert.deepEqual(chunks,[0]);queue.shutdown();
+});

@@ -4,6 +4,7 @@
  */
 
 const LANGUAGE_PATTERN = /^[a-z]{2}(?:-[A-Z]{2})?$/;
+const { synthesizeSpeechSegments } = require('./speech-segments');
 // #region 01 — Local conversation ownership
 
 function primaryLanguage(value = 'it') {
@@ -49,7 +50,9 @@ class SpeechArbiter {
     // proprietaria finché un nuovo speak/stop non la sostituisce.
     this.generation = generation;
     const service = this.select(engine, normalizedLanguage);
-    const result = await service.synthesize({ ...options, language: normalizedLanguage });
+    const result = await synthesizeSpeechSegments({ text: options.text,
+      synthesize: text => service.synthesize({ ...options, text, language: normalizedLanguage }),
+      cancelled: () => this.generation !== generation });
     if (this.generation !== generation) {
       const error = new Error('Sintesi vocale sostituita da una richiesta più recente.');
       error.code = 'VOICE_CANCELLED';
@@ -126,14 +129,18 @@ class RemoteSpeechQueue {
   async run(job) {
     const language = primaryLanguage(job.options.language);
     const service = this.arbiter.select('neural', language);
-    try {
-      return await service.synthesize({ ...job.options, language });
-    } catch (error) {
-      if (job.cancelled || this.disposed) throw this.cancelled();
-      const fallback = this.arbiter.engines.expressive;
-      if (service === fallback || !this.arbiter.supports('expressive', language)) throw error;
-      return fallback.synthesize({ ...job.options, language });
-    }
+    return synthesizeSpeechSegments({ text: job.options.text, onChunk: job.options.onChunk,
+      cancelled: () => job.cancelled || this.disposed,
+      synthesize: async text => {
+        try { return await service.synthesize({ ...job.options, text, language }); }
+        catch (error) {
+          if (job.cancelled || this.disposed) throw this.cancelled();
+          const fallback = this.arbiter.engines.expressive;
+          if (service === fallback || !this.arbiter.supports('expressive', language)) throw error;
+          return fallback.synthesize({ ...job.options, text, language });
+        }
+      }
+    });
   }
 
   shutdown() {

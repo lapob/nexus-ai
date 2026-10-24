@@ -1,3 +1,26 @@
+# Progressive speech and duplex admission — 24 October 2026
+
+Human feedback confirms Italian output but identifies touch-only mode in the
+failed interruption trial. This does not validate spoken interruption or
+the isolated recognizer candidate. Production duplex remains gated.
+
+Shared speech arbitration now splits complete requests into bounded engine
+segments, retaining one owner slot and cancellation across every segment.
+Legacy clients receive a combined PCM WAV; the browser negotiates progressive
+NDJSON audio and clears queued segments on interruption. Text above4000
+characters is rejected visibly, not silently shortened; quotas scale with
+text length. Individual workers keep their520-character input limit.
+
+Duplex accepts actual boolean/all echo cancellation and requests all only
+when advertised by the track. WebRTC-only echo cancellation does not qualify
+for local playback. Recorder failures stop output, and browser audio resume
+has a bounded wait.
+
+Source suite1208PASS/3SKIP and focused119PASS. Real isolated Chromium
+recorder/decoder/playback confirms synthetic barge-in, cancellation of queued
+audio and the next turn. This does not test physical microphone/speaker echo,
+model quality, or speech-to-speech generation. No model promotion or training.
+
 # Voice corrections and recoverable local tasks — 24 October 2026
 
 A real human voice test failed language/recognition acceptance. Browser capture

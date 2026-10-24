@@ -248,8 +248,9 @@ class NeuralSpeechService {
 
   async synthesize({ text, gender = 'male', language = 'it', delivery = 'neutral' } = {}) {
     if (this.disposed) throw new Error('Sintesi neurale terminata.');
-    const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 520);
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
     if (!clean) throw new Error('Testo vocale mancante.');
+    if (clean.length > 520) throw new Error('Segmento vocale troppo lungo.');
     const safeDelivery = ['neutral', 'warm', 'calm', 'serious', 'energetic'].includes(delivery) ? delivery : 'neutral';
     const signature = `${language}\u0000${gender}\u0000${safeDelivery}\u0000${clean}`;
     const cached = this.audioCache.get(signature);

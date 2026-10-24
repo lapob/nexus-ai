@@ -8,6 +8,12 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   let active = false, epoch = 0, stream = null, recorder = null;
   let controller = null, finishCapture = null, finishPlayback = null;
   let pendingCapture = null, playbackActive = false, responseInterrupted = false;
+  const echoMode = () => stream?.getAudioTracks()[0]?.getSettings?.().echoCancellation;
+  const canInterruptBySpeech = () => duplex && [true, 'all'].includes(echoMode());
+  const updateMode = () => {
+    runtime.voiceMode = canInterruptBySpeech() ? 'duplex' : 'turns';
+    document.body.dataset.voiceMode = runtime.voiceMode;
+  };
   let savedDraft = ''; const background = new Map();
   const controls = document.createElement('div');
   controls.className = 'voice-session-controls'; controls.hidden = true;
@@ -37,6 +43,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     controller?.abort(); finishCapture?.(); finishPlayback?.();
     stream?.getTracks().forEach(track => track.stop()); stream = null;
     pendingCapture = null; playbackActive = false;
+    runtime.voiceMode = 'off'; delete document.body.dataset.voiceMode;
     runtime.voiceEnergy = 0;
   };
   function leave({ focus = true } = {}) {
@@ -59,6 +66,15 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   document.addEventListener('visibilitychange', () => { if (document.hidden) leave({ focus: false }); });
   addEventListener('pagehide', () => leave({ focus: false }));
   const valid = id => active && id === epoch && !controller.signal.aborted;
+  const startConcurrentCapture = id => {
+    if (pendingCapture) return;
+    pendingCapture = capture(id, true).then(value => value || { blob: null }, error => {
+      responseInterrupted = true;
+      const wasPlaying = playbackActive; finishPlayback?.();
+      if (!wasPlaying && isBusy()) cancelResponse();
+      return { error };
+    });
+  };
   async function capture(id, duringPlayback = false) {
     const Engine = globalThis.AudioContext || globalThis.webkitAudioContext;
     const context = new Engine(), source = context.createMediaStreamSource(stream), analyser = context.createAnalyser();
@@ -69,7 +85,10 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     const current = new MediaRecorder(stream, { audioBitsPerSecond: 64000 }); recorder = current;
     const stop = () => { if (current.state === 'recording') current.stop(); };
     try {
-      await context.resume();
+      await Promise.race([context.resume(), new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(copy('Leva il blocco audio del browser e tocca il Core per riprovare.', 'Allow browser audio and tap the Core to retry.'))), 5000);
+      })]);
+      clearTimeout(timer);
       if (!valid(id)) return null;
       return await new Promise((resolve, reject) => {
         finishCapture = stop;
@@ -83,6 +102,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
         started = last = performance.now();
         current.start(250);
         if (!duringPlayback) state('listening', copy('Ti ascolto', 'Listening'));
+        else if (playbackActive) state('speaking', copy('Puoi interrompermi parlando', 'You can interrupt me by speaking'));
         const sample = now => {
           if (!valid(id) || current.state !== 'recording') return;
           const dt = Math.min(80, now - last); last = now;
@@ -135,29 +155,80 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     finishPlayback = cancel;
     sessionSignal.addEventListener('abort', cancel, { once: true });
     try {
-      const canDuplex = duplex && stream?.getAudioTracks()[0]?.getSettings().echoCancellation === true;
+      const canDuplex = canInterruptBySpeech();
       state('thinking', copy('Preparo la voce · tocca il Core per interrompere', 'Preparing audio · tap the Core to interrupt'));
       const tone = getPreferences().tone;
       const delivery = tone === 'warm' ? 'warm' : tone === 'direct' ? 'serious' : 'neutral';
-      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: preferredLanguage() || capturedLanguage || spokenLanguage(text), delivery }) });
+      if (String(text).length > 4000) throw new Error(copy('La risposta è troppo lunga per la voce. Puoi leggerla integralmente nella chat.', 'This answer is too long for speech. The complete answer is available in chat.'));
+      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }, body: JSON.stringify({ text, language: preferredLanguage() || capturedLanguage || spokenLanguage(text), delivery }) });
       if (!valid(id) || synthesis.signal.aborted) return;
       if (!response.ok) throw new Error(copy('Audio non disponibile. La risposta resta nella chat.', 'Audio unavailable. Your answer remains in chat.'));
-      const blob = await response.blob(); if (!valid(id) || synthesis.signal.aborted) return;
-      url = URL.createObjectURL(blob); current = new Audio(url);
-      await new Promise((resolve, reject) => {
+      const play = async blob => {
+        if (!valid(id) || synthesis.signal.aborted) return;
+        url = URL.createObjectURL(blob); current = new Audio(url);
+        try { await new Promise((resolve, reject) => {
         settlePlayback = resolve;
         current.onended = () => { playbackActive = false; resolve(); }; current.onerror = () => reject(new Error(copy('Riproduzione audio non riuscita.', 'Audio playback failed.')));
         current.play().then(() => {
           if (!valid(id) || synthesis.signal.aborted) { current.pause(); resolve(); return; }
           playbackActive = true;
-          state('speaking', canDuplex ? copy('Puoi interrompermi parlando', 'You can interrupt me by speaking') : copy('NexusNXS parla · tocca il Core per interrompere', 'NexusNXS is speaking · tap the Core to interrupt'));
+          state('speaking', canDuplex && recorder?.state === 'recording' ? copy('Puoi interrompermi parlando', 'You can interrupt me by speaking') : copy('NexusNXS parla · tocca il Core per interrompere', 'NexusNXS is speaking · tap the Core to interrupt'));
           if (canDuplex && !pendingCapture) {
             // Retain the whole utterance, including its beginning during playback.
             // Catch immediately: the conversational loop consumes the outcome later.
-            pendingCapture = capture(id, true).then(value => value || { blob: null }, error => ({ error }));
+            startConcurrentCapture(id);
           }
         }).catch(reject);
-      });
+        }); } finally { current?.pause(); current = null; if (url) URL.revokeObjectURL(url); url = ''; }
+      };
+      if (response.headers?.get('content-type')?.startsWith('application/x-ndjson')) {
+        const reader = response.body.getReader(), decoder = new TextDecoder();
+        const queue = []; let done = false, failure = null, wake = null, bytes = 0, wireBytes = 0, count = 0, terminal = false;
+        const receive = (async () => {
+          let pending = '';
+          try {
+            const line = value => {
+              if (value.length > 4 * 1024 * 1024 || terminal) throw new Error('Invalid voice stream');
+              const event = JSON.parse(value);
+              if (event.type === 'done' && event.segments === count && count > 0) { terminal = true; return; }
+              if (event.type !== 'audio' || event.index !== count || count >= 32 || event.mimeType !== 'audio/wav'
+                || typeof event.audio !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(event.audio) || event.audio.length % 4) throw new Error('Invalid voice stream');
+              const decoded = atob(event.audio); bytes += decoded.length;
+              if (bytes > 16 * 1024 * 1024) throw new Error('Voice stream too large');
+              queue.push(new Blob([Uint8Array.from(decoded, value => value.charCodeAt(0))], { type: 'audio/wav' }));
+              ++count; wake?.(); wake = null;
+            };
+            while (!synthesis.signal.aborted && valid(id)) {
+              const result = await reader.read();
+              if (result.done) { pending += decoder.decode(); if (pending) line(pending); if (!terminal) throw new Error('Incomplete voice stream'); break; }
+              wireBytes += result.value.byteLength;
+              if (wireBytes > 24 * 1024 * 1024) throw new Error('Voice stream too large');
+              pending += decoder.decode(result.value, { stream: true });
+              let boundary;
+              while ((boundary = pending.indexOf('\n')) >= 0) { const value = pending.slice(0, boundary); pending = pending.slice(boundary + 1); if (value) line(value); }
+              if (pending.length > 4 * 1024 * 1024) throw new Error('Voice stream too large');
+            }
+          } catch (error) { failure = error; }
+          finally { done = true; wake?.(); wake = null; }
+        })();
+        const notifyCancellation = () => { wake?.(); wake = null; void reader.cancel().catch(() => {}); };
+        synthesis.signal.addEventListener('abort', notifyCancellation, { once: true });
+        try {
+          while (valid(id) && !synthesis.signal.aborted) {
+            if (failure) throw new Error(copy('Audio interrotto. La risposta completa resta nella chat.', 'Audio interrupted. The complete answer remains in chat.'));
+            if (queue.length) await play(queue.shift());
+            else if (done) break;
+            else await new Promise(resolve => { wake = resolve; });
+          }
+        } finally {
+          synthesis.signal.removeEventListener('abort', notifyCancellation);
+          await reader.cancel().catch(() => {}); await receive; queue.length = 0;
+        }
+      } else {
+        const blob = await response.blob();
+        if (blob.size > 16 * 1024 * 1024) throw new Error(copy('Audio troppo grande. La risposta resta nella chat.', 'Audio too large. The answer remains in chat.'));
+        await play(blob);
+      }
     } catch (error) { if (valid(id) && !synthesis.signal.aborted) throw error; }
     finally {
       sessionSignal.removeEventListener('abort', cancel);
@@ -184,6 +255,15 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
       const acquired = await navigator.mediaDevices.getUserMedia({ video: false, audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (!valid(id)) { acquired.getTracks().forEach(track => track.stop()); return; }
       stream = acquired;
+      const track = stream.getAudioTracks()[0];
+      // Modern browsers can expose an explicit mode which also covers local
+      // HTMLAudio playback. remote-only covers WebRTC, not this audio source.
+      const echoOptions = track?.getCapabilities?.().echoCancellation;
+      if (duplex && Array.isArray(echoOptions) && echoOptions.includes('all')) {
+        try { await track.applyConstraints({ echoCancellation: { exact: 'all' } }); } catch { /* Keep the actual browser-reported setting. */ }
+      }
+      if (!valid(id)) { acquired.getTracks().forEach(item => item.stop()); return; }
+      updateMode();
       while (valid(id)) {
         const concurrent = pendingCapture; pendingCapture = null;
         if (concurrent) state('listening', copy('Ti ascolto', 'Listening'));
@@ -219,8 +299,8 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
         core.setAttribute('aria-label', copy('Invia la frase o interrompi la voce', 'Send speech or interrupt playback'));
         // Il microfono rimane attivo anche mentre il modello ragiona o prepara
         // l'audio: una nuova frase può annullare la risposta prima del playback.
-        if (duplex && stream?.getAudioTracks()[0]?.getSettings().echoCancellation === true && !pendingCapture) {
-          pendingCapture = capture(id, true).then(value => value || { blob: null }, error => ({ error }));
+        if (canInterruptBySpeech() && !pendingCapture) {
+          startConcurrentCapture(id);
         }
         state('thinking', copy('Sto preparando la risposta', 'Preparing a response'));
         await ask(data.text);

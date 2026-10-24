@@ -168,8 +168,9 @@ class ExpressiveSpeechService {
 
   async synthesize({ text, gender = 'male', language = 'it' } = {}) {
     if (this.disposed) throw new Error('Sintesi espressiva terminata.');
-    const clean = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 520);
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
     if (!clean) throw new Error('Testo vocale mancante.');
+    if (clean.length > 520) throw new Error('Segmento vocale troppo lungo.');
     if (this.pending.size) this.stop();
     const id = randomUUID();
     const output = path.join(os.tmpdir(), `nexus-expressive-${id}.wav`);

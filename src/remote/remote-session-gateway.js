@@ -36,6 +36,7 @@ const { ToolBus } = require('../agents/tool-bus');
 const { normalizeArtifacts } = require('../application/artifact-stream');
 const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 const { deviceGraph } = require('./device-graph');
+const { MAX_SPEECH_TEXT, MAX_SPEECH_AUDIO } = require('../voice/speech-segments');
 const { enhancePublicAiHtml, publicAiCosmicCoreScript } = require('./public-demo');
 
 const execFileAsync = promisify(execFile);
@@ -2147,27 +2148,54 @@ class RemoteSessionGateway {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
         if (!this.voiceOutputAvailable()) return this.json(response, 503, { error: 'La voce NexusNXS non è disponibile.' });
+        const body = await this.body(request);
+        const text = String(body.text || '').trim();
+        if (!text || text.length > MAX_SPEECH_TEXT) return this.json(response, 400, { error: 'Testo vocale mancante o troppo lungo.', code: 'VOICE_TEXT_INVALID' });
+        const voiceCost = 2 * Math.ceil(text.length / 520);
         const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
         const voiceAllowed = this.guestAllowed(`voice:${guest.id}`, 8, REQUEST_WINDOW_MS)
-          && this.guestDailyAllowed(guest, 'voice', 2, 120)
-          && this.persistentQuotas.allow(`voice-ip:${address}`, { cost: 2, limit: 240 });
+          && this.guestDailyAllowed(guest, 'voice', voiceCost, 120)
+          && this.persistentQuotas.allow(`voice-ip:${address}`, { cost: voiceCost, limit: 240 });
         if (!voiceAllowed) {
           this.securityEvents.append('guest.voice.blocked', { severity: 'warning', address, detail: 'Quota voce superata' });
           return this.json(response, 429, { error: 'Limite voce raggiunto. Riprova più tardi.' });
         }
-        const body = await this.body(request);
-        const text = String(body.text || '').trim().slice(0, 4_000);
         const language = /^[a-z]{2}(?:-[A-Z]{2})?$/.test(String(body.language || '')) ? String(body.language) : 'it';
-        if (!text) return this.json(response, 400, { error: 'Testo vocale mancante.' });
         const controller = new AbortController();
+        const streaming = String(request.headers.accept || '').split(',').map(value => value.trim()).includes('application/x-ndjson');
+        let streamBytes = 0, segmentCount = 0;
+        const frame = async value => {
+          if (controller.signal.aborted || response.destroyed) throw new Error('Voce annullata.');
+          if (!response.headersSent) response.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'none'" });
+          if (!response.write(JSON.stringify(value) + '\n')) await new Promise((resolve, reject) => {
+            const cleanup = () => { clearTimeout(timer); response.off('drain', ready); response.off('close', closed); controller.signal.removeEventListener('abort', closed); };
+            const ready = () => { cleanup(); resolve(); };
+            const closed = () => { cleanup(); reject(new Error('Voce annullata.')); };
+            const timer = setTimeout(() => { cleanup(); controller.abort(); response.destroy(); reject(new Error('Client vocale troppo lento.')); }, 15000);
+            response.once('drain', ready); response.once('close', closed); controller.signal.addEventListener('abort', closed, { once: true });
+            if (response.destroyed || controller.signal.aborted) closed();
+          });
+        };
+        const onChunk = async (result, index) => {
+          const audio = Buffer.from(result?.audio || []); streamBytes += audio.length;
+          if (index !== segmentCount || index >= 32 || !audio.length || audio.length > 3 * 1024 * 1024 - 1024
+            || streamBytes > MAX_SPEECH_AUDIO || result?.mimeType !== 'audio/wav') throw new Error('Segmento vocale non valido.');
+          await frame({ type: 'audio', index, mimeType: 'audio/wav', audio: audio.toString('base64') }); ++segmentCount;
+        };
         const disconnect = () => { if (!response.writableEnded) controller.abort(); };
         response.once('close', disconnect);
         this.activeVoiceRequests.add(controller);
         try {
           if (response.destroyed || this.stopping || this.disposed) { controller.abort(); return; }
           const delivery = ['neutral', 'warm', 'calm', 'serious', 'energetic'].includes(body.delivery) ? body.delivery : 'warm';
-          const result = await this.voiceSynthesizer({ text, language, delivery, gender: body.gender === 'female' ? 'female' : 'male', owner: guest.id, signal: controller.signal });
+          const result = await this.voiceSynthesizer({ text, language, delivery, gender: body.gender === 'female' ? 'female' : 'male', owner: guest.id, signal: controller.signal,
+            ...(streaming ? { onChunk } : {}) });
           if (controller.signal.aborted || response.destroyed || this.stopping || this.disposed) return;
+          if (streaming) {
+            if (!segmentCount) await onChunk(result, 0);
+            await frame({ type: 'done', segments: segmentCount }); response.end(); return;
+          }
           const audio = Buffer.from(result?.audio || []);
           if (!audio.length || audio.length > 16 * 1024 * 1024) throw new Error('Audio non valido.');
           response.writeHead(200, {
@@ -2182,6 +2210,7 @@ class RemoteSessionGateway {
           return;
         } catch (error) {
           if (controller.signal.aborted || response.destroyed) return;
+          if (response.headersSent) { response.end(JSON.stringify({ type: 'error', code: 'VOICE_SYNTHESIS_FAILED' }) + '\n'); return; }
           if (error?.code === 'VOICE_BUSY') return this.json(response, 429, { error: 'Voce occupata. Riprova tra poco.' });
           return this.json(response, 503, { error: 'La voce NexusNXS non è pronta.' });
         } finally {

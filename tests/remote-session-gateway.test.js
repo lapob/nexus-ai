@@ -724,6 +724,49 @@ test('la voce pubblica trascrive e sintetizza soltanto dentro una sessione guest
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('speech streaming yields the first audio before completion and preserves segment order', async () => {
+  const {root,gateway}=fixture();let release;const gate=new Promise(resolve=>{release=resolve;});
+  gateway.voiceSynthesizer=async({onChunk,text})=>{
+    assert.equal(text,'Una prova completa');
+    await onChunk({mimeType:'audio/wav',audio:Buffer.from('wave-first')},0);
+    await gate;await onChunk({mimeType:'audio/wav',audio:Buffer.from('wave-last')},1);
+    return {streamed:true,segments:2};
+  };
+  try {
+    const port=await freePort();await gateway.configure({enabled:true,port});const base=`http://127.0.0.1:${port}`,guest=await bootstrapGuest(base);
+    const response=await fetch(base+'/api/guest/voice/synthesize',{method:'POST',headers:{Authorization:`Bearer ${guest.token}`,'Content-Type':'application/json',Accept:'application/x-ndjson'},body:JSON.stringify({text:'Una prova completa'})});
+    assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/application\/x-ndjson/);
+    const reader=response.body.getReader(),first=await reader.read();let received=Buffer.from(first.value).toString();
+    assert.equal(JSON.parse(received.trim()).index,0);assert.doesNotMatch(received,/done/);
+    release();for(;;){const part=await reader.read();if(part.done)break;received+=Buffer.from(part.value).toString();}
+    const frames=received.trim().split('\n').map(value=>JSON.parse(value));assert.deepEqual(frames.map(value=>value.type),['audio','audio','done']);
+    assert.equal(Buffer.from(frames[1].audio,'base64').toString(),'wave-last');assert.equal(frames[2].segments,2);
+  } finally {release?.();await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('disconnect after the first speech segment cancels the owner without late audio',async()=>{
+  const {root,gateway}=fixture();let abort;const aborted=new Promise(resolve=>{abort=resolve;});
+  gateway.voiceSynthesizer=async({signal,onChunk})=>{
+    await onChunk({mimeType:'audio/wav',audio:Buffer.from('first')},0);
+    await new Promise(resolve=>signal.addEventListener('abort',()=>{abort();resolve();},{once:true}));
+    return {streamed:true,segments:1};
+  };
+  try{
+    const port=await freePort();await gateway.configure({enabled:true,port});const base=`http://127.0.0.1:${port}`,guest=await bootstrapGuest(base),controller=new AbortController();
+    const response=await fetch(base+'/api/guest/voice/synthesize',{method:'POST',signal:controller.signal,headers:{Authorization:`Bearer ${guest.token}`,'Content-Type':'application/json',Accept:'application/x-ndjson'},body:JSON.stringify({text:'Prova'})});
+    await response.body.getReader().read();controller.abort();await aborted;
+    await new Promise(setImmediate);assert.equal(gateway.activeVoiceRequests.size,0);
+  }finally{await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('speech rejects oversized text before inference instead of truncating it',async()=>{
+  const {root,gateway}=fixture();let calls=0;gateway.voiceSynthesizer=async()=>{calls++;};
+  try{const port=await freePort();await gateway.configure({enabled:true,port});const base=`http://127.0.0.1:${port}`,guest=await bootstrapGuest(base);
+    const response=await fetch(base+'/api/guest/voice/synthesize',{method:'POST',headers:{Authorization:`Bearer ${guest.token}`,'Content-Type':'application/json'},body:JSON.stringify({text:'x'.repeat(4001)})});
+    assert.equal(response.status,400);assert.equal(calls,0);
+  }finally{await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test('la voce non viene annunciata disponibile quando manca il runtime', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-voice-capability-'));
   let available = false;
