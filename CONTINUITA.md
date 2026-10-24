@@ -1,3 +1,15 @@
+## Voice corrections deployed — 24 October 2026
+
+Code9dfe4241f5cc498923bd895a1c1aea58ca418026 passed CI40086306065
+and the complete45unit/32browser release gate. Candidate5b8905ff was
+verified before promotion as Worker1ebc5850-1bfe-4850-8b01-eb5527ab3007.
+Fourteen public route/header/navigation checks and AI readiness pass; five
+live settings/text/CSP profiles and isolated offline/reconnection checks pass.
+Rollback b7892ef8 remains available. Public HTML contains the language/capture
+fixes; duplex remains local opt-in. Human voice acceptance and a model
+quality/latency comparison remain open. No native release or model promotion
+is implied. This documentation records the deployed code without changing it.
+
 ## Voice turn corrections prepared — 24 October 2026
 
 Canonical public UI synchronized from main: preserve detected/selected speech
