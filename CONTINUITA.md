@@ -1,3 +1,15 @@
+## Adaptive settings promoted — 24 October 2026
+
+Website code6fe054da7fd8a6e8e74b1243c040517ec28937ab passed CI40076772235
+and the full45unit/32browser release gate. Candidate
+1f4e4f0a-96a0-4dbb-9bf5-4c1f1c2a2565 was promoted as production Worker
+b7892ef8-3231-41a9-90eb-ffe24e007e44. Fourteen route/header/navigation
+checks and independent AI readiness passed. Five live profile/CSP scenarios
+and four cached offline/reconnection scenarios passed after deployment.
+Rollback3e035638-242d-4dd1-9d7e-dd0ef4d16af7 remains available. This note
+records deployment; it does not change the tested UI bundle or certify native
+Windows installation, speech quality or commercial readiness.
+
 ## Adaptive settings candidate — 24 October 2026
 
 Canonical AI settings shell synchronized from main source: one surface,
