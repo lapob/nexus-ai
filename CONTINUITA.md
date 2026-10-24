@@ -1,3 +1,14 @@
+Full local release gate passed after the Undici patch: 45 unit tests, 31 browser tests, signatures, audit, runtime, performance and deploy dry-run. Fresh CI and candidate promotion remain pending.
+
+# Undici tooling patch candidate — 24 October 2026
+
+The existing Undici override advances7.30.0 to7.30.1 for the newly updated
+EventSource advisory. The matching lock entry is the only dependency changed;
+it is development tooling, with no direct application EventSource import.
+Registry signatures/attestations and vulnerability audit pass. The complete
+Worker/browser release gate and exact-commit CI must pass before promotion.
+Existing production85384536 and its verified rollback remain available.
+
 # Production UI and live offline checks — 24 October 2026
 
 Website code8e1206e passes CI40040111018 and the complete release gate:
