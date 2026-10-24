@@ -1,3 +1,15 @@
+## Tooling patch promoted — 24 October 2026
+
+Website source 08851f001a20ff3fa73aaa29829991589d5657ca passed the full
+local release gate and GitHub verification 40042909190. Candidate
+4722ca96-12df-4ed4-aa48-c1fc6cda54cd was promoted as production Worker
+3e035638-242d-4dd1-9d7e-dd0ef4d16af7. Fourteen route/header/navigation
+checks and independent public AI readiness passed before and after promotion.
+Previous production 85384536-25ed-4302-ba33-206914569627 remains available
+for rollback. This is web deployment evidence, not desktop/native or
+commercial readiness certification. Post-deployment responsive/offline
+checks are recorded in the owner operational checkpoint.
+
 Full local release gate passed after the Undici patch: 45 unit tests, 31 browser tests, signatures, audit, runtime, performance and deploy dry-run. Fresh CI and candidate promotion remain pending.
 
 # Undici tooling patch candidate — 24 October 2026
