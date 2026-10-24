@@ -1,3 +1,23 @@
+# Voice corrections and recoverable local tasks — 24 October 2026
+
+A real human voice test failed language/recognition acceptance. Browser capture
+now crops waiting silence with400ms pre-roll and300ms tail; an overlong turn
+is rejected without sending a truncated command. Validated language hints
+preserve the session language, numeric answers keep the recognized language,
+and unknown confidence remains null. Spoken or Core interruption suppresses
+late synthesis, including while the model is still generating. Duplex remains
+local opt-in pending successful human echo/interruption tests. No parity with
+a realtime speech-to-speech product is claimed.
+
+Recent native workflows can be selected after browser storage is cleared.
+Lists are bounded and restricted to the owner and current workspace; they
+exclude arguments, tickets and results. Recovery never approves or executes
+a step automatically. Real renderer/IPC tests pass recovery, independent
+approvals, preserved originals, receipts and three responsive layouts.
+Final source checks and1191tests/3skips pass, including Core cancellation
+while duplex capture is waiting. No model has been promoted or trained.
+Signing, human voice acceptance, iOS and the other roadmap gaps remain open.
+
 # Daily-use service reliability — 24 October 2026
 
 Source passes 1178 tests/3 skips/zero failures. Research now preserves successful

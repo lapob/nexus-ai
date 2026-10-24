@@ -31,6 +31,7 @@ const CHANNELS = Object.freeze({
   workflowDecide: 'nexus:workflow-decide',
   workflowCancel: 'nexus:workflow-cancel',
   workflowStatus: 'nexus:workflow-status',
+  workflowList: 'nexus:workflow-list',
   voiceCapabilities: 'nexus:voice-capabilities',
   voiceDevices: 'nexus:voice-devices',
   voiceTranscribe: 'nexus:voice-transcribe',

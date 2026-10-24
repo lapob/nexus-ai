@@ -255,6 +255,7 @@ export interface NexusBridge {
   decideWorkflowStep(workflowId: string, ticketId: string, approved: boolean): Promise<{ workflow: LocalWorkflowSnapshot; result?: { receipt?: { id: string }; stdout?: string }; error?: { message: string } }>;
   cancelWorkflow(workflowId: string): Promise<{ workflow: LocalWorkflowSnapshot }>;
   workflowStatus(workflowId: string): Promise<LocalWorkflowSnapshot>;
+  listWorkflows(options?: { limit?: number }): Promise<{ items: LocalWorkflowSummary[]; truncated: boolean }>;
   bootstrap(): Promise<BootstrapData>;
   health(): Promise<BootstrapData['ai']['health']>;
   diagnostics(): Promise<{
@@ -411,6 +412,11 @@ export interface LocalWorkflowSnapshot {
   id: string; summary: string; status: string; cursor: number; stepCount: number;
   recoveryRequired?: boolean;
   steps: Array<{ id: string; tool: string; status: string; result?: { receipt?: { id: string; outcome?: string } } }>;
+}
+
+export interface LocalWorkflowSummary {
+  id: string; summary: string; status: string; cursor: number; stepCount: number;
+  createdAt: number; updatedAt: number; recoveryRequired: boolean;
 }
 
 declare global {

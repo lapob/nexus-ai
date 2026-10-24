@@ -7,6 +7,61 @@ const { WorkflowRuntime, validateSteps } = require('../src/agents/workflow-runti
 const { ActionRuntime } = require('../src/agents/action-runtime');
 const { documentCopyRecipe } = require('../src/shared/local-workflow-recipes.mjs');
 
+test('attività recenti persistenti isolate per proprietario e workspace senza ticket o contenuti', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-history-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  let workspace = 'workspace-a', clock = 10;
+  const action = { workspaceIdentity: () => workspace, propose: () => ({ id: 'secret-ticket', preview: 'private-preview' }), execute: async () => ({ status: 'completed' }) };
+  const runtime = new WorkflowRuntime({ actionRuntime: action, checkpointDirectory: root, now: () => ++clock });
+  const local = runtime.create({ summary: 'Locale', steps: [{ tool: 'read_file', arguments: { path: 'private-document.txt' } }] });
+  runtime.next(local.id);
+  const owned = runtime.create({ summary: 'Dispositivo A', steps: [{ tool: 'read_file' }] }, { subjectId: 'device-a' });
+  runtime.create({ summary: 'Dispositivo B', steps: [{ tool: 'read_file' }] }, { subjectId: 'device-b' });
+  workspace = 'workspace-b';
+  runtime.create({ summary: 'Altra cartella', steps: [{ tool: 'read_file' }] });
+  workspace = 'workspace-a';
+  const resumed = new WorkflowRuntime({ actionRuntime: action, checkpointDirectory: root });
+  const history = await resumed.list();
+  assert.deepEqual(history.items.map(item => item.id), [local.id]);
+  assert.equal(history.items[0].status, 'awaiting-approval');
+  assert.doesNotMatch(JSON.stringify(history), /secret-ticket|private-preview|private-document|arguments|proposal/);
+  assert.deepEqual((await resumed.list({}, { subjectId: 'device-a', requireSubject: true })).items.map(item => item.id), [owned.id]);
+  await assert.rejects(resumed.list({}, { requireSubject: true }), { code: 'WORKFLOW_SUBJECT_REQUIRED' });
+});
+
+test('la cronologia ordina, limita e indica le attività interrotte senza eseguirle', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-history-order-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  let clock = 10;
+  const runtime = new WorkflowRuntime({ actionRuntime: { propose() { throw new Error('Nessuna esecuzione implicita'); }, execute() {} }, checkpointDirectory: root, now: () => ++clock });
+  runtime.create({ summary: 'Prima', steps: [{ tool: 'read_file' }] });
+  const interrupted = runtime.create({ summary: 'Seconda', steps: [{ tool: 'read_file' }] });
+  interrupted.status = 'executing'; interrupted.steps[0].status = 'executing'; runtime.save(interrupted);
+  const recent = await runtime.list({ limit: 1 });
+  assert.equal(recent.items.length, 1); assert.equal(recent.truncated, true);
+  assert.equal(recent.items[0].id, interrupted.id); assert.equal(recent.items[0].recoveryRequired, true);
+  for (const limit of [0, 101, '20', NaN]) await assert.rejects(runtime.list({ limit }), { code: 'WORKFLOW_INVALID' });
+});
+
+test('checkpoint corrotti, enormi e collegati non diventano attività recuperabili', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-history-corrupt-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const runtime = new WorkflowRuntime({ actionRuntime: { propose() {}, execute() {} }, checkpointDirectory: root });
+  const valid = runtime.create({ summary: 'Valida', steps: [{ tool: 'read_file' }] });
+  const invalid = runtime.create({ summary: 'Corrotta', steps: [{ tool: 'read_file' }] });
+  fs.writeFileSync(runtime.filePath(invalid.id), '{broken');
+  const oversized = runtime.create({ summary: 'Enorme', steps: [{ tool: 'read_file' }] });
+  fs.writeFileSync(runtime.filePath(oversized.id), ' '.repeat(2 * 1024 * 1024 + 1));
+  assert.throws(() => runtime.load(oversized.id), { code: 'WORKFLOW_CHECKPOINT_INVALID' });
+  const linked = runtime.create({ summary: 'Collegata', steps: [{ tool: 'read_file' }] });
+  fs.unlinkSync(runtime.filePath(linked.id));
+  fs.symlinkSync(root, runtime.filePath(linked.id), process.platform === 'win32' ? 'junction' : 'dir');
+  assert.throws(() => runtime.load(linked.id), { code: 'WORKFLOW_CHECKPOINT_INVALID' });
+  const list = await runtime.list();
+  assert.deepEqual(list.items.map(item => item.id), [valid.id]);
+  assert.throws(() => { valid.cursor = -1; runtime.save(valid); runtime.load(valid.id); }, { code: 'WORKFLOW_CHECKPOINT_INVALID' });
+});
+
 test('incarico reale ripreso dopo riavvio: nuova approvazione, nessuna scrittura duplicata e undo', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-workflow-restart-'));
   const actions = [], workflows = [];

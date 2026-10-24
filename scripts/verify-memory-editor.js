@@ -176,6 +176,24 @@ conversations.save({ id: 'artifact-fixture', title: 'Documento Aurora', turns: [
     }));
     await page.screenshot({ path: path.join(root, 'qa-artifacts/local-workflow-recovery.png') });
     console.log('PASS real recovery UI: interrupted outcome visible, no replay/approval/cancellation, new recipe available and no side effects');
+    await page.evaluate(() => localStorage.removeItem('nexus.document-workflow.v1'));
+    await page.reload(); await page.keyboard.press('Control+,'); await page.locator('#settings-tab-permissions').click();
+    await recipe.getByRole('button', { name: 'Mostra attività recenti', exact: true }).click();
+    const recovered = recipe.locator('.local-workflow-history-item').filter({ hasText: 'Fixture di recupero' });
+    await recovered.waitFor(); assert.equal(await recovered.getAttribute('aria-pressed'), 'false');
+    await recovered.click();
+    await page.waitForFunction(() => document.querySelector('.local-workflow-history-item[aria-pressed=true]')?.textContent.includes('Fixture di recupero'));
+    assert.equal(await recipe.getByRole('button', { name: 'Approva questo passaggio', exact: true }).count(), 0);
+    assert.equal(fs.existsSync(path.join(documents, 'not-executed.md')), false);
+    for (const [width,height] of [[1200,800],[500,800],[900,500]]) {
+      await app.evaluate(({ BrowserWindow }, size) => { const win=BrowserWindow.getAllWindows()[0];win.setMinimumSize(320,320);win.setContentSize(...size); },[width,height]);
+      await recovered.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(200);
+      const metrics=await recipe.locator('.local-workflow-history').evaluate(element=>({width:element.clientWidth,content:element.scrollWidth,rows:[...element.querySelectorAll('button')].map(button=>button.getBoundingClientRect().height)}));
+      assert.ok(metrics.content<=metrics.width+1,JSON.stringify(metrics));assert.ok(metrics.rows.every(height=>height>=44));
+      await page.screenshot({path:path.join(root,`qa-artifacts/local-workflow-history-${width}.png`)});
+    }
+    console.log('PASS real history: browser checkpoint cleared, manually recovered native task, no implicit approval/replay, three layouts and 44px targets');
   } finally {
     requestProcessShutdown(path.join(profile, 'system-presence.lock'));
     if (app) await app.close();

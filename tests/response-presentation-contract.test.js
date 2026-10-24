@@ -113,7 +113,7 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   assert.match(html, /\.status-active \.dock/);
   assert.match(html, /finally\{busy=false;setSendMode\(false\);if\(requestGeneration===historyGeneration\)leaveRequestLayout\(\)\}/);
   assert.match(html, /visualViewport/);
-  assert.match(html, /language:\s*spokenLanguage\(text\)/);
+  assert.match(html, /language:\s*preferredLanguage\(\)\s*\|\|\s*capturedLanguage\s*\|\|\s*spokenLanguage\(text\)/);
   assert.match(html, /NexusNXS può commettere errori/);
   assert.match(html, /Parla con Nexus/);
   assert.match(html, /nexusnxs\.core-hint\.v1/);

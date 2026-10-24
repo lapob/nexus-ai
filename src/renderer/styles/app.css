@@ -3224,6 +3224,13 @@ button.shortcut-item:focus-visible kbd {
 .local-workflow-fields { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
 .local-workflow-fields .settings-field { flex: 1 1 12rem; min-width: 0; }
 .local-workflow-state { display: flex; gap: .75rem; align-items: center; }
+.local-workflow-history-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; color: var(--text-secondary); }
+.local-workflow-history { display: grid; gap: .35rem; max-height: min(22rem, 42dvh); overflow: auto; overscroll-behavior: contain; min-width: 0; }
+.local-workflow-history-item { display: grid; gap: .3rem; text-align: left; min-height: 44px; padding: .7rem; border: 0; border-radius: .75rem; background: transparent; color: var(--text-primary); font: inherit; overflow-wrap: anywhere; cursor: pointer; }
+.local-workflow-history-item small { color: var(--text-secondary); }
+.local-workflow-history-item:hover,.local-workflow-history-item[aria-pressed=true] { background: var(--surface-soft); }
+.local-workflow-history-item:focus-visible { outline: 2px solid var(--nexus-accent, #71e5e8); outline-offset: -2px; }
+.local-workflow .settings-quiet-action { min-width: 44px; min-height: 44px; flex-shrink: 0; }
 .local-workflow-preview { display: grid; gap: .5rem; padding: .75rem; background: var(--surface-soft); border-radius: .75rem; min-width: 0; }
 .local-workflow-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 10rem; overflow: auto; color: var(--text-primary); font: inherit; }
 .local-workflow-receipt { display: flex; align-items: center; gap: .5rem; color: var(--text-secondary); }

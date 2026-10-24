@@ -267,6 +267,47 @@ test('il gateway privato espone il ciclo workflow con ticket, consenso e ricevut
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('workflow history is private, scoped, bounded and revoked with the device', async () => {
+  const { root, gateway } = fixture();
+  const calls=[];
+  gateway.onWorkflowList=async ({limit,device})=>{calls.push({limit,device});return {items:[],truncated:false};};
+  try {
+    await gateway.configure({enabled:true,allowLan:false,port:await freePort()});
+    const base=`http://127.0.0.1:${gateway.state.port}`;
+    const paired=await pair(base,gateway.createPairingCode({scope:'console'}).code,'console');
+    const headers={Authorization:`Bearer ${paired.token}`};
+    assert.equal((await fetch(`${base}/api/workflows/list`)).status,401);
+    const guest=await bootstrapGuest(base);
+    assert.equal((await fetch(`${base}/api/workflows/list`,{headers:{Authorization:`Bearer ${guest.token}`}})).status,401);
+    const chat=await pair(base,gateway.createPairingCode({scope:'chat'}).code,'chat');
+    assert.equal((await fetch(`${base}/api/workflows/list`,{headers:{Authorization:`Bearer ${chat.token}`}})).status,403);
+    assert.equal((await fetch(`${base}/api/workflows/list?limit=101`,{headers})).status,400);
+    const result=await fetch(`${base}/api/workflows/list?limit=7`,{headers});
+    assert.equal(result.status,200);assert.deepEqual(await result.json(),{items:[],truncated:false});
+    assert.equal(calls.length,1);assert.equal(calls[0].limit,7);assert.equal(calls[0].device.id,paired.device.id);
+    for(let i=0;i<19;i++)assert.equal((await fetch(`${base}/api/workflows/list`,{headers})).status,200);
+    assert.equal((await fetch(`${base}/api/workflows/list`,{headers})).status,429);
+    gateway.revokeDevice(paired.device.id);
+    assert.equal((await fetch(`${base}/api/workflows/list`,{headers})).status,401);
+  } finally {await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('workflow history discards a result when access is revoked during its read', async () => {
+  const {root,gateway}=fixture();let release,begin;
+  const started=new Promise(resolve=>{begin=resolve;});
+  gateway.onWorkflowList=async()=>{begin();return await new Promise(resolve=>{release=resolve;});};
+  try {
+    const port=await freePort();await gateway.configure({enabled:true,allowLan:false,port});
+    const base=`http://127.0.0.1:${port}`,paired=await pair(base,gateway.createPairingCode({scope:'console'}).code,'console');
+    const response=fetch(`${base}/api/workflows/list`,{headers:{Authorization:`Bearer ${paired.token}`}}).catch(()=>null);
+    await started;gateway.revokeDevice(paired.device.id);release({items:[{summary:'private'}],truncated:false});
+    const result=await response;
+    // Revocation closes active authenticated sockets. If an HTTP response
+    // survives the close, it must be unauthorized and contain no history.
+    if(result){assert.equal(result.status,401);assert.doesNotMatch(await result.text(),/private/);}
+  } finally {release?.({items:[],truncated:false});await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test('il client remoto conserva la bozza e riprova dopo un cambio rete', () => {
   const source = fs.readFileSync(require.resolve('../src/remote/remote-session-gateway'), 'utf8');
   assert.match(source, /nexus\.remote\.draft/);
@@ -641,7 +682,7 @@ test('la voce pubblica trascrive e sintetizza soltanto dentro una sessione guest
     voiceTranscriber: async ({ audio, language }) => ({
       text: `trascritto:${audio.length}`,
       language: language === 'auto' ? 'it' : language,
-      confidence: 0.91
+      confidence: language === 'auto' ? 0.91 : null
     }),
     voiceSynthesizer: async ({ text, language }) => ({
       mimeType: 'audio/wav', audio: Buffer.from(`wave:${language}:${text}`)
@@ -662,6 +703,15 @@ test('la voce pubblica trascrive e sintetizza soltanto dentro una sessione guest
     });
     assert.equal(transcription.status, 200);
     assert.deepEqual(await transcription.json(), { text: 'trascritto:8044', language: 'it', confidence: 0.91 });
+    const hinted = await fetch(`${baseUrl}/api/guest/voice/transcribe`, {
+      method: 'POST', headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'audio/wav', 'X-Nexus-Speech-Language': 'it' }, body: mono16kWave()
+    });
+    assert.equal(hinted.status, 200);
+    assert.deepEqual(await hinted.json(), { text: 'trascritto:8044', language: 'it', confidence: null });
+    const invalidLanguage = await fetch(`${baseUrl}/api/guest/voice/transcribe`, {
+      method: 'POST', headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'audio/wav', 'X-Nexus-Speech-Language': '../../model' }, body: mono16kWave()
+    });
+    assert.equal(invalidLanguage.status, 400);
     const response = await fetch(`${baseUrl}/api/guest/voice/synthesize`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${guest.token}`, 'Content-Type': 'application/json' },

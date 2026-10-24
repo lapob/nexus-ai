@@ -712,6 +712,7 @@ class RemoteSessionGateway {
     this.onWorkflowDecide = onWorkflowDecide;
     this.onWorkflowCancel = onWorkflowCancel;
     this.onWorkflowStatus = onWorkflowStatus;
+    this.onWorkflowList = null;
     this.voiceTranscriber = typeof voiceTranscriber === 'function' ? voiceTranscriber : null;
     this.voiceSynthesizer = typeof voiceSynthesizer === 'function' ? voiceSynthesizer : null;
     this.voiceCapabilityProvider = typeof voiceCapabilityProvider === 'function' ? voiceCapabilityProvider : null;
@@ -1160,6 +1161,7 @@ class RemoteSessionGateway {
         integrity: this.receiptSigner ? 'signed-digest' : 'digest'
       },
       workflows: {
+        history: privateScope && typeof this.onWorkflowList === 'function',
         supported: privateScope && [
           this.onWorkflowCreate, this.onWorkflowNext, this.onWorkflowDecide,
           this.onWorkflowCancel, this.onWorkflowStatus
@@ -2098,6 +2100,8 @@ class RemoteSessionGateway {
       if (request.method === 'POST' && url.pathname === '/api/guest/voice/transcribe') {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
+        const speechLanguage = String(request.headers['x-nexus-speech-language'] || 'auto');
+        if (!/^(?:auto|[a-z]{2}(?:-[A-Z]{2})?)$/.test(speechLanguage)) return this.json(response, 400, { error: 'Lingua vocale non valida.', code: 'VOICE_LANGUAGE_INVALID' });
         if (!this.voiceInputAvailable()) return this.json(response, 503, { error: 'Il riconoscimento vocale NexusNXS non è pronto.', code: 'VOICE_BACKEND_UNAVAILABLE' });
         const contentType = String(request.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
         if (contentType !== 'audio/wav') return this.json(response, 415, { error: 'Formato audio non supportato.', code: 'VOICE_FORMAT_UNSUPPORTED' });
@@ -2118,7 +2122,7 @@ class RemoteSessionGateway {
         this.activeVoiceRequests.add(controller);
         try {
           if (response.destroyed || this.stopping || this.disposed) { controller.abort(); return; }
-          const result = await this.voiceTranscriber({ audio, language: 'auto', timeoutSeconds: 55, owner: guest.id, signal: controller.signal });
+          const result = await this.voiceTranscriber({ audio, language: speechLanguage, timeoutSeconds: 55, owner: guest.id, signal: controller.signal });
           if (controller.signal.aborted || response.destroyed || this.stopping || this.disposed) return;
           this.assertServing();
           const text = String(result?.text || '').trim().slice(0, 4_000);
@@ -2126,7 +2130,7 @@ class RemoteSessionGateway {
           return this.json(response, 200, {
             text,
             language: String(result?.language || 'und').slice(0, 16),
-            confidence: Number.isFinite(Number(result?.confidence)) ? Math.max(0, Math.min(1, Number(result.confidence))) : null
+            confidence: typeof result?.confidence === 'number' && Number.isFinite(result.confidence) ? Math.max(0, Math.min(1, result.confidence)) : null
           });
         } catch (error) {
           if (controller.signal.aborted || response.destroyed) return;
@@ -2516,7 +2520,7 @@ class RemoteSessionGateway {
           return this.json(response, 200, {
             text,
             language: String(result?.language || 'und').slice(0, 16),
-            confidence: Number.isFinite(Number(result?.confidence)) ? Math.max(0, Math.min(1, Number(result.confidence))) : null
+            confidence: typeof result?.confidence === 'number' && Number.isFinite(result.confidence) ? Math.max(0, Math.min(1, result.confidence)) : null
           });
         } catch (error) {
           if (controller.signal.aborted || error?.name === 'AbortError' || error?.code === 'VOICE_CANCELLED') {
@@ -2823,6 +2827,20 @@ class RemoteSessionGateway {
           completedAt: Date.now()
         });
         return this.json(response, 200, { ...result, ...receipt });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/workflows/list') {
+        if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
+        if (!this.onWorkflowList) return this.json(response, 503, { error: 'Le attività salvate non sono pronte.' });
+        const limit = Number(url.searchParams.get('limit') ?? 20);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) return this.json(response, 400, { error: 'Limite attività non valido.' });
+        if (!this.guestAllowed(`workflow-history:${device.id}`, 20, REQUEST_WINDOW_MS)
+          || !this.guestAllowed('workflow-history:all', 60, REQUEST_WINDOW_MS)) {
+          return this.json(response, 429, { error: 'Attendi prima di aggiornare le attività.' });
+        }
+        const result = await this.onWorkflowList({ limit, device: { id: device.id, name: device.name } });
+        this.assertServing();
+        this.assertRequestAuthorized(request);
+        return this.json(response, 200, result);
       }
       if (request.method === 'POST' && url.pathname === '/api/workflows/create') {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });

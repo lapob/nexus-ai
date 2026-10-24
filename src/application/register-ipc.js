@@ -1344,6 +1344,10 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     assertTrustedSender(event);
     return workflowRuntime.status(parseWorkflowId(value?.workflowId ?? value));
   });
+  ipcMain.handle(CHANNELS.workflowList, (event, value) => {
+    assertTrustedSender(event);
+    return workflowRuntime.list({ limit: value?.limit ?? 20 });
+  });
   ipcMain.handle(CHANNELS.windowCompact, (event, enabled) => {
     assertTrustedSender(event);
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -2203,6 +2207,9 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
   remoteGateway.onWorkflowDecide = remoteWorkflowDecide;
   remoteGateway.onWorkflowCancel = remoteWorkflowCancel;
   remoteGateway.onWorkflowStatus = remoteWorkflowStatus;
+  remoteGateway.onWorkflowList = ({ limit, device }) => workflowRuntime.list(
+    { limit }, { subjectId: String(device?.id || ''), requireSubject: true }
+  );
   let shutdownPromise = null;
   const shutdown = () => {
     if (shutdownPromise) return shutdownPromise;
@@ -2226,6 +2233,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     remoteGateway.onWorkflowDecide = null;
     remoteGateway.onWorkflowCancel = null;
     remoteGateway.onWorkflowStatus = null;
+    remoteGateway.onWorkflowList = null;
     shutdownPromise = Promise.allSettled([
       uiCommandRunner.shutdown(),
       workflowRuntime.shutdown(),

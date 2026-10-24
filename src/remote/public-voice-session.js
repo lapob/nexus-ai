@@ -1,10 +1,13 @@
 /** @module remote/public-voice-session Shared chat history and cancellable browser media. */
 // #region Session controls and capture
 function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, getPreferences = () => ({}), closeIcon = '', duplex = false }) {
-  const copy = (it, en) => /^it\b/i.test(navigator.language) ? it : en;
+  let capturedLanguage = '';
+  const normalizedLanguage = value => /^[a-z]{2}(?:-[a-z]{2})?$/i.test(String(value || '')) ? String(value).toLowerCase().split('-')[0] : '';
+  const preferredLanguage = () => normalizedLanguage(getPreferences().responseLanguage);
+  const copy = (it, en) => /^it\b/i.test(preferredLanguage() || capturedLanguage || navigator.language) ? it : en;
   let active = false, epoch = 0, stream = null, recorder = null;
   let controller = null, finishCapture = null, finishPlayback = null;
-  let pendingCapture = null, playbackActive = false;
+  let pendingCapture = null, playbackActive = false, responseInterrupted = false;
   let savedDraft = ''; const background = new Map();
   const controls = document.createElement('div');
   controls.className = 'voice-session-controls'; controls.hidden = true;
@@ -62,7 +65,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     const samples = new Uint8Array(512), chunks = [];
     analyser.fftSize = 1024; source.connect(analyser);
     let frame = 0, timer = 0, heard = false, voiced = 0, floor = .009;
-    let last = performance.now(), lastSpeech = last; const started = last;
+    let last = performance.now(), lastSpeech = last, started = last, firstSpeech = null;
     const current = new MediaRecorder(stream, { audioBitsPerSecond: 64000 }); recorder = current;
     const stop = () => { if (current.state === 'recording') current.stop(); };
     try {
@@ -72,7 +75,12 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
         finishCapture = stop;
         current.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
         current.onerror = () => reject(new Error(copy('Registrazione interrotta. Tocca il Core per riprovare.', 'Recording interrupted. Tap the Core to retry.')));
-        current.onstop = () => resolve(heard ? new Blob(chunks, { type: current.mimeType || 'audio/webm' }) : null);
+        current.onstop = () => resolve(heard ? {
+          blob: new Blob(chunks, { type: current.mimeType || 'audio/webm' }),
+          startSeconds: Math.max(0, (firstSpeech - started) / 1000 - .4),
+          endSeconds: (lastSpeech - started) / 1000 + .3
+        } : null);
+        started = last = performance.now();
         current.start(250);
         if (!duringPlayback) state('listening', copy('Ti ascolto', 'Listening'));
         const sample = now => {
@@ -84,10 +92,22 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
           if (now - started < 300 && level < .02) floor = floor * .9 + level * .1;
           else if (level > Math.max(.016, Math.min(.065, floor * 2.35 + .006))) {
             voiced += dt; if (voiced >= (playbackActive ? 240 : 140)) {
-              if (!heard && duringPlayback) { finishPlayback?.(); state('listening', copy('Ti ascolto', 'Listening')); }
+              if (!heard && duringPlayback) {
+                responseInterrupted = true;
+                const wasPlaying = playbackActive;
+                finishPlayback?.();
+                if (!wasPlaying && isBusy()) cancelResponse();
+                state('listening', copy('Ti ascolto', 'Listening'));
+              }
+              if (!heard) firstSpeech = now - voiced;
               heard = true; lastSpeech = now;
             }
           } else voiced = Math.max(0, voiced - dt);
+          // Waiting for the next turn is not part of the utterance. Never send
+          // a silently truncated command when the spoken turn exceeds the cap.
+          if (heard && now - firstSpeech > 12000) {
+            stop(); reject(new Error(copy('Frase troppo lunga. Riprova con una frase entro 12 secondi.', 'Speech too long. Retry with a phrase under 12 seconds.'))); return;
+          }
           if (heard && now - lastSpeech > 950) return current.stop();
           frame = requestAnimationFrame(sample);
         };
@@ -105,7 +125,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   // #endregion
   // #region Playback and conversational loop
   async function speak(text) {
-    const id = epoch; if (!active) return;
+    const id = epoch; if (!active || responseInterrupted) return;
     const synthesis = new AbortController(), sessionSignal = controller.signal;
     let url = '', current = null, settlePlayback = null;
     const cancel = () => {
@@ -119,7 +139,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
       state('thinking', copy('Preparo la voce · tocca il Core per interrompere', 'Preparing audio · tap the Core to interrupt'));
       const tone = getPreferences().tone;
       const delivery = tone === 'warm' ? 'warm' : tone === 'direct' ? 'serious' : 'neutral';
-      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: spokenLanguage(text), delivery }) });
+      const response = await fetchAudio('/api/guest/voice/synthesize', { method: 'POST', signal: synthesis.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 4000), language: preferredLanguage() || capturedLanguage || spokenLanguage(text), delivery }) });
       if (!valid(id) || synthesis.signal.aborted) return;
       if (!response.ok) throw new Error(copy('Audio non disponibile. La risposta resta nella chat.', 'Audio unavailable. Your answer remains in chat.'));
       const blob = await response.blob(); if (!valid(id) || synthesis.signal.aborted) return;
@@ -134,7 +154,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
           if (canDuplex && !pendingCapture) {
             // Retain the whole utterance, including its beginning during playback.
             // Catch immediately: the conversational loop consumes the outcome later.
-            pendingCapture = capture(id, true).then(blob => ({ blob }), error => ({ error }));
+            pendingCapture = capture(id, true).then(value => value || { blob: null }, error => ({ error }));
           }
         }).catch(reject);
       });
@@ -149,6 +169,8 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   async function start() {
     if (active || isBusy()) return;
     active = true; const id = ++epoch; controller = new AbortController();
+    capturedLanguage = '';
+    responseInterrupted = false;
     savedDraft = prompt.value;
     for (const element of document.querySelectorAll('.exchange,.copy,.dock,.privacy,.identity')) { background.set(element, element.inert); element.inert = true; }
     document.body.classList.add('voice-session'); document.body.classList.remove('keyboard-open');
@@ -165,7 +187,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
       while (valid(id)) {
         const concurrent = pendingCapture; pendingCapture = null;
         if (concurrent) state('listening', copy('Ti ascolto', 'Listening'));
-        const captured = concurrent ? await concurrent : { blob: await capture(id) };
+        const captured = (concurrent ? await concurrent : await capture(id)) || { blob: null };
         if (!valid(id)) break;
         if (captured.error) throw captured.error;
         const blob = captured.blob;
@@ -173,11 +195,33 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
         if (!blob) throw new Error(copy('Non ho sentito una frase. Tocca il Core per riprovare.', 'No speech detected. Tap the Core to retry.'));
         state('transcribing', copy('Comprendo la voce', 'Understanding speech'));
         const Engine = globalThis.AudioContext || globalThis.webkitAudioContext, context = new Engine({ sampleRate: 16000 });
-        let wav; try { wav = encodeWav(await context.decodeAudioData(await blob.arrayBuffer())); } finally { await context.close(); }
+        let wav;
+        try {
+          const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+          const first = Math.max(0, Math.floor(captured.startSeconds * decoded.sampleRate));
+          const end = Math.min(decoded.length, Math.ceil(captured.endSeconds * decoded.sampleRate));
+          const length = end - first;
+          if (!Number.isFinite(length) || length <= 0 || length / decoded.sampleRate > 12) {
+            throw new Error(copy('Frase troppo lunga o incompleta. Riprova con una frase entro 12 secondi.', 'Speech too long or incomplete. Retry with a phrase under 12 seconds.'));
+          }
+          wav = encodeWav({ sampleRate: decoded.sampleRate, length, numberOfChannels: decoded.numberOfChannels,
+            getChannelData: channel => decoded.getChannelData(channel).subarray(first, end) });
+        } finally { await context.close(); }
         if (!valid(id)) break;
-        const response = await fetchAudio('/api/guest/voice/transcribe', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'audio/wav' }, body: wav });
+        const response = await fetchAudio('/api/guest/voice/transcribe', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'audio/wav', 'X-Nexus-Speech-Language': preferredLanguage() || capturedLanguage || 'auto' }, body: wav });
         const data = await response.json(); if (!valid(id)) break;
         if (!response.ok || !String(data.text || '').trim()) throw new Error(copy('Frase non riconosciuta. Tocca il Core per riprovare.', 'Speech not recognized. Tap the Core to retry.'));
+        // Le risposte brevi o numeriche non contengono indizi linguistici:
+        // usare la lingua riconosciuta dalla voce, non quella del browser.
+        capturedLanguage = normalizedLanguage(data.language) || capturedLanguage;
+        responseInterrupted = false;
+        close.setAttribute('aria-label', copy('Torna alla conversazione scritta', 'Return to text conversation'));
+        core.setAttribute('aria-label', copy('Invia la frase o interrompi la voce', 'Send speech or interrupt playback'));
+        // Il microfono rimane attivo anche mentre il modello ragiona o prepara
+        // l'audio: una nuova frase può annullare la risposta prima del playback.
+        if (duplex && stream?.getAudioTracks()[0]?.getSettings().echoCancellation === true && !pendingCapture) {
+          pendingCapture = capture(id, true).then(value => value || { blob: null }, error => ({ error }));
+        }
         state('thinking', copy('Sto preparando la risposta', 'Preparing a response'));
         await ask(data.text);
         if (document.getElementById('phase')?.classList.contains('error')) throw new Error(document.getElementById('phase').textContent);
@@ -189,8 +233,8 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   function interact() {
     if (!active) return start();
     if (finishPlayback) return finishPlayback();
+    if (isBusy()) { responseInterrupted = true; return cancelResponse(); }
     if (recorder?.state === 'recording') return finishCapture?.();
-    if (isBusy()) return cancelResponse();
     if (runtime.voiceState === 'error') { leave({ focus: false }); return start(); }
   }
   return { start, interact, speak, leave, get active() { return active; } };

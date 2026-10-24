@@ -10,7 +10,11 @@ const { assertRemoteToolAllowed } = require('../security/remote-tool-policy');
 // #region 01 — Validazione e persistenza
 
 const MAX_STEPS = 8;
+const MAX_CHECKPOINT_BYTES = 2 * 1024 * 1024;
+const MAX_HISTORY_FILES = 2048;
+const MAX_HISTORY_BYTES = 32 * 1024 * 1024;
 const TERMINAL_STATUSES = new Set(['complete', 'denied', 'cancelled', 'failed', 'reverted']);
+const WORKFLOW_STATUSES = new Set(['pending', 'awaiting-approval', 'executing', ...TERMINAL_STATUSES]);
 
 function workflowFailure(message, code = 'WORKFLOW_INVALID', status = 400) {
   return Object.assign(new Error(message), { code, status });
@@ -143,18 +147,85 @@ class WorkflowRuntime {
     atomicWrite(this.filePath(workflow.id), workflow);
   }
 
-  load(id) {
+  load(id, { maximumBytes = MAX_CHECKPOINT_BYTES, onRead = null } = {}) {
     const canonicalId = workflowId(id);
+    if (!Number.isInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > MAX_CHECKPOINT_BYTES) {
+      throw workflowFailure('Limite checkpoint non valido.', 'WORKFLOW_CHECKPOINT_INVALID', 409);
+    }
     let workflow;
-    try { workflow = JSON.parse(fs.readFileSync(this.filePath(canonicalId), 'utf8')); }
+    try {
+      const file = this.filePath(canonicalId);
+      const metadata = fs.lstatSync(file);
+      if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > maximumBytes) {
+        throw workflowFailure('Checkpoint workflow non valido.', 'WORKFLOW_CHECKPOINT_INVALID', 409);
+      }
+      const descriptor = fs.openSync(file, 'r');
+      try {
+        const opened = fs.fstatSync(descriptor);
+        if (opened.ino !== metadata.ino || opened.size !== metadata.size) throw new Error('Checkpoint cambiato.');
+        const bytes = Buffer.alloc(metadata.size + 1);
+        let length = 0;
+        while (length < bytes.length) {
+          const read = fs.readSync(descriptor, bytes, length, bytes.length - length, null);
+          if (!read) break;
+          length += read;
+        }
+        const after = fs.fstatSync(descriptor);
+        onRead?.(length);
+        if (length !== metadata.size || after.size !== opened.size || after.mtimeMs !== opened.mtimeMs) throw new Error('Checkpoint cambiato.');
+        workflow = JSON.parse(bytes.toString('utf8', 0, length));
+      } finally { fs.closeSync(descriptor); }
+    }
     catch (error) {
       if (error?.code === 'ENOENT') throw workflowFailure('Workflow non trovato.', 'WORKFLOW_NOT_FOUND', 404);
       throw workflowFailure('Checkpoint workflow non leggibile.', 'WORKFLOW_CHECKPOINT_INVALID', 409);
     }
-    if (!workflow || workflow.id !== canonicalId || !Array.isArray(workflow.steps)) {
+    if (!workflow || workflow.id !== canonicalId || !Array.isArray(workflow.steps)
+      || !workflow.steps.length || workflow.steps.length > MAX_STEPS
+      || !Number.isInteger(workflow.cursor) || workflow.cursor < 0 || workflow.cursor > workflow.steps.length
+      || !WORKFLOW_STATUSES.has(workflow.status)
+      || workflow.steps.some(step => !step || !WORKFLOW_STATUSES.has(step.status))) {
       throw workflowFailure('Checkpoint workflow non valido.', 'WORKFLOW_CHECKPOINT_INVALID', 409);
     }
     return workflow;
+  }
+
+  async list({ limit = 20 } = {}, context = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw workflowFailure('Limite attività non valido.');
+    const owner = String(context.subjectId || '').trim();
+    if (context.requireSubject && !owner) throw workflowFailure('Sessione richiesta.', 'WORKFLOW_SUBJECT_REQUIRED', 403);
+    let directory;
+    try { directory = await fs.promises.opendir(this.checkpointDirectory); }
+    catch (error) { if (error.code === 'ENOENT') return { items: [], truncated: false }; throw error; }
+    const candidates = [];
+    let scanned = 0, bytes = 0, truncated = false;
+    for await (const entry of directory) {
+      if (++scanned > MAX_HISTORY_FILES) { truncated = true; break; }
+      if (!entry.isFile() || !/^[0-9a-f-]{36}\.json$/i.test(entry.name)) continue;
+      let metadata;
+      try { metadata = await fs.promises.lstat(path.join(this.checkpointDirectory, entry.name)); }
+      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+      if (metadata.isFile() && !metadata.isSymbolicLink() && metadata.size <= MAX_CHECKPOINT_BYTES) {
+        candidates.push({ id: entry.name.slice(0, -5), bytes: metadata.size, updatedAt: metadata.mtimeMs });
+      }
+    }
+    candidates.sort((a, b) => b.updatedAt - a.updatedAt || b.id.localeCompare(a.id));
+    const items = [], workspace = this.actionRuntime.workspaceIdentity?.() || '';
+    for (const file of candidates) {
+      if (bytes + file.bytes > MAX_HISTORY_BYTES) { truncated = true; break; }
+      let workflow;
+      try { workflow = this.load(file.id, {
+        maximumBytes: Math.min(MAX_CHECKPOINT_BYTES, MAX_HISTORY_BYTES - bytes),
+        onRead: length => { bytes += length; }
+      }); } catch { truncated = true; continue; }
+      if (String(workflow.ownerSubjectId || '') !== owner || String(workflow.workspaceId || '') !== workspace) continue;
+      if (!Number.isFinite(workflow.createdAt) || !Number.isFinite(workflow.updatedAt)) continue;
+      items.push({ id: workflow.id, summary: String(workflow.summary || '').slice(0, 1000),
+        status: workflow.status, cursor: workflow.cursor, stepCount: workflow.steps.length,
+        createdAt: workflow.createdAt, updatedAt: workflow.updatedAt, recoveryRequired: this.needsRecovery(workflow) });
+    }
+    items.sort((a, b) => b.updatedAt - a.updatedAt || b.id.localeCompare(a.id));
+    return { items: items.slice(0, limit), truncated: truncated || items.length > limit };
   }
 
   resolve(value) {
