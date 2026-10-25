@@ -1,3 +1,14 @@
+## Attivazione routine verificata — 25 ottobre
+
+Sorgenti ac94e03 e sito2b6440e conCIesattaPASS; Worker5a782d3d attivo,
+rollback6dc3c1f6.45unit/36browser,4profiliHTTPS e HTML/readinessPASS;
+Samsung28nativi/5profili e ART verificati sull'APK68651475.1265test/2skipPASS.
+L'avvio è recuperato dopo timeout180s, totale355s: lentezza a freddo APERTA,
+non promettere startup più rapido. Download candidato sospeso prima inferenza,
+nessuna promozione o training. Prossimo lavoro: isolare I/O/cache/driver senza
+benchmark o trasferimenti concorrenti, poi confronto modello su runtime separato.
+Voceumana rinviata, hardwareApple/firmeproduzione assenti. Native pubbliche immutabili.
+
 ## Recupero e preparazione quotidiana — 25 ottobre
 
 Budget preload180s distinto dalle risposte, singleflight cancellabile e cache

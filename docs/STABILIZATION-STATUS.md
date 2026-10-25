@@ -1,3 +1,26 @@
+# Routine changes activated and device verified — 25 October 2026
+
+Application ac94e03 passed CI40224939502 on Windows and Linux. Website2b6440e
+passed CI40224943404 and the full45unit/36browser security, runtime,
+performance and dry-run gate. Worker5a782d3d-491f-4e63-89d4-7f8e317d94df is
+active, with6dc3c1f6 retained for rollback. Four live HTTPS touch/text profiles
+pass canonical local/public HTML, readiness, covered-scene pause, private
+diagnostics and CSP checks. The final landscape capture was inspected.
+
+Samsung QA APK686514755bd660232d94744c784ff67d13bd6c7d7a9fc4382ac45042c4b8be02
+passes28 native tests and five online visual profiles. ART speed-profile is
+verified; three-start median180 to174ms is not a universal performance claim.
+This QA installation does not replace immutable public native downloads.
+
+The service recovered after one180-second preparation timeout and became ready
+in355seconds. Its retry took154927ms; runtime initialization10921ms. Slow cold
+startup remains open. Model download was stopped by verified ownership to give
+service recovery priority; its effect on startup was not established. The
+candidate is incomplete and was never evaluated or promoted. Training and
+optional cloud remain off. Human voice acceptance, physical iOS, production
+signing and a controlled model comparison remain open. These documentation
+updates do not change the tested running application or require redeployment.
+
 # Routine recovery and preparation safeguards — 25 October 2026
 
 Model preparation has its own 180-second budget, cancellation and a single
