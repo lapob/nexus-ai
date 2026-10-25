@@ -4,7 +4,9 @@ The full voice Core follows the held finger, shrinking and revealing chat
 before release. Reversal and cancellation restore the full presentation;
 settling respects reduced motion. One renderer and its hitbox move together;
 presentation does not end voice or reacquire media. Controls stay clear of
-the revealed composer. Android uses window coordinates to prevent movement
+the revealed composer. The compact canvas and face hitbox remain above the
+composer glass; actual face-point picking is checked as well as rectangles.
+Android uses window coordinates to prevent movement
 of the host feeding back into the gesture. The shared browser surface also
 supplies iOS; this is not an iOS device acceptance.
 

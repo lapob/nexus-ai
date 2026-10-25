@@ -31,13 +31,21 @@ const output = path.resolve(__dirname, '../qa-artifacts');
         await page.waitForTimeout(reducedMotion === 'reduce' ? 80 : 650);
         const layout = await page.evaluate(() => {
           const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+          const face = rect('#core');
           return { core: rect('#core'), dock: rect('.dock'), close: rect('.voice-session-actions button:last-child'),
+            faceHits: [[0,0],[0,.3],[0,-.3],[.3,0],[-.3,0]].every(([x,y]) => document.elementFromPoint(face.x+face.width*(.5+x),face.y+face.height*(.5+y))?.closest('#core')),
             inert: document.querySelector('.dock').inert, overflow: document.documentElement.scrollWidth > innerWidth,
             pointer: getComputedStyle(document.querySelector('#core')).pointerEvents,
+            canvasLayer: Number(getComputedStyle(document.querySelector('#coreCanvas')).zIndex),
+            canvasPointer: getComputedStyle(document.querySelector('#coreCanvas')).pointerEvents,
+            dockLayer: Number(getComputedStyle(document.querySelector('.dock')).zIndex),
             label: document.querySelector('#core').getAttribute('aria-label') };
         });
         assert.ok(!layout.inert && !layout.overflow, JSON.stringify(layout));
         assert.equal(layout.pointer, 'auto');
+        assert.equal(layout.faceHits, true, 'The visible Core face must retain its own hitbox');
+        assert.equal(layout.canvasPointer, 'none', 'The raised canvas must not intercept chat controls');
+        assert.ok(layout.canvasLayer > layout.dockLayer, 'The composer glass must not occlude compact Core particles');
         assert.ok(layout.core.width >= 52 && layout.core.width <= 80.1, JSON.stringify(layout));
         assert.ok(layout.core.left >= 0 && layout.core.right <= width && layout.core.top >= 0 && layout.core.bottom <= layout.dock.top, JSON.stringify(layout));
         assert.ok(layout.close.left >= layout.core.right && layout.close.right <= width, JSON.stringify(layout));
