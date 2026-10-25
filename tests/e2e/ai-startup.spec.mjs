@@ -78,7 +78,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
   });
 }
 
-test('AI settings preserve readable controls and reachable close at 200 percent text', async ({ page }) => {
+for (const section of [0, 1, 2, 3]) test(`AI settings panel ${section + 1} preserves readable controls and reachable close at 200 percent text`, async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(origin);
   await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
@@ -88,7 +88,8 @@ test('AI settings preserve readable controls and reachable close at 200 percent 
   await expect(sheet).toBeVisible();
   const tabs = sheet.getByRole('tab');
   await expect(tabs).toHaveCount(4);
-  for (const tab of await tabs.all()) {
+  const tab = tabs.nth(section);
+  {
     await tab.click();
     await expect(tab).toHaveAttribute('aria-selected', 'true');
     const panel = sheet.getByRole('tabpanel');
