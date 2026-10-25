@@ -86,11 +86,21 @@ test('AI settings preserve readable controls and reachable close at 200 percent 
   await page.locator('#profileSettings').click();
   const sheet = page.locator('#profileSheet');
   await expect(sheet).toBeVisible();
-  const audit = await new AxeBuilder({ page }).include('#profileSheet').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
-  expect(audit.violations).toEqual([]);
-  expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
-  for (const select of await sheet.locator('select').all()) {
-    expect((await select.boundingBox()).height).toBeGreaterThanOrEqual(48);
+  const tabs = sheet.getByRole('tab');
+  await expect(tabs).toHaveCount(4);
+  for (const tab of await tabs.all()) {
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
+    const panel = sheet.getByRole('tabpanel');
+    await expect(panel).toHaveCount(1);
+    await expect(panel).toHaveAttribute('id', await tab.getAttribute('aria-controls'));
+    const audit = await new AxeBuilder({ page }).include('#profileSheet').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    expect(audit.violations).toEqual([]);
+    expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    for (const select of await panel.locator('select').all()) {
+      await expect(select).toBeVisible();
+      expect((await select.boundingBox()).height).toBeGreaterThanOrEqual(48);
+    }
   }
   await sheet.evaluate(element => { element.scrollTop = element.scrollHeight; });
   await sheet.getByRole('button', { name: 'Chiudi', exact: true }).click();
