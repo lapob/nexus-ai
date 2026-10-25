@@ -60,6 +60,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   globalThis.visualViewport?.addEventListener('scroll', fitVoiceCore, { passive: true });
   const state = (value, message) => {
     setState(value); lastMessage = message; status.textContent = message;
+    if (minimized && value === 'error') setPhase(message, true);
     if (minimized) core.setAttribute('aria-label', copy('Espandi conversazione vocale', 'Expand voice conversation'));
     fitVoiceCore();
   };
@@ -70,6 +71,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     document.body.classList.remove('voice-session'); document.body.classList.add('voice-minimized');
     core.setAttribute('aria-label', copy('Espandi conversazione vocale', 'Expand voice conversation'));
     onPresentationChange('compact'); fitVoiceCore(); core.focus({ preventScroll: true });
+    if (runtime.voiceState === 'error') setPhase(lastMessage, true);
     return true;
   }
   function expand() {
@@ -144,7 +146,8 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   async function capture(id, duringPlayback = false) {
     const Engine = globalThis.AudioContext || globalThis.webkitAudioContext;
     const context = new Engine(), source = context.createMediaStreamSource(stream), analyser = context.createAnalyser();
-    const samples = new Uint8Array(512), chunks = [];
+    const floatSamples = typeof analyser.getFloatTimeDomainData === 'function';
+    const samples = floatSamples ? new Float32Array(1024) : new Uint8Array(1024), chunks = [];
     analyser.fftSize = 1024; source.connect(analyser);
     let frame = 0, timer = 0, heard = false, voiced = 0, floor = .009;
     let last = performance.now(), lastSpeech = last, started = last, firstSpeech = null;
@@ -172,8 +175,13 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
         const sample = now => {
           if (!valid(id) || current.state !== 'recording') return;
           const dt = Math.min(80, now - last); last = now;
-          analyser.getByteTimeDomainData(samples);
-          const level = Math.sqrt(samples.reduce((sum, v) => sum + ((v - 128) / 128) ** 2, 0) / samples.length);
+          if (floatSamples) analyser.getFloatTimeDomainData(samples); else analyser.getByteTimeDomainData(samples);
+          let squared = 0;
+          for (let index = 0; index < samples.length; index++) {
+            const value = floatSamples ? samples[index] : (samples[index] - 128) / 128;
+            squared += value * value;
+          }
+          const level = Math.sqrt(squared / samples.length);
           runtime.voiceEnergy = Math.min(1, Math.max(0, (level - floor) * 10));
           if (now - started < 300 && level < .02) floor = floor * .9 + level * .1;
           else if (level > Math.max(.016, Math.min(.065, floor * 2.35 + .006))) {
@@ -323,6 +331,13 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
       if (!valid(id)) { acquired.getTracks().forEach(track => track.stop()); return; }
       stream = acquired;
       const track = stream.getAudioTracks()[0];
+      track?.addEventListener?.('ended', () => {
+        if (!valid(id)) return;
+        ++epoch; responseInterrupted = true;
+        if (isBusy()) cancelResponse();
+        stopMedia();
+        state('error', copy('Microfono scollegato. Tocca il Core per riprovare.', 'Microphone disconnected. Tap the Core to retry.'));
+      }, { once: true, signal: controller.signal });
       // Modern browsers can expose an explicit mode which also covers local
       // HTMLAudio playback. remote-only covers WebRTC, not this audio source.
       const echoOptions = track?.getCapabilities?.().echoCancellation;

@@ -274,3 +274,23 @@ test('il provisioning accetta solo redistributable Microsoft validi e rifiuta pu
   assert.equal(result.status, 0, result.stderr || result.error?.message);
   assert.match(result.stdout, /PASS signature acceptance matrix/);
 });
+
+ test('async audit preserves the same admission rules without blocking the event loop', async t => {
+  const { auditOllamaRuntimeAsync }=require('../src/ai/ollama-runtime-security');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nexus-async-audit-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const executable=path.join(root,'ollama.exe');fs.writeFileSync(executable,'reviewed');
+  const runner=fixtureRunner(),stages=[];let ticks=0;const timer=setInterval(()=>ticks++,2);t.after(()=>clearInterval(timer));
+  const actual=await auditOllamaRuntimeAsync(executable,{platform:'win32',onStage:s=>stages.push(s.stage),runProcess:async(...args)=>{await new Promise(r=>setTimeout(r,15));return runner(...args)}});
+  assert.deepEqual(actual,auditOllamaRuntime(executable,{platform:'win32',runProcess:runner}));
+  assert.ok(ticks>=5);assert.deepEqual(stages,['identity','signature','version','vulnerabilities','identity-final']);
+  for(const outcome of ['blocked','changed','cancelled']){
+   const controller=new AbortController();
+   await assert.rejects(auditOllamaRuntimeAsync(executable,{platform:'win32',signal:controller.signal,runProcess:async(command,args)=>{
+    if(command==='grype'){
+     if(outcome==='changed')fs.appendFileSync(executable,'tampered');
+     if(outcome==='cancelled')controller.abort();
+     if(outcome==='blocked')return fixtureRunner({findings:[{vulnerability:{id:'CVE-fixture',severity:'High'},artifact:{name:'fixture'}}]})(command,args);
+    }return runner(command,args);
+   }}),e=>outcome==='cancelled'?e.name==='AbortError':e.code===(outcome==='changed'?'OLLAMA_RUNTIME_CHANGED':'OLLAMA_RUNTIME_VULNERABLE'));
+  }
+ });

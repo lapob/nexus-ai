@@ -3680,17 +3680,29 @@ private fun responsePresentationKind(value: String): ResponsePresentationKind = 
     else -> ResponsePresentationKind.ANSWER
 }
 
-private fun streamSafeMarkdown(value: String): String {
-    var safe = value
-    listOf("**", "`").forEach { token ->
-        if ((safe.split(token).size - 1) % 2 != 0) {
-            val at = safe.lastIndexOf(token)
-            if (at >= 0) safe = safe.removeRange(at, at + token.length)
+internal fun streamSafeMarkdown(value: String): String {
+    fun cleanInline(part: String): String {
+        var safe = part
+        listOf("**", "`").forEach { token ->
+            if ((safe.split(token).size - 1) % 2 != 0) {
+                val at = safe.lastIndexOf(token)
+                if (at >= 0) safe = safe.removeRange(at, at + token.length)
+            }
         }
+        val stars = Regex("(?<!\\*)\\*(?!\\*)").findAll(safe).toList()
+        if (stars.size % 2 != 0) safe = safe.removeRange(stars.last().range)
+        return safe
     }
-    val stars = Regex("(?<!\\*)\\*(?!\\*)").findAll(safe).toList()
-    if (stars.size % 2 != 0) safe = safe.removeRange(stars.last().range)
-    return safe
+    val output = mutableListOf<String>()
+    val prose = mutableListOf<String>()
+    var fenced = false
+    fun flush() { if (prose.isNotEmpty()) { output.add(cleanInline(prose.joinToString("\n"))); prose.clear() } }
+    value.split("\n").forEach { line ->
+        if (line.trimStart().startsWith("```")) { flush(); fenced = !fenced; output.add(line) }
+        else if (fenced) output.add(line) else prose.add(line)
+    }
+    flush()
+    return output.joinToString("\n")
 }
 
 private fun readableMathNotation(value: String): String {

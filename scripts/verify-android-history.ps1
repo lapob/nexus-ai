@@ -14,26 +14,39 @@ $adb = Join-Path $buildEnvironment.SdkRoot 'platform-tools\adb.exe'
 $devices = @(& $adb devices | Where-Object { $_ -match '\sdevice$' })
 if ($devices.Count -ne 1) { throw 'Collega un solo dispositivo Android autorizzato.' }
 $device = ($devices[0] -split '\s+')[0]
+function Assert-TestingSurface {
+    $snapshot = (& $adb -s $device shell dumpsys window) -join "`n"
+    if ($snapshot -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Dispositivo bloccato: nessun tocco eseguito.' }
+    $foreground = [regex]::Match($snapshot, 'mCurrentFocus=.*?\su0\s+([^/\s]+)/').Groups[1].Value
+    $resolvedHomeActivity = ((& $adb -s $device shell cmd package resolve-activity --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME) -join "`n")
+    $homePackage = [regex]::Match($resolvedHomeActivity, '(?m)^([^/\s]+)/').Groups[1].Value
+    if ($foreground -notin @('local.nexus.remote', 'local.nexus.remote.qa', 'local.nexus.console', $homePackage) -or -not $foreground) {
+        throw 'Un altra app e in primo piano: collaudo sospeso prima delle interazioni.'
+    }
+}
+Assert-TestingSurface
 $window = (& $adb -s $device shell dumpsys window) -join "`n"
 if ($window -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Sblocca il dispositivo prima dei test Activity; nessun tocco eseguito.' }
 & $gradle.FullName -p $androidProject --console=plain assembleDebug assembleDebugAndroidTest
 if ($LASTEXITCODE -ne 0) { throw 'Compilazione test Android fallita.' }
 $window = (& $adb -s $device shell dumpsys window) -join "`n"
 if ($window -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Il dispositivo si è bloccato durante la build: collaudo sospeso.' }
+Assert-TestingSurface
 foreach ($apk in @('app\build\outputs\apk\debug\app-debug.apk', 'app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk')) {
     & $adb -s $device install --user 0 -r (Join-Path $androidProject $apk)
     if ($LASTEXITCODE -ne 0) { throw 'Installazione APK di test fallita.' }
 }
 $window = (& $adb -s $device shell dumpsys window) -join "`n"
 if ($window -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Sblocca il dispositivo prima del collaudo.' }
+Assert-TestingSurface
 $output = & $adb -s $device shell am instrument --user 0 -w -r -e class 'local.nexus.remote.LocalChatStoreTest,local.nexus.remote.ComposerContinuityTest,local.nexus.remote.VoicePresentationTest' local.nexus.remote.qa.test/androidx.test.runner.AndroidJUnitRunner 2>&1
 $exitCode = $LASTEXITCODE
 $report = $output -join [Environment]::NewLine
 $artifactDirectory = Join-Path $projectRoot 'qa-artifacts'
 [IO.Directory]::CreateDirectory($artifactDirectory) | Out-Null
 [IO.File]::WriteAllText((Join-Path $artifactDirectory 'android-history-device.log'), $report)
-if ($exitCode -ne 0 -or $report -notmatch 'OK \(27 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
+if ($exitCode -ne 0 -or $report -notmatch 'OK \(28 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
     Write-Output $report
     throw 'Test nativi della cronologia non superati.'
 }
-Write-Output 'PASS: 27 test SQLite/Keystore, readiness, risultati tipizzati, continuita Activity, Core full/mini e autorizzazione assistente sul dispositivo, sandbox QA separata.'
+Write-Output 'PASS: 28 test SQLite/Keystore, readiness, risultati tipizzati, continuita Activity, Core full/mini e autorizzazione assistente sul dispositivo, sandbox QA separata.'

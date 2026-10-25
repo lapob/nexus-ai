@@ -16,7 +16,7 @@ const PUBLIC_PROFILE_STYLE = `<style>
 #profileSheet .sheet-close{width:${layout.touchTargetDp}px;height:${layout.touchTargetDp}px;min-width:${layout.touchTargetDp}px;min-height:${layout.touchTargetDp}px;padding:12px;border:0;background:transparent;border-radius:50%;color:${colors.mist}}
 .profile-layout{display:grid;grid-template-columns:164px minmax(0,1fr);gap:28px;margin-top:16px;align-items:start}
 .profile-nav{display:grid;gap:4px;align-content:start;min-width:0}
-.profile-nav button{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:${layout.touchTargetDp}px;padding:10px 12px;border:0;border-radius:12px;background:transparent;color:${colors.mist};font:inherit;font-size:.875rem;font-weight:500;text-align:left;cursor:pointer}
+.profile-nav button{min-width:0;position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:${layout.touchTargetDp}px;padding:10px 12px;border:0;border-radius:12px;background:transparent;color:${colors.mist};font:inherit;font-size:.875rem;font-weight:500;text-align:left;cursor:pointer}
 .profile-nav button .nxs-symbol{width:20px;height:20px;flex-shrink:0}
 .profile-nav button[aria-selected=true]{color:${colors.ice};background:${colors.surfaceRaised}}
 .profile-nav button[aria-selected=true] .nxs-symbol{color:${colors.cyan}}
@@ -41,20 +41,30 @@ const PUBLIC_PROFILE_STYLE = `<style>
 @keyframes profile-reveal{from{opacity:0;transform:scale(${motion.modeScaleIn})}to{opacity:1;transform:none}}
 @container nxs-profile (max-width:18rem){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}}
 @media(max-width:839px){#profileSheet{width:min(560px,calc(100% - 24px))}.profile-layout{grid-template-columns:minmax(0,1fr);gap:20px}.profile-nav{display:flex;gap:4px}.profile-nav button{flex:1;justify-content:center;text-align:center;padding:10px 8px}.profile-nav button span{min-width:0;overflow-wrap:anywhere}}
-@media(max-width:599px){#profileSheet{width:100%;height:100dvh;max-width:100%;max-height:100dvh;margin:0;border:0;border-radius:0}#profileSheet .sheet-body{padding:20px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}.profile-layout{margin-top:12px}.profile-main{padding-top:4px}}
+@media(max-width:599px){.profile-nav button span{display:none}.profile-nav button{min-height:48px;padding:12px}#profileSheet{width:100%;height:100dvh;max-width:100%;max-height:100dvh;margin:0;border:0;border-radius:0}#profileSheet .sheet-body{padding:20px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}.profile-layout{margin-top:12px}.profile-main{padding-top:4px}}
 @media(max-width:340px){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}.profile-nav button{gap:6px;font-size:.8rem}}
 @media(prefers-reduced-motion:reduce){#profileSheet[open],.profile-panel{animation:none}}
 .profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:12px}
 #profileSheet .profile-note{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
+html[data-nxs-motion=reduce] *,html[data-nxs-motion=reduce] *::before,html[data-nxs-motion=reduce] *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+html[data-nxs-reading=large] :is(.answer,.session-turn-content){font-size:1.3rem!important;line-height:1.75}
 </style>`;
 // #endregion
 // #region 02 — Local preferences, service status and data actions
 function createPublicConversationPreferences(normalize, { getHistory = () => [], clearHistory = () => {}, icons } = {}) {
   const namespace = 'nexusnxs.conversation.preferences.v1';
   const copy = (it, en) => /^it\b/i.test(document.documentElement.lang || navigator.language) ? it : en;
-  let profile;
-  try { profile = normalize(JSON.parse(localStorage.getItem(namespace) || '{}')); }
-  catch { profile = normalize({}); }
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(namespace) || '{}') || {}; } catch { /* Private storage can be unavailable. */ }
+  let profile = normalize(saved);
+  const defaultAppearance = () => ({ motion: 'system', reading: 'standard' });
+  let appearance = { motion: saved.appearance?.motion === 'reduce' ? 'reduce' : 'system', reading: saved.appearance?.reading === 'large' ? 'large' : 'standard' };
+  const applyAppearance = () => {
+    document.documentElement.dataset.nxsMotion = appearance.motion;
+    document.documentElement.dataset.nxsReading = appearance.reading;
+    document.dispatchEvent(new Event('nexusappearancechange'));
+  };
+  applyAppearance();
   const trigger = document.createElement('button');
   trigger.type = 'button'; trigger.id = 'profileSettings'; trigger.className = 'download-trigger profile-trigger';
   trigger.setAttribute('aria-label', copy('Impostazioni NexusNXS', 'NexusNXS settings'));
@@ -67,7 +77,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const closeDialog = async () => {
     if (!dialog.open || closingAnimation) return;
     const generation = dialogGeneration;
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && dialog.animate) {
+    if (appearance.motion !== 'reduce' && !matchMedia('(prefers-reduced-motion: reduce)').matches && dialog.animate) {
       const style = getComputedStyle(dialog);
       closingAnimation = dialog.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: `scale(${style.getPropertyValue('--profile-scale').trim() || '1'})` }], { duration: Number(style.getPropertyValue('--profile-exit')) || 0, easing: style.getPropertyValue('--profile-easing').trim() || 'linear' });
       try { await closingAnimation.finished; } catch { /* A native close cancels the transition. */ }
@@ -89,14 +99,14 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   };
   const conversation = section('profileConversation', 'Chat', 'Chat', true);
   const fields = document.createElement('div'); fields.className = 'profile-fields';
-  const selects = new Map();
+  const selects = new Map(), appearanceSelects = new Map();
   const definitions = [
     ['responseStyle', copy('Dettaglio', 'Detail'), [['concise', copy('Conciso', 'Concise')], ['natural', copy('Naturale', 'Natural')], ['detailed', copy('Approfondito', 'Detailed')]]],
     ['tone', copy('Tono', 'Tone'), [['neutral', copy('Equilibrato', 'Balanced')], ['warm', copy('Caloroso', 'Warm')], ['direct', copy('Diretto', 'Direct')]]],
     ['responseLanguage', copy('Lingua delle risposte', 'Response language'), [['auto', copy('Automatico', 'Automatic')], ['it', 'Italiano'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch']]]
   ];
-  const save = () => { try { localStorage.setItem(namespace, JSON.stringify(profile)); } catch { /* Still usable without persistent storage. */ } };
-  const refresh = () => { for (const [key, select] of selects) select.value = profile[key]; };
+  const save = () => { try { localStorage.setItem(namespace, JSON.stringify({ ...profile, appearance })); } catch { /* Still usable without persistent storage. */ } };
+  const refresh = () => { for (const [key, select] of selects) select.value = profile[key]; for (const [key, select] of appearanceSelects) select.value = appearance[key]; };
   for (const [key, labelText, options] of definitions) {
     const label = document.createElement('label'); label.textContent = labelText;
     const select = document.createElement('select'); select.id = `profile-${key}`;
@@ -141,16 +151,34 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
       ]);
       if (epoch !== statusEpoch || !dialog.open || !services.open) return;
       serviceStates.get('engine').textContent = ready.status === 'fulfilled'
-        ? ready.value.ready ? copy('Operativo', 'Ready') : [200, 404].includes(ready.value.status) ? copy('Da verificare', 'Unverified') : copy('Non disponibile', 'Unavailable')
+        ? ready.value.ready ? copy('Operativo', 'Ready') : ready.value.status === 503 ? copy('In preparazione', 'Preparing') : [200, 404].includes(ready.value.status) ? copy('Da verificare', 'Unverified') : copy('Non disponibile', 'Unavailable')
         : copy('Non raggiungibile', 'Unreachable');
       const entries = capabilities.status === 'fulfilled' && Array.isArray(capabilities.value?.capabilities) ? capabilities.value.capabilities : [];
-      for (const id of ['voice-input', 'voice-output']) serviceStates.get(id).textContent = entries.find(entry => entry.id === id)?.state === 'available'
-        ? copy('Disponibile', 'Available') : copy('Non disponibile', 'Unavailable');
+      for (const id of ['voice-input', 'voice-output']) {
+        const state = entries.find(entry => entry.id === id)?.state;
+        serviceStates.get(id).textContent = state === 'available' ? copy('Disponibile', 'Available')
+          : state === 'unavailable' ? copy('Non disponibile', 'Unavailable')
+            : ['limited', 'degraded'].includes(state) ? copy('Limitato', 'Limited') : copy('Da verificare', 'Unverified');
+      }
     } finally {
       clearTimeout(timer); if (epoch === statusEpoch) { retry.disabled = false; services.removeAttribute('aria-busy'); statusController = null; }
     }
   };
   retry.onclick = () => void checkServices(); services.addEventListener('toggle', () => { if (services.open && dialog.open) void checkServices(); else { ++statusEpoch; statusController?.abort(); retry.disabled = false; services.removeAttribute('aria-busy'); } });
+  const appearanceSection = section('profileAppearance', copy('Aspetto', 'Appearance'), 'Tune');
+  const appearanceFields = document.createElement('div'); appearanceFields.className = 'profile-fields';
+  for (const [key, title, options] of [
+    ['motion', copy('Movimento', 'Motion'), [['system', copy('Automatico', 'Automatic')], ['reduce', copy('Ridotto', 'Reduced')]]],
+    ['reading', copy('Testo della chat', 'Chat text'), [['standard', copy('Standard', 'Standard')], ['large', copy('Grande', 'Large')]]]
+  ]) {
+    const label = document.createElement('label'); label.textContent = title;
+    const select = document.createElement('select'); select.id = 'profile-appearance-' + key;
+    for (const [value, title] of options) { const option = document.createElement('option'); option.value = value; option.textContent = title; select.append(option); }
+    select.value = appearance[key]; select.onchange = () => { appearance[key] = select.value; save(); applyAppearance(); };
+    appearanceSelects.set(key, select); label.append(select); appearanceFields.append(label);
+  }
+  const appearanceNote = document.createElement('p'); appearanceNote.textContent = copy('Seguiamo anche le preferenze di accessibilità del dispositivo. Queste scelte restano sul dispositivo.', 'Device accessibility preferences also apply. These choices stay on your device.');
+  appearanceSection.append(appearanceFields, appearanceNote);
   const data = section('profileData', copy('Dati locali', 'Local data'), 'Lock');
   const dataNote = document.createElement('p'); dataNote.textContent = copy('La cronologia è salvata in questo browser. Il file esportato non è cifrato e resta separato dalla cancellazione.', 'History is saved in this browser. Exported files are not encrypted and remain separate from deletion.'); data.append(dataNote);
   dataNote.id = 'profileDataDisclosure';
@@ -193,8 +221,8 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
       const details = panels[index].querySelector('details'); if (details.open !== active) details.open = active;
     }
   };
-  for (const [details, shortName, icon] of [[conversation, 'Chat', 'Chat'], [services, copy('Voce', 'Voice'), 'Mic'], [data, copy('Dati', 'Data'), 'Lock']]) {
-    const tab = document.createElement('button'); tab.type = 'button'; tab.id = `${details.id}Tab`; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `${details.id}Panel`);
+  for (const [details, shortName, icon] of [[conversation, 'Chat', 'Chat'], [services, copy('Voce', 'Voice'), 'Mic'], [appearanceSection, copy('Aspetto', 'Appearance'), 'Tune'], [data, copy('Dati', 'Data'), 'Lock']]) {
+    const tab = document.createElement('button'); tab.type = 'button'; tab.id = `${details.id}Tab`; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-label', shortName); tab.setAttribute('aria-controls', `${details.id}Panel`);
     tab.innerHTML = icons[icon]; const label = document.createElement('span'); label.textContent = shortName; tab.append(label);
     const panel = document.createElement('div'); panel.id = `${details.id}Panel`; panel.className = 'profile-panel'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', tab.id);
     const heading = document.createElement('h2'); heading.textContent = details.querySelector('summary span').textContent;
@@ -217,7 +245,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   dialog.addEventListener('click', event => { if (event.target === dialog) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) void closeDialog(); } });
   dialog.addEventListener('close', () => { ++dialogGeneration; closingAnimation?.cancel(); ++statusEpoch; statusController?.abort(); confirmation.hidden = true; retry.disabled = false; services.removeAttribute('aria-busy'); trigger.focus({ preventScroll: true }); });
   return { value: () => normalize(profile), forVoice: language => normalize(profile, {}, { voice: true, voiceLanguage: language }),
-    clear: () => { profile = normalize({}); refresh(); } };
+    clear: () => { profile = normalize({}); appearance = defaultAppearance(); applyAppearance(); refresh(); } };
 }
 // #endregion
 module.exports = { createPublicConversationPreferences, PUBLIC_PROFILE_STYLE };

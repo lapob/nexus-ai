@@ -6,6 +6,9 @@
 const { createCosmicVisualizers } = require('../shared/cosmic-visualizers');
 const { createDesktopRecipes } = require('../shared/desktop-recipes');
 const { createPublicVoiceSession } = require('./public-voice-session');
+const { observePublicInteractions } = require('./public-interaction-metrics');
+const { streamSafeMarkdown } = require('../shared/streaming-markdown');
+const { webInteraction } = require('../../config/product-slo.json').objectives;
 const { createPublicWebImages } = require('./public-web-images');
 const { createPublicArtifacts } = require('./public-artifacts');
 const { webImageQuery } = require('../shared/web-image-query');
@@ -15,7 +18,7 @@ const { normalizeConversationPreferences } = require('../shared/conversation-pre
 const { colors: designColors, cosmicGlass, layout: designLayout } = require('../../config/nexus-design-tokens.json');
 const { publicReleaseTarget } = require('../shared/public-release');
 const { symbolSvg, symbolLicenseNotice } = require('../shared/symbols');
-const PROFILE_ICONS = Object.fromEntries(['Settings', 'Close', 'Restore', 'Chat', 'Mic', 'Lock', 'Download', 'DeleteOutline', 'Check'].map(name => [name, symbolSvg(name)]));
+const PROFILE_ICONS = Object.fromEntries(['Settings', 'Close', 'Restore', 'Chat', 'Mic', 'Lock', 'Download', 'DeleteOutline', 'Check', 'Tune'].map(name => [name, symbolSvg(name)]));
 const { windowsDownload: WINDOWS_DOWNLOAD, androidDownload: ANDROID_DOWNLOAD } = publicReleaseTarget({
   version: require('../../package.json').version,
   tag: process.env.NEXUS_GITHUB_RELEASE_TAG,
@@ -249,7 +252,7 @@ const RESPONSE_STYLE = `<style>
 
 const RESPONSE_PRESENTATION_STYLE = `<style>
 .web-answer-context{--answer-accent:112,226,220;width:min(760px,100%);margin:2px 0 14px;display:flex;align-items:center;gap:10px;color:rgb(var(--answer-accent))}.web-answer-context[hidden]{display:none}.web-answer-context>i{width:19px;height:19px;flex:0 0 auto;border:1px solid rgba(var(--answer-accent),.34);border-radius:50%;background:radial-gradient(circle at 42% 38%,rgba(235,255,255,.9) 0 4%,rgba(var(--answer-accent),.7) 5% 12%,rgba(var(--answer-accent),.14) 14% 34%,transparent 36%),conic-gradient(from 20deg,transparent,rgba(var(--answer-accent),.6),transparent 35%,rgba(var(--answer-accent),.28),transparent 76%);box-shadow:0 0 17px rgba(var(--answer-accent),.22)}.web-answer-context>span{display:grid;gap:1px}.web-answer-context small{font:650 .56rem ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}.web-answer-context strong{color:#6f898a;font-size:.64rem;font-weight:510}.web-answer-context[data-kind=code]{--answer-accent:156,181,255}.web-answer-context[data-kind=research]{--answer-accent:111,224,174}.web-answer-context[data-kind=plan]{--answer-accent:198,170,250}.web-answer-context:has(+ .answer.streaming)>i{animation:answer-orbit 1.25s cubic-bezier(.2,0,.2,1) infinite}
-.answer.rich{gap:.72rem}.answer.rich h2,.answer.rich h3{font-weight:590;letter-spacing:-.028em}.answer.rich h2{font-size:1.2em}.answer.rich h3{font-size:1.06em}.answer.rich li::marker{color:#63bebb}.answer.rich hr{height:1px;border:0;background:linear-gradient(90deg,transparent,rgba(103,199,197,.19),transparent)}.answer.rich blockquote{margin:0;padding:2px 0 2px 14px;border-left:2px solid rgba(105,216,212,.32);color:#90a8a8}.math-inline,.web-math-block{font-family:"Cambria Math","STIX Two Math","Noto Sans Math","DejaVu Sans",serif;font-variant-numeric:lining-nums tabular-nums}.math-inline{display:inline-block;margin-inline:.08em;color:#d9fafa;white-space:nowrap}.web-math-block{max-width:100%;overflow-x:auto;padding:14px 16px;border:1px solid rgba(103,211,212,.13);border-radius:15px;color:#e7feff;background:linear-gradient(135deg,rgba(42,135,137,.09),rgba(5,13,15,.52));font-size:1.05em;line-height:1.65;text-align:center;white-space:pre-wrap}.web-code-card{overflow:hidden;border:1px solid rgba(116,167,229,.16);border-radius:17px;background:linear-gradient(145deg,rgba(8,17,24,.93),rgba(5,13,17,.9));box-shadow:0 18px 48px rgba(0,0,0,.18)}.web-code-card>header{min-height:38px;padding:0 12px 0 15px;border-bottom:1px solid rgba(132,172,216,.1);display:flex;align-items:center;justify-content:space-between;color:#748eaa;background:rgba(118,163,218,.035);font:620 .59rem ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase}.web-code-card pre{margin:0!important;border:0!important;border-radius:0!important;background:transparent!important}.web-code-card button{min-height:28px;padding:0 10px;border:1px solid rgba(134,180,232,.12);border-radius:999px;color:#8ea5bb;background:rgba(86,129,177,.07);cursor:pointer;font:600 .58rem system-ui,sans-serif}.web-code-card button:hover,.web-code-card button:focus-visible{outline:0;color:#dceeff;border-color:rgba(140,191,245,.27);background:rgba(103,154,211,.13)}.tok-comment{color:#657c80}.tok-string{color:#9ad8bd}.tok-number{color:#deb98a}.tok-keyword{color:#a7baff}.web-callout{--callout:111,215,210;padding:13px 15px;border:1px solid rgba(var(--callout),.14);border-left:3px solid rgba(var(--callout),.65);border-radius:4px 15px 15px 4px;display:grid;gap:5px;background:linear-gradient(90deg,rgba(var(--callout),.07),rgba(4,13,14,.36) 68%)}.web-callout[data-tone=tip]{--callout:103,220,169}.web-callout[data-tone=warning]{--callout:235,174,98}.web-callout[data-tone=result]{--callout:140,178,250}.web-callout strong{color:rgb(var(--callout));font-size:.72rem;letter-spacing:.015em}.web-callout p{margin:0!important}.web-table-wrap{max-width:100%;overflow:auto;border:1px solid rgba(105,210,207,.12);border-radius:15px;background:rgba(5,16,17,.62);scrollbar-width:thin}.web-table-wrap table{width:100%;border-collapse:collapse;font-size:.78rem}.web-table-wrap th,.web-table-wrap td{padding:10px 12px;border-bottom:1px solid rgba(105,210,207,.08);text-align:left;vertical-align:top}.web-table-wrap th{color:#dff3f2;background:rgba(94,199,196,.055);font-weight:620}.web-table-wrap td{color:#9db2b2}.web-table-wrap tr:last-child td{border-bottom:0}@keyframes answer-orbit{50%{opacity:.72;filter:brightness(1.2);transform:rotate(180deg) scale(1.08)}to{transform:rotate(360deg)}}
+.answer.rich{gap:.72rem}.answer.rich h2,.answer.rich h3{font-weight:650;letter-spacing:-.028em}.answer.rich h2{font-size:1.2em}.answer.rich h3{font-size:1.06em}.answer.rich li::marker{color:#63bebb}.answer.rich hr{height:1px;border:0;background:linear-gradient(90deg,transparent,rgba(103,199,197,.19),transparent)}.answer.rich blockquote{margin:0;padding:2px 0 2px 14px;border-left:2px solid rgba(105,216,212,.32);color:#90a8a8}.math-inline,.web-math-block{font-family:"Cambria Math","STIX Two Math","Noto Sans Math","DejaVu Sans",serif;font-variant-numeric:lining-nums tabular-nums}.math-inline{display:inline-block;margin-inline:.08em;color:#d9fafa;white-space:nowrap}.web-math-block{max-width:100%;overflow-x:auto;padding:14px 16px;border:1px solid rgba(103,211,212,.13);border-radius:15px;color:#e7feff;background:linear-gradient(135deg,rgba(42,135,137,.09),rgba(5,13,15,.52));font-size:1.05em;line-height:1.65;text-align:center;white-space:pre-wrap}.web-code-card{overflow:hidden;border:1px solid rgba(116,167,229,.16);border-radius:17px;background:linear-gradient(145deg,rgba(8,17,24,.93),rgba(5,13,17,.9));box-shadow:0 18px 48px rgba(0,0,0,.18)}.web-code-card>header{min-height:38px;padding:0 12px 0 15px;border-bottom:1px solid rgba(132,172,216,.1);display:flex;align-items:center;justify-content:space-between;color:#748eaa;background:rgba(118,163,218,.035);font:620 .59rem ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase}.web-code-card pre{margin:0!important;border:0!important;border-radius:0!important;background:transparent!important}.web-code-actions{display:flex;gap:4px;align-items:center}.web-code-card button.response-action{width:44px;height:44px;padding:11px;border:0;background:transparent}.web-code-card button.response-action svg{width:20px;height:20px;fill:currentColor;stroke:none}.web-code-card button{min-height:28px;padding:0 10px;border:1px solid rgba(134,180,232,.12);border-radius:999px;color:#8ea5bb;background:rgba(86,129,177,.07);cursor:pointer;font:600 .58rem system-ui,sans-serif}.web-code-card button:hover,.web-code-card button:focus-visible{outline:0;color:#dceeff;border-color:rgba(140,191,245,.27);background:rgba(103,154,211,.13)}.tok-comment{color:#657c80}.tok-string{color:#9ad8bd}.tok-number{color:#deb98a}.tok-keyword{color:#a7baff}.web-callout{--callout:111,215,210;padding:13px 15px;border:1px solid rgba(var(--callout),.14);border-left:3px solid rgba(var(--callout),.65);border-radius:4px 15px 15px 4px;display:grid;gap:5px;background:linear-gradient(90deg,rgba(var(--callout),.07),rgba(4,13,14,.36) 68%)}.web-callout[data-tone=tip]{--callout:103,220,169}.web-callout[data-tone=warning]{--callout:235,174,98}.web-callout[data-tone=result]{--callout:140,178,250}.web-callout strong{color:rgb(var(--callout));font-size:.72rem;letter-spacing:.015em}.web-callout p{margin:0!important}.web-table-wrap{max-width:100%;overflow:auto;border:1px solid rgba(105,210,207,.12);border-radius:15px;background:rgba(5,16,17,.62);scrollbar-width:thin}.web-table-wrap table{width:100%;border-collapse:collapse;font-size:.78rem}.web-table-wrap th,.web-table-wrap td{padding:10px 12px;border-bottom:1px solid rgba(105,210,207,.08);text-align:left;vertical-align:top}.web-table-wrap th{color:#dff3f2;background:rgba(94,199,196,.055);font-weight:620}.web-table-wrap td{color:#9db2b2}.web-table-wrap tr:last-child td{border-bottom:0}@keyframes answer-orbit{50%{opacity:.72;filter:brightness(1.2);transform:rotate(180deg) scale(1.08)}to{transform:rotate(360deg)}}
 @media(max-width:560px){.web-answer-context{margin-bottom:11px}.answer.rich{gap:.64rem}.answer.rich h2{font-size:1.14em}.web-code-card{border-radius:15px}.web-table-wrap table{min-width:440px}}@media(prefers-reduced-motion:reduce){.web-answer-context:has(+ .answer.streaming)>i{animation:none}}
 </style>`;
 
@@ -315,6 +318,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;background:transparent';
   const paint = field.getContext('2d');
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  const reducedMotion = () => motion.matches || document.documentElement.dataset.nxsMotion === 'reduce';
   const stars = Array.from({ length: efficient ? 140 : 360 }, (_, i) => ({
     x: ((i + 901) * .61803398875) % 1, y: ((i + 901) * .41421356237) % 1,
     radius: .55 + (i % 7) * .13, phase: i * 2.399963
@@ -322,7 +326,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   let fieldFrame = 0, width = 0, height = 0, elapsed = 0, previous = 0, lastPaint = 0;
   const resizeField = () => { width = innerWidth; height = innerHeight; const dpr = Math.min(devicePixelRatio || 1, 1.5, Math.sqrt(2073600 / (width * height))); field.width = width * dpr; field.height = height * dpr; paint?.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const drawField = now => {
-    if (!motion.matches && now - lastPaint < 32) { fieldFrame = requestAnimationFrame(drawField); return; }
+    if (!reducedMotion() && now - lastPaint < 32) { fieldFrame = requestAnimationFrame(drawField); return; }
     lastPaint = now;
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
     if (paint) {
@@ -332,7 +336,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
         const star = stars[i];
         if (visual.backend === 'webgl') continue;
         let x = star.x * width, y = star.y * height;
-        const starTime = motion.matches ? 0 : visual.elapsed;
+        const starTime = reducedMotion() ? 0 : visual.elapsed;
         x += Math.sin(starTime * .07 + star.phase) * 5; y += Math.cos(starTime * .06 + star.phase) * 4;
         const side = Math.min(1, Math.abs(x - width / 2) / Math.min(460, width * .48));
         const readingFade = .04 + .5 * side * side;
@@ -341,7 +345,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
       }
       field.dataset.assembled = String(renderer.getMetrics().arrival === 1);
     }
-    if (!document.hidden && !motion.matches) fieldFrame = requestAnimationFrame(drawField);
+    if (!document.hidden && !reducedMotion()) fieldFrame = requestAnimationFrame(drawField);
   };
   const resumeField = () => { cancelAnimationFrame(fieldFrame); previous = 0; if (!document.hidden) fieldFrame = requestAnimationFrame(drawField); };
   resizeField(); resumeField();
@@ -353,8 +357,10 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const retainVoiceCore = () => { voiceCore = true; };
   button.addEventListener('click', retainVoiceCore, true);
   const desktopCore = matchMedia('(min-width: 960px) and (pointer: fine)');
-  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, expansive: true, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getVisible: () => document.body.classList.contains('voice-session') || document.body.classList.contains('voice-minimized') || document.body.classList.contains('image-generating') || !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
+  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, expansive: true, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getReduced: () => reducedMotion(), getVisible: () => document.body.classList.contains('voice-session') || document.body.classList.contains('voice-minimized') || document.body.classList.contains('image-generating') || !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
   let renderer = createRenderer();
+  const appearanceChanged = () => { renderer.refresh(); fitCore(); resumeField(); };
+  document.addEventListener('nexusappearancechange', appearanceChanged);
   const switchCoreLayout = () => { renderer.dispose(); renderer = createRenderer(); fitCore(); resumeField(); };
   desktopCore.addEventListener('change', switchCoreLayout);
   // The GPU canvas belongs to the page, so host opacity cannot hide it.
@@ -364,7 +370,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
   globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => renderer.getMetrics().particles, renderer: () => renderer.getMetrics() };
-  addEventListener('pagehide', event => { if (event.persisted) return; observer.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); document.removeEventListener('transitionend', settleCore); removeEventListener('resize', fitCore); desktopCore.removeEventListener('change', switchCoreLayout); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
+  addEventListener('pagehide', event => { if (event.persisted) return; document.removeEventListener('nexusappearancechange', appearanceChanged); observer.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); document.removeEventListener('transitionend', settleCore); removeEventListener('resize', fitCore); desktopCore.removeEventListener('change', switchCoreLayout); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
   readExchange();
 }
 
@@ -519,7 +525,7 @@ body:not(.keyboard-open):not(.request-active):not(.conversation-active).status-a
 }
 
 /** Renderer DOM sicuro condiviso dalla generazione e dalla risposta conclusa. */
-function publicAnswerPresentationRuntime(answer) {
+function publicAnswerPresentationRuntime(answer, icons, safeStreaming) {
   const context = document.getElementById('answerContext');
   const contextKind = document.getElementById('answerKind');
   const contextStatus = document.getElementById('answerStatus');
@@ -536,21 +542,6 @@ function publicAnswerPresentationRuntime(answer) {
     contextStatus.hidden = !streaming;
   };
   const hideAnswerContext = () => { context.hidden = true; };
-  const safeStreaming = (text) => {
-    let safe = String(text || '');
-    for (const token of ['**', '`']) {
-      if ((safe.split(token).length - 1) % 2) {
-        const at = safe.lastIndexOf(token);
-        safe = safe.slice(0, at) + safe.slice(at + token.length);
-      }
-    }
-    const stars = [...safe.matchAll(/(?<!\*)\*(?!\*)/g)];
-    if (stars.length % 2) {
-      const at = stars.at(-1).index;
-      safe = safe.slice(0, at) + safe.slice(at + 1);
-    }
-    return safe;
-  };
   const readableMath = (value) => {
     const symbols = { '\\times': '×', '\\cdot': '·', '\\div': '÷', '\\pm': '±', '\\mp': '∓', '\\neq': '≠', '\\leq': '≤', '\\le': '≤', '\\geq': '≥', '\\ge': '≥', '\\approx': '≈', '\\infty': '∞', '\\sum': '∑', '\\prod': '∏', '\\int': '∫', '\\partial': '∂', '\\nabla': '∇', '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\pi': 'π', '\\rho': 'ρ', '\\sigma': 'σ', '\\phi': 'φ', '\\omega': 'ω', '\\Delta': 'Δ', '\\Omega': 'Ω', '\\rightarrow': '→', '\\to': '→', '\\leftarrow': '←', '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\subseteq': '⊆', '\\forall': '∀', '\\exists': '∃', '\\quad': ' ', '\\,': ' ', '\\;': ' ' };
     const superscripts = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻' };
@@ -604,9 +595,20 @@ function publicAnswerPresentationRuntime(answer) {
   const appendCode = (fragment, language, code) => {
     const card = document.createElement('section'); card.className = 'web-code-card';
     const meta = document.createElement('header'); const label = document.createElement('span'); const copy = document.createElement('button');
-    label.textContent = language || 'codice'; copy.type = 'button'; copy.textContent = 'Copia';
-    copy.onclick = async () => { try { await navigator.clipboard.writeText(code); copy.textContent = 'Copiato'; } catch { copy.textContent = 'Non riuscito'; } setTimeout(() => { copy.textContent = 'Copia'; }, 1400); };
-    meta.append(label, copy); const pre = document.createElement('pre'); const codeNode = document.createElement('code'); appendHighlightedCode(codeNode, code); pre.append(codeNode); card.append(meta, pre); fragment.append(card);
+    const localized = (it, en) => /^it\b/i.test(document.documentElement.lang || navigator.language) ? it : en;
+    label.textContent = language || localized('codice', 'code'); copy.type = 'button'; copy.className = 'response-action';
+    const copyState = state => { copy.innerHTML = icons[state]; copy.setAttribute('aria-label', state === 'check' ? localized('Copiato', 'Copied') : state === 'error' ? localized('Copia non riuscita', 'Copy failed') : localized('Copia codice', 'Copy code')); };
+    copyState('copy');
+    copy.onclick = async () => { try { await navigator.clipboard.writeText(code); copyState('check'); } catch { copyState('error'); } setTimeout(() => copyState('copy'), 1400); };
+    const download = document.createElement('button'); download.type = 'button'; download.className = 'response-action';
+    download.innerHTML = icons.download; download.setAttribute('aria-label', localized('Scarica codice', 'Download code'));
+    download.onclick = () => {
+      const extensions = {javascript:'js',js:'js',typescript:'ts',ts:'ts',python:'py',py:'py',json:'json',css:'css',html:'html',sql:'sql',bash:'sh',shell:'sh',powershell:'ps1',yaml:'yaml'};
+      const link = document.createElement('a'), url = URL.createObjectURL(new Blob([code], {type:'text/plain;charset=utf-8'}));
+      link.href = url; link.download = 'NexusNXS.' + (extensions[String(language).toLowerCase()] || 'txt'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const actions = document.createElement('div'); actions.className = 'web-code-actions'; actions.append(copy, download);
+    meta.append(label, actions); const pre = document.createElement('pre'); const codeNode = document.createElement('code'); appendHighlightedCode(codeNode, code); pre.append(codeNode); card.append(meta, pre); fragment.append(card);
   };
   const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
   const formatAnswer = (text, options = {}) => {
@@ -637,7 +639,17 @@ function publicAnswerPresentationRuntime(answer) {
       while (index < lines.length && lines[index].trim() && !/^(?:```|#{1,4}\s|>\s|\s*---+\s*$|\s*(?:[-*]|\d+[.)])\s+)/.test(lines[index]) && !(lines[index].includes('|') && index + 1 < lines.length && /^\s*\|?\s*:?-{3,}/.test(lines[index + 1]))) values.push(lines[index++].trim());
       appendInline(paragraph, values.join(' ')); fragment.append(paragraph);
     }
-    output.replaceChildren(fragment); output.classList.add('rich'); output.dataset.kind = kindOf(source);
+    // Reuse unchanged blocks so selection, focus and code-copy feedback survive
+    // subsequent streamed paragraphs. All nodes still come from safe DOM APIs.
+    const nodes = [...fragment.childNodes];
+    for (let position = 0; position < nodes.length; position++) {
+      const node = nodes[position], signature = node.outerHTML || node.textContent, previous = output.childNodes[position];
+      if (previous?.nexusRenderSignature === signature) continue;
+      node.nexusRenderSignature = signature;
+      if (previous) output.replaceChild(node, previous); else output.append(node);
+    }
+    while (output.childNodes.length > nodes.length) output.lastChild.remove();
+    output.classList.add('rich'); output.dataset.kind = kindOf(source);
   };
   return { formatAnswer, hideAnswerContext };
 }
@@ -759,7 +771,7 @@ function resolveSlashInput(value){const raw=String(value||'').trim();let custom=
 prompt.addEventListener('keydown',event=>{const values=slashMatches();if(!values.length)return;if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();event.stopImmediatePropagation();slashSelected=(slashSelected+(event.key==='ArrowDown'?1:-1)+values.length)%values.length;updateSlashMenu()}else if(event.key==='Tab'||event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();chooseSlash(values[slashSelected]?.name||values[0].name)}else if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();slashMenu.hidden=true}},{capture:true});
 prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
   const webImagesRuntime = `const webImages=(${createPublicWebImages.toString()})({target:artifacts,queryFor:(${webImageQuery.toString()}),fetchAuthorized:authenticatedFetch,phase:setPhase,copy:composerCopy,signal:()=>requestAbort?.signal});`;
-  const answerFormattingRuntime = `const {formatAnswer,hideAnswerContext}=(${publicAnswerPresentationRuntime.toString()})(answer);`;
+  const answerFormattingRuntime = `globalThis.nexusInteractionMetrics=(${observePublicInteractions.toString()})(${JSON.stringify({maximumLatencyMs:webInteraction.maximumObservedP95Ms,minimumSamples:webInteraction.minimumObservedInteractions,limit:webInteraction.maximumMemoryRecords})});const {formatAnswer,hideAnswerContext}=(${publicAnswerPresentationRuntime.toString()})(answer,${JSON.stringify({copy:symbolSvg("ContentCopy"),check:symbolSvg("Check"),error:symbolSvg("Restore"),download:symbolSvg("Download")})},(${streamSafeMarkdown.toString()}));`;
   const enhancedScript = script
     .replace('globalThis.nexusDemoState=runtime', 'globalThis.nexusAiState=runtime')
     .replace("const setVoiceState=value=>", "const coreHintSeen=()=>{try{return localStorage.getItem('nexusnxs.core-hint.v1')==='1'}catch{return false}},markCoreHintSeen=()=>{try{localStorage.setItem('nexusnxs.core-hint.v1','1')}catch{}};const setVoiceState=value=>")

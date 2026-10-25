@@ -1,3 +1,36 @@
+# Daily-use polish verified — 25 October 2026
+
+Runtime admission now awaits the same signature/version/vulnerability policy
+asynchronously, with before/after executable identity, cancellation and stage
+timings. The real installed runtime passed in15.986s while147 event-loop ticks
+completed. This does not establish a boot-time speedup or cache-independent
+comparison. Warm-up now separates selection, admission, preload and reported
+model-load duration for diagnosis.
+
+Completed streamed response blocks retain DOM identity, focus and copy state.
+Code copy/download actions use the shared offline Material Symbols; the desktop
+emits only its four actual paths to preserve the240KiB shell budget. Code fences
+remain verbatim during incomplete streaming on desktop, web and Android.
+Microphone loss invalidates the partial turn and exposes a recoverable error;
+floating-point capture retains the byte-input fallback and existing thresholds.
+
+Appearance preferences add local reduced motion and larger conversation text.
+They are excluded from AI requests and reset with browser data. Event Timing
+observations retain at most200 durations, no event contents, identifiers in
+reports or uploads. Their observed-window p95 is not a field INP certification.
+Unknown service capability and AI preparation are distinct from unavailability.
+
+Source suite1256PASS/2SKIP, runtime26focused and voice34focused pass. Four
+new browser profiles pass stable streamed code, exact downloads, appearance
+persistence/reset and privacy; offline four formats and24Core layouts pass.
+Android build/lint,28native tests and five online profiles pass; ART is verified,
+with three-start median173→172ms and no general performance claim.
+
+Final CI and deployment verification still precede activation. Existing signed
+release requirements, human voice/echo, iOS hardware and model-quality evidence
+remain open. The CPU-isolated candidate estimate requires19.9GiB free against
+13.8GiB observed; no evaluation, training, promotion or cloud activation began.
+
 ## Compact voice verified live — 25 October 2026
 
 Runtime UI revision7c97be0 and QA revision3c43edd passed exact-commit CI.

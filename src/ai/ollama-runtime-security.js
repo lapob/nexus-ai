@@ -5,7 +5,8 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { spawnSync, execFile } = require('node:child_process');
+const { hashFile } = require('./native-runtime-inventory');
 
 // #region 01 — Regole, parsing e identità del runtime
 
@@ -55,8 +56,7 @@ function runChecked(runProcess, command, args, options, errorCode, description) 
   return result;
 }
 
-function verifyAuthenticode(executablePath, { platform = process.platform, runProcess = spawnSync } = {}) {
-  if (platform !== 'win32') return { status: 'NotApplicable', signer: '' };
+function authenticodeOperation(executablePath) {
   const command = [
     "$ErrorActionPreference = 'Stop';",
     'Import-Module Microsoft.PowerShell.Security -ErrorAction Stop;',
@@ -73,16 +73,19 @@ function verifyAuthenticode(executablePath, { platform = process.platform, runPr
     process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'WindowsPowerShell', 'Modules'),
     path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'Modules')
   ].filter(Boolean).join(path.delimiter);
-  const result = runChecked(runProcess, 'powershell.exe', [
+  return { command: 'powershell.exe', args: [
     '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command
-  ], {
+  ], options: {
     encoding: 'utf8', windowsHide: true, timeout: 15_000, maxBuffer: 2 * 1024 * 1024,
     env: {
       ...process.env,
       PSModulePath: windowsPowerShellModules,
       NEXUS_OLLAMA_AUDIT_TARGET: executablePath
     }
-  }, 'OLLAMA_SIGNATURE_CHECK_FAILED', 'Verifica firma Ollama');
+  }, errorCode: 'OLLAMA_SIGNATURE_CHECK_FAILED', description: 'Verifica firma Ollama', stage: 'signature' };
+}
+
+function parseAuthenticode(result) {
   let signature;
   try { signature = JSON.parse(String(result.stdout || '').trim()); }
   catch { throw runtimeSecurityError('Risposta firma Ollama non valida.', 'OLLAMA_SIGNATURE_CHECK_FAILED'); }
@@ -92,13 +95,18 @@ function verifyAuthenticode(executablePath, { platform = process.platform, runPr
   return { status: signature.Status, signer: signature.Signer };
 }
 
+function verifyAuthenticode(executablePath, { platform = process.platform, runProcess = spawnSync } = {}) {
+  if (platform !== 'win32') return { status: 'NotApplicable', signer: '' };
+  const operation = authenticodeOperation(executablePath);
+  return parseAuthenticode(runChecked(runProcess, operation.command, operation.args, operation.options, operation.errorCode, operation.description));
+}
+
 // #endregion
 
 // #region 02 — Audit fail-closed e API pubblica
 
-function auditOllamaRuntime(executablePath, {
+function* auditRuntimeSteps(executablePath, {
   platform = process.platform,
-  runProcess = spawnSync,
   requireSignature = platform === 'win32',
   usage = 'distribution',
   host = '',
@@ -112,13 +120,14 @@ function auditOllamaRuntime(executablePath, {
   // External scanners may not traverse Windows junctions used by worktrees.
   // Audit, execute and hash the same resolved file, without bypassing the gate.
   executable = fs.realpathSync.native(executable);
+  const initialHash = yield { kind: 'sha256', executable, stage: 'identity' };
   const signature = requireSignature
-    ? verifyAuthenticode(executable, { platform, runProcess })
+    ? parseAuthenticode(yield authenticodeOperation(executable))
     : { status: 'NotRequired', signer: '' };
-  const versionResult = runChecked(runProcess, executable, ['--version'], {
+  const versionResult = yield { command: executable, args: ['--version'], options: {
     encoding: 'utf8', windowsHide: true, timeout: 10_000, maxBuffer: 2 * 1024 * 1024,
     env: { ...process.env, OLLAMA_HOST: '127.0.0.1:1' }
-  }, 'OLLAMA_VERSION_CHECK_FAILED', 'Lettura versione Ollama');
+  }, errorCode: 'OLLAMA_VERSION_CHECK_FAILED', description: 'Lettura versione Ollama', stage: 'version' };
   const version = parseOllamaVersion(`${versionResult.stdout || ''}\n${versionResult.stderr || ''}`);
   if (!version) throw runtimeSecurityError('Versione Ollama non verificabile.', 'OLLAMA_VERSION_INVALID');
   if (compareVersions(version, minimumVersion) < 0) {
@@ -128,14 +137,14 @@ function auditOllamaRuntime(executablePath, {
     );
   }
 
-  const scanResult = runChecked(runProcess, scannerExecutable, [
+  const scanResult = yield { command: scannerExecutable, args: [
     `file:${executable}`, '--scope', 'all-layers', '-o', 'json'
-  ], {
+  ], options: {
     // Grype's first database-backed scan can be slow on the portable SSD.
     // Keep the fail-closed gate, but allow enough time for a real result.
     encoding: 'utf8', windowsHide: true, timeout: 300_000, maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, GRYPE_CHECK_FOR_APP_UPDATE: 'false' }
-  }, 'OLLAMA_SECURITY_SCAN_FAILED', 'Scansione Grype Ollama');
+  }, errorCode: 'OLLAMA_SECURITY_SCAN_FAILED', description: 'Scansione Grype Ollama', stage: 'vulnerabilities' };
   let scan;
   try { scan = JSON.parse(String(scanResult.stdout || '')); }
   catch { throw runtimeSecurityError('Risposta Grype non valida.', 'OLLAMA_SECURITY_SCAN_FAILED'); }
@@ -147,7 +156,8 @@ function auditOllamaRuntime(executablePath, {
     throw runtimeSecurityError('Risposta Grype incompleta o non valida.', 'OLLAMA_SECURITY_SCAN_FAILED');
   }
   const blocking = blockingFindings(scan);
-  const sha256 = crypto.createHash('sha256').update(fs.readFileSync(executable)).digest('hex');
+  const sha256 = yield { kind: 'sha256', executable, stage: 'identity-final' };
+  if (sha256 !== initialHash) throw runtimeSecurityError('Il runtime è cambiato durante la verifica.', 'OLLAMA_RUNTIME_CHANGED');
   const developmentLoopback = usage === 'development' && isLoopbackHost(host);
   if (blocking.length && !developmentLoopback) {
     throw runtimeSecurityError(
@@ -164,12 +174,44 @@ function auditOllamaRuntime(executablePath, {
   return Object.freeze({ executable, version, minimumVersion, sha256, signature, blockingFindings: blocking.length, warnings });
 }
 
+function auditOllamaRuntime(executablePath, options = {}) {
+  const steps = auditRuntimeSteps(executablePath, options); let next = steps.next();
+  while (!next.done) {
+    const op = next.value;
+    const result = op.kind === 'sha256' ? crypto.createHash('sha256').update(fs.readFileSync(op.executable)).digest('hex')
+      : runChecked(options.runProcess || spawnSync, op.command, op.args, op.options, op.errorCode, op.description);
+    next = steps.next(result);
+  }
+  return next.value;
+}
+
+async function auditOllamaRuntimeAsync(executablePath, options = {}) {
+  const steps = auditRuntimeSteps(executablePath, options); let next = steps.next();
+  const run = options.runProcess || ((command, args, settings) => new Promise(resolve => {
+    execFile(command, args, { ...settings, signal: options.signal }, (error, stdout, stderr) => {
+      resolve({ status: error ? (Number.isInteger(error.code) ? error.code : -1) : 0, error, stdout, stderr });
+    });
+  }));
+  while (!next.done) {
+    options.signal?.throwIfAborted();
+    const op = next.value, started = performance.now();
+    const result = op.kind === 'sha256' ? await hashFile(op.executable, options.signal)
+      : await run(op.command, op.args, op.options);
+    options.signal?.throwIfAborted();
+    const checked = op.kind === 'sha256' ? result
+      : runChecked(() => result, op.command, op.args, op.options, op.errorCode, op.description);
+    try { options.onStage?.({ stage: op.stage, durationMs: Math.round(performance.now() - started) }); } catch { /* Observability cannot admit or reject a runtime. */ }
+    next = steps.next(checked);
+  }
+  return next.value;
+}
+
 function assertOllamaRuntimeSecure(executablePath, options) {
   return auditOllamaRuntime(executablePath, options);
 }
 
 module.exports = {
-  DEVELOPMENT_MINIMUM_VERSION, assertOllamaRuntimeSecure, auditOllamaRuntime,
+  DEVELOPMENT_MINIMUM_VERSION, assertOllamaRuntimeSecure, auditOllamaRuntime, auditOllamaRuntimeAsync,
   blockingFindings, compareVersions, isLoopbackHost, parseOllamaVersion, verifyAuthenticode
 };
 

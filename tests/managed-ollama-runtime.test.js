@@ -257,3 +257,17 @@ test('taskkill riuscito chiude l albero posseduto senza inviare un secondo segna
   assert.equal(runtime.process, null);
   assert.equal(runtime.ownedProcess, false);
 });
+
+ test('pending asynchronous admission is single-flight, cancellable and cannot spawn after stop', async t => {
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nexus-pending-admission-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const executable=path.join(root,'ollama.exe');fs.writeFileSync(executable,'fixture');
+  let finish,signal,audits=0,spawns=0;
+  const runtime=new ManagedOllamaRuntime({enabled:true,executablePath:executable,userDataPath:root,
+   runtimeSecurityCheck:async(_,options)=>{audits++;signal=options.signal;await new Promise(r=>finish=r)},
+   spawnProcess:()=>{spawns++;return new EventEmitter()},terminateProcess(){}});
+  runtime.health=async()=>spawns>0;
+  const starting=runtime.start();while(!finish)await new Promise(r=>setImmediate(r));
+  const concurrent=runtime.ensureHealthy();assert.equal(spawns,0);assert.equal(runtime.stop(),true);assert.equal(signal.aborted,true);
+  finish();assert.equal((await starting).available,false);assert.equal((await concurrent).available,false);
+  assert.equal(audits,1);assert.equal(spawns,0);runtime.shutdown();
+ });

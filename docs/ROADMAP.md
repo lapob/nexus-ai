@@ -1,5 +1,23 @@
 # Roadmap tecnica
 
+## Programma quotidiano applicato — 25 ottobre
+
+| Area | Stato e prova | Gate ancora aperto |
+| --- | --- | --- |
+| Avvio | Audit asincrono con firma/versione/vulnerabilità invariati, identità prima/dopo e cancellazione; verifica reale16s senza bloccare il main | Misurare nuovo boot e distinguere cache del sistema da miglioramenti del codice |
+| Voce | Campionamento float con fallback, errore recuperabile su scollegamento, scarto del turno parziale;34 test PASS | Accettazione umana di eco, precisione e latenza; ASR residente ancora candidato |
+| Movimento | Preferenza locale ridotta, rispetto del sistema e token condivisi mantenuti | Verifica fisica iOS richiede Mac e dispositivo |
+| Risposte | Blocchi DOM completati stabili, icone copia/download, contenuto esatto e fence di codice preservati su web/desktop/Android | Gate sorgenti, browser e nativi della revisione finale |
+| Impostazioni | Aspetto separato, navigazione compatta con icone, testo grande e reset senza inviare preferenze visive al servizio | Gate visivo/CSP della versione pubblicata |
+| Adattamento | Quattro nuovi profili inclusi200% testo, persistenza, cancellazione e scorrimento | Le piattaforme non disponibili restano non collaudate |
+| Prestazioni | SLO locale200ms e osservazioni Event Timing limitate a200 interazioni, senza contenuti o upload | Una finestra osservata non certifica INP al75° percentile degli utenti |
+| Funzioni | Contratti di permessi, annullamento e ricevute conservati; stati preparazione/ignoto distinti da indisponibile | Integrazioni esterne richiedono configurazioni reali del proprietario |
+| Qualità e consegna | Suite100 casi/28 obbligatori e gate esistenti riutilizzati; nessun training o promozione | Candidato15.36GB richiede19.9GiB RAM libera in isolamento CPU, rilevati13.8GiB; zero esempi approvati, firme produzione assenti |
+
+Il servizio attivo non viene usato come runtime di benchmark. I download
+nativi pubblici restano immutabili; un APK installato per QA non è una release
+firmata di produzione. Locale predefinito e cloud disattivato.
+
 ## Uso quotidiano: stato verificato del 24 ottobre
 
 Ricerca Deep resistente ai guasti parziali, lettura streaming limitata e target

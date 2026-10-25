@@ -35,6 +35,12 @@ class ComposerContinuityTest {
         context.getSharedPreferences("nexus_compose", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
+    @Test fun streamedCodePreservesItsSyntaxWhileProseIsIncomplete() {
+        assertEquals("Testo", streamSafeMarkdown("**Testo"))
+        assertEquals("```python\na*b\nprint(\"**\")", streamSafeMarkdown("```python\na*b\nprint(\"**\")"))
+        assertEquals("```js\nconst marker = \"*\";\n```\n\nRisultato", streamSafeMarkdown("```js\nconst marker = \"*\";\n```\n\n**Risultato"))
+    }
+
     @Test fun typedResultsSurviveActivityRecreationWithoutExecutingTheirContent() {
         val metadata = JSONArray()
             .put(JSONObject().put("id", "qa-code").put("kind", "code").put("title", "QA code result").put("content", "<script>not executed</script>"))

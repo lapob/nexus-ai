@@ -39,6 +39,12 @@
         "https://ai.nexusnxs.com/healthz",
         "https://ai.nexusnxs.com/readyz"
       ]
+    },
+    "webInteraction": {
+      "maximumObservedP95Ms": 200,
+      "minimumObservedInteractions": 10,
+      "maximumMemoryRecords": 200,
+      "measurementScope": "local-observed-window-not-field-inp"
     }
   }
 }

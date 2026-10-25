@@ -3,16 +3,17 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { createPublicVoiceSession } = require('../src/remote/public-voice-session');
 
-function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null, tone = 'neutral', voiceCapability = 'available', { browserLanguage = 'it-IT', transcriptLanguages = ['it'], responseLanguage = 'auto', spokenTurns = 1, fallbackLanguage = 'it', responseText = 'response', spokenGenerationInterruption = false, waitingFrames = 0, speechFrames = 7, streamingFrames = null, resumeFailureAt = 0, presentationDuringPlayback = false } = {}) {
+function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null, tone = 'neutral', voiceCapability = 'available', { browserLanguage = 'it-IT', transcriptLanguages = ['it'], responseLanguage = 'auto', spokenTurns = 1, fallbackLanguage = 'it', responseText = 'response', spokenGenerationInterruption = false, waitingFrames = 0, speechFrames = 7, streamingFrames = null, resumeFailureAt = 0, presentationDuringPlayback = false, microphoneDisconnectAtFrame = 0, floatCapture = false } = {}) {
   let frames=0, recordings=0, transcriptions=0, paused=0, stopped=0, speaking=false, busy=false, cancelled=0, audioStarts=0, synthesisAborted=false, microphoneRequests=0, instance, finishGeneration;
   const element=()=>{const classes=new Set(),attributes=new Map(),listeners=new Map();return {hidden:false,value:'',className:'',textContent:'',dataset:{},inert:false,style:{setProperty(){},removeProperty(){}},classList:{contains:value=>classes.has(value),add(...values){values.forEach(value=>classes.add(value));},remove(...values){values.forEach(value=>classes.delete(value));}},setAttribute(key,value){attributes.set(key,value);},getAttribute(key){return attributes.get(key)||'';},addEventListener(key,handler){listeners.set(key,handler);},emit(key,event){listeners.get(key)?.(event);},append(){},focus(){document.activeElement=this;},blur(){},dispatchEvent(){}};};
   const prompt=element(),core=element(),background=element();
   const document={createElement:element,body:element(),addEventListener(){},querySelectorAll:()=>[background],getElementById:()=>null};
-  const stream={getTracks:()=>[{stop(){stopped++;}}],getAudioTracks:()=>[{getSettings:()=>({echoCancellation})}]};
+  let ended; const track={stop(){stopped++;},getSettings:()=>({echoCancellation}),addEventListener(type,callback,options){if(type==='ended'){ended=callback;options?.signal?.addEventListener('abort',()=>{ended=null;});}}};
+  const stream={getTracks:()=>[track],getAudioTracks:()=>[track]};
   const durations=[],encoded=[],hints=[]; let resumes=0;
   class Context {
     createMediaStreamSource(){return {connect(){},disconnect(){}};}
-    createAnalyser(){let n=0;return {disconnect(){},getByteTimeDomainData(samples){n++;const loud=n>waitingFrames&&n<=waitingFrames+speechFrames;samples.forEach((_,i)=>{samples[i]=loud?(i%2?155:101):128;});}};}
+    createAnalyser(){let n=0;const sample=(samples,float)=>{n++;if(n===microphoneDisconnectAtFrame)queueMicrotask(()=>ended?.());const loud=n>waitingFrames&&n<=waitingFrames+speechFrames;samples.forEach((_,i)=>{samples[i]=float?(loud?(i%2?.21:-.21):0):(loud?(i%2?155:101):128);});};return {disconnect(){},getByteTimeDomainData:samples=>sample(samples,false),...(floatCapture?{getFloatTimeDomainData:samples=>sample(samples,true)}:{})};}
     async resume(){if(++resumes===resumeFailureAt)throw new Error('Capture unavailable');} async close(){} async decodeAudioData(){const length=Math.max(1,Math.round(durations.shift()*16000)),data=Float32Array.from({length},(_,index)=>index);return {length,sampleRate:16000,numberOfChannels:1,getChannelData:()=>data};}
   }
   class Recorder {
@@ -200,4 +201,13 @@ for(const mode of ['late-response','reject','leave']){
    h.core.emit('pointermove',{pointerId:2,clientX:x,clientY:y});
    if(cancel)h.core.emit('pointercancel',{});h.core.emit('pointerup',{pointerId:2});assert.equal(h.instance.minimized,false);
   }h.instance.leave();
+ });
+
+ test('microphone disconnection discards partial capture and leaves an explicit recoverable error', async()=>{
+  const h=harness(false,true,false,false,null,'neutral','available',{microphoneDisconnectAtFrame:4});await h.run();
+  assert.equal(h.stats().transcriptions,0);assert.equal(h.stats().audioStarts,0);assert.equal(h.stats().voiceState,'error');assert.ok(h.stats().stopped>0);h.instance.leave();
+ });
+ test('floating point capture keeps the same cancellation and complete-turn contract',async()=>{
+  const h=harness(true,true,false,false,null,'neutral','available',{floatCapture:true});await h.run();
+  assert.equal(h.stats().transcriptions,2);assert.equal(h.stats().audioStarts,1);assert.equal(h.stats().microphoneRequests,1);
  });

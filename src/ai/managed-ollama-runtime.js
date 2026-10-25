@@ -7,7 +7,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
-const { assertOllamaRuntimeSecure } = require('./ollama-runtime-security');
+const { auditOllamaRuntimeAsync } = require('./ollama-runtime-security');
 const { AIError, AI_ERROR_CODES } = require('./ai-errors');
 
 function managedRuntimeSecurityUsage({ serverMode = false, isPackaged = true } = {}) {
@@ -107,7 +107,8 @@ class ManagedOllamaRuntime {
     this.lastRestartAt = 0;
     this.platform = options.platform || process.platform;
     this.spawnProcess = options.spawnProcess || spawn;
-    this.runtimeSecurityCheck = options.runtimeSecurityCheck || assertOllamaRuntimeSecure;
+    this.runtimeSecurityCheck = options.runtimeSecurityCheck || auditOllamaRuntimeAsync;
+    this.admissionController = null;
     const securityUsage = options.securityUsage ?? 'distribution';
     if (!['development', 'distribution'].includes(securityUsage)) throw new TypeError('Profilo sicurezza runtime non valido.');
     Object.defineProperty(this, 'securityUsage', { value: securityUsage, enumerable: true });
@@ -192,18 +193,24 @@ class ManagedOllamaRuntime {
       this.logger?.warn('Runtime AI NEXUSNXS non incluso nel pacchetto.', { executablePath: this.executablePath });
       return { managed: true, available: false, baseUrl: this.baseUrl, reason: 'runtime-missing' };
     }
+    const admission = new AbortController();
+    this.admissionController = admission;
     try {
       // Grype deve ricevere il percorso reale: su Windows non segue sempre i
       // junction usati per aggirare i limiti del loader ROCm.
-      this.runtimeSecurityCheck(this.securityExecutablePath, {
-        usage: this.securityUsage, host: this.host
+      await this.runtimeSecurityCheck(this.securityExecutablePath, {
+        usage: this.securityUsage, host: this.host, signal: admission.signal,
+        onStage: ({ stage, durationMs }) => this.logger?.info('Verifica runtime completata.', { stage, durationMs })
       });
     } catch (error) {
+      if (admission.signal.aborted || this.disposed || generation !== this.lifecycleGeneration) {
+        return { managed: true, available: false, baseUrl: this.baseUrl, reason: 'runtime-stopped' };
+      }
       this.logger?.error('Runtime AI NEXUSNXS bloccato dal gate di sicurezza.', {
         code: error?.code || 'OLLAMA_SECURITY_BLOCKED', executablePath: this.executablePath
       });
       return { managed: true, available: false, baseUrl: this.baseUrl, reason: 'runtime-security-blocked' };
-    }
+    } finally { if (this.admissionController === admission) this.admissionController = null; }
     fs.mkdirSync(this.modelsPath, { recursive: true });
     if (this.disposed || generation !== this.lifecycleGeneration) {
       return { managed: true, available: false, baseUrl: this.baseUrl, reason: 'runtime-stopped' };
@@ -253,6 +260,10 @@ class ManagedOllamaRuntime {
     if (requireDistribution && (!this.enabled || this.securityUsage !== 'distribution')) {
       return { available: false, recovered: false, reason: 'runtime-security-profile' };
     }
+    if (this.startPromise) {
+      const result = await this.startPromise;
+      return { available: result.available === true, recovered: false, ...(result.reason ? { reason: result.reason } : {}) };
+    }
     const generation = this.lifecycleGeneration;
     const child = this.process;
     if ((!this.enabled || this.hasAdmittedProcess()) && await this.health()) {
@@ -281,7 +292,13 @@ class ManagedOllamaRuntime {
   // #region 03 — Arresto controllato
 
   stop() {
-    if (!this.ownedProcess || !this.process) return false;
+    const admission = this.admissionController;
+    this.admissionController = null;
+    admission?.abort();
+    if (!this.ownedProcess || !this.process) {
+      if (admission) this.lifecycleGeneration += 1;
+      return Boolean(admission);
+    }
     const child = this.process;
     this.lifecycleGeneration += 1;
     try {

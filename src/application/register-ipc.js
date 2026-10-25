@@ -542,9 +542,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     // Il bootstrap, il retry e il keep-warm possono cadere nello stesso
     // intervallo. Una sola richiesta raggiunge Ollama; gli altri chiamanti
     // attendono la medesima promise invece di caricare due volte il modello.
+    const started = performance.now();
     const settings = await adaptiveSettings();
+    const selectedAt = performance.now();
     const model = settings.fastModel || settings.chatModel || 'automatic';
     await ensureRuntime(settings);
+    const admittedAt = performance.now();
     const prepared = await aiRuntime.preloadModel(model, {
       keepAlive: runtimeTuning.keepAlive,
       numCtx: runtimeTuning.contextTokens,
@@ -552,7 +555,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       // background non deve espellere un modello profondo ancora caldo.
       preserveLoadedModel: preserveLoadedModel && (runtimeTuning.maxLoadedModels || 1) <= 1
     });
-    logger.info('Servizio AI preparato in background.', { model: prepared?.model || model, tier: runtimeTuning.tier, remote: prepared?.remote === true, preserved: prepared?.preserved === true });
+    logger.info('Servizio AI preparato in background.', {
+      model: prepared?.model || model, tier: runtimeTuning.tier, remote: prepared?.remote === true, preserved: prepared?.preserved === true,
+      selectionMs: Math.round(selectedAt - started), admissionMs: Math.round(admittedAt - selectedAt),
+      preloadMs: Math.round(performance.now() - admittedAt),
+      reportedLoadMs: Number.isFinite(prepared?.loadDurationNs) ? Math.round(prepared.loadDurationNs / 1_000_000) : null
+    });
     return { warmed: prepared?.warmed !== false, model: prepared?.model || model, remote: prepared?.remote === true, preserved: prepared?.preserved === true };
   });
   const aiReadiness = aiWarmup.status;

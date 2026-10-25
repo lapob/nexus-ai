@@ -6,20 +6,18 @@ import { memo, type ReactNode, useEffect, useId, useMemo, useRef, useState } fro
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { QuietClose } from './QuietClose';
+import { NexusSymbol } from './NexusSymbol';
+import { streamSafeMarkdown } from '../../shared/streaming-markdown';
 import { NexusSelect } from './NexusSelect';
 import { MAX_ARTIFACT_CONTENT } from '../../shared/artifact-revisions.mjs';
 import type { OperationalArtifact } from '../types/nexus';
 
 function CopyGlyph({ state = 'idle' }: { state?: 'idle' | 'copied' | 'error' }) {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {state === 'copied' ? <path d="m5 12 4 4L19 6" /> : state === 'error' ? <path d="m7 7 10 10M17 7 7 17" /> : <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V4H4v12h4" /></>}
-  </svg>;
+  return <NexusSymbol name={state === 'copied' ? 'Check' : state === 'error' ? 'Restore' : 'ContentCopy'} />;
 }
 
 function DownloadGlyph({ original = false }: { original?: boolean }) {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {original ? <><path d="M3 11a9 9 0 1 1 3 8M3 4v7h7" /><path d="M12 7v5l3 2" /></> : <><path d="M12 3v12m-4-4 4 4 4-4M5 17v4h14v-4" /></>}
-  </svg>;
+  return <NexusSymbol name={original ? 'Restore' : 'Download'} />;
 }
 
 function downloadArtifact(artifact: OperationalArtifact, version: 'current' | 'original' | 'diff') {
@@ -111,21 +109,6 @@ function responseKind(text: string): ResponseKind {
   return 'answer';
 }
 
-function streamSafeMarkdown(markdown: string) {
-  let safe = markdown;
-  for (const token of ['**', '`']) {
-    if ((safe.split(token).length - 1) % 2 !== 0) {
-      const index = safe.lastIndexOf(token);
-      safe = `${safe.slice(0, index)}${safe.slice(index + token.length)}`;
-    }
-  }
-  const singleStars = [...safe.matchAll(/(?<!\*)\*(?!\*)/g)];
-  if (singleStars.length % 2 !== 0) {
-    const index = singleStars.at(-1)?.index ?? -1;
-    if (index >= 0) safe = `${safe.slice(0, index)}${safe.slice(index + 1)}`;
-  }
-  return safe;
-}
 
 function tableCells(line: string) {
   return line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
