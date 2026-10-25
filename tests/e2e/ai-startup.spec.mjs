@@ -109,6 +109,27 @@ for (const section of [0, 1, 2, 3]) test(`AI settings panel ${section + 1} prese
   await expect(page.locator('#profileSettings')).toBeFocused();
 });
 
+test('draft recovery requires opt-in and diagnostics never include its text', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(origin);
+  await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
+  await page.locator('#profileSettings').click(); await page.locator('#profileDataTab').click();
+  await expect(page.locator('#profile-recovery-draft')).toHaveValue('off');
+  await page.locator('#profile-recovery-draft').selectOption('session');
+  await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
+  await page.locator('#keyboard').click(); await page.locator('#prompt').fill('Private draft sentinel');
+  await page.reload(); await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
+  await expect(page.locator('#prompt')).toHaveValue('Private draft sentinel');
+  await page.locator('#profileSettings').click(); await page.locator('#profileDataTab').click();
+  const downloading = page.waitForEvent('download'); await page.locator('#profileDiagnostics').click();
+  const file = await downloading, diagnostic = JSON.parse(await readFile(await file.path(), 'utf8'));
+  expect(diagnostic.schema).toBe('nexusnxs.diagnostics.v1');
+  expect(diagnostic.uploaded).toBe(false);
+  expect(JSON.stringify(diagnostic)).not.toContain('Private draft sentinel');
+  await page.locator('#profile-recovery-draft').selectOption('off');
+  expect(await page.evaluate(() => sessionStorage.getItem('nxs.tab-draft.v1'))).toBeNull();
+});
+
 test('reload restores a slow local conversation before revealing its controls', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(origin);

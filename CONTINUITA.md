@@ -1,3 +1,16 @@
+## Routine recovery and covered-scene shell — 25 October 2026
+
+Canonical main shell adds opt-in text-only tab draft recovery, explicit reset,
+private count/timing diagnostic download and pause behind open settings dialogs.
+Existing Inter, icons, layout and particle scene are reused. No automatic sends
+or attachment persistence; default recovery remains disabled. Browser tests
+cover reload, clearing, privacy and the first frame without provisional icons.
+
+45 unit checks and nine focused startup/settings/recovery browser checks pass.
+The full 36-browser security/runtime/performance release gate, exact-commit CI
+and activation remain required before promotion. Retain Worker6dc3c1f6 and its
+rollback until then. Native downloads and active model remain unchanged.
+
 ## Interactive Core final activation — 25 October 2026
 
 Source539e94f passed CI40218936469 and45unit/35browser release checks,
