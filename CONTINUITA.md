@@ -1,3 +1,16 @@
+## Compact voice deployed — 25 October 2026
+
+Code84c64cd passed CI40210622355 and the full45unit/32browser release gate,
+including security, runtime, performance and dry-run checks. Candidate
+fe37b3b3 was promoted as Workerf4d67bde-b85e-4c25-a2d5-4f8af7a6d5a6.
+Fourteen public route/header/navigation checks and independent AI readiness
+pass. Both local and public shells match the canonical application source
+apart from response nonces. Four actual live viewport/text profiles pass,
+including200percent text, compact Core/end-call hitboxes and CSP checks;
+microphone access was denied synthetically, not recorded from hardware.
+Rollback13478bda remains available. No native release or model promotion.
+This documentation does not require re-deploying the unchanged tested code.
+
 ## Compact voice shell candidate — 25 October 2026
 
 Canonical shell synchronized from main7c97be0: full/compact voice presentation,
@@ -419,4 +432,3 @@ The development dependency source-map-js is updated from1.2.1 to the patched1.2.
 Use Node 24 and `npm ci`, then `npm run cloud:check` for source checks. Production additionally requires `npm run verify:security`, the browser/performance checks and the existing prepare/promote pipeline. No Cloudflare credentials are needed for source work. Leave the agent's internet access disabled unless a task requires it; setup needs dependency access.
 
 Before resuming an interrupted operation, inspect Git and previous logs. Keep current production and rollback identifiers in the private workstation checkpoint. Update this public file with actual source checks and commits, excluding tokens, personal information and local data.
-
