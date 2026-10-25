@@ -1,3 +1,16 @@
+## Interactive Core final activation — 25 October 2026
+
+Source539e94f passed CI40218936469 and45unit/35browser release checks,
+security, runtime, performance and dry-run. Candidate497cfce7 was promoted
+as Worker6dc3c1f6-ee7d-4ff6-b507-f02181e19645; rollbackb26f5c07 is retained.
+Fourteen production routes and independent AI health pass. Four actual HTTPS
+touch/text profiles pass including200percent text, cancellation, compact
+Core face picking, canvas above composer glass and no CSP errors. Local and
+public HTML match canonical main9e96545 and readiness is200. The final
+landscape image was inspected: the Core is whole above the feathered glass.
+No native download or model was promoted. Physical iOS and human voice remain
+separate acceptance gates. This documentation does not change deployed code.
+
 ## Compact Core glass-layer correction — 25 October 2026
 
 Canonical main9e96545 keeps compact particles and their face hitbox above
