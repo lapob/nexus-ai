@@ -1,3 +1,22 @@
+# Interactive Core delivered — 25 October 2026
+
+Application revision9e96545 passed CI40218860620. Website539e94f passed
+CI40218936469 and the45unit/35browser security/runtime/performance release
+gate. Public Worker6dc3c1f6-ee7d-4ff6-b507-f02181e19645 is active, with
+b26f5c07 retained for rollback. Local/public readiness and canonical HTML
+match; four actual HTTPS touch/text profiles pass including200percent text,
+cancellation, compact face picking, canvas layering and CSP checks. The final
+landscape capture confirms the Core stays whole above composer glass.
+
+Samsung6.5.26/code116 passes28 native tests and five online visual profiles.
+This QA installation does not replace immutable public native downloads.
+Windows remains0.3.33 Preview and public Android6.5.25. Physical iOS,
+human speech/echo, production signing and measured model comparisons remain
+open; local inference and cloud-off defaults are unchanged. The last service
+restart took44s, versus245s with a recovered timeout earlier; different cache
+conditions prevent a general performance claim. These documentation changes
+do not require re-deploying the unchanged tested application code.
+
 # Interactive Core drag verified — 25 October 2026
 
 The full voice Core follows the held finger, shrinking and revealing chat

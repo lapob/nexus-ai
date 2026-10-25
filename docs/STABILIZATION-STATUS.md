@@ -1,3 +1,16 @@
+# Interactive Core activation — 25 October 2026
+
+Code9e96545 and website539e94f passed exact-commit CI. Worker6dc3c1f6 is
+live with rollbackb26f5c07. Four HTTPS touch/text profiles pass canonical
+local/public HTML, readiness, Core geometry/face hitbox, canvas layering and
+CSP checks. All35 website browser checks and45 website unit tests pass.
+The final compact Core remains visible above glass in landscape. Samsung
+QA passes28 native tests and five online profiles; public native downloads
+are unchanged. Voice tests use synthetic input; physical iOS, human echo/
+recognition, production signing and isolated model evaluation remain open.
+Final service restart44s follows an earlier245s recovered timeout; cache
+variation prevents a universal speedup claim. No training or cloud activation.
+
 # Interactive Core drag — 25 October 2026
 
 Full voice presentation follows the held finger on browser and Android,
