@@ -1,3 +1,12 @@
+## Compact Core glass-layer correction — 25 October 2026
+
+Canonical main9e96545 keeps compact particles and their face hitbox above
+composer glass. Eight touch/layout/motion profiles pass actual face-point
+picking, canvas layering, cancellation and reversal; canvas never intercepts
+input. The preceding interactive shell is already live as Workerb26f5c07.
+This final visual correction requires exact-commit CI and a new full candidate
+gate before promotion. Public native downloads and model admission are unchanged.
+
 ## Interactive Core and daily-use shell candidate — 25 October 2026
 
 Canonical shell synchronized from main68ea818. The Core follows held touch,
