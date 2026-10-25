@@ -866,6 +866,13 @@ function bootstrapElectron({ env = process.env } = {}) {
         // Il gateway ha un motore dedicato: preparare quello desktop lasciava
         // comunque al primo utente web l'intero caricamento della voce.
         (headlessMode ? remoteNeuralSpeech : neuralSpeechService).warmUp();
+        if (headlessMode) {
+          const modelReady = serverMode ? ipcServices.warmupAI().catch(() => null) : Promise.resolve();
+          modelReady.then(async () => {
+            const started = performance.now();
+            if (await remoteTranscriptionService.warmUp()) logger.info('Riconoscimento vocale preparato in background.', { elapsedMs: Math.round(performance.now() - started) });
+          }).catch(() => {});
+        }
       }, speechWarmupDelay, { idleSeconds: 1, retryMs: 1_000, maxWaitMs: 30_000 });
 
       // Il confronto usa solo percorso, dimensione e mtime: una cache invariata

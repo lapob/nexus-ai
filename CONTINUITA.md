@@ -1,3 +1,16 @@
+# Warm speech recognition before the first remote turn — 25 October 2026
+
+A local authorized recording probe measured11183ms for the first cold STT
+request and554ms for the next, with correct Italian transcripts. Native
+recognition now supports a single background preparation using one second
+of synthetic silent PCM. A real request preempts it; it never captures a
+microphone, stores human speech, or trains a model. Headless startup schedules
+it after model preparation so it does not contend with the initial load.
+
+Source checks/check/cloud:check pass; suite1220PASS/2SKIP/zero failures.
+Focused tests cover valid silence, singleflight, foreground priority,
+temporary-file cleanup and shutdown without revival. Performance acceptance
+still requires a post-restart measurement; a warm sample is not a p95 claim.
 # Resolve image subjects before media lookup — 25 October 2026
 
 A real Italian photo lookup revealed unrelated homonyms in catalog full-text

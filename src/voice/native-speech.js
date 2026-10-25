@@ -153,6 +153,8 @@ class NativeSpeechService extends EventEmitter {
     this.captureDeviceCache = [];
     this.captureDeviceCacheAt = 0;
     this.disposed = false;
+    this.audioWarmup = null;
+    this.audioWarmupController = null;
   }
 
   capabilities() {
@@ -420,7 +422,24 @@ class NativeSpeechService extends EventEmitter {
     });
   }
 
-  transcribeAudio({ audio, language = 'auto', timeoutSeconds = 30, signal } = {}) {
+  warmUp() {
+    if (this.audioWarmup) return this.audioWarmup;
+    if (!this.audioAvailable() || this.active) return Promise.resolve(false);
+    const controller = new AbortController(); this.audioWarmupController = controller;
+    // A valid one-second silent PCM buffer warms file/decoder initialization
+    // without opening a microphone or retaining anyone's speech.
+    const audio = Buffer.alloc(32044); audio.write('RIFF'); audio.writeUInt32LE(audio.length - 8, 4);
+    audio.write('WAVEfmt ', 8); audio.writeUInt32LE(16, 16); audio.writeUInt16LE(1, 20); audio.writeUInt16LE(1, 22);
+    audio.writeUInt32LE(16000, 24); audio.writeUInt32LE(32000, 28); audio.writeUInt16LE(2, 32); audio.writeUInt16LE(16, 34);
+    audio.write('data', 36); audio.writeUInt32LE(32000, 40);
+    const pending = this.transcribeAudio({ audio, language: 'it', timeoutSeconds: 30, signal: controller.signal, backgroundWarmup: true })
+      .then(() => true, error => error?.code === 'VOICE_NO_SPEECH')
+      .finally(() => { if (this.audioWarmup === pending) { this.audioWarmup = null; this.audioWarmupController = null; } });
+    this.audioWarmup = pending; return pending;
+  }
+
+  transcribeAudio({ audio, language = 'auto', timeoutSeconds = 30, signal, backgroundWarmup = false } = {}) {
+    if (!backgroundWarmup) this.audioWarmupController?.abort();
     if (this.disposed || signal?.aborted) {
       return Promise.reject(speechError('VOICE_CANCELLED', 'Il servizio vocale è stato arrestato.'));
     }
@@ -554,7 +573,9 @@ class NativeSpeechService extends EventEmitter {
   shutdown() {
     if (this.disposed) return false;
     this.disposed = true;
-    let stopped = this.stop();
+    const warming = Boolean(this.audioWarmupController);
+    this.audioWarmupController?.abort();
+    let stopped = this.stop() || warming;
     for (const child of [...this.captureProbes]) {
       stopped = true;
       child.nexusCancelProbe?.();

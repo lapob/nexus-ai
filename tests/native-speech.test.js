@@ -333,6 +333,36 @@ test('chiude prima una frase completa e protegge i frammenti molto brevi', () =>
   assert.equal(transcriptStabilityThreshold('Sì'), 5);
 });
 
+test('decoder warm-up uses silent audio, is singleflight and yields to real transcription', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-whisper-warmup-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const name of ['whisper-cli.exe','ggml-base.bin']) fs.writeFileSync(path.join(directory, name), 'fixture');
+  const children = [], inputs = [];
+  const service = new NativeSpeechService({ platform: 'win32', whisperDirectory: directory,
+    terminateProcess: child => { child.killed = true; },
+    spawnProcess: (file, args) => {
+      assert.equal(path.basename(file), 'whisper-cli.exe', 'Never start microphone capture');
+      const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough() });
+      child.output = args[args.indexOf('-of') + 1] + '.txt';
+      children.push(child); inputs.push(args[args.indexOf('-f') + 1]); return child;
+    } });
+  const first = service.warmUp(); assert.equal(service.warmUp(), first); assert.equal(children.length, 1);
+  const silence = fs.readFileSync(inputs[0]);
+  assert.equal(silence.readUInt32LE(24), 16000); assert.equal(silence.readUInt32LE(40), 32000);
+  assert.equal(silence.subarray(44).every(value => value === 0), true);
+  const foreground = service.transcribeAudio({ audio: silence, language: 'it' });
+  assert.equal(await first, false); assert.equal(children[0].killed, true); assert.equal(children.length, 2);
+  assert.equal(fs.existsSync(inputs[0]), false); assert.equal(fs.existsSync(inputs[1]), true);
+  assert.equal(await service.warmUp(), false, 'Background preparation must not steal a human turn');
+  fs.writeFileSync(children[1].output, 'Richiesta reale.'); children[1].emit('exit', 0);
+  assert.equal((await foreground).text, 'Richiesta reale.'); assert.equal(fs.existsSync(inputs[1]), false);
+  const prepared = service.warmUp(); children[2].emit('exit', 0);
+  assert.equal(await prepared, true, 'No speech is the expected result of warming with silence');
+  const closing = service.warmUp(); assert.equal(service.shutdown(), true);
+  assert.equal(await closing, false); assert.equal(children[3].killed, true);
+  assert.equal(await service.warmUp(), false); assert.equal(children.length, 4);
+});
+
 test('shutdown ferma ascolto e sonde microfono senza poterle riavviare', async () => {
   const taskkillCalls = [];
   let service;
