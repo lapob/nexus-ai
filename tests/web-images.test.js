@@ -5,6 +5,7 @@ const { webImageQuery } = require('../src/shared/web-image-query');
 
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64');
 const thumbnail = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Test.png/500px-Test.png?utm_source=commons.wikimedia.org';
+const subjectResponse = () => Response.json({ query: { pages: { a: { title: 'Saturno (astronomia)', pageimage: 'Test.png' } } } });
 function page(overrides = {}) {
   return { index: 1, title: 'File:Test.png', imageinfo: [{ mime: 'image/png', thumburl: thumbnail,
     descriptionurl: 'https://commons.wikimedia.org/wiki/File:Test.png',
@@ -20,6 +21,7 @@ test('retrieves attributed bounded raster previews only from fixed Wikimedia hos
   const calls = [];
   const service = new WebResearchService({ fetchImpl: async (url, options) => {
     calls.push({ url: String(url), options });
+    if (new URL(url).hostname === 'it.wikipedia.org') return subjectResponse();
     if (new URL(url).hostname === 'commons.wikimedia.org') return Response.json({ query: { pages: { a: page() } } });
     return new Response(png, { headers: { 'content-type': 'image/png' } });
   } });
@@ -27,9 +29,11 @@ test('retrieves attributed bounded raster previews only from fixed Wikimedia hos
   assert.equal(result.images.length, 1);
   assert.equal(result.images[0].author, 'Artist'); assert.equal(result.images[0].license, 'CC BY 4.0');
   assert.equal(result.images[0].url, `data:image/png;base64,${png.toString('base64')}`);
-  assert.equal(new URL(calls[1].url).search, '');
+  assert.equal(new URL(calls[2].url).search, '');
   assert.ok(calls.every(call => call.options.redirect === 'error'));
-  assert.equal(new URL(calls[0].url).searchParams.get('gsrsearch'), 'Saturn filetype:bitmap');
+  assert.equal(new URL(calls[0].url).searchParams.get('gsrsearch'), 'Saturn');
+  assert.equal(new URL(calls[1].url).searchParams.get('titles'), 'File:Test.png');
+  assert.equal(new URL(calls[1].url).searchParams.has('gsrsearch'), false, 'Do not fill the gallery with full-text homonyms');
 });
 
 test('rejects arbitrary/private hosts, SVG, missing attribution and credentials without downloading', async () => {
@@ -37,8 +41,8 @@ test('rejects arbitrary/private hosts, SVG, missing attribution and credentials 
     { thumburl: 'https://user:secret@thumb.wikimedia.org/wikipedia/commons/a.png' }, { thumburl: thumbnail + '&redirect=https://evil.test' },
     { descriptionurl: 'https://evil.test/wiki/File:Test.png' }, { mime: 'image/svg+xml' }, { extmetadata: {} }]) {
     let calls = 0;
-    const service = new WebResearchService({ fetchImpl: async () => { calls++; return Response.json({ query: { pages: { a: page(override) } } }); } });
-    assert.deepEqual((await service.searchImages('Saturn')).images, []); assert.equal(calls, 1);
+    const service = new WebResearchService({ fetchImpl: async url => { calls++; return new URL(url).hostname === 'it.wikipedia.org' ? subjectResponse() : Response.json({ query: { pages: { a: page(override) } } }); } });
+    assert.deepEqual((await service.searchImages('Saturn')).images, []); assert.equal(calls, 2);
   }
 });
 
@@ -47,10 +51,16 @@ test('rejects MIME mismatch, oversized streams and redirects while preserving go
     () => new Response(png, { headers: { 'content-type': 'text/html' } }),
     () => new Response(Buffer.alloc(256 * 1024 + 1), { headers: { 'content-type': 'image/png' } }),
     () => new Response(null, { status: 302, headers: { location: 'https://127.0.0.1/private' } })]) {
-    const service = new WebResearchService({ fetchImpl: async url => new URL(url).hostname === 'commons.wikimedia.org'
-      ? Response.json({ query: { pages: { a: page() } } }) : bad() });
+    const service = new WebResearchService({ fetchImpl: async url => new URL(url).hostname === 'it.wikipedia.org' ? subjectResponse()
+      : new URL(url).hostname === 'commons.wikimedia.org' ? Response.json({ query: { pages: { a: page() } } }) : bad() });
     assert.deepEqual((await service.searchImages('Saturn')).images, []);
   }
+});
+
+test('missing subject images do not fall back to loosely related catalog results', async () => {
+  let calls = 0;
+  const service = new WebResearchService({ fetchImpl: async url => { calls++; assert.equal(new URL(url).hostname, 'it.wikipedia.org'); return Response.json({ query: { pages: { a: { title: 'A subject without a photograph' } } } }); } });
+  assert.deepEqual((await service.searchImages('A subject')).images, []); assert.equal(calls, 1);
 });
 
 test('disabled/private queries never leave the process and cancellation discards late images', async () => {

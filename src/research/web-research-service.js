@@ -175,14 +175,22 @@ class WebResearchService {
     }
   }
 
-  async searchImages(query, { signal, limit = 3 } = {}) {
+  async searchImages(query, { signal } = {}) {
     if (!this.enabled) throw new Error('Ricerca immagini disattivata.');
     const subject = String(query || '').trim();
     if (!subject || subject.length > 160 || PRIVATE_LITERAL_PATTERN.test(subject)) throw new Error('Soggetto pubblico non valido.');
-    const count = Math.max(1, Math.min(3, Number(limit) || 3));
+    // Resolve the subject before loading media: Commons full-text search can
+    // rank files whose descriptions merely mention an unrelated homonym.
+    // A single encyclopedic lead image is preferable to unrelated photos.
+    const subjectUrl = new URL('https://it.wikipedia.org/w/api.php');
+    subjectUrl.search = new URLSearchParams({ action: 'query', format: 'json', generator: 'search',
+      gsrsearch: subject, gsrnamespace: '0', gsrlimit: '1', prop: 'pageimages', piprop: 'name', redirects: '1' }).toString();
+    const resolved = await this.requestJson(subjectUrl, { signal });
+    const article = Object.values(resolved?.query?.pages || {}).find(page => typeof page.pageimage === 'string');
+    if (!article) return { provider: 'wikimedia-commons', images: [] };
+    const count = 1;
     const url = new URL('https://commons.wikimedia.org/w/api.php');
-    url.search = new URLSearchParams({ action: 'query', format: 'json', generator: 'search',
-      gsrsearch: `${subject} filetype:bitmap`, gsrnamespace: '6', gsrlimit: String(count * 2),
+    url.search = new URLSearchParams({ action: 'query', format: 'json', titles: `File:${cleanText(article.pageimage, 240)}`,
       prop: 'imageinfo', iiprop: 'url|mime|extmetadata', iiurlwidth: '480',
       iiextmetadatafilter: 'Artist|LicenseShortName|ImageDescription' }).toString();
     const payload = await this.requestJson(url, { signal });

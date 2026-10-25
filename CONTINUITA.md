@@ -1,3 +1,18 @@
+# Resolve image subjects before media lookup — 25 October 2026
+
+A real Italian photo lookup revealed unrelated homonyms in catalog full-text
+results. Image lookup now resolves an encyclopedic subject first and requests
+only its principal file from Commons, retaining source, author, license and
+bounded raster validation. If that subject has no available Commons image,
+it returns no preview rather than filling the gallery with unrelated files.
+A local live lookup for the previously failing subject returns the expected
+planetary photograph. This is an initial subject resolver, not semantic
+verification of every possible query or a general-purpose image search index.
+
+The correction passes check/cloud:check and1219tests/2skips with zero failures,
+including the no-full-text-fallback regression. Current native installers,
+models and cloud inference settings remain unchanged. Human microphone/echo,
+startup latency, signing, iOS and model quality admission remain open.
 # Adaptive web settings and attributed images — 25 October 2026
 
 Settings reuse the shared Inter, symbols, neutral palette and motion values.
