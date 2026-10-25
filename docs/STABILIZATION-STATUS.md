@@ -1,3 +1,26 @@
+# Voice presentation continuity — 25 October 2026
+
+The browser and Android public client keep one Core while switching between
+full voice and the current conversation. A downward swipe on the Core or its
+collapse icon reveals chat; tapping the compact Core expands it. The end-call
+icon exits voice explicitly. Presentation changes do not cancel a response or
+reacquire the microphone. Android recognition pauses during generation/playback
+and resumes afterwards; this is sequential speech, not admitted full duplex.
+
+Core geometry and hitboxes animate together. Reduced motion keeps the same
+controls without the movement. Compact particles retain their positions and
+count, with opacity and framing adapted to their smaller area. The shared
+Material Symbols catalog includes the pinned, offline end-call icon.
+
+Evidence: browser eight viewport/motion combinations, repeated transitions,
+32 voice unit tests, real Chromium synthetic playback/interruption and27
+native tests including actual Core touch dispatch. Offline passes four formats.
+Android Preview/Release now reject a missing public origin and private fallback
+origins; Debug remains available for isolated tests. Native distribution and
+service activation must be verified separately from these source checks.
+Human speech/echo acceptance, production signing and iOS device validation
+remain open. Local inference and cloud-disabled defaults are unchanged.
+
 # Progressive speech and duplex admission — 24 October 2026
 
 Human feedback confirms Italian output but identifies touch-only mode in the

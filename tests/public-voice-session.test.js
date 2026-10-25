@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { createPublicVoiceSession } = require('../src/remote/public-voice-session');
 
-function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null, tone = 'neutral', voiceCapability = 'available', { browserLanguage = 'it-IT', transcriptLanguages = ['it'], responseLanguage = 'auto', spokenTurns = 1, fallbackLanguage = 'it', responseText = 'response', spokenGenerationInterruption = false, waitingFrames = 0, speechFrames = 7, streamingFrames = null, resumeFailureAt = 0 } = {}) {
+function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null, tone = 'neutral', voiceCapability = 'available', { browserLanguage = 'it-IT', transcriptLanguages = ['it'], responseLanguage = 'auto', spokenTurns = 1, fallbackLanguage = 'it', responseText = 'response', spokenGenerationInterruption = false, waitingFrames = 0, speechFrames = 7, streamingFrames = null, resumeFailureAt = 0, presentationDuringPlayback = false } = {}) {
   let frames=0, recordings=0, transcriptions=0, paused=0, stopped=0, speaking=false, busy=false, cancelled=0, audioStarts=0, synthesisAborted=false, microphoneRequests=0, instance, finishGeneration;
-  const element=()=>({hidden:false,value:'',className:'',textContent:'',dataset:{},inert:false,classList:{contains:()=>false,add(){},remove(){}},setAttribute(){},getAttribute(){return '';},append(){},focus(){},blur(){},dispatchEvent(){}});
-  const prompt=element(),core=element();
-  const document={createElement:element,body:element(),addEventListener(){},querySelectorAll:()=>[],getElementById:()=>null};
+  const element=()=>{const classes=new Set(),attributes=new Map(),listeners=new Map();return {hidden:false,value:'',className:'',textContent:'',dataset:{},inert:false,style:{setProperty(){},removeProperty(){}},classList:{contains:value=>classes.has(value),add(...values){values.forEach(value=>classes.add(value));},remove(...values){values.forEach(value=>classes.delete(value));}},setAttribute(key,value){attributes.set(key,value);},getAttribute(key){return attributes.get(key)||'';},addEventListener(key,handler){listeners.set(key,handler);},emit(key,event){listeners.get(key)?.(event);},append(){},focus(){document.activeElement=this;},blur(){},dispatchEvent(){}};};
+  const prompt=element(),core=element(),background=element();
+  const document={createElement:element,body:element(),addEventListener(){},querySelectorAll:()=>[background],getElementById:()=>null};
   const stream={getTracks:()=>[{stop(){stopped++;}}],getAudioTracks:()=>[{getSettings:()=>({echoCancellation})}]};
   const durations=[],encoded=[],hints=[]; let resumes=0;
   class Context {
@@ -21,10 +21,10 @@ function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, i
     stop(){if(this.state!=='recording')return;this.state='inactive';durations.push((frames-this.started)*.08);queueMicrotask(()=>{this.ondataavailable?.({data:new Blob(['audio'])});this.onstop?.();});}
   }
   class Audio {
-    async play(){audioStarts++;speaking=true;if(leaveDuringPlayback){queueMicrotask(()=>instance.leave());return;}if(!duplex||![true,'all'].includes(echoCancellation))queueMicrotask(()=>{speaking=false;this.onended?.();});}
+    async play(){audioStarts++;speaking=true;if(presentationDuringPlayback){for(let n=0;n<3;n++){instance.minimize();assert.equal(instance.active,true);assert.equal(background.inert,false);instance.expand();assert.equal(background.inert,true);}} if(leaveDuringPlayback){queueMicrotask(()=>instance.leave());return;}if(!duplex||![true,'all'].includes(echoCancellation))queueMicrotask(()=>{speaking=false;this.onended?.();});}
     pause(){if(speaking)paused++;speaking=false;}
   }
-  const sandbox={document,navigator:{language:browserLanguage,mediaDevices:{getUserMedia:async()=>{microphoneRequests++;return stream;}}},AudioContext:Context,MediaRecorder:Recorder,Audio,AbortController,Blob,Event,TextDecoder,atob,URL:{createObjectURL:()=> 'blob:qa',revokeObjectURL(){}},performance:{now:()=>frames*80},requestAnimationFrame:callback=>setImmediate(()=>{frames++;if(frames>1000)throw Error('capture did not settle');callback(frames*80);}),cancelAnimationFrame:clearImmediate,setTimeout,clearTimeout,addEventListener(){}};
+  const sandbox={document,navigator:{language:browserLanguage,mediaDevices:{getUserMedia:async()=>{microphoneRequests++;return stream;}}},AudioContext:Context,MediaRecorder:Recorder,Audio,assert,AbortController,Blob,Event,TextDecoder,atob,URL:{createObjectURL:()=> 'blob:qa',revokeObjectURL(){}},performance:{now:()=>frames*80},requestAnimationFrame:callback=>setImmediate(()=>{frames++;if(frames>1000)throw Error('capture did not settle');callback(frames*80);}),cancelAnimationFrame:clearImmediate,setTimeout,clearTimeout,addEventListener(){}};
   const factory=vm.runInNewContext(`(${createPublicVoiceSession.toString()})`,sandbox);
   const runtime={capabilities:voiceCapability===null?{}:{'voice-input':{state:voiceCapability}}};
   const deliveries=[],languages=[];
@@ -38,7 +38,7 @@ function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, i
     if(streamingFrames){const data=new TextEncoder().encode(streamingFrames.map(frame=>JSON.stringify(frame)).join('\n')+'\n');let offset=0;return {ok:true,headers:{get:()=> 'application/x-ndjson'},body:new ReadableStream({pull(controller){if(offset>=data.length){controller.close();return;}const end=Math.min(data.length,offset+17);controller.enqueue(data.subarray(offset,end));offset=end;}})};}return {ok:true,blob:async()=>new Blob(['speech'])};
   };
   instance=factory({core,prompt,runtime,duplex,getPreferences:()=>({tone,responseLanguage}),session:async()=>{},fetchAudio:async (path,options)=>{if(path.endsWith('synthesize'))return await synthesize(options);hints.push(options.headers['X-Nexus-Speech-Language']);return {ok:true,json:async()=>({text:`phrase ${++transcriptions}`,language:transcriptLanguages[(transcriptions-1)%transcriptLanguages.length]})};},ask:async()=>{if(transcriptions<=spokenTurns){if(spokenGenerationInterruption){busy=true;await new Promise(resolve=>{finishGeneration=resolve;});busy=false;await instance.speak(responseText);}else if(interruptGeneration){busy=true;instance.interact();busy=false;}else await instance.speak(responseText);}else instance.leave();},encodeWav:buffer=>{encoded.push({seconds:buffer.length/buffer.sampleRate,first:buffer.getChannelData(0)[0],last:buffer.getChannelData(0).at(-1)});return new Uint8Array(4);},spokenLanguage:()=> fallbackLanguage,setState:s=>{runtime.voiceState=s;},setPhase(){},isBusy:()=>busy,cancelResponse:()=>{cancelled++;finishGeneration?.();},showText(){}});
-  return {instance,run:()=>instance.start(),stats:()=>({recordings,transcriptions,paused,stopped,speaking,cancelled,audioStarts,synthesisAborted,deliveries,languages,hints,encoded,microphoneRequests,voiceState:runtime.voiceState})};
+  return {instance,core,background,document,run:()=>instance.start(),stats:()=>({recordings,transcriptions,paused,stopped,speaking,cancelled,audioStarts,synthesisAborted,deliveries,languages,hints,encoded,microphoneRequests,voiceState:runtime.voiceState})};
 }
 
 for (const capability of ['unavailable', 'unknown', null]) {
@@ -176,3 +176,28 @@ for(const mode of ['late-response','reject','leave']){
     assert.equal(h.instance.active,false);
   });
 }
+
+ test('compact and full presentations preserve microphone, playback and the next turn', async () => {
+  const h=harness(true,true,false,false,null,'neutral','available',{presentationDuringPlayback:true});await h.run();
+  const stats=h.stats();assert.equal(stats.microphoneRequests,1);assert.equal(stats.audioStarts,1);
+  assert.equal(stats.cancelled,0);assert.equal(stats.transcriptions,2);assert.equal(stats.paused,1);
+  assert.equal(h.background.inert,false);assert.equal(h.instance.active,false);
+ });
+ test('downward Core swipe minimizes, ignores the following click and restores original inert state', async () => {
+  const h=harness(false,true,false,false,null,'neutral','unavailable');await h.run();
+  assert.equal(h.background.inert,true);
+  h.core.emit('pointerdown',{pointerType:'touch',pointerId:1,clientX:20,clientY:20});
+  h.core.emit('pointermove',{pointerId:1,clientX:24,clientY:100});
+  h.core.emit('pointerup',{pointerId:1});
+  assert.equal(h.instance.minimized,true);assert.equal(h.background.inert,false);
+  h.instance.interact();assert.equal(h.instance.minimized,true,'synthesized click must not expand');
+  h.instance.expand();assert.equal(h.background.inert,true);h.instance.leave();assert.equal(h.background.inert,false);
+ });
+ test('horizontal, mouse and cancelled drags do not minimize the voice view', async () => {
+  const h=harness(false,true,false,false,null,'neutral','unavailable');await h.run();
+  for(const [pointerType,x,y,cancel] of [['touch',200,95,false],['mouse',25,120,false],['touch',25,120,true]]){
+   h.core.emit('pointerdown',{pointerType,pointerId:2,clientX:20,clientY:20});
+   h.core.emit('pointermove',{pointerId:2,clientX:x,clientY:y});
+   if(cancel)h.core.emit('pointercancel',{});h.core.emit('pointerup',{pointerId:2});assert.equal(h.instance.minimized,false);
+  }h.instance.leave();
+ });

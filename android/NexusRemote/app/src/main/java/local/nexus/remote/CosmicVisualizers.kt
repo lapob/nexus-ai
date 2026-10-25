@@ -11,16 +11,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateRectAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
@@ -28,6 +30,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -126,22 +130,56 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion: Boolean, onClick: () -> Unit) {
+internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion: Boolean, onSwipeDown: (() -> Unit)? = null, onClick: () -> Unit) {
     val scene = LocalCosmicScene.current
     val interaction = remember { MutableInteractionSource() }
+    var layoutBounds by remember { mutableStateOf(Rect.Zero) }
     val pressed by interaction.collectIsPressedAsState()
+    val swipeDown by rememberUpdatedState(onSwipeDown)
+    val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
     val touchScale by animateFloatAsState(if (pressed && !reduceMotion) .984f else 1f,
         tween(if (reduceMotion) 0 else if (pressed) local.nexus.motion.NexusMotion.PRESS else local.nexus.motion.NexusMotion.CORE_RELEASE,
             easing = CubicBezierEasing(.2f, 0f, .2f, 1f)), label = "Core touch")
-    SideEffect { scene.state = state; scene.energy = energy; scene.reduced = reduceMotion }
+    // Read snapshot values during composition so layout/press frames schedule
+    // the scene update, including when no other application state changes.
+    val measuredBounds = layoutBounds
+    val inset = measuredBounds.width * (1f - touchScale) / 2f
+    SideEffect {
+        scene.state = state; scene.energy = energy; scene.reduced = reduceMotion
+        scene.bounds = Rect(measuredBounds.left + inset, measuredBounds.top + inset,
+            measuredBounds.right - inset, measuredBounds.bottom - inset)
+    }
     DisposableEffect(scene) { scene.present = true; onDispose { scene.present = false } }
-    Box(Modifier.size(diameter).graphicsLayer { scaleX = touchScale; scaleY = touchScale }.onGloballyPositioned { scene.bounds = it.boundsInWindow() }
-        .pointerInput(reduceMotion) { if (!reduceMotion) detectDragGestures(
-            onDragEnd = { scene.inspection = listOf(0f, 0f, 0f) },
-            onDragCancel = { scene.inspection = listOf(0f, 0f, 0f) },
-            onDrag = { change, _ -> change.consume(); scene.inspection = listOf(change.position.x / size.width * 2f - 1f, change.position.y / size.height * 2f - 1f, 1f) }
-        ) }
+    Box(Modifier.size(diameter).onGloballyPositioned { layoutBounds = it.boundsInWindow() }
+        .pointerInput(reduceMotion, swipeThreshold) {
+            var displacement = Offset.Zero
+            detectDragGestures(
+                onDragStart = { displacement = Offset.Zero },
+                onDragEnd = {
+                    if (displacement.y > swipeThreshold && displacement.y > kotlin.math.abs(displacement.x) * 1.5f) swipeDown?.invoke()
+                    scene.inspection = listOf(0f, 0f, 0f)
+                },
+                onDragCancel = { displacement = Offset.Zero; scene.inspection = listOf(0f, 0f, 0f) },
+                onDrag = { change, delta ->
+                    displacement += delta
+                    change.consume()
+                    if (!reduceMotion) scene.inspection = listOf(change.position.x / size.width * 2f - 1f, change.position.y / size.height * 2f - 1f, 1f)
+                }
+            )
+        }
         .semantics { contentDescription = "NexusNXS Core" }.clickable(interactionSource = interaction, indication = null, onClick = onClick))
+}
+
+/** One host survives presentation changes; renderer bounds and hitbox move together. */
+@Composable
+internal fun CosmicPresentationCore(target: Rect, origin: Offset, state: String, energy: Float, reduceMotion: Boolean, onSwipeDown: (() -> Unit)?, onClick: () -> Unit) {
+    if (target.width <= 0f) return
+    val bounds by animateRectAsState(target, tween(if (reduceMotion) 0 else 500,
+        easing = CubicBezierEasing(.2f, 0f, .2f, 1f)), label = "Voice Core presentation")
+    val diameter = with(LocalDensity.current) { bounds.width.toDp() }
+    Box(Modifier.offset { IntOffset((bounds.left - origin.x).toInt(), (bounds.top - origin.y).toInt()) }.size(diameter)) {
+        CosmicCore(diameter, state, energy, reduceMotion, onSwipeDown, onClick)
+    }
 }
 
 @Composable
@@ -150,7 +188,7 @@ internal fun CosmicStandaloneCore(diameter: Dp, state: String, energy: Float, re
     CompositionLocalProvider(LocalCosmicScene provides scene) {
         Box(Modifier.size(diameter)) {
             CosmicScene(Modifier.fillMaxSize())
-            CosmicCore(diameter, state, energy, reduceMotion, onClick)
+            CosmicCore(diameter, state, energy, reduceMotion, onClick = onClick)
         }
     }
 }

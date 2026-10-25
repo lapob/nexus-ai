@@ -64,4 +64,5 @@ internal object NexusSymbols {
     val Check: ImageVector get() = vector("Check")
     val ThumbUp: ImageVector get() = vector("ThumbUp")
     val ThumbDown: ImageVector get() = vector("ThumbDown")
+    val CallEnd: ImageVector get() = vector("CallEnd")
 }

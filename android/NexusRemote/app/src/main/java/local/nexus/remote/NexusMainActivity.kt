@@ -109,6 +109,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.LinkAnnotation
@@ -2923,6 +2926,12 @@ private fun JSONArray?.toTurns() = buildList {
     // Una sessione microfono non deve mai essere ripristinata dal saved state
     // dopo un nuovo avvio o un ritorno dal task switcher.
     var voiceMode by remember { mutableStateOf(false) }
+    var voiceMinimized by remember { mutableStateOf(false) }
+    var fullCoreBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    var miniCoreBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    var coreOrigin by remember { mutableStateOf(Offset.Zero) }
+    val showWritten = typedSession || (voiceMode && voiceMinimized)
+    LaunchedEffect(voiceMode) { if (!voiceMode) voiceMinimized = false }
     var inlineVoiceListening by remember { mutableStateOf(false) }
     var inlineVoiceEnergy by remember { mutableFloatStateOf(0f) }
     var inlineVoiceStatus by remember { mutableStateOf("") }
@@ -2978,7 +2987,7 @@ private fun JSONArray?.toTurns() = buildList {
         }
     }
     BackHandler(enabled = voiceMode || textMode || typedSession) {
-        if (voiceMode) voiceMode = false
+        if (voiceMode) { voiceMode = false; dispatch("stopSpeech", ""); if (voiceMinimized) typedSession = true }
         else if (textMode) {
             keyboard?.hide()
             focusManager.clearFocus(force = true)
@@ -3021,6 +3030,7 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }            }.statusBarsPadding().navigationBarsPadding().imePadding()
                 .padding(horizontal = metrics.horizontalPadding).padding(top = 12.dp, bottom = 10.dp)
+                .onGloballyPositioned { coreOrigin = it.positionInWindow() }
         ) {
             InstantConnectionMark(state.connection, Modifier.align(Alignment.TopEnd))
             AnimatedVisibility(controlsAwake, modifier = Modifier.align(Alignment.TopStart), enter = fadeIn(), exit = fadeOut()) {
@@ -3031,7 +3041,7 @@ private fun JSONArray?.toTurns() = buildList {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AnimatedContent(
-                    targetState = typedSession,
+                    targetState = showWritten,
                     transitionSpec = { nexusTransform(reduceMotion) },
                     modifier = Modifier.fillMaxSize(),
                     label = "instantInteractionMode"
@@ -3064,6 +3074,23 @@ private fun JSONArray?.toTurns() = buildList {
                                     error = state.error, centered = false, busy = state.busy, activity = state.activity,
                                     reduceMotion = reduceMotion, modifier = Modifier.fillMaxWidth()
                                 )
+                            }
+                        }
+                        if (voiceMode && voiceMinimized) Row(
+                            Modifier.fillMaxWidth().height(76.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(Modifier.size(64.dp).onGloballyPositioned {
+                                if (voiceMode && voiceMinimized) miniCoreBounds = it.boundsInWindow()
+                            })
+                            Text(when {
+                                state.speechPlayback == "speaking" -> nexusCopy("NexusNXS parla", "NexusNXS is speaking")
+                                state.busy || state.speechPlayback == "preparing" -> nexusCopy("Preparo la risposta", "Preparing a response")
+                                else -> inlineVoiceStatus
+                            }, color = Mist, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { voiceMode = false; typedSession = true; dispatch("stopSpeech", "") }) {
+                                Icon(NexusSymbols.CallEnd, nexusCopy("Termina conversazione vocale", "End voice conversation"), tint = Ice)
                             }
                         }
                         AnimatedVisibility(state.attachment != null, enter = nexusEnter(reduceMotion), exit = nexusExit(reduceMotion)) {
@@ -3178,27 +3205,9 @@ private fun JSONArray?.toTurns() = buildList {
                         BoxWithConstraints(Modifier.fillMaxSize().padding(bottom = 62.dp)) {
                             val wideCoreLayout = maxWidth > maxHeight * 1.5f
                             val renderCore: @Composable (Dp) -> Unit = { availableDiameter ->
-                            NexusInstantCore(
-                                fullScene = true,
-                                active = voiceMode || state.busy,
-                                offline = state.connection == NexusConnection.OFFLINE,
-                                reduceMotion = reduceMotion,
-                                energy = if (voiceMode) inlineVoiceEnergy else 0f,
-                                diameter = minOf(homeCoreDiameter, availableDiameter),
-                                phaseState = when { !interactionAvailable -> "offline"; voiceMode && inlineVoiceListening -> "listening"; voiceMode -> "transcribing"; state.speechPlayback == "speaking" -> "speaking"; state.busy || state.speechPlayback == "preparing" -> "thinking"; else -> "idle" },
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    if (!interactionAvailable) {
-                                        dispatch("probe", "")
-                                        return@NexusInstantCore
-                                    }
-                                    keyboard?.hide()
-                                    textMode = false
-                                    if (state.busy) dispatch("stop", "")
-                                    dispatch("stopSpeech", "")
-                                    voiceMode = !voiceMode
-                                }
-                            )
+                                Box(Modifier.size(minOf(homeCoreDiameter, availableDiameter)).onGloballyPositioned {
+                                    if (!showWritten) fullCoreBounds = it.boundsInWindow()
+                                })
                             }
                             val renderLabels: @Composable () -> Unit = {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -3234,6 +3243,11 @@ private fun JSONArray?.toTurns() = buildList {
                                 renderLabels()
                             }
                         }
+                        if (voiceMode) IconButton(
+                            onClick = { voiceMinimized = true },
+                            modifier = Modifier.align(Alignment.BottomCenter).size(48.dp)
+                        ) { Icon(NexusSymbols.ChevronRight, nexusCopy("Riduci voce e mostra chat", "Minimize voice and show chat"),
+                            tint = Ice, modifier = Modifier.graphicsLayer { rotationZ = 90f }) }
                         IconButton(
                             onClick = { typedSession = true; textMode = true },
                             enabled = true,
@@ -3242,6 +3256,29 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }
             }
+            if (!showWritten || voiceMode && voiceMinimized) CosmicPresentationCore(
+                target = if (voiceMode && voiceMinimized && miniCoreBounds.width > 0f) miniCoreBounds else fullCoreBounds,
+                origin = coreOrigin,
+                state = when {
+                    !interactionAvailable -> "offline"
+                    state.speechPlayback == "speaking" -> "speaking"
+                    state.busy || state.speechPlayback == "preparing" -> "thinking"
+                    voiceMode && inlineVoiceListening -> "listening"
+                    voiceMode -> "transcribing"
+                    else -> "idle"
+                }, energy = if (voiceMode) inlineVoiceEnergy else 0f, reduceMotion = reduceMotion,
+                onSwipeDown = if (voiceMode && !voiceMinimized) ({ voiceMinimized = true }) else null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    if (voiceMode && voiceMinimized) { voiceMinimized = false; typedSession = false }
+                    else if (!interactionAvailable) dispatch("probe", "")
+                    else {
+                        keyboard?.hide(); textMode = false
+                        if (state.busy) dispatch("stop", "")
+                        dispatch("stopSpeech", ""); voiceMode = !voiceMode
+                    }
+                }
+            )
         }
     }
         }
@@ -3408,17 +3445,14 @@ private fun JSONArray?.toTurns() = buildList {
         shape = RoundedCornerShape(26.dp)
     )
     if (voiceMode && interactionAvailable) ContinuousVoicePanel(
+        captureActive = !state.busy && state.speechPlayback == "idle",
         reduceMotion = reduceMotion,
         connection = state.connection,
         currentDraft = "",
         bargeIn = { dispatch("stopSpeech", "") },
         close = { voiceMode = false },
         transcript = {},
-        instantSubmit = { phrase ->
-            voiceMode = false
-            typedSession = false
-            dispatch("voiceSend", phrase)
-        },
+        instantSubmit = { phrase -> dispatch("voiceSend", phrase) },
         inlineState = { listening, energy, status, detail -> inlineVoiceListening = listening; inlineVoiceEnergy = energy; inlineVoiceStatus = status; inlineVoiceDetail = detail }
     )
     NexusAttachmentFlow(
@@ -3939,7 +3973,8 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
     compactOverlay: Boolean = false,
     openKeyboard: (() -> Unit)? = null,
     openAttachment: (() -> Unit)? = null,
-    inlineState: ((Boolean, Float, String, String) -> Unit)? = null
+    inlineState: ((Boolean, Float, String, String) -> Unit)? = null,
+    captureActive: Boolean = true
 ) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -4126,8 +4161,11 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
             }
         }
     }
-    LaunchedEffect(Unit) {
-        if (instantSubmit != null) beginCapture(NexusVoiceMode.SINGLE_TURN)
+    LaunchedEffect(captureActive) {
+        if (instantSubmit != null) {
+            if (captureActive) beginCapture(NexusVoiceMode.SINGLE_TURN)
+            else haltCapture(false, false)
+        }
     }
     val voiceStatus = when {
         connection == NexusConnection.OFFLINE -> nexusCopy("Server offline", "Server offline")

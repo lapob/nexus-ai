@@ -25,6 +25,18 @@ def requireHttpsEndpoint = { name, value ->
         throw new GradleException("$name deve essere un'origine HTTPS senza credenziali, query o percorso.")
     }
 }
+
+// A distributable client without its origin looks healthy but can never connect.
+// Debug remains configurable for the isolated native-test sandbox.
+def verifyPublicOrigin = tasks.register("verifyPublicOrigin") {
+    doLast {
+        if (!publicNexusUrl) throw new GradleException("NEXUS_URL is required for Preview and Release builds.")
+        if (localNexusUrl || fallbackNexusUrl) throw new GradleException("Private fallback origins are not allowed in the public app.")
+    }
+}
+tasks.matching { it.name in ["prePreviewBuild", "preReleaseBuild"] }.configureEach {
+    dependsOn(verifyPublicOrigin)
+}
 requireHttpsEndpoint("NEXUS_URL", publicNexusUrl)
 requireHttpsEndpoint("NEXUS_LAN_URL", localNexusUrl)
 requireHttpsEndpoint("NEXUS_FALLBACK_URL", fallbackNexusUrl)

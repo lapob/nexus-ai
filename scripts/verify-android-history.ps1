@@ -26,14 +26,14 @@ foreach ($apk in @('app\build\outputs\apk\debug\app-debug.apk', 'app\build\outpu
 }
 $window = (& $adb -s $device shell dumpsys window) -join "`n"
 if ($window -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Sblocca il dispositivo prima del collaudo.' }
-$output = & $adb -s $device shell am instrument --user 0 -w -r -e class 'local.nexus.remote.LocalChatStoreTest,local.nexus.remote.ComposerContinuityTest' local.nexus.remote.qa.test/androidx.test.runner.AndroidJUnitRunner 2>&1
+$output = & $adb -s $device shell am instrument --user 0 -w -r -e class 'local.nexus.remote.LocalChatStoreTest,local.nexus.remote.ComposerContinuityTest,local.nexus.remote.VoicePresentationTest' local.nexus.remote.qa.test/androidx.test.runner.AndroidJUnitRunner 2>&1
 $exitCode = $LASTEXITCODE
 $report = $output -join [Environment]::NewLine
 $artifactDirectory = Join-Path $projectRoot 'qa-artifacts'
 [IO.Directory]::CreateDirectory($artifactDirectory) | Out-Null
 [IO.File]::WriteAllText((Join-Path $artifactDirectory 'android-history-device.log'), $report)
-if ($exitCode -ne 0 -or $report -notmatch 'OK \(26 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
+if ($exitCode -ne 0 -or $report -notmatch 'OK \(27 tests\)' -or $report -match 'FAILURES!!!|INSTRUMENTATION_FAILED') {
     Write-Output $report
     throw 'Test nativi della cronologia non superati.'
 }
-Write-Output 'PASS: 26 test SQLite/Keystore, readiness, risultati tipizzati, continuita Activity e autorizzazione assistente sul dispositivo, sandbox QA separata.'
+Write-Output 'PASS: 27 test SQLite/Keystore, readiness, risultati tipizzati, continuita Activity, Core full/mini e autorizzazione assistente sul dispositivo, sandbox QA separata.'

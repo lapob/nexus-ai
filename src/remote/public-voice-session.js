@@ -1,11 +1,12 @@
 /** @module remote/public-voice-session Shared chat history and cancellable browser media. */
 // #region Session controls and capture
-function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, getPreferences = () => ({}), closeIcon = '', duplex = false }) {
+function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, ask, encodeWav, spokenLanguage, setState, setPhase, isBusy, showText, cancelResponse = () => {}, getPreferences = () => ({}), closeIcon = '', collapseIcon = '', onPresentationChange = () => {}, duplex = false }) {
   let capturedLanguage = '';
   const normalizedLanguage = value => /^[a-z]{2}(?:-[a-z]{2})?$/i.test(String(value || '')) ? String(value).toLowerCase().split('-')[0] : '';
   const preferredLanguage = () => normalizedLanguage(getPreferences().responseLanguage);
   const copy = (it, en) => /^it\b/i.test(preferredLanguage() || capturedLanguage || navigator.language) ? it : en;
-  let active = false, epoch = 0, stream = null, recorder = null;
+  let active = false, minimized = false, epoch = 0, stream = null, recorder = null;
+  let lastMessage = '', swipe = null, suppressInteractionUntil = 0;
   let controller = null, finishCapture = null, finishPlayback = null;
   let pendingCapture = null, playbackActive = false, responseInterrupted = false;
   const echoMode = () => stream?.getAudioTracks()[0]?.getSettings?.().echoCancellation;
@@ -17,15 +18,33 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   let savedDraft = ''; const background = new Map();
   const controls = document.createElement('div');
   controls.className = 'voice-session-controls'; controls.hidden = true;
-  const status = document.createElement('p'); status.setAttribute('role', 'status');
+  const status = document.createElement('p'); status.id = 'nexusVoiceStatus'; status.setAttribute('role', 'status');
+  const collapse = document.createElement('button'); collapse.type = 'button'; collapse.className = 'voice-collapse';
+  collapse.setAttribute('aria-label', copy('Riduci voce e mostra chat', 'Minimize voice and show chat'));
+  collapse.setAttribute('data-material', String(Boolean(collapseIcon)));
+  collapse.innerHTML = collapseIcon || '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   const close = document.createElement('button'); close.type = 'button';
-  close.setAttribute('aria-label', copy('Torna alla conversazione scritta', 'Return to text conversation'));
-  close.title = close.getAttribute('aria-label');
-  close.innerHTML = closeIcon || '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>';
-  controls.append(status, close); document.body.append(controls);
+  close.setAttribute('aria-label', copy('Termina conversazione vocale', 'End voice conversation'));
+  close.innerHTML = closeIcon || '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15v-3c5-5 13-5 18 0v3l-5-1v-3M8 11v3l-5 1"/></svg>';
+  close.setAttribute('data-material', String(Boolean(closeIcon)));
+  const actions = document.createElement('div'); actions.className = 'voice-session-actions'; actions.append(collapse, close);
+  controls.append(status, actions); document.body.append(controls);
   const fitVoiceCore = () => {
     if (!active || !controls.getBoundingClientRect) return;
     const viewport = globalThis.visualViewport;
+    if (minimized) {
+      const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+      const diameter = Math.max(52, Math.min(80, width < 380 || height < 420 ? 64 : 80));
+      const dockTop = document.querySelector?.('.dock')?.getBoundingClientRect().top;
+      const bottom = Math.min(Number.isFinite(dockTop) ? dockTop - 12 : height - 104, (viewport?.offsetTop || 0) + height - 12);
+      const center = Math.max((viewport?.offsetTop || 0) + diameter / 2 + 12, bottom - diameter / 2);
+      const values = { '--nxs-mini-core-size': diameter + 'px',
+        '--nxs-mini-core-left': ((viewport?.offsetLeft || 0) + width / 2 - 24) + 'px',
+        '--nxs-mini-core-top': center + 'px',
+        '--nxs-mini-close-right': Math.max(12, width / 2 - diameter / 2 - 40) + 'px' };
+      for (const [key, value] of Object.entries(values)) document.body.style.setProperty(key, value);
+      return;
+    }
     const top = (viewport?.offsetTop || 0) + 16;
     const bottom = Math.min(controls.getBoundingClientRect().top, (viewport?.offsetTop || 0) + (viewport?.height || innerHeight));
     const available = Math.max(64, bottom - top - 24);
@@ -35,10 +54,52 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   };
   const layout = globalThis.ResizeObserver ? new ResizeObserver(fitVoiceCore) : null;
   layout?.observe(controls);
+  const dock = document.querySelector?.('.dock'); if (dock) layout?.observe(dock);
   addEventListener('resize', fitVoiceCore, { passive: true });
   globalThis.visualViewport?.addEventListener('resize', fitVoiceCore, { passive: true });
   globalThis.visualViewport?.addEventListener('scroll', fitVoiceCore, { passive: true });
-  const state = (value, message) => { setState(value); status.textContent = message; fitVoiceCore(); };
+  const state = (value, message) => {
+    setState(value); lastMessage = message; status.textContent = message;
+    if (minimized) core.setAttribute('aria-label', copy('Espandi conversazione vocale', 'Expand voice conversation'));
+    fitVoiceCore();
+  };
+  function minimize() {
+    if (!active || minimized) return false;
+    minimized = true; swipe = null;
+    for (const [element, inert] of background) element.inert = inert;
+    document.body.classList.remove('voice-session'); document.body.classList.add('voice-minimized');
+    core.setAttribute('aria-label', copy('Espandi conversazione vocale', 'Expand voice conversation'));
+    onPresentationChange('compact'); fitVoiceCore(); core.focus({ preventScroll: true });
+    return true;
+  }
+  function expand() {
+    if (!active || !minimized) return false;
+    minimized = false; swipe = null; prompt.blur();
+    for (const element of background.keys()) element.inert = true;
+    document.body.classList.remove('voice-minimized', 'keyboard-open'); document.body.classList.add('voice-session');
+    core.setAttribute('aria-label', copy('Invia la frase o interrompi la voce', 'Send speech or interrupt playback'));
+    status.textContent = lastMessage; onPresentationChange('full'); fitVoiceCore(); collapse.focus({ preventScroll: true });
+    return true;
+  }
+  collapse.onclick = minimize;
+  core.addEventListener('pointerdown', event => {
+    swipe = active && !minimized && ['touch', 'pen'].includes(event.pointerType) && event.isPrimary !== false
+      ? { id: event.pointerId, x: event.clientX, y: event.clientY, recognized: false } : null;
+  });
+  core.addEventListener('pointermove', event => {
+    if (!swipe || swipe.id !== event.pointerId) return;
+    const dy = event.clientY - swipe.y, dx = event.clientX - swipe.x;
+    if (dy > 64 && dy > Math.abs(dx) * 1.5) {
+      swipe.recognized = true;
+      try { core.setPointerCapture?.(event.pointerId); } catch { /* The pointer may already have ended or been cancelled. */ }
+      if (event.cancelable) event.preventDefault();
+    }
+  }, { passive: false });
+  core.addEventListener('pointerup', event => {
+    const recognized = swipe?.id === event.pointerId && swipe.recognized; swipe = null;
+    if (recognized) { suppressInteractionUntil = performance.now() + 500; minimize(); }
+  });
+  core.addEventListener('pointercancel', () => { swipe = null; });
   const stopMedia = () => {
     controller?.abort(); finishCapture?.(); finishPlayback?.();
     stream?.getTracks().forEach(track => track.stop()); stream = null;
@@ -48,9 +109,11 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   };
   function leave({ focus = true } = {}) {
     if (!active) return;
-    active = false; ++epoch; stopMedia(); controls.hidden = true;
-    document.body.classList.remove('voice-session');
+    active = false; minimized = false; swipe = null; ++epoch; stopMedia(); controls.hidden = true;
+    document.body.classList.remove('voice-session', 'voice-minimized');
     core.style?.removeProperty('--nxs-voice-core-size'); core.style?.removeProperty('--nxs-voice-core-top');
+    for (const key of ['--nxs-mini-core-size', '--nxs-mini-core-left', '--nxs-mini-core-top', '--nxs-mini-close-right']) document.body.style?.removeProperty(key);
+    core.setAttribute('aria-describedby', '');
     for (const [element, inert] of background) element.inert = inert;
     background.clear(); if (!prompt.value && savedDraft) prompt.value = savedDraft;
     prompt.dispatchEvent(new Event('input', { bubbles: true }));
@@ -61,7 +124,10 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   document.addEventListener('keydown', event => {
     if (!active) return;
     if (event.key === 'Escape') { event.preventDefault(); leave(); }
-    if (event.key === 'Tab') { event.preventDefault(); (document.activeElement === close ? core : close).focus({ preventScroll: true }); }
+    if (event.key === 'Tab' && !minimized) {
+      event.preventDefault(); const focusable = [core, collapse, close], current = focusable.indexOf(document.activeElement);
+      focusable[(current + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length].focus({ preventScroll: true });
+    }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) leave({ focus: false }); });
   addEventListener('pagehide', () => leave({ focus: false }));
@@ -239,12 +305,13 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   }
   async function start() {
     if (active || isBusy()) return;
-    active = true; const id = ++epoch; controller = new AbortController();
+    active = true; minimized = false; const id = ++epoch; controller = new AbortController();
     capturedLanguage = '';
     responseInterrupted = false;
     savedDraft = prompt.value;
     for (const element of document.querySelectorAll('.exchange,.copy,.dock,.privacy,.identity')) { background.set(element, element.inert); element.inert = true; }
     document.body.classList.add('voice-session'); document.body.classList.remove('keyboard-open');
+    core.setAttribute('aria-describedby', status.id);
     prompt.blur(); controls.hidden = false; close.focus({ preventScroll: true });
     core.setAttribute('aria-label', copy('Invia la frase o interrompi la voce', 'Send speech or interrupt playback'));
     state('requesting', copy('Autorizza il microfono', 'Allow microphone access'));
@@ -311,13 +378,15 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
     } finally { if (id === epoch) { stream?.getTracks().forEach(track => track.stop()); stream = null; } }
   }
   function interact() {
+    if (performance.now() < suppressInteractionUntil) return;
     if (!active) return start();
+    if (minimized) return expand();
     if (finishPlayback) return finishPlayback();
     if (isBusy()) { responseInterrupted = true; return cancelResponse(); }
     if (recorder?.state === 'recording') return finishCapture?.();
     if (runtime.voiceState === 'error') { leave({ focus: false }); return start(); }
   }
-  return { start, interact, speak, leave, get active() { return active; } };
+  return { start, interact, speak, leave, minimize, expand, get active() { return active; }, get minimized() { return minimized; } };
 }
 
 module.exports = { createPublicVoiceSession };

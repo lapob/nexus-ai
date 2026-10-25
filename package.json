@@ -206,7 +206,8 @@
     "qa:android:device:strict": "pwsh -NoProfile -File scripts/run-android-device-gate.ps1",
     "qa:android:history": "pwsh -NoProfile -File scripts/verify-android-history.ps1",
     "qa:android:benchmark": "pwsh -NoProfile -File scripts/benchmark-android-ui.ps1",
-    "qa:visual:matrix": "npm run build:renderer && node scripts/visual-qa.js --views=conversation,history,neural --scales=100,200 && npm run qa:android:visual && npm run qa:android:visual:public"
+    "qa:visual:matrix": "npm run build:renderer && node scripts/visual-qa.js --views=conversation,history,neural --scales=100,200 && npm run qa:android:visual && npm run qa:android:visual:public",
+    "qa:voice:presentation": "node scripts/verify-public-voice-presentation.js && node scripts/verify-public-voice-stream.js"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",

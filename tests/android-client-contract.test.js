@@ -661,7 +661,7 @@ test('la voce Android parte dal Core, invia una frase e non resta attiva in back
   assert.match(activity, /SpeechRecognizer\.createOnDeviceSpeechRecognizer\(context\)/);
   assert.match(activity, /RecognizerIntent\.EXTRA_PREFER_OFFLINE, onDeviceAvailable/);
   assert.match(activity, /RecognizerIntent\.EXTRA_LANGUAGE, voiceLocale/);
-  assert.match(activity, /LaunchedEffect\(Unit\)[\s\S]{0,120}beginCapture\(NexusVoiceMode\.SINGLE_TURN\)/);
+  assert.ok(/LaunchedEffect\(captureActive\)[\s\S]{0,180}if \(captureActive\) beginCapture\(NexusVoiceMode\.SINGLE_TURN\)[\s\S]{0,60}else haltCapture\(false, false\)/.test(activity), 'Capture follows real response/playback state, independently of presentation');
   assert.doesNotMatch(activity, /LaunchedEffect\(instantSubmit\)/, 'Recomposition must not restart the microphone');
   assert.match(activity, /if \(inlineState != null\) return/, 'Inline voice must keep the existing core, without a second dialog');
   assert.match(activity, /if \(instantSubmit != null\) instantSubmit\(value\)/);

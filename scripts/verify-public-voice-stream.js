@@ -25,11 +25,11 @@ async function main(){
   const microphone=path.join(profile,'synthetic-microphone.wav');fs.writeFileSync(microphone,wave(8,true));
   let client,child,transcriptions=0,synthesis=0;
   const html=`<!doctype html><html><body><button id="core">Voice test</button><textarea id="prompt"></textarea><p id="phase"></p><pre id="result"></pre><script>
-    const stats={asked:0,plays:0,pauses:0,states:[],error:''},runtime={capabilities:{'voice-input':{state:'available'}}};
+    const stats={asked:0,plays:0,pauses:0,presentationSwitches:0,states:[],error:''},runtime={capabilities:{'voice-input':{state:'available'}}};
     const NativeAudio=Audio;window.Audio=function(url){const audio=new NativeAudio(url),play=audio.play.bind(audio),pause=audio.pause.bind(audio);audio.play=()=>{stats.plays++;return play()};audio.pause=()=>{if(!audio.paused)stats.pauses++;pause()};return audio};
     const session=(${createPublicVoiceSession.toString()})({core:document.querySelector('#core'),prompt:document.querySelector('#prompt'),runtime,duplex:true,
       session:async()=>{},fetchAudio:fetch,encodeWav:()=>new Blob(['synthetic transcript input']),spokenLanguage:()=> 'it',
-      ask:async()=>{stats.asked++;if(stats.asked===1)await session.speak('Risposta sintetica di prova');else session.leave()},
+      ask:async()=>{stats.asked++;if(stats.asked===1){const speaking=session.speak('Risposta sintetica di prova');setTimeout(()=>{for(let i=0;i<3;i++){if(session.minimize())stats.presentationSwitches++;if(session.expand())stats.presentationSwitches++;}},300);await speaking}else session.leave()},
       setState:value=>stats.states.push(value),setPhase:()=>{},isBusy:()=>false,showText:()=>{stats.mode=runtime.voiceMode;document.querySelector('#result').textContent=JSON.stringify(stats)}});
     document.querySelector('#core').onclick=()=>session.start().then(()=>{if(session.active){stats.error=document.querySelector('.voice-session-controls p').textContent;document.querySelector('#result').textContent=JSON.stringify(stats)}});
   </script></body></html>`;
@@ -63,7 +63,7 @@ async function main(){
     let report;const deadline=Date.now()+20000;
     while(Date.now()<deadline){const text=await client.evaluate("document.querySelector('#result').textContent");if(text){report=JSON.parse(text);break;}await new Promise(resolve=>setTimeout(resolve,100));}
     assert.ok(report,'Synthetic browser voice test did not settle');assert.equal(report.error,'',JSON.stringify(report));
-    assert.equal(report.asked,2);assert.equal(report.plays,1);assert.equal(report.pauses,1);assert.equal(report.mode,'off');
+    assert.equal(report.presentationSwitches,6);assert.equal(report.asked,2);assert.equal(report.plays,1);assert.equal(report.pauses,1);assert.equal(report.mode,'off');
     assert.equal(transcriptions,2);assert.equal(synthesis,1);assert.ok(report.states.includes('speaking'));
     fs.writeFileSync(path.join(output,'public-voice-stream-report.json'),JSON.stringify({passed:true,syntheticOnly:true,humanEchoVerified:false,...report},null,2));
     console.log('PASS real Chromium recorder/decoder, fragmented audio stream, spoken interruption, queued audio cancellation and next turn; synthetic input, no physical microphone or inference.');
