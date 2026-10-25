@@ -10,7 +10,7 @@ async function mediaFixture() {
     globalThis.mediaRequested++;
     if (globalThis.delayPermission) await new Promise(resolve => { globalThis.allowPermission = resolve; });
     if (globalThis.denyPermission) throw new DOMException('denied', 'NotAllowedError');
-    return { getTracks: () => [{ stop() { globalThis.mediaStopped++; } }] };
+    return { getTracks: () => [{ stop() { globalThis.mediaStopped++; } }], getAudioTracks: () => [{ getSettings: () => ({ echoCancellation: false }) }] };
   };
   globalThis.MediaRecorder = class {
     state = 'inactive'; mimeType = 'audio/webm';
@@ -21,7 +21,7 @@ async function mediaFixture() {
     resume() { return Promise.resolve(); } close() { return Promise.resolve(); }
     createMediaStreamSource() { return { connect() {}, disconnect() {} }; }
     createAnalyser() { return { disconnect() {}, getByteTimeDomainData(array) { array.fill(globalThis.speechLevel ? 156 : 128); } }; }
-    decodeAudioData() { return Promise.resolve({ sampleRate: 16000, length: 1600, numberOfChannels: 1, getChannelData: () => new Float32Array(1600) }); }
+    decodeAudioData() { return Promise.resolve({ sampleRate: 16000, length: 64000, numberOfChannels: 1, getChannelData: () => new Float32Array(64000) }); }
   };
   globalThis.Audio = class {
     play() { globalThis.spoken++; globalThis.finishAudio = () => this.onended?.(); return Promise.resolve(); }
@@ -66,20 +66,30 @@ if (require.main === module) {
       const controls = await page.locator('.voice-session-controls').boundingBox();
       assert.ok(core.y + core.height <= controls.y, 'Core must not collide with voice controls');
       assert.equal(await page.locator('.exchange').evaluate(el => getComputedStyle(el).visibility), 'hidden');
+      const captureStops = await page.evaluate(() => mediaStopped);
+      await page.locator('.voice-collapse').click();
+      assert.equal(await page.locator('body').evaluate(el => el.classList.contains('voice-minimized')), true);
+      assert.equal(await page.locator('.exchange').evaluate(el => el.inert), false);
+      assert.equal(await page.locator('#answer').textContent(), 'Risposta sintetica.');
+      assert.equal(await page.evaluate(() => mediaRequested), 1);
+      assert.equal(await page.evaluate(() => mediaStopped), captureStops);
+      await page.locator('#core').click();
+      await page.waitForSelector('body.voice-session');
+      assert.equal(await page.evaluate(() => spoken), 1, 'Expansion must preserve current playback');
       await page.locator('#core').click(); // interrupt playback, resume listening
       await page.waitForFunction(() => nexusAiState.voiceState === 'listening');
       await say(); await page.waitForFunction(() => spoken === 2);
       assert.equal(requests.length, 2); assert.equal(requests[1].history.length, 2);
       await page.evaluate(() => finishAudio());
       await page.waitForFunction(() => nexusAiState.voiceState === 'listening');
-      await page.locator('.voice-session-controls button').click();
+      await page.locator('.voice-session-actions button:last-child').click();
       assert.ok(await page.evaluate(() => mediaStopped > 0));
       assert.equal(await page.locator('body').evaluate(el => el.classList.contains('voice-session')), false);
       assert.equal(await page.locator('#answer').textContent(), 'Risposta sintetica.');
       assert.equal(transcriptions, 2, 'Exit must discard unfinished recording');
       await page.evaluate(() => { delayPermission = true; });
       await page.locator('#voiceStart').click(); await page.waitForFunction(() => typeof allowPermission === 'function');
-      await page.locator('.voice-session-controls button').click();
+      await page.locator('.voice-session-actions button:last-child').click();
       const stops = await page.evaluate(() => mediaStopped);
       await page.evaluate(() => allowPermission());
       await page.waitForFunction(previous => mediaStopped > previous, stops);
@@ -98,7 +108,7 @@ if (require.main === module) {
       await say();
       for (let n = 0; n < 100 && !releaseSynthesis; n++) await page.waitForTimeout(25);
       assert.ok(releaseSynthesis, 'Synthesis request started');
-      await page.locator('.voice-session-controls button').click();
+      await page.locator('.voice-session-actions button:last-child').click();
       releaseSynthesis(); await page.waitForTimeout(200);
       assert.equal(await page.evaluate(() => spoken), 2, 'Late audio must not play after exit');
       assert.equal(await page.locator('#prompt').inputValue(), 'Bozza da conservare');
