@@ -1036,22 +1036,23 @@ class RemoteSessionGateway {
         try { listener(event); } catch { execution.listeners.delete(listener); }
       }
     };
-    execution.promise = (async () => {
+    execution.promise = this.measureStage('guest.response', { component: 'gateway', operation: 'message', transport: 'ndjson', tier: descriptor.mode }, async () => {
       const startedAt = Date.now();
-      let release;
+      let release, firstToken = true;
       try {
-        release = await this.acquireGuestSlot(guest, (position) => {
+        release = await this.measureStage('guest.queue', { component: 'gateway', operation: 'queue', tier: descriptor.mode }, () => this.acquireGuestSlot(guest, (position) => {
           const activity = { text: `In attesa · posizione ${position}`, phase: 'queued', step: 'queued', updatedAt: Date.now() };
           guest.activity = activity;
           execution.emit({ type: 'phase', activity });
-        }, controller.signal, descriptor.mode === 'fast' ? FAST_QUEUE_PRIORITY : DEEP_QUEUE_PRIORITY);
+        }, controller.signal, descriptor.mode === 'fast' ? FAST_QUEUE_PRIORITY : DEEP_QUEUE_PRIORITY));
         this.assertServing();
         const report = (message, phase = 'work', step = '') => {
           guest.activity = { text: String(message || '').slice(0, 160), phase, ...(['understand','plan','retrieve','verify','respond'].includes(step) ? {step} : {}), updatedAt: Date.now() };
           execution.emit({ type: 'phase', activity: guest.activity });
         };
         report('Comprendo la richiesta…', 'work', 'understand');
-        const attachments = await guestAttachments(body.attachments, { signal: controller.signal });
+        const attachments = await this.measureStage('guest.attachments', { component: 'gateway', operation: 'attachments', tier: descriptor.mode },
+          () => guestAttachments(body.attachments, { signal: controller.signal }));
         this.assertServing();
         if (controller.signal.aborted) throw Object.assign(new Error('Richiesta annullata.'), { name: 'AbortError', code: 'ABORT_ERR' });
         const now = Date.now();
@@ -1068,6 +1069,11 @@ class RemoteSessionGateway {
           onToken: (token) => {
             if (controller.signal.aborted) return;
             const text = String(token || '');
+            if (text && firstToken) {
+              firstToken = false;
+              this.telemetry?.emit({ name: 'guest.first-token', startedAt, endedAt: Date.now(),
+                attributes: { component: 'gateway', operation: 'first-token', outcome: 'success', tier: descriptor.mode } });
+            }
             const cursor = this.requestLedger.append(descriptor.key, text);
             if (text) execution.emit({ type: 'token', token: text, cursor });
           },
@@ -1084,7 +1090,6 @@ class RemoteSessionGateway {
         this.requestLedger.complete(descriptor.key, result);
         report('Risposta pronta', 'done');
         execution.emit({ type: 'complete', ...result, cursor: result.message.length });
-        this.telemetry?.emit({ name: 'guest.response', startedAt, endedAt: Date.now(), attributes: { component: 'gateway', operation: 'message', outcome: 'success', transport: 'ndjson', tier: descriptor.mode, artifactCount: artifacts.length } });
         return result;
       } catch (error) {
         this.requestLedger.fail(descriptor.key);
@@ -1095,7 +1100,6 @@ class RemoteSessionGateway {
           mode: descriptor.mode
         });
         execution.emit({ type: 'error', error: error?.name === 'AbortError' || error?.code === 'ABORT_ERR' ? 'Richiesta annullata.' : 'La risposta non è stata completata.' });
-        this.telemetry?.emit({ name: 'guest.response', startedAt, endedAt: Date.now(), attributes: { component: 'gateway', operation: 'message', outcome: error?.name === 'AbortError' ? 'cancelled' : 'failure', transport: 'ndjson', tier: descriptor.mode } });
         throw error;
       } finally {
         execution.settled = true;
@@ -1104,11 +1108,15 @@ class RemoteSessionGateway {
         release?.();
         this.activeGuestExecutions.delete(descriptor.key);
       }
-    })();
+    });
     // Evita una rejection non osservata se il client sparisce nello stesso tick.
     execution.promise.catch(() => {});
     this.activeGuestExecutions.set(descriptor.key, execution);
     return execution;
+  }
+
+  measureStage(name, attributes, operation) {
+    return typeof this.telemetry?.measure === 'function' ? this.telemetry.measure(name, attributes, operation) : operation();
   }
 
   subscribeGuestExecution(execution, response, listener = null) {

@@ -1,5 +1,5 @@
 /** @module security/remote-tool-policy Shared authority boundary for paired devices. */
-const LOCAL_ONLY_TOOLS = new Set(['run_script', 'run_command', 'open_path', 'open_user_path']);
+const LOCAL_ONLY_TOOLS = new Set(['run_script', 'run_command', 'open_path', 'open_user_path', 'run_integration']);
 
 function remoteToolAllowed(tool) { return !LOCAL_ONLY_TOOLS.has(tool); }
 

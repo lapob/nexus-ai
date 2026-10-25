@@ -1,3 +1,43 @@
+# Coherent mobile motion, observable stages and local integrations — 25 October 2026
+
+The shared Core retains the last touch location while its influence fades; idle
+light returns gradually. Android press feedback uses a small reversible scale
+and a650ms release, with reduced motion respected. Ready no longer implies an
+active microphone. Transcription is labelled explicitly. Web and Android results
+now support typed previews and accessible copy/download controls; Android also
+has a contextual conversation-results menu. Native previews are decoded off the
+UI thread with bounded dimensions and one expanded result per surface.
+
+Local performance spans now separate queue, attachments, first token, STT, TTS
+and startup stages. Async-local correlation and whole-trace sampling preserve
+privacy; stages do not contaminate response-latency percentiles. The existing
+SQLite store retains bounded content-free spans and survives exporter failures.
+
+Local MCP/n8n adapters reuse ActionRuntime and WorkflowRuntime, explicit one-use
+approval, revocation and receipts. They are disabled until configured by the
+owner, remain local-only and do not retry uncertain effects. The official MCP
+SDK is pinned; source dependency audit reports zero known advisories. See
+[local integration setup](docs/LOCAL-INTEGRATIONS.md).
+
+A resident CPU recognizer is available only to the isolated STT evaluator.
+Pinned file identity, owner-death cleanup, cancellation and two authorized local
+clips were exercised. Production keeps its CLI baseline pending dependency and
+acoustic admission. See [resident ASR boundaries](docs/RESIDENT-ASR.md).
+Model comparison now refuses unmatched suites, missing baselines, simulated or
+stale results and incompatible evaluation modes. No model was trained/promoted.
+
+Validation:1246source tests pass,2skip; check/cloud:check pass. Browser44states,
+24Core layouts plus touch release, and four offline/reload/reconnect layouts
+pass. Android Public6.5.26 and Control1.20.4 compile with lint. Both APKs pass five physical online layout profiles;26native regression cases pass. The public ART profile is installed and verified as speed-profile. Three cold-launch medians were173ms before and176ms after, so no startup improvement is claimed. Control ART is also verified as speed-profile after the documented forced profile merge. Its three-launch median changed from87ms to77ms; this small, cache-sensitive sample is not a general performance claim. An observed
+false-offline path was corrected: bounded TLS probing now has a compatible
+overall deadline, an atomic singleflight guard and distinct warming semantics.
+The complete native regression suite passes26cases in its separate QA sandbox.
+iOS settings reuse the web preference panel and native keyboard dismissal;
+Mac/iOS compilation and physical verification remain outstanding.
+
+This source checkpoint is not a new native release or commercial-readiness
+claim. Existing published Preview assets remain unchanged. No cloud inference,
+private corpus publication, new model download or training was enabled.
 # Warm speech recognition before the first remote turn — 25 October 2026
 
 A local authorized recording probe measured11183ms for the first cold STT

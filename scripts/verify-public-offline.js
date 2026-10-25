@@ -73,7 +73,9 @@ async function main() {
         const dataSectionAvailable = await page.locator('#profileData summary').count() === 1;
         if (!live) assert.equal(dataSectionAvailable, true, 'Current source includes offline data actions');
         if (dataSectionAvailable) {
-          await page.locator('#profileData summary').click();
+          const dataTab = page.locator('#profileDataTab');
+          if (await dataTab.count()) await dataTab.click();
+          else await page.locator('#profileData summary').click();
           assert.equal(await page.locator('#profileExport').isEnabled(), true);
         }
         await page.locator('#profileSheet .sheet-top .sheet-close').click();

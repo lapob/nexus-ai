@@ -361,6 +361,7 @@
     }
   },
   "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
     "electron-updater": "^6.8.9",
     "pdf-parse": "^1.1.1",
     "qrcode": "^1.5.4"

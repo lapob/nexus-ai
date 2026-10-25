@@ -1,4 +1,4 @@
-/** Generated from config/nexus-interaction-states.json · 2bd84253e710af79. Do not edit. */
+/** Generated from config/nexus-interaction-states.json · fd1b823025e44333. Do not edit. */
 package local.nexus.motion;
 
 import java.util.Collections;
@@ -55,7 +55,8 @@ public final class NexusInteractionStates {
         aliases.put("reasoning", "thinking");
         aliases.put("verifying", "thinking");
         aliases.put("validating", "thinking");
-        aliases.put("ready", "listening");
+        aliases.put("ready", "idle");
+        aliases.put("transcribing", "thinking");
         aliases.put("consent", "permission");
         aliases.put("failed", "error");
         ALIASES = Collections.unmodifiableMap(aliases);

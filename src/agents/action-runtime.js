@@ -89,6 +89,7 @@ const APPLICATIONS = Object.freeze({
 });
 
 const TOOL_DEFINITIONS = Object.freeze([
+  Object.freeze({ name: 'run_integration', label: 'Esegui integrazione locale', risk: 'critical', description: 'Invoca un solo strumento MCP o webhook n8n configurato dal proprietario, con consenso per ogni esecuzione.' }),
   Object.freeze({ name: 'open_application', label: 'Apri applicazione', risk: 'medium', description: 'Apre un’applicazione nota installata nel sistema.' }),
   Object.freeze({ name: 'open_path', label: 'Apri file o cartella', risk: 'medium', description: 'Apre un percorso esistente contenuto nella vault NexusNXS.' }),
   Object.freeze({ name: 'open_user_path', label: 'Apri file personale', risk: 'medium', description: 'Apre un file o una cartella esistente nella home dell’utente.' }),
@@ -105,6 +106,7 @@ const TOOL_DEFINITIONS = Object.freeze([
 ]);
 
 const TOOL_EFFECTS = Object.freeze({
+  run_integration: Object.freeze({ effect: 'execute', rollback: 'not-guaranteed' }),
   open_application: Object.freeze({ effect: 'launch', rollback: 'close-manually' }),
   open_path: Object.freeze({ effect: 'read', rollback: 'not-required' }),
   open_user_path: Object.freeze({ effect: 'read', rollback: 'not-required' }),
@@ -557,7 +559,7 @@ function launchDetached(command, args = []) {
 }
 
 class ActionRuntime {
-  constructor({ vaultPath, userPath = os.homedir(), auditPath, checkpointDirectory, receiptPath, receiptSigner = null, securityEventStore = null, shell, logger, platform = process.platform, now = () => Date.now(), applicationProbe = applicationAvailable }) {
+  constructor({ vaultPath, userPath = os.homedir(), auditPath, checkpointDirectory, receiptPath, receiptSigner = null, securityEventStore = null, integrations = null, shell, logger, platform = process.platform, now = () => Date.now(), applicationProbe = applicationAvailable }) {
     this.vaultPath = fs.realpathSync(vaultPath);
     this.userPath = fs.realpathSync(userPath);
     this.auditPath = auditPath;
@@ -567,6 +569,7 @@ class ActionRuntime {
     this.shell = shell;
     this.logger = logger;
     this.securityEventStore = securityEventStore;
+    this.integrations = integrations;
     this.platform = platform;
     this.now = now;
     this.applicationProbe = applicationProbe;
@@ -583,7 +586,9 @@ class ActionRuntime {
   capabilities() {
     const applications = APPLICATIONS[this.platform] || APPLICATIONS.linux;
     return {
-      tools: TOOL_DEFINITIONS.map((tool) => ({ ...tool, ...TOOL_EFFECTS[tool.name] })),
+      tools: TOOL_DEFINITIONS.filter(tool => tool.name !== 'run_integration' || this.integrations?.capabilities().some(item => item.ready))
+        .map((tool) => ({ ...tool, ...TOOL_EFFECTS[tool.name] })),
+      integrations: this.integrations?.capabilities() || [],
       applications: Object.entries(applications)
         .filter(([, app]) => this.applicationProbe(app))
         .map(([id, app]) => ({ id, label: app.label })),
@@ -617,6 +622,7 @@ class ActionRuntime {
 
   async shutdown({ timeoutMs = 2_500 } = {}) {
     this.acceptingActions = false;
+    this.integrations?.shutdown();
     this.tickets.clear();
     const active = [...this.activeProcesses];
     if (!active.length) return { terminated: 0, timedOut: false };
@@ -633,6 +639,10 @@ class ActionRuntime {
 
   validate(tool, input = {}) {
     const args = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    if (tool === 'run_integration') {
+      if (!this.integrations) throw new Error('Nessuna integrazione locale configurata.');
+      return this.integrations.validate(args);
+    }
     if (tool === 'open_application') {
       const application = asText(args.application, 'L’applicazione', 64).toLowerCase();
       const applications = APPLICATIONS[this.platform] || APPLICATIONS.linux;
@@ -706,6 +716,7 @@ class ActionRuntime {
   }
 
   preview(tool, args) {
+    if (tool === 'run_integration') return `Integrazione locale: ${args.connection}\nStrumento: ${args.tool}\nDati inviati:\n${JSON.stringify(args.input, null, 2)}\nGli effetti esterni non hanno ripristino automatico.`;
     if (tool === 'open_application') return `Apri applicazione: ${args.application}`;
     const relative = (value) => path.relative(this.vaultPath, value) || '.';
     if (tool === 'open_path') return `Apri percorso nella vault: ${relative(args.path)}`;
@@ -1154,6 +1165,7 @@ class ActionRuntime {
 
   async perform(ticket, { onOutput, transactionId = '', signal } = {}) {
     assertActionNotAborted(signal);
+    if (ticket.tool === 'run_integration') return this.integrations.invoke(ticket.args, { signal });
     if (ticket.tool === 'open_path' || ticket.tool === 'open_user_path') {
       const error = await this.shell.openPath(ticket.args.path);
       if (error) throw new Error(error);

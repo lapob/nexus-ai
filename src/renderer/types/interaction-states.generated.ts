@@ -1,6 +1,6 @@
 /**
  * @module renderer/types/interaction-states.generated
- * @description Generated from config/nexus-interaction-states.json · 2bd84253e710af79. Do not edit.
+ * @description Generated from config/nexus-interaction-states.json · fd1b823025e44333. Do not edit.
  */
 // #region 01 — Identità e stati
 export const NEXUS_INTERACTION_CONTRACT_ID = "nexusnxs-interaction-state" as const;
@@ -125,7 +125,8 @@ export const NEXUS_INTERACTION_ALIASES = {
   "reasoning": "thinking",
   "verifying": "thinking",
   "validating": "thinking",
-  "ready": "listening",
+  "ready": "idle",
+  "transcribing": "thinking",
   "consent": "permission",
   "failed": "error"
 } as const;

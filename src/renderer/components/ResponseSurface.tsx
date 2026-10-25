@@ -23,6 +23,10 @@ function DownloadGlyph({ original = false }: { original?: boolean }) {
 }
 
 function downloadArtifact(artifact: OperationalArtifact, version: 'current' | 'original' | 'diff') {
+  if (artifact.kind === 'image' && version === 'current' && artifact.url && artifact.url.length <= 2 * 1024 * 1024
+    && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/i.test(artifact.url)) {
+    const link = document.createElement('a'); link.href = artifact.url; link.download = 'NexusNXS.' + (artifact.url.startsWith('data:image/jpeg') ? 'jpg' : artifact.url.startsWith('data:image/webp') ? 'webp' : 'png'); link.click(); return;
+  }
   const extensions: Record<string, string> = { javascript: 'js', typescript: 'ts', python: 'py', json: 'json', markdown: 'md', css: 'css', sql: 'sql', yaml: 'yaml', shell: 'sh', powershell: 'ps1' };
   const stem = artifact.title.split(/[\\/]/).pop()?.replace(/[<>:"|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '').slice(0, 100) || 'NexusNXS';
   const name = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(stem) ? `NexusNXS-${stem}` : stem;
@@ -382,6 +386,10 @@ export function ArtifactShelf({ artifacts, onRevise }: { artifacts: OperationalA
           const revisions = artifact.revisions || [];
           const selected = revisions.find(item => item.id === versionId);
           const displayed = { ...artifact, content: selected?.content ?? artifact.content };
+          let sourceUrl = '';
+          if (artifact.kind === 'link' && artifact.url) {
+            try { const parsed = new URL(artifact.url); if (parsed.protocol === 'https:' && !parsed.username && !parsed.password) sourceUrl = artifact.url; } catch { /* Inert malformed result. */ }
+          }
           return (
           <div className="artifact-item" data-open={openId === artifact.id} key={artifact.id}>
             <button type="button" aria-expanded={openId === artifact.id} onClick={(event) => { trigger.current = event.currentTarget; setCopyState('idle'); setViewMode('result'); setVersionId(revisions.at(-1)?.id || ''); setEdit(null); setSaveError(''); setOpenId(artifact.id); }}>
@@ -397,10 +405,10 @@ export function ArtifactShelf({ artifacts, onRevise }: { artifacts: OperationalA
                         <button type="button" data-active={viewMode === 'diff'} onClick={() => setViewMode('diff')}>Modifiche</button>
                         <button type="button" data-active={viewMode === 'split'} onClick={() => setViewMode('split')}>Prima / dopo</button>
                       </>}
-                      <button className="response-icon-action" type="button" disabled={edit !== null} aria-label={copyState === 'error' ? 'Copia non riuscita: riprova' : copyState === 'copied' ? 'Contenuto copiato' : 'Copia contenuto'} onClick={() => void window.nexus.copyText(viewMode === 'diff' ? artifact.diff || '' : displayed.content || '').then(() => setCopyState('copied')).catch(() => setCopyState('error'))}><CopyGlyph state={copyState} /></button>
+                      {artifact.kind !== 'image' && <button className="response-icon-action" type="button" disabled={edit !== null} aria-label={copyState === 'error' ? 'Copia non riuscita: riprova' : copyState === 'copied' ? 'Contenuto copiato' : 'Copia contenuto'} onClick={() => void window.nexus.copyText(viewMode === 'diff' ? artifact.diff || '' : displayed.content || '').then(() => setCopyState('copied')).catch(() => setCopyState('error'))}><CopyGlyph state={copyState} /></button>}
                       <button className="response-icon-action" type="button" disabled={edit !== null} aria-label={viewMode === 'diff' ? 'Scarica modifiche' : 'Scarica risultato'} onClick={() => downloadArtifact(displayed, viewMode === 'diff' ? 'diff' : 'current')}><DownloadGlyph /></button>
                       {artifact.kind === 'file-change' && artifact.previousContent !== undefined && <button className="response-icon-action" type="button" aria-label="Scarica originale" onClick={() => downloadArtifact(artifact, 'original')}><DownloadGlyph original /></button>}
-                      {onRevise && edit === null && <button className="response-icon-action" type="button" aria-label="Modifica una copia" onClick={() => { editExpected.current = revisions.at(-1)?.id || ''; setViewMode('result'); setEdit(displayed.content || ''); setSaveError(''); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
+                      {onRevise && artifact.kind !== 'image' && edit === null && <button className="response-icon-action" type="button" aria-label="Modifica una copia" onClick={() => { editExpected.current = revisions.at(-1)?.id || ''; setViewMode('result'); setEdit(displayed.content || ''); setSaveError(''); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15z" /></svg></button>}
                       <QuietClose onClick={closeDetail} label="Chiudi dettaglio" />
                     </span>
                   </div>
@@ -418,8 +426,13 @@ export function ArtifactShelf({ artifacts, onRevise }: { artifacts: OperationalA
                   {revisions.length > 0 && <div className="artifact-versions"><NexusSelect ariaLabel="Versione del risultato" value={versionId} options={[{ value: '', label: 'Risultato AI' }, ...revisions.map(item => ({ value: item.id, label: `Copia ${item.sequence}` }))]} onValueChange={value => { setVersionId(value); setViewMode('result'); setCopyState('idle'); }} /></div>}
                   {viewMode === 'split' && artifact.previousContent !== undefined
                     ? <div className="artifact-split"><div><small>Prima</small><pre><HighlightedCode language={artifact.language || 'text'} content={artifact.previousContent || 'File nuovo'} /></pre></div><div><small>Dopo</small><pre><HighlightedCode language={artifact.language || 'text'} content={artifact.content || ''} /></pre></div></div>
-                    : <pre><HighlightedCode language={viewMode === 'diff' ? 'diff' : artifact.language || 'text'} content={viewMode === 'diff' ? artifact.diff || 'Nessuna differenza disponibile.' : displayed.content || 'Nessun output.'} /></pre>}
+                    : artifact.kind === 'image' && artifact.url && artifact.url.length <= 2 * 1024 * 1024 && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/i.test(artifact.url)
+                      ? <img src={artifact.url} alt={artifact.title} style={{ display: 'block', maxWidth: '100%', maxHeight: '65svh', objectFit: 'contain', margin: 'auto' }} />
+                      : ['document', 'table', 'link'].includes(artifact.kind)
+                        ? <MarkdownContent text={displayed.content || 'Nessun output.'} />
+                        : <pre><HighlightedCode language={viewMode === 'diff' ? 'diff' : artifact.language || 'text'} content={viewMode === 'diff' ? artifact.diff || 'Nessuna differenza disponibile.' : displayed.content || 'Nessun output.'} /></pre>}
                   </>}
+                  {sourceUrl && <RichLink label="Apri fonte" url={sourceUrl} />}
                   {saveError && <small role="alert" className="artifact-truncated">{saveError}</small>}
                   {Boolean(artifact.events?.length) && <ol className="artifact-timeline">{artifact.events?.map((event, index) => <li key={`${event.label}-${index}`} data-status={event.status}><i />{event.label}</li>)}</ol>}
                   {Boolean(artifact.diagnostics?.length) && <div className="artifact-diagnostics">{artifact.diagnostics?.map((entry, index) => <div key={`${entry.file}-${entry.line}-${index}`}><strong>{entry.file}:{entry.line}{entry.column ? `:${entry.column}` : ''}</strong><span>{entry.message}</span></div>)}</div>}

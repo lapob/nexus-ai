@@ -30,7 +30,8 @@
     "reasoning": "thinking",
     "verifying": "thinking",
     "validating": "thinking",
-    "ready": "listening",
+    "ready": "idle",
+    "transcribing": "thinking",
     "consent": "permission",
     "failed": "error"
   },

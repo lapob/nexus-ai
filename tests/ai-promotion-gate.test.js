@@ -10,12 +10,14 @@ const script = path.resolve(__dirname, '..', 'scripts', 'compare-ai-evaluations.
 function write(file, passRate, latency, gatePassed = true, mustPassFailures = []) {
   fs.writeFileSync(file, JSON.stringify({
     schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    provenance: { trainingUse: 'evaluation-only', containsRealUserData: false },
     suite: { hash: 'a'.repeat(64) },
-    models: [{ model: 'nexus-candidate', summary: { passRate, medianLatencyMs: latency, p95LatencyMs: latency * 2, gatePassed, mustPassFailures } }]
+    models: [{ model: 'nexus-candidate', mode: 'quick', summary: { modelCases: 100, passRate, medianLatencyMs: latency, p95LatencyMs: latency * 2, gatePassed, mustPassFailures } }]
   }));
 }
 
-test('promuove soltanto un candidato senza regressioni e produce una ricevuta', (t) => {
+test('verifica soltanto un candidato con evidenza comparabile senza promozione automatica', (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-promotion-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const baseline = path.join(directory, 'baseline.json');
@@ -26,6 +28,7 @@ test('promuove soltanto un candidato senza regressioni e produce una ricevuta', 
   const result = spawnSync(process.execPath, [script, baseline, candidate, `--output=${receipt}`], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(fs.readFileSync(receipt, 'utf8')).accepted, true);
+  assert.equal(JSON.parse(fs.readFileSync(receipt, 'utf8')).automaticProductionPromotion, false);
 });
 
 test('blocca un candidato con must-pass fallito anche se la media è alta', (t) => {

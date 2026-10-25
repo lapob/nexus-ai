@@ -65,5 +65,5 @@ async function synthesizeSpeechSegments({ text, synthesize, cancelled = () => fa
   if (onChunk) return { streamed: true, segments: chunks.length };
   return results.length === 1 ? results[0] : joinSpeechWaves(results);
 }
-module.exports = { MAX_SPEECH_TEXT, MAX_SPEECH_AUDIO, speechChunks, joinSpeechWaves, synthesizeSpeechSegments };
+module.exports = { MAX_SPEECH_TEXT, MAX_SPEECH_AUDIO, pcmWave, speechChunks, joinSpeechWaves, synthesizeSpeechSegments };
 // #endregion

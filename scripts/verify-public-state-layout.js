@@ -9,6 +9,11 @@ const {PUBLIC_AI_HTML}=require('../src/remote/remote-session-gateway');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const output=path.resolve(__dirname,'../qa-artifacts');
+const resultArtifacts = [
+ { id: 'qa-code', kind: 'code', title: 'Codice verificabile', content: 'const value = 42;\n' + 'x'.repeat(4000), language: 'javascript' },
+ { id: 'qa-image', kind: 'image', title: 'Immagine locale', url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=', content: '' },
+ { id: 'qa-inert', kind: 'link', title: '<img src=x onerror=alert(1)>', url: 'javascript:alert(1)', content: '<script>unsafe()</script>' }
+];
 // #endregion
 // #region Layout and interaction verification
 (async()=>{
@@ -21,7 +26,7 @@ const output=path.resolve(__dirname,'../qa-artifacts');
    if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:PUBLIC_AI_HTML});
    if(url.pathname==='/api/guest/bootstrap')return route.fulfill({json:{token:'synthetic-qa',capabilities:{capabilities:[]}}});
    if(url.pathname==='/api/guest/rating'){const body=route.request().postDataJSON();assert.deepEqual(Object.keys(body).sort(),['clientMessageId','rating']);ratings.push(body.rating);return route.fulfill({json:{status:'received',rating:body.rating}});}
-   if(url.pathname==='/api/guest/messages/stream'){const answer='Risposta di prova.\n\n'+('Un paragrafo lungo per controllare leggibilità, scorrimento e separazione dai comandi.\n\n').repeat(12);return route.fulfill({contentType:'application/x-ndjson',body:JSON.stringify({type:'token',token:answer})+'\n'+JSON.stringify({type:'complete',message:answer})+'\n'});}
+   if(url.pathname==='/api/guest/messages/stream'){const answer='Risposta di prova.\n\n'+('Un paragrafo lungo per controllare leggibilità, scorrimento e separazione dai comandi.\n\n').repeat(12);return route.fulfill({contentType:'application/x-ndjson',body:JSON.stringify({type:'token',token:answer})+'\n'+JSON.stringify({type:'complete',message:answer,artifacts:resultArtifacts})+'\n'});}
    if(url.pathname!=='/readyz')return route.continue();
    return route.fulfill({json:{ready:true,status:'ready'}});
   });
@@ -39,6 +44,16 @@ const output=path.resolve(__dirname,'../qa-artifacts');
   assert.equal(await page.locator('.identity').evaluate(el=>getComputedStyle(el,'::before').opacity),'0','Idle chrome must not tint the shared background');
   await page.locator('#download').click();await capture('download');await page.locator('#sheetClose').click();
   await page.locator('#keyboard').click();await page.locator('#prompt').fill('Prova sintetica della disposizione');await capture('compose');await page.locator('#send').click();await page.locator('#answer').filter({hasText:'Risposta di prova.'}).waitFor();await capture('answer');
+  await page.locator('.artifact-card').first().waitFor();
+  assert.equal(await page.locator('.artifact-card').count(),3);
+  assert.equal(await page.locator('.artifact-card script,.artifact-card [onerror],.artifact-card a[href^="javascript:"]').count(),0,'Result content remains inert');
+  await page.waitForFunction(()=>document.querySelector('.artifact-card img')?.naturalWidth>0);
+  const picture = page.locator('.artifact-card[data-kind="image"]');
+  await picture.scrollIntoViewIfNeeded();
+  const downloading = page.waitForEvent('download'); await picture.locator('button').click();
+  const download = await downloading; assert.ok(download.suggestedFilename().endsWith('.png'));
+  assert.equal(await page.locator('.artifact-card button').evaluateAll(buttons=>buttons.every(button=>button.getAttribute('aria-label')&&button.textContent==='')),true,'Result actions use accessible icons');
+  await capture('results');
   for(const id of ['copyResponse','deepenResponse','exportResponse']){
    assert.equal(await page.locator('#'+id).innerText(),'','Response commands use icons');
    assert.ok(await page.locator('#'+id).getAttribute('aria-label'),'Icon has an accessible name');

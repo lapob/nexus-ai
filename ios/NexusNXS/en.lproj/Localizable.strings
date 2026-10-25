@@ -2,6 +2,9 @@
 "connection.detail" = "Check your connection and try again.";
 "connection.retry" = "Try again";
 "settings.title" = "Settings";
+"settings.conversation" = "Conversation";
+"settings.responses.voice" = "Responses and voice";
+"settings.conversation.detail" = "Chat preferences and local data use the conversation’s settings without separate copies.";
 "settings.device" = "Device";
 "settings.permissions" = "App permissions";
 "settings.device.detail" = "Native text size and transitions follow iOS accessibility preferences.";

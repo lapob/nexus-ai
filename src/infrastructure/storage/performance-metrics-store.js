@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { closeDatabase, configureDatabase } = require('./sqlite-durability');
+const { safeAttributes } = require('../privacy-telemetry');
 
 const ALLOWED_KINDS = new Set(['chat', 'stream', 'remote']);
 const ALLOWED_MODES = new Set(['instant', 'fast', 'deep']);
@@ -104,12 +105,20 @@ class PerformanceMetricsStore {
         cached INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS performance_metrics_mode_id ON performance_metrics(mode, id DESC);`);
+      database.exec(`CREATE TABLE IF NOT EXISTS performance_spans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, recorded_at INTEGER NOT NULL,
+        trace_id TEXT NOT NULL, span_id TEXT NOT NULL, parent_span_id TEXT,
+        name TEXT NOT NULL, component TEXT NOT NULL, operation TEXT NOT NULL,
+        outcome TEXT NOT NULL, tier TEXT NOT NULL, duration_ms INTEGER NOT NULL,
+        queue_ms INTEGER, first_token_ms INTEGER
+      );`);
       const columns = new Set(database.prepare('PRAGMA table_info(performance_metrics)').all().map((row) => row.name));
       if (!columns.has('prepare_ms')) database.exec('ALTER TABLE performance_metrics ADD COLUMN prepare_ms INTEGER;');
       if (!columns.has('inference_ms')) database.exec('ALTER TABLE performance_metrics ADD COLUMN inference_ms INTEGER;');
       if (!columns.has('verify_ms')) database.exec('ALTER TABLE performance_metrics ADD COLUMN verify_ms INTEGER;');
       this.database = database;
       this.pendingRows = [];
+      this.pendingSpans = [];
       this.pendingWrites = 0;
       this.flushTimer = null;
       this.retryDelayMs = 150;
@@ -117,6 +126,10 @@ class PerformanceMetricsStore {
         recorded_at,kind,mode,model_class,duration_ms,first_token_ms,prepare_ms,inference_ms,verify_ms,success,corrected,cached
       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
       this.trimStatement = database.prepare('DELETE FROM performance_metrics WHERE id <= COALESCE((SELECT id FROM performance_metrics ORDER BY id DESC LIMIT 1 OFFSET ?), 0)');
+      this.insertSpanStatement = database.prepare(`INSERT INTO performance_spans(
+        recorded_at,trace_id,span_id,parent_span_id,name,component,operation,outcome,tier,duration_ms,queue_ms,first_token_ms
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
+      this.trimSpansStatement = database.prepare('DELETE FROM performance_spans WHERE id <= COALESCE((SELECT id FROM performance_spans ORDER BY id DESC LIMIT 1 OFFSET ?), 0)');
       this.migrateLegacy(legacyFilePath);
       this.trim();
     } catch (error) {
@@ -150,6 +163,7 @@ class PerformanceMetricsStore {
 
   trim() {
     this.trimStatement.run(this.limit);
+    this.trimSpansStatement.run(this.limit);
   }
 
   beginBatch() {
@@ -158,7 +172,7 @@ class PerformanceMetricsStore {
   }
 
   scheduleFlush(delayMs = 75) {
-    if (this.flushTimer || !this.pendingRows.length) return;
+    if (this.flushTimer || (!this.pendingRows.length && !this.pendingSpans.length)) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
       try { this.flush(); } catch { /* Il batch resta in coda e viene ritentato con backoff. */ }
@@ -169,22 +183,26 @@ class PerformanceMetricsStore {
   flush() {
     if (this.flushTimer) clearTimeout(this.flushTimer);
     this.flushTimer = null;
-    if (!this.pendingRows.length) return false;
+    if (!this.pendingRows.length && !this.pendingSpans.length) return false;
     const batch = this.pendingRows;
+    const spans = this.pendingSpans;
     this.pendingRows = [];
+    this.pendingSpans = [];
     this.pendingWrites = 0;
     try {
       this.database.exec('BEGIN IMMEDIATE');
       for (const row of batch) this.insert(row);
+      for (const span of spans) this.insertSpanStatement.run(...span);
       this.trim();
       this.database.exec('COMMIT');
       this.retryDelayMs = 150;
-      if (this.pendingRows.length) this.beginBatch();
+      if (this.pendingRows.length || this.pendingSpans.length) this.beginBatch();
       return true;
     } catch (error) {
       try { this.database.exec('ROLLBACK'); } catch {}
       this.pendingRows = [...batch, ...this.pendingRows];
-      this.pendingWrites = this.pendingRows.length;
+      this.pendingSpans = [...spans, ...this.pendingSpans];
+      this.pendingWrites = this.pendingRows.length + this.pendingSpans.length;
       const retryDelay = this.retryDelayMs;
       this.retryDelayMs = Math.min(2_000, retryDelay * 2);
       this.scheduleFlush(retryDelay);
@@ -193,7 +211,7 @@ class PerformanceMetricsStore {
   }
 
   read() {
-    if (this.pendingRows.length) this.flush();
+    if (this.pendingRows.length || this.pendingSpans.length) this.flush();
     return this.database.prepare(`SELECT recorded_at,kind,mode,model_class,duration_ms,first_token_ms,prepare_ms,inference_ms,verify_ms,success,corrected,cached
       FROM (SELECT * FROM performance_metrics ORDER BY id DESC LIMIT ?) ORDER BY id ASC`).all(this.limit).map((row) => ({
       schemaVersion: 3,
@@ -215,10 +233,44 @@ class PerformanceMetricsStore {
   record(value = {}) {
     const row = normalizeMetric(value);
     this.pendingRows.push(row);
-    this.pendingWrites = this.pendingRows.length;
+    this.pendingWrites = this.pendingRows.length + this.pendingSpans.length;
     this.beginBatch();
     if (this.pendingWrites >= 32) this.flush();
     return row;
+  }
+
+  recordSpan(span) {
+    if (span?.schema !== 'nexusnxs.telemetry.v1' || !/^[a-f0-9]{32}$/.test(span.traceId || '')
+      || !/^[a-f0-9]{16}$/.test(span.spanId || '') || !/^[a-z0-9._-]{1,80}$/i.test(span.name || '')) return false;
+    const attributes = safeAttributes(span.attributes);
+    const label = value => /^[a-z0-9._-]{1,80}$/i.test(value || '') ? value : 'unknown';
+    this.pendingSpans.push([Date.now(), span.traceId, span.spanId,
+      /^[a-f0-9]{16}$/.test(span.parentSpanId || '') ? span.parentSpanId : null,
+      span.name, label(attributes.component), label(attributes.operation),
+      ['success', 'failure', 'cancelled'].includes(attributes.outcome) ? attributes.outcome : 'unknown',
+      ALLOWED_MODES.has(attributes.tier) ? attributes.tier : 'unknown', boundedDuration(span.durationMs) || 0,
+      boundedDuration(attributes.queueMs), boundedDuration(attributes.firstTokenMs)]);
+    if (this.pendingSpans.length > this.limit) this.pendingSpans.splice(0, this.pendingSpans.length - this.limit);
+    this.pendingWrites = this.pendingRows.length + this.pendingSpans.length;
+    this.beginBatch(); if (this.pendingWrites >= 32) this.flush(); return true;
+  }
+
+  stageSummary() {
+    this.flush();
+    const rows = this.database.prepare('SELECT name,component,operation,outcome,duration_ms FROM performance_spans ORDER BY id DESC LIMIT ?').all(this.limit);
+    const groups = new Map();
+    for (const row of rows) {
+      if (!groups.has(row.name)) groups.set(row.name, []);
+      groups.get(row.name).push(row);
+    }
+    return [...groups.entries()].map(([name, group]) => {
+      const durations = group.filter(row => row.outcome === 'success').map(row => Number(row.duration_ms));
+      return { name, component: group[0].component, operation: group[0].operation, samples: group.length,
+        successful: durations.length, failures: group.filter(row => row.outcome === 'failure').length,
+        cancelled: group.filter(row => row.outcome === 'cancelled').length,
+        p50Ms: percentile(durations, 0.5), p95Ms: percentile(durations, 0.95),
+        status: durations.length < 10 ? 'insufficient' : 'measured' };
+    });
   }
 
   summary({ mode } = {}) {

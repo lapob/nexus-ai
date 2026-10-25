@@ -47,6 +47,9 @@ $densityState = (Invoke-CheckedAdb -s $device shell wm density) -join "`n"
 $fontScale = ((Invoke-CheckedAdb -s $device shell settings get system font_scale) -join '').Trim()
 $rotationMode = ((Invoke-CheckedAdb -s $device shell settings get system accelerometer_rotation) -join '').Trim()
 $userRotation = ((Invoke-CheckedAdb -s $device shell settings get system user_rotation) -join '').Trim()
+$screenTimeout = ((Invoke-CheckedAdb -s $device shell settings --user 0 get system screen_off_timeout) -join '').Trim()
+$windowBefore = (Invoke-CheckedAdb -s $device shell dumpsys window) -join "`n"
+if ($windowBefore -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Dispositivo bloccato: nessuna impostazione display modificata.' }
 $profiles = @(
   @{ Name = 'phone-small'; Size = '720x1280'; Density = '320'; Font = '1.0' },
   @{ Name = 'phone-compact'; Size = '1080x2400'; Density = '480'; Font = '1.0' },
@@ -69,9 +72,12 @@ function Restore-Display {
 #region 02 — Installazione, cattura e ripristino
 
 try {
+  if ($screenTimeout -match '^\d+$' -and [long]$screenTimeout -lt 300000) {
+    Invoke-CheckedAdb -s $device shell settings --user 0 put system screen_off_timeout 300000 | Out-Null
+  }
   Invoke-CheckedAdb -s $device shell settings put system accelerometer_rotation 0 | Out-Null
   Invoke-CheckedAdb -s $device shell settings put system user_rotation 0 | Out-Null
-  Invoke-CheckedAdb -s $device install -r $ApkPath | Out-Null
+  Invoke-CheckedAdb -s $device install --user 0 -r $ApkPath | Out-Null
   $frameMetrics = @()
   $jankFailures = @()
   foreach ($profile in $profiles) {
@@ -96,6 +102,16 @@ try {
     Invoke-CheckedAdb -s $device pull $remotePng (Join-Path $OutputDirectory "$($profile.Name).png") | Out-Null
     Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
     $capturedXml = [xml](Get-Content -LiteralPath (Join-Path $OutputDirectory "$($profile.Name).xml") -Raw)
+    $visibleDeadline = [DateTime]::UtcNow.AddSeconds(12)
+    while (-not $capturedXml.SelectSingleNode("//node[@package='$package']") -and [DateTime]::UtcNow -lt $visibleDeadline) {
+      $window = (Invoke-CheckedAdb -s $device shell dumpsys window) -join "`n"
+      $focused = ($window -split "`n" | Where-Object { $_ -match 'mCurrentFocus=' }) -join ''
+      if ($window -match 'mDreamingLockscreen=true|mShowingLockscreen=true' -or $focused -notmatch [regex]::Escape($package)) { throw 'Foreground esterno o dispositivo bloccato: collaudo sospeso.' }
+      Start-Sleep -Milliseconds 600
+      Invoke-CheckedAdb -s $device shell uiautomator dump $remoteXml | Out-Null
+      Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
+      $capturedXml = [xml](Get-Content -LiteralPath (Join-Path $OutputDirectory "$($profile.Name).xml") -Raw)
+    }
     if (-not $capturedXml.SelectSingleNode("//node[@package='$package']")) {
       throw "La cattura $($profile.Name) non contiene l'app prevista."
     }
@@ -122,10 +138,20 @@ try {
         throw "Control $($profile.Name): atteso stato $ControlState. La schermata di connessione non dimostra il layout della dashboard."
       }
     } else {
+      $publicDeadline = [DateTime]::UtcNow.AddSeconds(25)
+      while ($PublicState -eq 'Online' -and -not $capturedXml.SelectSingleNode("//node[@package='$package' and @text='Online']") -and [DateTime]::UtcNow -lt $publicDeadline) {
+        Start-Sleep -Milliseconds 800
+        Invoke-CheckedAdb -s $device shell uiautomator dump $remoteXml | Out-Null
+        Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
+        $capturedXml = [xml](Get-Content -LiteralPath (Join-Path $OutputDirectory "$($profile.Name).xml") -Raw)
+        if (-not $capturedXml.SelectSingleNode("//node[@package='$package']")) { throw 'Foreground cambiato durante il probe pubblico.' }
+      }
       $connection = $capturedXml.SelectSingleNode("//node[@package='$package' and @text='$PublicState']")
       if (-not $connection) {
         throw "Public $($profile.Name): atteso stato $PublicState. Una schermata offline non dimostra il percorso online."
       }
+      Invoke-CheckedAdb -s $device shell screencap -p $remotePng | Out-Null
+      Invoke-CheckedAdb -s $device pull $remotePng (Join-Path $OutputDirectory "$($profile.Name).png") | Out-Null
     }
     Invoke-CheckedAdb -s $device shell rm $remotePng $remoteXml | Out-Null
     $capturedPng = [IO.File]::ReadAllBytes((Join-Path $OutputDirectory "$($profile.Name).png"))
@@ -183,6 +209,7 @@ try {
 }
 finally {
   Restore-Display
+  if ($screenTimeout -match '^\d+$') { Invoke-CheckedAdb -s $device shell settings --user 0 put system screen_off_timeout $screenTimeout | Out-Null }
   Invoke-CheckedAdb -s $device shell am force-stop $package | Out-Null
   Invoke-CheckedAdb -s $device shell am start -n $activity | Out-Null
 }

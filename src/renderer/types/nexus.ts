@@ -281,8 +281,10 @@ export interface NexusBridge {
   listAgentCapabilities(): Promise<{
     tools: Array<{ name: string; label: string; risk: string; description: string }>;
     applications: Array<{ id: string; label: string }>;
+    integrations?: Array<{ id: string; type: 'mcp' | 'n8n'; tools: string[]; ready: boolean }>;
     policy: { approval: string; ticketTtlMs: number; audit: string };
   }>;
+  revokeIntegration(id: string): Promise<{ revoked: boolean }>;
   planAction(request: string | { instruction: string; observations?: string[] }): Promise<{
     message?: string;
     error?: string;
@@ -393,7 +395,8 @@ export interface UpdateStatus {
 
 export interface OperationalArtifact {
   id: string;
-  kind: 'file-change' | 'command' | 'file' | 'result';
+  kind: 'file-change' | 'command' | 'file' | 'result' | 'code' | 'document' | 'image' | 'link' | 'table';
+  url?: string;
   title: string;
   subtitle?: string;
   language?: string;

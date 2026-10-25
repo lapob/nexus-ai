@@ -273,7 +273,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
         const blob = captured.blob;
         if (!blob && concurrent) continue;
         if (!blob) throw new Error(copy('Non ho sentito una frase. Tocca il Core per riprovare.', 'No speech detected. Tap the Core to retry.'));
-        state('transcribing', copy('Comprendo la voce', 'Understanding speech'));
+        state('transcribing', copy('Trascrivo la voce', 'Transcribing speech'));
         const Engine = globalThis.AudioContext || globalThis.webkitAudioContext, context = new Engine({ sampleRate: 16000 });
         let wav;
         try {

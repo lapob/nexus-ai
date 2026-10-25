@@ -4,7 +4,9 @@ import WebKit
 /// Reuses the public conversation and Core without a privileged JavaScript bridge.
 struct NexusWebView: UIViewRepresentable {
     let reloadID: UUID
+    let settingsRequest: Int
     @Binding var unavailable: Bool
+    @Binding var ready: Bool
     private static let origin = URL(string: "https://ai.nexusnxs.com/")!
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -18,7 +20,9 @@ struct NexusWebView: UIViewRepresentable {
         view.isOpaque = false
         view.backgroundColor = .clear
         view.scrollView.backgroundColor = .clear
+        view.scrollView.keyboardDismissMode = .interactive
         context.coordinator.lastReloadID = reloadID
+        context.coordinator.lastSettingsRequest = settingsRequest
         view.load(URLRequest(url: Self.origin))
         return view
     }
@@ -28,6 +32,15 @@ struct NexusWebView: UIViewRepresentable {
         if context.coordinator.lastReloadID != reloadID {
             context.coordinator.lastReloadID = reloadID
             view.load(URLRequest(url: Self.origin))
+        }
+        if context.coordinator.lastSettingsRequest != settingsRequest {
+            context.coordinator.lastSettingsRequest = settingsRequest
+            // A fixed command on the trusted main page; no privileged JS bridge,
+            // arbitrary script arguments, or separate copy of chat preferences.
+            if view.url?.scheme == "https", view.url?.host == Self.origin.host,
+               view.url?.port == nil || view.url?.port == 443 {
+                view.evaluateJavaScript("document.getElementById('profileSettings')?.click();", completionHandler: nil)
+            }
         }
     }
 
@@ -40,18 +53,24 @@ struct NexusWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var parent: NexusWebView
         var lastReloadID: UUID?
+        var lastSettingsRequest: Int?
         init(_ parent: NexusWebView) { self.parent = parent }
+
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            parent.ready = false
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parent.unavailable = false
+            parent.ready = true
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            if (error as NSError).code != NSURLErrorCancelled { parent.unavailable = true }
+            if (error as NSError).code != NSURLErrorCancelled { parent.unavailable = true; parent.ready = false }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            if (error as NSError).code != NSURLErrorCancelled { parent.unavailable = true }
+            if (error as NSError).code != NSURLErrorCancelled { parent.unavailable = true; parent.ready = false }
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

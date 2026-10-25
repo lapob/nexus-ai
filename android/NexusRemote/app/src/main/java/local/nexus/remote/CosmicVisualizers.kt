@@ -9,12 +9,17 @@ import android.webkit.WebViewClient
 import android.webkit.RenderProcessGoneDetail
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -123,15 +128,20 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
 @Composable
 internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion: Boolean, onClick: () -> Unit) {
     val scene = LocalCosmicScene.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val touchScale by animateFloatAsState(if (pressed && !reduceMotion) .984f else 1f,
+        tween(if (reduceMotion) 0 else if (pressed) local.nexus.motion.NexusMotion.PRESS else local.nexus.motion.NexusMotion.CORE_RELEASE,
+            easing = CubicBezierEasing(.2f, 0f, .2f, 1f)), label = "Core touch")
     SideEffect { scene.state = state; scene.energy = energy; scene.reduced = reduceMotion }
     DisposableEffect(scene) { scene.present = true; onDispose { scene.present = false } }
-    Box(Modifier.size(diameter).onGloballyPositioned { scene.bounds = it.boundsInWindow() }
+    Box(Modifier.size(diameter).graphicsLayer { scaleX = touchScale; scaleY = touchScale }.onGloballyPositioned { scene.bounds = it.boundsInWindow() }
         .pointerInput(reduceMotion) { if (!reduceMotion) detectDragGestures(
             onDragEnd = { scene.inspection = listOf(0f, 0f, 0f) },
             onDragCancel = { scene.inspection = listOf(0f, 0f, 0f) },
             onDrag = { change, _ -> change.consume(); scene.inspection = listOf(change.position.x / size.width * 2f - 1f, change.position.y / size.height * 2f - 1f, 1f) }
         ) }
-        .semantics { contentDescription = "NexusNXS Core" }.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick))
+        .semantics { contentDescription = "NexusNXS Core" }.clickable(interactionSource = interaction, indication = null, onClick = onClick))
 }
 
 @Composable

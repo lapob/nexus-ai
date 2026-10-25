@@ -227,6 +227,8 @@ Strumenti disponibili:
 ${tools}
 
 Applicazioni consentite per open_application: ${applications}.
+Integrazioni locali esplicitamente configurate: ${JSON.stringify(capabilities.integrations || [])}.
+run_integration richiede {"connection":"id configurato","tool":"nome consentito","input":{}}. Non inventare collegamenti o strumenti. Ogni esecuzione richiede sempre approvazione specifica; nessuna ripetizione automatica se l'esito esterno è incerto.
 open_application richiede {"application":"id"}.
 open_path richiede {"path":"percorso relativo alla vault"}.
 open_user_path richiede {"path":"percorso relativo alla cartella personale"}.
@@ -998,6 +1000,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       aiCircuits: aiRuntime.circuitStatus(),
       hardware: hardwareProfile,
       performance: performanceStore?.summary?.() || null,
+      performanceStages: performanceStore?.stageSummary?.() || [],
     };
     logger.info('Controllo locale di funzionamento completato.', internalReport);
     return {
@@ -1391,6 +1394,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     }
   });
   ipcMain.handle(CHANNELS.agentCapabilities, (event) => { assertTrustedSender(event); return actionRuntime.capabilities(); });
+  ipcMain.handle(CHANNELS.integrationRevoke, (event, id) => {
+    assertTrustedSender(event);
+    if (distributionMode === 'public' || typeof id !== 'string' || !/^[a-z][a-z0-9-]{1,40}$/.test(id)) throw new Error('Integrazione locale non disponibile.');
+    actionRuntime.integrations?.revoke(id);
+    return { revoked: true };
+  });
   ipcMain.handle(CHANNELS.voiceCapabilities, (event) => {
     assertTrustedSender(event);
     if (distributionMode === 'public') return { available: true, backend: 'nexus-service', local: false, remote: true };

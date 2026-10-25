@@ -41,8 +41,8 @@ foreach ($asset in @($manifest.archive, $manifest.model)) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead($archive)
 try {
-  $entries = @($zip.Entries | Where-Object { $_.FullName -match '^Release/(whisper-(cli|stream)\.exe|whisper\.dll|SDL2\.dll|ggml(?:-base|-cpu-[a-z0-9]+)?\.dll)$' })
-  foreach ($required in @('whisper-cli.exe', 'whisper-stream.exe', 'whisper.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu-x64.dll', 'SDL2.dll')) {
+  $entries = @($zip.Entries | Where-Object { $_.FullName -match '^Release/(whisper-(cli|stream|server)\.exe|whisper\.dll|SDL2\.dll|ggml(?:-base|-cpu-[a-z0-9]+)?\.dll)$' })
+  foreach ($required in @('whisper-cli.exe', 'whisper-stream.exe', 'whisper-server.exe', 'whisper.dll', 'ggml.dll', 'ggml-base.dll', 'ggml-cpu-x64.dll', 'SDL2.dll')) {
     if (-not ($entries | Where-Object Name -eq $required)) { throw "Missing archive runtime entry: $required" }
   }
   foreach ($entry in $entries) {
@@ -54,6 +54,8 @@ try {
     $stream = $entry.Open(); $sha = [Security.Cryptography.SHA256]::Create()
     try { $expected = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
     finally { $stream.Dispose(); $sha.Dispose() }
+    $pinned = $manifest.residentFiles.PSObject.Properties[$entry.Name]
+    if ($pinned -and $pinned.Value -ne $expected) { throw "Resident manifest integrity mismatch: $($entry.Name)" }
     if ((Get-AssetHash $target) -ne $expected) { throw "Runtime binary integrity mismatch: $($entry.Name)" }
   }
 } finally { $zip.Dispose() }

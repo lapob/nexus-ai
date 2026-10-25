@@ -32,6 +32,7 @@ requireHttpsEndpoint("NEXUS_CONSOLE_FALLBACK_URL", fallbackUrl, ["", "/"])
 requireHttpsEndpoint("NEXUS_LAN_URL", localNexusUrl, ["", "/"])
 
 dependencies {
+    implementation "androidx.profileinstaller:profileinstaller:1.4.1"
     implementation "androidx.activity:activity:1.10.1"
     implementation "androidx.core:core:1.16.0"
 }
@@ -44,8 +45,8 @@ android {
         applicationId "local.nexus.console"
         minSdk 26
         targetSdk 36
-        versionCode 47
-        versionName "1.20.3-nexus-control"
+        versionCode 48
+        versionName "1.20.4-nexus-control"
         buildConfigField "String", "NEXUS_URL", quotedBuildValue(consoleUrl)
         buildConfigField "String", "NEXUS_FALLBACK_URL", quotedBuildValue(fallbackUrl)
         buildConfigField "String", "NEXUS_LAN_URL", quotedBuildValue(localNexusUrl)

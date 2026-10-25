@@ -4,6 +4,22 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { PerformanceMetricsStore, percentile, evaluateSlo } = require('../src/infrastructure/storage/performance-metrics-store');
+const { createPrivacySpan } = require('../src/infrastructure/privacy-telemetry');
+
+test('stage samples stay bounded and separate from response latency without private content', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-stage-metrics-'));
+  const filePath = path.join(directory, 'performance.sqlite3'), store = new PerformanceMetricsStore({ filePath, limit: 100 });
+  t.after(() => { store.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  store.record({ durationMs: 1000 });
+  for (let i = 0; i < 140; ++i) store.recordSpan(createPrivacySpan({ name: 'voice.stt', startedAt: 1, endedAt: i + 1,
+    attributes: { component: 'voice', operation: 'transcribe', outcome: i === 139 ? 'cancelled' : 'success', prompt: 'private content' } }));
+  assert.equal(store.summary().samples, 1); assert.equal(store.summary().p95Ms, 1000);
+  const [summary] = store.stageSummary(); assert.equal(summary.samples, 100); assert.equal(summary.successful, 99); assert.equal(summary.cancelled, 1);
+  assert.equal(summary.status, 'measured');
+  assert.equal(store.recordSpan({ schema: 'nexusnxs.telemetry.v1', traceId: 'private' }), false);
+  const rows = store.database.prepare('SELECT * FROM performance_spans').all();
+  assert.doesNotMatch(JSON.stringify(rows), /private content/);
+});
 
 test('il bootstrap collega le metriche reali agli handler desktop', () => {
   const bootstrap = fs.readFileSync(path.join(__dirname, '..', 'src', 'application', 'bootstrap.js'), 'utf8');

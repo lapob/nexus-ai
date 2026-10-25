@@ -24,6 +24,7 @@ const CHANNELS = Object.freeze({
   streamEvent: 'nexus:stream-event',
   embed: 'nexus:embed',
   agentCapabilities: 'nexus:agent-capabilities',
+  integrationRevoke: 'nexus:integration-revoke',
   agentPlan: 'nexus:agent-plan',
   agentExecute: 'nexus:agent-execute',
   workflowCreate: 'nexus:workflow-create',

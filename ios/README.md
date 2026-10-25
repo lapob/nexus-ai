@@ -11,6 +11,13 @@ bridge JavaScript privilegiato. Solo l'origine HTTPS ai.nexusnxs.com resta
 nella WebView; i link HTTPS esterni selezionati dall'utente aprono il browser.
 Microfono e camera richiedono i permessi di iOS e del sito.
 
+Le impostazioni native ora aprono anche il pannello condiviso «Risposte e voce»
+attraverso un comando DOM fisso, soltanto sulla pagina principale fidata e dopo
+il caricamento. Nessun bridge privilegiato o copia separata dei dati. La tastiera
+usa la chiusura interattiva di UIKit; il Core riusa feedback al tocco e rientro
+graduale della web app, rispettando il movimento ridotto del dispositivo.
+Queste modifiche ai sorgenti richiedono ancora compilazione e prove su Mac/iOS.
+
 ## Compilazione su Mac
 
 Richiede Xcode con SDK iOS 17+ e XcodeGen. Nessuna dipendenza Swift esterna.

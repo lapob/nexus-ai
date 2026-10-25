@@ -9,6 +9,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -32,6 +33,37 @@ class ComposerContinuityTest {
         scenario?.close()
         LocalChatStore(context).use { it.clearAll() }
         context.getSharedPreferences("nexus_compose", Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
+    @Test fun typedResultsSurviveActivityRecreationWithoutExecutingTheirContent() {
+        val metadata = JSONArray()
+            .put(JSONObject().put("id", "qa-code").put("kind", "code").put("title", "QA code result").put("content", "<script>not executed</script>"))
+            .put(JSONObject().put("id", "qa-image").put("kind", "image").put("title", "QA image result").put("url", "data:image/png;base64,AA=="))
+        val id = LocalChatStore(context).use { store ->
+            val created = store.createConversation()
+            store.addTurn(created, "assistant", "QA result", metadata.toString())
+            created
+        }
+        context.getSharedPreferences("nexus_compose", Context.MODE_PRIVATE).edit().putString("currentConversationId", id).commit()
+        val session = ActivityScenario.launch<NexusMainActivity>(Intent(context, NexusMainActivity::class.java))
+        scenario = session
+        repeat(2) { iteration ->
+            session.onActivity { activity ->
+                val result = state(activity).turns.last().artifacts
+                assertEquals(2, result.size)
+                assertEquals("code", result[0].kind)
+                assertEquals("<script>not executed</script>", result[0].content)
+                assertEquals("image", result[1].kind)
+                assertEquals("data:image/png;base64,AA==", result[1].url)
+            }
+            if (iteration == 0) session.recreate()
+        }
+    }
+
+    @Test fun readinessDistinguishesWarmupFromOfflineAndNeverPromotesLivenessOver503() {
+        assertEquals(NexusConnection.ONLINE, connectionFromProbeStatuses(listOf(0, 200, 503)))
+        assertEquals(NexusConnection.CHECKING, connectionFromProbeStatuses(listOf(503, 0)))
+        assertEquals(NexusConnection.OFFLINE, connectionFromProbeStatuses(listOf(0, 404, 500)))
     }
 
     private fun state(activity: NexusMainActivity): NexusUiState =

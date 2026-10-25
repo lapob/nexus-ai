@@ -54,6 +54,7 @@ recordModuleStage('ai');
 const { ActionRuntime } = require('../agents/action-runtime');
 const { WorkflowRuntime } = require('../agents/workflow-runtime');
 const { NativeSpeechService } = require('../voice/native-speech');
+const { LocalIntegrations, connectionsFromFile, disableConnectionInFile } = require('../plugins/local-integrations');
 const { NeuralSpeechService } = require('../voice/neural-speech');
 const { RemoteSpeechQueue } = require('../voice/speech-arbiter');
 const { ExpressiveSpeechService } = require('../voice/expressive-speech');
@@ -62,7 +63,7 @@ const { TrainingStore } = require('../infrastructure/storage/training-store');
 const { PersonalMemoryStore } = require('../infrastructure/storage/personal-memory-store');
 const { ConversationStore } = require('../infrastructure/storage/conversation-store');
 const { PerformanceMetricsStore } = require('../infrastructure/storage/performance-metrics-store');
-const { PrivacyTelemetry } = require('../infrastructure/privacy-telemetry');
+const { PrivacyTelemetry, createPrivacySpan } = require('../infrastructure/privacy-telemetry');
 const { createAvailabilityMonitor } = require('../infrastructure/storage/availability-monitor');
 const { SemanticResponseCache } = require('../infrastructure/storage/semantic-response-cache');
 recordModuleStage('stores');
@@ -157,7 +158,16 @@ function bootstrapElectron({ env = process.env } = {}) {
   });
   const smokeTest = env.NEXUS_SMOKE_TEST === '1';
   const smokeStagePath = smokeTest ? String(env.NEXUS_SMOKE_STAGE_PATH || '').trim() : '';
+  const startupSpans = [];
+  const startupTraceId = createPrivacySpan().traceId;
+  let previousStage = { wall: Date.now(), monotonic: performance.now() }, startupSpanSink = null;
   const recordSmokeStage = (stage) => {
+    const current = { wall: Date.now(), monotonic: performance.now() };
+    const span = createPrivacySpan({ name: `startup.${stage}`, startedAt: previousStage.wall,
+      endedAt: previousStage.wall + Math.max(0, current.monotonic - previousStage.monotonic),
+      attributes: { component: 'bootstrap', operation: stage, outcome: 'success' }, context: { traceId: startupTraceId } });
+    previousStage = current;
+    if (startupSpanSink) startupSpanSink(span); else if (startupSpans.length < 32) startupSpans.push(span);
     if (!smokeStagePath) return;
     try {
       fs.mkdirSync(path.dirname(smokeStagePath), { recursive: true });
@@ -537,13 +547,20 @@ function bootstrapElectron({ env = process.env } = {}) {
       });
       const privacyTelemetry = new PrivacyTelemetry({
         sampleRate: Number(env.NEXUS_TELEMETRY_SAMPLE_RATE ?? 0.1),
-        exporter: (span) => performanceStore.record({
+        exporter: (span) => {
+          performanceStore.recordSpan(span);
+          if (span.name !== 'guest.response') return;
+          performanceStore.record({
           kind: 'remote',
           mode: span.attributes.tier || 'fast',
           durationMs: span.durationMs,
           success: span.attributes.outcome === 'success'
-        })
+          });
+        }
       });
+      startupSpanSink = span => performanceStore.recordSpan(span);
+      const startupTelemetry = new PrivacyTelemetry({ sampleRate: 1, exporter: startupSpanSink });
+      for (const span of startupSpans.splice(0)) startupSpanSink(span);
       const responseCache = new SemanticResponseCache({
         filePath: path.join(localData.database, 'response-cache.sqlite3'),
         encrypt: safeStorage.isEncryptionAvailable() ? (value) => safeStorage.encryptString(value).toString('base64') : null,
@@ -580,13 +597,15 @@ function bootstrapElectron({ env = process.env } = {}) {
         researchAvailable: webResearchService?.enabled !== false,
         researchCapabilityProvider: () => webResearchService.capabilityState(),
         webImageSearch: webResearchService.enabled ? (query, options) => webResearchService.searchImages(query, options) : null,
-        voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 55, signal }) => remoteTranscriptionService.transcribeAudio({
+        voiceTranscriber: ({ audio, language = 'auto', timeoutSeconds = 55, signal }) => privacyTelemetry.measure('voice.stt',
+          { component: 'voice', operation: 'transcribe', transport: 'http' }, () => remoteTranscriptionService.transcribeAudio({
           audio,
           language,
           timeoutSeconds,
           signal
-        }),
-        voiceSynthesizer: (request) => remoteSpeechQueue.synthesize({ ...request, delivery: request.delivery || 'warm' }),
+        })),
+        voiceSynthesizer: (request) => privacyTelemetry.measure('voice.tts', { component: 'voice', operation: 'synthesize', transport: 'http' },
+          () => remoteSpeechQueue.synthesize({ ...request, delivery: request.delivery || 'warm' })),
         voiceInputCapabilityProvider: () => remoteTranscriptionService.audioAvailable(),
         voiceCapabilityProvider: () => !remoteSpeechQueue.disposed
           && (remoteNeuralSpeech.capabilities().available || remoteExpressiveSpeech.capabilities().available),
@@ -617,6 +636,10 @@ function bootstrapElectron({ env = process.env } = {}) {
         auditPath: path.join(localData.logs, 'action-audit.jsonl'),
         checkpointDirectory: path.join(localData.root, 'action-checkpoints'),
         securityEventStore,
+        integrations: new LocalIntegrations({ load: () => {
+          try { return connectionsFromFile(path.join(localData.root, 'integrations.json')); }
+          catch { logger.warn('Configurazione integrazioni locali non valida: collegamenti disattivati.'); return []; }
+        }, persistRevocation: id => disableConnectionInFile(path.join(localData.root, 'integrations.json'), id), env }),
         shell,
         logger
       });
@@ -696,7 +719,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         let retryIndex = 0;
         const runHeadlessWarmup = () => {
           if (cancelled) return;
-          ipcServices.warmupAI().catch((error) => {
+          startupTelemetry.measure('startup.model-warmup', { component: 'bootstrap', operation: 'model-warmup' }, () => ipcServices.warmupAI()).catch((error) => {
             if (cancelled) return;
             const delay = warmupRetryDelay(error, retryIndex++, aiWarmupPolicy);
             if (delay === null) {

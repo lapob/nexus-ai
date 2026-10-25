@@ -29,6 +29,7 @@ public final class NexusMotion {
     public static final int AMBIENT_PULSE = 950;
     public static final int PRESS = 85;
     public static final int RELEASE = 180;
+    public static final int CORE_RELEASE = 650;
 
     public static final float STANDARD_X1 = .20f;
     public static final float STANDARD_Y1 = 0f;

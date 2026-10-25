@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { NativeSpeechService } = require('../src/voice/native-speech');
+const { ResidentTranscriber } = require('../src/voice/resident-transcriber');
 
 // #region 01 — WER e dataset
 function words(value) { return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/).filter(Boolean); }
@@ -147,7 +148,10 @@ async function run() {
     process.stdout.write(`Dataset STT valido: ${validatedCases.length} casi · ${speechLanguages.length} lingue · audio confinato.\n`);
     return;
   }
-  const service = new NativeSpeechService({ whisperDirectory: path.join(__dirname, '..', 'vendor', 'whisper', 'windows-x64') });
+  const backend = option('backend', 'cli');
+  if (!['cli', 'resident'].includes(backend)) throw new Error('Backend STT non valido: cli oppure resident.');
+  const directory = path.join(__dirname, '..', 'vendor', 'whisper', 'windows-x64');
+  const service = backend === 'resident' ? new ResidentTranscriber({ directory }) : new NativeSpeechService({ whisperDirectory: directory });
   const results = [];
   try {
     for (let index = 0; index < cases.length; index += 1) {
@@ -168,11 +172,11 @@ async function run() {
         latencyMs: Math.round(performance.now() - startedAt)
       });
     }
-  } finally { service.shutdown(); }
+  } finally { await service.shutdown(); }
   const aggregate = aggregateResults(results);
   const failures = sttGateFailures(aggregate, { minimumAccuracy, maximumFalsePositive });
-  const report = { evaluatedAt: new Date().toISOString(), minimumAccuracy, maximumFalsePositive, minimumLanguageCases, gatePassed: failures.length === 0, failures, cases: results.length, ...aggregate, results };
-  const target = path.join(__dirname, '..', 'qa-artifacts', 'local-stt-evaluation.json');
+  const report = { evaluatedAt: new Date().toISOString(), backend, minimumAccuracy, maximumFalsePositive, minimumLanguageCases, gatePassed: failures.length === 0, failures, cases: results.length, ...aggregate, results };
+  const target = path.join(__dirname, '..', 'qa-artifacts', `local-stt-evaluation${backend === 'resident' ? '-resident' : ''}.json`);
   fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`STT: ${results.length} casi · accuratezza ${(report.accuracy * 100).toFixed(1)}% · falsi richiami ${(report.falseActivationRate * 100).toFixed(1)}% · p95 ${report.latencyP95Ms} ms\n`);
   if (failures.length) process.exitCode = 2;

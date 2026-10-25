@@ -2,6 +2,9 @@
 "connection.detail" = "Controlla la connessione e riprova.";
 "connection.retry" = "Riprova";
 "settings.title" = "Impostazioni";
+"settings.conversation" = "Conversazione";
+"settings.responses.voice" = "Risposte e voce";
+"settings.conversation.detail" = "Personalizzazioni e dati della chat usano le stesse impostazioni della conversazione, senza copie separate.";
 "settings.device" = "Dispositivo";
 "settings.permissions" = "Permessi dell’app";
 "settings.device.detail" = "Dimensione del testo nativo e transizioni seguono le preferenze di accessibilità di iOS.";

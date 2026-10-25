@@ -139,6 +139,26 @@ const assert = require('node:assert/strict');
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(() => document.querySelector('canvas').getContext('2d').getImageData(0,0,390,568).data.some((value,index)=>index%4===3&&value>0)),false);
     report.push({ fallbackHiddenClearsCanvas:true });
+    const touch = await browser.newPage({ viewport: { width: 390, height: 568 } });
+    await touch.setContent('<style>body{margin:0}canvas{width:390px;height:568px}#host{position:absolute;left:45px;top:100px;width:300px;height:300px}</style><canvas></canvas><div id="host"></div>');
+    await touch.evaluate(({ runtime, recipes }) => {
+      window.inspection = [.75, -.4, 1]; window.activity = 'speaking';
+      window.touchCore = eval(`(${runtime})`)(document.querySelector('canvas'), {
+        host: document.getElementById('host'), getInspection: () => inspection, getState: () => activity
+      }, eval(`(${recipes})`));
+    }, { runtime: String(createCosmicVisualizers), recipes: String(createDesktopRecipes) });
+    await touch.waitForFunction(() => touchCore.getMetrics().pointerStrength > .3);
+    const held = await touch.evaluate(() => touchCore.getMetrics());
+    await touch.evaluate(() => { inspection = [0, 0, 0]; activity = 'idle'; });
+    await touch.waitForTimeout(200);
+    const released = await touch.evaluate(() => touchCore.getMetrics());
+    assert.deepEqual(released.pointer, held.pointer, 'Release preserves the touch location while its influence decays');
+    assert.ok(released.pointerStrength > 0 && released.pointerStrength < held.pointerStrength, 'Touch influence fades rather than snapping away');
+    await touch.waitForTimeout(500);
+    const settled = await touch.evaluate(() => touchCore.getMetrics());
+    assert.ok(settled.energy < released.energy && settled.pointerStrength < released.pointerStrength, 'Idle light and input decay continuously');
+    await touch.evaluate(() => touchCore.dispose()); await touch.close();
+    report.push({ touchReleaseContinuous: true });
     fs.writeFileSync('qa-artifacts/core-framing-report.json',JSON.stringify(report,null,2));
     console.log('PASS 24 layouts, centered vertical Core, Core/title/control separation, composer bounds, responsive switch, touch tablet, cold start and reduced motion; software fallback clears hidden Core.');
   } finally { await browser.close(); }

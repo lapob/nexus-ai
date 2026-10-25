@@ -385,12 +385,17 @@ private val NEXUS_COSMIC_CONTINUUM_ID = NexusInteractionStates.CONTINUUM_ID
 enum class NexusScreen { CHAT, LIBRARY, PROJECTS, ACTIVITY, REMOTE, SCHEDULED, SETTINGS }
 enum class NexusPresence { IDLE, LISTENING, THINKING, RESPONDING, EXECUTING, CONNECTING, OFFLINE, ERROR }
 enum class NexusConnection { CHECKING, ONLINE, OFFLINE }
+internal fun connectionFromProbeStatuses(statuses: List<Int>): NexusConnection = when {
+    statuses.any { it in 200..299 } -> NexusConnection.ONLINE
+    statuses.any { it == 503 } -> NexusConnection.CHECKING
+    else -> NexusConnection.OFFLINE
+}
 private enum class NexusVoiceMode { IDLE, SINGLE_TURN, HANDS_FREE }
 private enum class NexusAuthorizationKind { NONE, WORK, WAKE }
 @Immutable data class ChatRow(val id: String, val title: String, val preview: String, val updatedAt: Long, val pinned: Boolean = false)
 @Immutable data class DeviceRow(val id: String, val name: String, val scope: String, val lastSeenAt: Long, val current: Boolean)
 @Immutable data class WakeTargetRow(val id: String, val label: String)
-@Immutable data class WorkArtifact(val title: String, val subtitle: String, val language: String, val content: String, val added: Int, val removed: Int)
+@Immutable data class WorkArtifact(val title: String, val subtitle: String, val language: String, val content: String, val added: Int, val removed: Int, val kind: String = "document", val url: String = "")
 @Immutable data class Turn(val role: String, val content: String, val artifacts: List<WorkArtifact> = emptyList())
 @Immutable data class ModelRow(val id: String, val name: String, val size: Long = 0L, val available: Boolean = true)
 @Immutable data class SlashCommandRow(val name: String, val label: String, val description: String, val template: String, val custom: Boolean = false)
@@ -837,7 +842,7 @@ open class NexusMainActivity : ComponentActivity() {
     private val activeConnections = ConcurrentHashMap.newKeySet<HttpURLConnection>()
     @Volatile private var destroyed = false
     @Volatile private var retryingPending = false
-    @Volatile private var connectionProbeRunning = false
+    private val connectionProbeRunning = AtomicBoolean(false)
     @Volatile private var capabilityProbeRunning = false
     @Volatile private var capabilityProbeCompleted = false
     @Volatile private var wakeProbeRunning = false
@@ -894,17 +899,17 @@ open class NexusMainActivity : ComponentActivity() {
         val connection = openTrackedConnection(base.trimEnd('/') + path)
         return try {
             connection.instanceFollowRedirects = false
-            connection.connectTimeout = 1_800
-            connection.readTimeout = 1_800
+            connection.connectTimeout = 2_500
+            connection.readTimeout = 2_500
             connection.requestMethod = "GET"
             connection.responseCode
         } finally { closeTrackedConnection(connection) }
     }
-    private fun probeReady(base: String): Boolean {
+    private fun probeReady(base: String): Int {
         val readiness = probeStatus(base, "/readyz")
         // Compatibilità con gateway precedenti: un 503 significa non pronto e
         // non deve essere trasformato in Online dal solo endpoint di liveness.
-        return readiness in 200..299 || readiness == 404 && probeStatus(base, "/healthz") in 200..299
+        return if (readiness == 404) probeStatus(base, "/healthz") else readiness
     }
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -2389,28 +2394,31 @@ open class NexusMainActivity : ComponentActivity() {
     }
 
     private fun probeConnection() {
-        if (connectionProbeRunning) return
-        connectionProbeRunning = true
+        if (!connectionProbeRunning.compareAndSet(false, true)) return
         runTask {
             try {
                 val endpoints = endpointCandidates()
                 val probes = endpoints.associateWith { base -> CompletableFuture.supplyAsync({
-                    try { probeReady(base) } catch (_: Exception) { false }
+                    try { probeReady(base) } catch (_: Exception) { 0 }
                 }, backgroundExecutor) }
-                val deadline = SystemClock.uptimeMillis() + 2_100L
+                // TLS and fallback liveness may consume both bounded socket
+                // waits. A2.1s overall deadline falsely marked cold links offline.
+                val deadline = SystemClock.uptimeMillis() + 6_000L
                 var winner: String? = null
                 while (!destroyed && winner == null && SystemClock.uptimeMillis() < deadline) {
-                    winner = endpoints.firstOrNull { probes.getValue(it).getNow(false) }
+                    winner = endpoints.firstOrNull { probes.getValue(it).getNow(0) in 200..299 }
                     if (winner == null && probes.values.any { !it.isDone }) Thread.sleep(35)
                     else if (winner == null) break
                 }
+                val connectionState = connectionFromProbeStatuses(probes.values.map { if (it.isDone && !it.isCancelled) it.getNow(0) else 0 })
+                winner = winner ?: endpoints.firstOrNull { probes.getValue(it).getNow(0) in 200..299 }
                 probes.values.forEach { if (!it.isDone) it.cancel(true) }
                 val reachable = winner != null
                 if (winner != null) rememberReachable(winner)
                 postUi {
                     if (!state.busy && !state.temporary) state = state.copy(
-                        status = if (reachable) "Online" else if (store.pendingCount() > 0) nexusCopy("Server NexusNXS non raggiungibili · ${store.pendingCount()} in coda", "NexusNXS servers unreachable · ${store.pendingCount()} queued") else nexusCopy("Server NexusNXS non raggiungibili", "NexusNXS servers unreachable"),
-                        connection = if (reachable) NexusConnection.ONLINE else NexusConnection.OFFLINE,
+                        status = if (reachable) "Online" else if (connectionState == NexusConnection.CHECKING) nexusCopy("Il motore AI si sta preparando", "The AI engine is warming up") else if (store.pendingCount() > 0) nexusCopy("Server NexusNXS non raggiungibili · ${store.pendingCount()} in coda", "NexusNXS servers unreachable · ${store.pendingCount()} queued") else nexusCopy("Server NexusNXS non raggiungibili", "NexusNXS servers unreachable"),
+                        connection = if (reachable) NexusConnection.ONLINE else connectionState,
                         pendingCount = store.pendingCount(),
                         // Un probe riuscito chiude soltanto errori di trasporto ormai
                         // obsoleti; errori di contenuto, sicurezza o autorizzazione restano.
@@ -2422,7 +2430,7 @@ open class NexusMainActivity : ComponentActivity() {
                 // automatico in background e manuale dal relativo pulsante.
                 if (reachable) { refreshRemoteCapabilities(); if (!appVisible) retryPendingRequests() }
             } finally {
-                connectionProbeRunning = false
+                connectionProbeRunning.set(false)
             }
         }
     }
@@ -2823,7 +2831,7 @@ private fun JSONArray.toChatRows() = buildList {
 
 private fun JSONArray?.toTurns() = buildList {
     if (this@toTurns != null) for (i in 0 until length()) optJSONObject(i)?.let {
-        val artifacts = buildList { it.optJSONArray("artifacts")?.let { rows -> for (index in 0 until rows.length()) rows.optJSONObject(index)?.let { artifact -> add(WorkArtifact(artifact.optString("title"), artifact.optString("subtitle"), artifact.optString("language", "text"), artifact.optString("content").take(48_000), artifact.optInt("added"), artifact.optInt("removed"))) } } }
+        val artifacts = buildList { it.optJSONArray("artifacts")?.let { rows -> for (index in 0 until minOf(rows.length(), 12)) rows.optJSONObject(index)?.let { artifact -> add(WorkArtifact(artifact.optString("title").take(180), artifact.optString("subtitle"), artifact.optString("language", "text"), artifact.optString("content").take(48_000), artifact.optInt("added"), artifact.optInt("removed"), artifact.optString("kind", "document"), artifact.optString("url").take(2 * 1024 * 1024))) } } }
         add(Turn(it.optString("role"), it.optString("content").normalizedExternalText(), artifacts))
     }
 }
@@ -2863,6 +2871,7 @@ private fun JSONArray?.toTurns() = buildList {
 @Composable private fun NexusInstantApp(state: NexusUiState, dispatch: (String, String) -> Unit) {
     val context = LocalContext.current
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var resultsOpen by rememberSaveable(state.conversationId) { mutableStateOf(false) }
     var menuPreferences by rememberSaveable { mutableStateOf(false) }
     var menuSection by rememberSaveable { mutableStateOf("") }
     var menuSearchOpen by rememberSaveable { mutableStateOf(false) }
@@ -3047,6 +3056,7 @@ private fun JSONArray?.toTurns() = buildList {
                                     error = null, centered = false, busy = false, activity = "",
                                     reduceMotion = reduceMotion, modifier = Modifier.fillMaxWidth()
                                 )
+                                if (turn.role == "assistant" && turn.artifacts.isNotEmpty()) ResponseArtifacts(turn.artifacts, reduceMotion)
                             }
                             item(key = "instant-stream") {
                                 if (state.busy || state.error != null || state.turns.isEmpty()) InstantWrittenExchange(
@@ -3295,6 +3305,9 @@ private fun JSONArray?.toTurns() = buildList {
                         voiceMode = false; dispatch("stopSpeech", ""); dispatch("open", chat.id)
                         settingsOpen = false; typedSession = true; textMode = false
                     }
+                    if (state.turns.any { it.artifacts.isNotEmpty() }) DrawerItem(NexusSymbols.Description, nexusCopy("Risultati della conversazione", "Conversation results")) {
+                        keyboard?.hide(); voiceMode = false; dispatch("stopSpeech", ""); settingsOpen = false; resultsOpen = true
+                    }
                     IconButton(onClick = { keyboard?.hide(); focusManager.clearFocus(force = true); menuPreferences = true }, modifier = Modifier.align(Alignment.Start)) { Icon(NexusSymbols.Settings, nexusCopy("Impostazioni", "Settings"), tint = Mist) }
                     } else AnimatedContent(targetState = menuSection,
                         transitionSpec = { nexusScreenTransform(back = targetState.isEmpty(), reduced = reduceMotion) },
@@ -3342,6 +3355,13 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                     }
                 }
+            }
+        }
+    }
+    if (resultsOpen) Dialog(onDismissRequest = { resultsOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(Ink).navigationBarsPadding()) {
+            Page(nexusCopy("Risultati", "Results"), { action, value -> if (action == "back") resultsOpen = false else dispatch(action, value) }) {
+                ResponseArtifacts(state.turns.flatMap { it.artifacts }, reduceMotion)
             }
         }
     }
@@ -3719,7 +3739,7 @@ private data class MobileParticle(val x: Float, val y: Float, val depth: Float, 
 
 @Composable private fun TransparencyLine(label: String, value: String) = Row(Modifier.fillMaxWidth()) { Text(label.uppercase(), color = Color(0xFF557879), fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.width(84.dp)); Text(value, color = Color(0xFFB6C7C7), fontSize = 11.sp, modifier = Modifier.weight(1f)) }
 
-@Composable private fun MarkdownMessage(value: String, streamingTailChars: Int = 0, streamingAccent: Float = 0f) {
+@Composable internal fun MarkdownMessage(value: String, streamingTailChars: Int = 0, streamingAccent: Float = 0f) {
     val context = LocalContext.current
     val sections = value.split("```")
     val lastContentLine = value.lineSequence().lastOrNull { it.isNotBlank() }

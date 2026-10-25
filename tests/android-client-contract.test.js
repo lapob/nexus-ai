@@ -637,10 +637,11 @@ test('NexusNXS per Android distingue verifica, connessione e server offline senz
   assert.match(activity, /enum class NexusConnection \{ CHECKING, ONLINE, OFFLINE \}/);
   assert.match(activity, /val connection: NexusConnection = NexusConnection\.CHECKING/);
   assert.match(activity, /Server NexusNXS non raggiungibili/);
-  assert.match(activity, /@Volatile private var connectionProbeRunning = false/);
+  assert.match(activity, /private val connectionProbeRunning = AtomicBoolean\(false\)/);
+  assert.match(activity, /connectionProbeRunning\.compareAndSet\(false, true\)/);
   assert.match(activity, /NetworkCapabilities\.NET_CAPABILITY_VALIDATED/);
   assert.match(activity, /probeStatus\(base, "\/readyz"\)/, 'Online deve indicare che il servizio AI è pronto, non soltanto che il processo risponde');
-  assert.match(activity, /readiness == 404 && probeStatus\(base, "\/healthz"\)/, 'healthz resta soltanto compatibilità per gateway che non espongono readiness');
+  assert.match(activity, /if \(readiness == 404\) probeStatus\(base, "\/healthz"\) else readiness/, 'healthz resta soltanto compatibilità per gateway che non espongono readiness');
 });
 
 test('Android conserva la chat scelta e sospende soltanto i polling periodici in background', () => {

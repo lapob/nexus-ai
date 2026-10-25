@@ -117,6 +117,9 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
     onExportPersonalData, onImportPersonalData
   } = props;
   const labels = uiCopy(preferences.locale);
+  const integrationCopy = resolvedUiLocale(preferences.locale) === 'it'
+    ? { consent: 'Collegamenti locali · consenso per ogni azione', revoke: 'Revoca', failed: 'Revoca non salvata. Riprova.', auth: 'Credenziale richiesta' }
+    : { consent: 'Local connections · approval for every action', revoke: 'Revoke', failed: 'Revocation was not saved. Try again.', auth: 'Credential required' };
   const [tab, setTab] = useState<SettingsTab>('audio');
   const [settingsQuery, setSettingsQuery] = useState('');
   const [draft, setDraft] = useState<NexusSettings | null>(settings);
@@ -141,6 +144,7 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
   const [availableTools, setAvailableTools] = useState<Array<{ name: string; label: string; description: string }>>([]);
   const [capabilitiesFailed, setCapabilitiesFailed] = useState(false);
   const [localIntegrations, setLocalIntegrations] = useState<Array<{ id: string; label: string }>>([]);
+  const [connectedServices, setConnectedServices] = useState<Array<{ id: string; type: 'mcp' | 'n8n'; tools: string[]; ready: boolean }>>([]);
   const [backupPassphrase, setBackupPassphrase] = useState('');
   const [remoteStatus, setRemoteStatus] = useState<RemoteSessionStatus | null>(null);
   const [startupStatus, setStartupStatus] = useState<{ available: boolean; enabled: boolean }>({ available: false, enabled: false });
@@ -319,8 +323,8 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
     window.nexus.responseCacheStats().then(setResponseCache).catch(() => setResponseCache({ entries: 0, hits: 0 }));
     window.nexus.actionHistory().then(setActionHistory).catch(() => setActionHistory([]));
     window.nexus.listAgentCapabilities()
-      .then((capabilities) => { setLocalIntegrations(capabilities.applications); setAvailableTools(capabilities.tools); setCapabilitiesFailed(false); })
-      .catch(() => { setLocalIntegrations([]); setAvailableTools([]); setCapabilitiesFailed(true); });
+      .then((capabilities) => { setConnectedServices(capabilities.integrations || []); setLocalIntegrations(capabilities.applications); setAvailableTools(capabilities.tools); setCapabilitiesFailed(false); })
+      .catch(() => { setConnectedServices([]); setLocalIntegrations([]); setAvailableTools([]); setCapabilitiesFailed(true); });
     window.nexus.getWorkspace().then(setWorkspace).catch(() => setWorkspace(null));
     window.nexus.remoteStatus().then(setRemoteStatus).catch(() => setRemoteStatus(null));
     window.nexus.startupStatus().then(setStartupStatus).catch(() => setStartupStatus({ available: false, enabled: false }));
@@ -1237,6 +1241,16 @@ export function SettingsOverlay(props: SettingsOverlayProps) {
                       <span><strong>{labels.localApplications}</strong><small>{labels.detectedCapabilities}</small></span>
                       <div>{localIntegrations.length ? localIntegrations.map((integration) => <i key={integration.id}>{integration.label}</i>) : <i>{labels.noApplications}</i>}</div>
                     </div>
+                    {connectedServices.length > 0 && <div className="local-integrations settings-wide">
+                      <span><strong>MCP · n8n</strong><small>{integrationCopy.consent}</small></span>
+                      <div>{connectedServices.map(service => <span key={service.id}>
+                        <strong>{service.id}</strong><small>{service.type.toUpperCase()} · {service.tools.length}{!service.ready ? ` · ${integrationCopy.auth}` : ''}</small>
+                        <button className="settings-secondary" type="button" onClick={async () => {
+                          try { await window.nexus.revokeIntegration(service.id); setConnectedServices(current => current.filter(item => item.id !== service.id)); }
+                          catch (error) { setMessage(publicUiError(error, integrationCopy.failed)); }
+                        }}>{integrationCopy.revoke}</button>
+                      </span>)}</div>
+                    </div>}
                     <div className="settings-inline-actions settings-wide">
                       <button className="settings-secondary" type="button" onClick={() => setTab('permissions')}>{labels.permissions}</button>
                       <button className="settings-secondary" type="button" onClick={() => setTab('activity')}>{labels.activity}</button>

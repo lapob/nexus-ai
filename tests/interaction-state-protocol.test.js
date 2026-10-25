@@ -25,6 +25,8 @@ test('il protocollo di stato è completo, valido e non espone chain-of-thought',
     'executing', 'permission', 'offline', 'error'
   ]);
   assert.equal(resolveInteractionState('researching'), 'thinking');
+  assert.equal(resolveInteractionState('ready'), 'idle');
+  assert.equal(resolveInteractionState('transcribing'), 'thinking');
   assert.equal(resolveInteractionState('consent'), 'permission');
   assert.equal(resolveInteractionState('unknown'), 'idle');
   const presentation = interactionPresentation();
