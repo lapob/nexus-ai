@@ -1,3 +1,14 @@
+## Adaptive web interface deployed — 25 October 2026
+
+Sourcea426447 passed CI40188964821 and the complete45unit/32browser release
+gate, dependency signatures/audit, runtime, performance and dry-run checks.
+Candidatea8e29a32 was promoted as Worker13478bda-e9a8-4a01-9396-ed7a761acf2b.
+Fourteen public route/header/navigation checks and independent AI readiness
+pass. Five actual live settings/CSP/text profiles pass. Rollback959b26aa
+remains available. The canonical shell includes adaptive settings, current
+activity presentation and attributed image results; image-provider selection
+is implemented and corrected on the separate main backend. No native release,
+model promotion or full physical voice acceptance is implied.
 ## Adaptive settings and web photographs — 25 October 2026
 
 Canonical shell synchronized from main5dbd509: responsive tabbed settings,
