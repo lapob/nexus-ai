@@ -29,17 +29,39 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   close.setAttribute('data-material', String(Boolean(closeIcon)));
   const actions = document.createElement('div'); actions.className = 'voice-session-actions'; actions.append(collapse, close);
   controls.append(status, actions); document.body.append(controls);
+  const miniGeometry = () => {
+    const viewport = globalThis.visualViewport;
+    const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+    const size = width < 380 || height < 420 ? 64 : 80;
+    const dockTop = document.querySelector?.('.dock')?.getBoundingClientRect().top;
+    const bottom = Math.min(Number.isFinite(dockTop) ? dockTop - 12 : height - 104, (viewport?.offsetTop || 0) + height - 12);
+    return { size, x: (viewport?.offsetLeft || 0) + width / 2 - 24,
+      y: Math.max((viewport?.offsetTop || 0) + size / 2 + 12, bottom - size / 2), width, height };
+  };
+  let dragFrame = 0;
+  const clearDrag = () => {
+    if (dragFrame) cancelAnimationFrame(dragFrame);
+    dragFrame = 0; swipe = null; document.body.classList.remove('voice-dragging');
+    for (const key of ['size', 'left', 'top', 'progress']) document.body.style?.removeProperty('--nxs-drag-' + key);
+  };
+  const paintDrag = () => {
+    dragFrame = 0;
+    if (!swipe?.recognized) return;
+    const { from, to, dy } = swipe;
+    const progress = Math.min(1, Math.max(0, dy) / Math.max(120, to.y - from.y));
+    const size = from.size + (to.size - from.size) * progress;
+    const y = Math.min(from.y + Math.max(0, dy), (globalThis.visualViewport?.offsetTop || 0) + to.height - size / 2 - 12);
+    const values = { size: size + 'px', left: (from.x + (to.x - from.x) * progress) + 'px', top: y + 'px', progress };
+    for (const [key, value] of Object.entries(values)) document.body.style.setProperty('--nxs-drag-' + key, String(value));
+  };
   const fitVoiceCore = () => {
     if (!active || !controls.getBoundingClientRect) return;
+    if (swipe?.recognized) return;
     const viewport = globalThis.visualViewport;
     if (minimized) {
-      const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
-      const diameter = Math.max(52, Math.min(80, width < 380 || height < 420 ? 64 : 80));
-      const dockTop = document.querySelector?.('.dock')?.getBoundingClientRect().top;
-      const bottom = Math.min(Number.isFinite(dockTop) ? dockTop - 12 : height - 104, (viewport?.offsetTop || 0) + height - 12);
-      const center = Math.max((viewport?.offsetTop || 0) + diameter / 2 + 12, bottom - diameter / 2);
+      const { size: diameter, x, y: center, width } = miniGeometry();
       const values = { '--nxs-mini-core-size': diameter + 'px',
-        '--nxs-mini-core-left': ((viewport?.offsetLeft || 0) + width / 2 - 24) + 'px',
+        '--nxs-mini-core-left': x + 'px',
         '--nxs-mini-core-top': center + 'px',
         '--nxs-mini-close-right': Math.max(12, width / 2 - diameter / 2 - 40) + 'px' };
       for (const [key, value] of Object.entries(values)) document.body.style.setProperty(key, value);
@@ -66,7 +88,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   };
   function minimize() {
     if (!active || minimized) return false;
-    minimized = true; swipe = null;
+    minimized = true; clearDrag();
     for (const [element, inert] of background) element.inert = inert;
     document.body.classList.remove('voice-session'); document.body.classList.add('voice-minimized');
     core.setAttribute('aria-label', copy('Espandi conversazione vocale', 'Expand voice conversation'));
@@ -76,7 +98,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   }
   function expand() {
     if (!active || !minimized) return false;
-    minimized = false; swipe = null; prompt.blur();
+    minimized = false; clearDrag(); prompt.blur();
     for (const element of background.keys()) element.inert = true;
     document.body.classList.remove('voice-minimized', 'keyboard-open'); document.body.classList.add('voice-session');
     core.setAttribute('aria-label', copy('Invia la frase o interrompi la voce', 'Send speech or interrupt playback'));
@@ -85,23 +107,49 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   }
   collapse.onclick = minimize;
   core.addEventListener('pointerdown', event => {
+    if (swipe) return;
     swipe = active && !minimized && ['touch', 'pen'].includes(event.pointerType) && event.isPrimary !== false
       ? { id: event.pointerId, x: event.clientX, y: event.clientY, recognized: false } : null;
   });
   core.addEventListener('pointermove', event => {
     if (!swipe || swipe.id !== event.pointerId) return;
     const dy = event.clientY - swipe.y, dx = event.clientX - swipe.x;
-    if (dy > 64 && dy > Math.abs(dx) * 1.5) {
+    if (!swipe.recognized && dy > 8 && dy > Math.abs(dx) * 1.5) {
+      const rect = core.getBoundingClientRect?.();
+      if (!rect) return;
+      swipe.from = { size: rect.width, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       swipe.recognized = true;
+      onPresentationChange('compact');
+      swipe.to = miniGeometry();
+      document.body.classList.add('voice-dragging');
       try { core.setPointerCapture?.(event.pointerId); } catch { /* The pointer may already have ended or been cancelled. */ }
+    }
+    if (swipe.recognized) {
+      swipe.dy = dy; swipe.dx = dx;
+      if (!dragFrame) dragFrame = requestAnimationFrame(paintDrag);
       if (event.cancelable) event.preventDefault();
     }
   }, { passive: false });
   core.addEventListener('pointerup', event => {
-    const recognized = swipe?.id === event.pointerId && swipe.recognized; swipe = null;
-    if (recognized) { suppressInteractionUntil = performance.now() + 500; minimize(); }
+    if (swipe?.id !== event.pointerId) return;
+    const commit = swipe.recognized && swipe.dy > 64 && swipe.dy > Math.abs(swipe.dx) * 1.5;
+    if (swipe.recognized) {
+      paintDrag(); core.getBoundingClientRect?.(); suppressInteractionUntil = performance.now() + 500;
+      if (commit) minimize(); else cancelDrag();
+    } else swipe = null;
   });
-  core.addEventListener('pointercancel', () => { swipe = null; });
+  function cancelDrag() {
+    const dragging = swipe?.recognized;
+    clearDrag();
+    if (dragging && active && !minimized) {
+      document.body.classList.remove('keyboard-open'); onPresentationChange('full'); fitVoiceCore();
+      suppressInteractionUntil = performance.now() + 500;
+    }
+  }
+  core.addEventListener('pointercancel', cancelDrag);
+  core.addEventListener('lostpointercapture', cancelDrag);
+  addEventListener('resize', cancelDrag, { passive: true });
+  globalThis.visualViewport?.addEventListener('resize', cancelDrag, { passive: true });
   const stopMedia = () => {
     controller?.abort(); finishCapture?.(); finishPlayback?.();
     stream?.getTracks().forEach(track => track.stop()); stream = null;
@@ -111,7 +159,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
   };
   function leave({ focus = true } = {}) {
     if (!active) return;
-    active = false; minimized = false; swipe = null; ++epoch; stopMedia(); controls.hidden = true;
+    active = false; minimized = false; clearDrag(); ++epoch; stopMedia(); controls.hidden = true;
     document.body.classList.remove('voice-session', 'voice-minimized');
     core.style?.removeProperty('--nxs-voice-core-size'); core.style?.removeProperty('--nxs-voice-core-top');
     for (const key of ['--nxs-mini-core-size', '--nxs-mini-core-left', '--nxs-mini-core-top', '--nxs-mini-close-right']) document.body.style?.removeProperty(key);

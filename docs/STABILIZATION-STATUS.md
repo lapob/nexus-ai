@@ -1,3 +1,13 @@
+# Interactive Core drag — 25 October 2026
+
+Full voice presentation follows the held finger on browser and Android,
+with progressive size/chat reveal, cancellation and smooth release settling.
+One persistent scene retains voice and playback. Eight real browser touch
+profiles and28 native tests pass, including geometry before finger release.
+35 voice unit tests and source suite1257PASS/2SKIP pass; four offline formats
+and four synthetic conversations pass. Native iOS and human voice acceptance
+remain unverified. Final CI, activation and visual distribution gates follow.
+
 # Daily-use polish verified — 25 October 2026
 
 Runtime admission now awaits the same signature/version/vulnerability policy

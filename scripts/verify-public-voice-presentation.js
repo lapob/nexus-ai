@@ -47,6 +47,34 @@ const output = path.resolve(__dirname, '../qa-artifacts');
       }
       // A touch gesture belongs to the Core, not the chat or the page.
       await page.waitForTimeout(600);
+      const full = await page.locator('#core').boundingBox();
+      const touch = await page.context().newCDPSession(page);
+      const pointer = async (type, y) => touch.send('Input.dispatchTouchEvent', {
+        type: { pointerdown: 'touchStart', pointermove: 'touchMove', pointerup: 'touchEnd', pointercancel: 'touchCancel' }[type],
+        touchPoints: ['pointerup','pointercancel'].includes(type) ? [] : [{ x: full.x + full.width / 2, y: full.y + full.height / 2 + y - 50 }]
+      });
+      await pointer('pointerdown', 50);
+      await pointer('pointermove', 85);
+      await page.waitForTimeout(50);
+      const held = await page.locator('#core').boundingBox();
+      assert.ok(held.width < full.width, 'Core must shrink before release');
+      assert.ok(Math.abs(held.y + held.height / 2 - (full.y + full.height / 2) - 35) < 2, 'Core must follow the finger without a tween');
+      await pointer('pointermove', 100);
+      await page.waitForTimeout(50);
+      const moved = await page.locator('#core').boundingBox();
+      assert.ok(Math.abs(moved.y + moved.height / 2 - (held.y + held.height / 2) - 15) < 2);
+      if (width === 390 && reducedMotion === 'no-preference') await page.screenshot({ path: path.join(output, 'voice-drag-held.png') });
+      await pointer('pointercancel', 100);
+      await page.waitForTimeout(600);
+      assert.equal(await page.locator('body').evaluate(el => el.classList.contains('voice-dragging') || el.classList.contains('voice-minimized')), false);
+      const restored = await page.locator('#core').boundingBox();
+      assert.ok(Math.abs(restored.width - full.width) < 2, 'Cancelled drag must return to full size');
+      await pointer('pointerdown', 50); await pointer('pointermove', 160);
+      await page.waitForTimeout(40);
+      await pointer('pointermove', 70); await pointer('pointerup', 70);
+      await page.waitForTimeout(600);
+      assert.equal(await page.locator('body').evaluate(el => el.classList.contains('voice-minimized')), false, 'Reversed drag must not commit');
+      await touch.detach();
       await page.locator('#core').evaluate(el => {
         el.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch', isPrimary: true, pointerId: 2, clientX: 50, clientY: 50 }));
         el.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'touch', pointerId: 2, clientX: 52, clientY: 160 }));
@@ -59,7 +87,7 @@ const output = path.resolve(__dirname, '../qa-artifacts');
       await page.locator('.voice-session-actions button:last-child').click();
       assert.equal(await page.locator('.dock').evaluate(el => el.inert), false);
       assert.equal(await page.locator('body').evaluate(el => el.classList.contains('voice-minimized')), false);
-      report.push({ width, height, reducedMotion, cycles: 3, passed: true });
+      report.push({ width, height, reducedMotion, cycles: 3, interactiveDrag: true, cancellation: true, reversal: true, passed: true });
       await page.close();
     }
     fs.writeFileSync(path.join(output, 'voice-presentation-report.json'), JSON.stringify(report, null, 2));

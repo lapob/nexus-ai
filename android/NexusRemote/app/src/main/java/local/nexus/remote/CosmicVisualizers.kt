@@ -130,12 +130,13 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion: Boolean, onSwipeDown: (() -> Unit)? = null, onClick: () -> Unit) {
+internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion: Boolean, onSwipeDown: (() -> Unit)? = null, onPresentationDrag: ((Offset?) -> Unit)? = null, onClick: () -> Unit) {
     val scene = LocalCosmicScene.current
     val interaction = remember { MutableInteractionSource() }
     var layoutBounds by remember { mutableStateOf(Rect.Zero) }
     val pressed by interaction.collectIsPressedAsState()
     val swipeDown by rememberUpdatedState(onSwipeDown)
+    val presentationDrag by rememberUpdatedState(onPresentationDrag)
     val swipeThreshold = with(LocalDensity.current) { 64.dp.toPx() }
     val touchScale by animateFloatAsState(if (pressed && !reduceMotion) .984f else 1f,
         tween(if (reduceMotion) 0 else if (pressed) local.nexus.motion.NexusMotion.PRESS else local.nexus.motion.NexusMotion.CORE_RELEASE,
@@ -153,15 +154,20 @@ internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion
     Box(Modifier.size(diameter).onGloballyPositioned { layoutBounds = it.boundsInWindow() }
         .pointerInput(reduceMotion, swipeThreshold) {
             var displacement = Offset.Zero
+            var dragOrigin = Offset.Zero
             detectDragGestures(
-                onDragStart = { displacement = Offset.Zero },
+                onDragStart = { dragOrigin = layoutBounds.topLeft + it; displacement = Offset.Zero },
                 onDragEnd = {
+                    presentationDrag?.invoke(null)
                     if (displacement.y > swipeThreshold && displacement.y > kotlin.math.abs(displacement.x) * 1.5f) swipeDown?.invoke()
                     scene.inspection = listOf(0f, 0f, 0f)
                 },
-                onDragCancel = { displacement = Offset.Zero; scene.inspection = listOf(0f, 0f, 0f) },
-                onDrag = { change, delta ->
-                    displacement += delta
+                onDragCancel = { presentationDrag?.invoke(null); displacement = Offset.Zero; scene.inspection = listOf(0f, 0f, 0f) },
+                onDrag = { change, _ ->
+                    // The host moves under the finger. Window coordinates prevent
+                    // local deltas from feeding its own movement back into the drag.
+                    displacement = layoutBounds.topLeft + change.position - dragOrigin
+                    if (swipeDown != null) presentationDrag?.invoke(displacement)
                     change.consume()
                     if (!reduceMotion) scene.inspection = listOf(change.position.x / size.width * 2f - 1f, change.position.y / size.height * 2f - 1f, 1f)
                 }
@@ -172,13 +178,32 @@ internal fun CosmicCore(diameter: Dp, state: String, energy: Float, reduceMotion
 
 /** One host survives presentation changes; renderer bounds and hitbox move together. */
 @Composable
-internal fun CosmicPresentationCore(target: Rect, origin: Offset, state: String, energy: Float, reduceMotion: Boolean, onSwipeDown: (() -> Unit)?, onClick: () -> Unit) {
+internal fun CosmicPresentationCore(target: Rect, origin: Offset, state: String, energy: Float, reduceMotion: Boolean, onSwipeDown: (() -> Unit)?, compactTarget: Rect = Rect.Zero, onDragProgress: (Float, Boolean) -> Unit = { _, _ -> }, onClick: () -> Unit) {
     if (target.width <= 0f) return
-    val bounds by animateRectAsState(target, tween(if (reduceMotion) 0 else 500,
+    var dragging by remember { mutableStateOf(false) }
+    var dragBounds by remember { mutableStateOf(target) }
+    var dragStart by remember { mutableStateOf(target) }
+    var dragDestination by remember { mutableStateOf(compactTarget) }
+    val minimumTravel = with(LocalDensity.current) { 120.dp.toPx() }
+    val animated by animateRectAsState(if (dragging) dragBounds else target, tween(if (reduceMotion || dragging) 0 else 500,
         easing = CubicBezierEasing(.2f, 0f, .2f, 1f)), label = "Voice Core presentation")
+    val bounds = if (dragging) dragBounds else animated
     val diameter = with(LocalDensity.current) { bounds.width.toDp() }
     Box(Modifier.offset { IntOffset((bounds.left - origin.x).toInt(), (bounds.top - origin.y).toInt()) }.size(diameter)) {
-        CosmicCore(diameter, state, energy, reduceMotion, onSwipeDown, onClick)
+        CosmicCore(diameter, state, energy, reduceMotion, onSwipeDown,
+            onPresentationDrag = { displacement ->
+                if (displacement == null) {
+                    dragging = false; onDragProgress(0f, false)
+                } else if (compactTarget.width > 0f && (dragging || displacement.y > 0f && displacement.y > kotlin.math.abs(displacement.x) * 1.5f)) {
+                    if (!dragging) { dragStart = bounds; dragDestination = compactTarget; dragging = true }
+                    val progress = (displacement.y.coerceAtLeast(0f) / maxOf(minimumTravel, dragDestination.center.y - dragStart.center.y)).coerceIn(0f, 1f)
+                    val size = dragStart.width + (dragDestination.width - dragStart.width) * progress
+                    val center = Offset(dragStart.center.x + (dragDestination.center.x - dragStart.center.x) * progress,
+                        dragStart.center.y + displacement.y.coerceAtLeast(0f))
+                    dragBounds = Rect(center - Offset(size / 2f, size / 2f), androidx.compose.ui.geometry.Size(size, size))
+                    onDragProgress(progress, true)
+                }
+            }, onClick = onClick)
     }
 }
 

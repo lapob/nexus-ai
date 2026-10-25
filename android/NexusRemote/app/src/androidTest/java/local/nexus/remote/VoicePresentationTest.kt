@@ -42,7 +42,7 @@ class VoicePresentationTest {
                         Box(Modifier.fillMaxSize().onGloballyPositioned { origin.value = it.positionInWindow() }) {
                             CosmicPresentationCore(if (compact.value) mini else full, origin.value,
                                 "speaking", .43f, reduced.value,
-                                onSwipeDown = { compact.value = true }, onClick = { compact.value = false })
+                                onSwipeDown = { compact.value = true }, compactTarget = mini, onClick = { compact.value = false })
                         }
                     }
                 }
@@ -61,7 +61,7 @@ class VoicePresentationTest {
                 }
                 fail("Core bounds did not reach the presentation target")
             }
-            fun touch(from: Offset, to: Offset) {
+            fun touch(from: Offset, to: Offset, cancel: Boolean = false) {
                 val down = SystemClock.uptimeMillis()
                 fun send(action: Int, point: Offset) {
                     val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, point.x, point.y, 0)
@@ -74,10 +74,22 @@ class VoicePresentationTest {
                     SystemClock.sleep(16)
                     send(MotionEvent.ACTION_MOVE, from + (to - from) * ((step + 1) / 12f))
                 }
-                send(MotionEvent.ACTION_UP, to)
+                if (from != to) {
+                    SystemClock.sleep(40)
+                    instrumentation.runOnMainSync {
+                        assertFalse("Drag must not commit before finger release", compact.value)
+                        assertTrue("Core must shrink while the finger is held", scene.bounds.width < full.width - 8f * density)
+                        assertTrue("Core must move with the held finger", scene.bounds.center.y > full.center.y + 40f * density)
+                        assertTrue(scene.present)
+                    }
+                }
+                send(if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP, to)
             }
             for (reduce in listOf(false, true)) {
                 instrumentation.runOnMainSync { reduced.value = reduce }
+                settle(full)
+                touch(full.center, full.center + Offset(0f, 90f * density), cancel = true)
+                settle(full)
                 repeat(3) {
                     settle(full)
                     touch(full.center, full.center + Offset(0f, 90f * density))

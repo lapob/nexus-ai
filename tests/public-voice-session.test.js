@@ -5,7 +5,7 @@ const { createPublicVoiceSession } = require('../src/remote/public-voice-session
 
 function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, interruptGeneration = false, synthesisInterruption = null, tone = 'neutral', voiceCapability = 'available', { browserLanguage = 'it-IT', transcriptLanguages = ['it'], responseLanguage = 'auto', spokenTurns = 1, fallbackLanguage = 'it', responseText = 'response', spokenGenerationInterruption = false, waitingFrames = 0, speechFrames = 7, streamingFrames = null, resumeFailureAt = 0, presentationDuringPlayback = false, microphoneDisconnectAtFrame = 0, floatCapture = false } = {}) {
   let frames=0, recordings=0, transcriptions=0, paused=0, stopped=0, speaking=false, busy=false, cancelled=0, audioStarts=0, synthesisAborted=false, microphoneRequests=0, instance, finishGeneration;
-  const element=()=>{const classes=new Set(),attributes=new Map(),listeners=new Map();return {hidden:false,value:'',className:'',textContent:'',dataset:{},inert:false,style:{setProperty(){},removeProperty(){}},classList:{contains:value=>classes.has(value),add(...values){values.forEach(value=>classes.add(value));},remove(...values){values.forEach(value=>classes.delete(value));}},setAttribute(key,value){attributes.set(key,value);},getAttribute(key){return attributes.get(key)||'';},addEventListener(key,handler){listeners.set(key,handler);},emit(key,event){listeners.get(key)?.(event);},append(){},focus(){document.activeElement=this;},blur(){},dispatchEvent(){}};};
+  const element=()=>{const classes=new Set(),attributes=new Map(),listeners=new Map(),styles=new Map();return {hidden:false,value:'',className:'',textContent:'',dataset:{},inert:false,style:{setProperty(k,v){styles.set(k,v);},removeProperty(k){styles.delete(k);},getPropertyValue:k=>styles.get(k)},getBoundingClientRect:()=>({left:40,top:80,width:240,height:240}),classList:{contains:value=>classes.has(value),add(...values){values.forEach(value=>classes.add(value));},remove(...values){values.forEach(value=>classes.delete(value));}},setAttribute(key,value){attributes.set(key,value);},getAttribute(key){return attributes.get(key)||'';},addEventListener(key,handler){listeners.set(key,handler);},emit(key,event){listeners.get(key)?.(event);},append(){},focus(){document.activeElement=this;},blur(){},dispatchEvent(){}};};
   const prompt=element(),core=element(),background=element();
   const document={createElement:element,body:element(),addEventListener(){},querySelectorAll:()=>[background],getElementById:()=>null};
   let ended; const track={stop(){stopped++;},getSettings:()=>({echoCancellation}),addEventListener(type,callback,options){if(type==='ended'){ended=callback;options?.signal?.addEventListener('abort',()=>{ended=null;});}}};
@@ -25,7 +25,7 @@ function harness(duplex, echoCancellation = true, leaveDuringPlayback = false, i
     async play(){audioStarts++;speaking=true;if(presentationDuringPlayback){for(let n=0;n<3;n++){instance.minimize();assert.equal(instance.active,true);assert.equal(background.inert,false);instance.expand();assert.equal(background.inert,true);}} if(leaveDuringPlayback){queueMicrotask(()=>instance.leave());return;}if(!duplex||![true,'all'].includes(echoCancellation))queueMicrotask(()=>{speaking=false;this.onended?.();});}
     pause(){if(speaking)paused++;speaking=false;}
   }
-  const sandbox={document,navigator:{language:browserLanguage,mediaDevices:{getUserMedia:async()=>{microphoneRequests++;return stream;}}},AudioContext:Context,MediaRecorder:Recorder,Audio,assert,AbortController,Blob,Event,TextDecoder,atob,URL:{createObjectURL:()=> 'blob:qa',revokeObjectURL(){}},performance:{now:()=>frames*80},requestAnimationFrame:callback=>setImmediate(()=>{frames++;if(frames>1000)throw Error('capture did not settle');callback(frames*80);}),cancelAnimationFrame:clearImmediate,setTimeout,clearTimeout,addEventListener(){}};
+  const sandbox={document,innerWidth:390,innerHeight:844,navigator:{language:browserLanguage,mediaDevices:{getUserMedia:async()=>{microphoneRequests++;return stream;}}},AudioContext:Context,MediaRecorder:Recorder,Audio,assert,AbortController,Blob,Event,TextDecoder,atob,URL:{createObjectURL:()=> 'blob:qa',revokeObjectURL(){}},performance:{now:()=>frames*80},requestAnimationFrame:callback=>setImmediate(()=>{frames++;if(frames>1000)throw Error('capture did not settle');callback(frames*80);}),cancelAnimationFrame:clearImmediate,setTimeout,clearTimeout,addEventListener(){}};
   const factory=vm.runInNewContext(`(${createPublicVoiceSession.toString()})`,sandbox);
   const runtime={capabilities:voiceCapability===null?{}:{'voice-input':{state:voiceCapability}}};
   const deliveries=[],languages=[];
@@ -201,6 +201,23 @@ for(const mode of ['late-response','reject','leave']){
    h.core.emit('pointermove',{pointerId:2,clientX:x,clientY:y});
    if(cancel)h.core.emit('pointercancel',{});h.core.emit('pointerup',{pointerId:2});assert.equal(h.instance.minimized,false);
   }h.instance.leave();
+ });
+
+ test('drag geometry follows the finger before release and reversal preserves the voice session', async () => {
+  const h=harness(false,true,false,false,null,'neutral','unavailable');
+  await h.instance.start();
+  h.core.emit('pointerdown',{pointerType:'touch',pointerId:3,clientX:160,clientY:200});
+  h.core.emit('pointermove',{pointerId:3,clientX:160,clientY:240});
+  await new Promise(setImmediate);
+  assert.equal(h.document.body.classList.contains('voice-dragging'),true);
+  assert.equal(h.document.body.style.getPropertyValue('--nxs-drag-top'),'240px');
+  assert.ok(parseFloat(h.document.body.style.getPropertyValue('--nxs-drag-size'))<240);
+  assert.equal(h.instance.minimized,false);
+  h.core.emit('pointermove',{pointerId:3,clientX:160,clientY:210});
+  h.core.emit('pointerup',{pointerId:3});
+  assert.equal(h.instance.active,true); assert.equal(h.instance.minimized,false);
+  assert.equal(h.document.body.classList.contains('voice-dragging'),false);
+  h.instance.leave();
  });
 
  test('microphone disconnection discards partial capture and leaves an explicit recoverable error', async()=>{

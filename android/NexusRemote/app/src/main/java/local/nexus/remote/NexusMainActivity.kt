@@ -2927,11 +2927,14 @@ private fun JSONArray?.toTurns() = buildList {
     // dopo un nuovo avvio o un ritorno dal task switcher.
     var voiceMode by remember { mutableStateOf(false) }
     var voiceMinimized by remember { mutableStateOf(false) }
+    var voiceDragging by remember { mutableStateOf(false) }
+    var voiceDragProgress by remember { mutableFloatStateOf(0f) }
     var fullCoreBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     var miniCoreBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    var voiceColumnBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     var coreOrigin by remember { mutableStateOf(Offset.Zero) }
-    val showWritten = typedSession || (voiceMode && voiceMinimized)
-    LaunchedEffect(voiceMode) { if (!voiceMode) voiceMinimized = false }
+    val showWritten = typedSession || (voiceMode && (voiceMinimized || voiceDragging))
+    LaunchedEffect(voiceMode) { if (!voiceMode) { voiceMinimized = false; voiceDragging = false; voiceDragProgress = 0f } }
     var inlineVoiceListening by remember { mutableStateOf(false) }
     var inlineVoiceEnergy by remember { mutableFloatStateOf(0f) }
     var inlineVoiceStatus by remember { mutableStateOf("") }
@@ -3037,16 +3040,17 @@ private fun JSONArray?.toTurns() = buildList {
                 IconButton(onClick = { keyboard?.hide(); settingsOpen = true }, modifier = Modifier.size(48.dp).clip(CircleShape).background(Surface.copy(alpha = .8f))) { PremiumMenuGlyph() }
             }
             Column(
-                Modifier.fillMaxSize().widthIn(max = 760.dp).align(Alignment.Center).padding(top = 48.dp),
+                Modifier.fillMaxSize().widthIn(max = 760.dp).align(Alignment.Center).padding(top = 48.dp)
+                    .onGloballyPositioned { voiceColumnBounds = it.boundsInWindow() },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AnimatedContent(
                     targetState = showWritten,
-                    transitionSpec = { nexusTransform(reduceMotion) },
+                    transitionSpec = { nexusTransform(reduceMotion || voiceDragging) },
                     modifier = Modifier.fillMaxSize(),
                     label = "instantInteractionMode"
                 ) { written ->
-                    if (written) Column(Modifier.fillMaxSize()) {
+                    if (written) Column(Modifier.fillMaxSize().graphicsLayer { alpha = if (voiceDragging) voiceDragProgress else 1f }) {
                         val historyState = rememberLazyListState()
                         LaunchedEffect(Unit) { historyState.scrollToItem(state.turns.size) }
                         val followLatest = !historyState.canScrollForward
@@ -3076,12 +3080,12 @@ private fun JSONArray?.toTurns() = buildList {
                                 )
                             }
                         }
-                        if (voiceMode && voiceMinimized) Row(
+                        if (voiceMode && (voiceMinimized || voiceDragging)) Row(
                             Modifier.fillMaxWidth().height(76.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Box(Modifier.size(64.dp).onGloballyPositioned {
-                                if (voiceMode && voiceMinimized) miniCoreBounds = it.boundsInWindow()
+                                if (voiceMode && (voiceMinimized || voiceDragging)) miniCoreBounds = it.boundsInWindow()
                             })
                             Text(when {
                                 state.speechPlayback == "speaking" -> nexusCopy("NexusNXS parla", "NexusNXS is speaking")
@@ -3256,7 +3260,7 @@ private fun JSONArray?.toTurns() = buildList {
                     }
                 }
             }
-            if (!showWritten || voiceMode && voiceMinimized) CosmicPresentationCore(
+            if (!showWritten || voiceMode && (voiceMinimized || voiceDragging)) CosmicPresentationCore(
                 target = if (voiceMode && voiceMinimized && miniCoreBounds.width > 0f) miniCoreBounds else fullCoreBounds,
                 origin = coreOrigin,
                 state = when {
@@ -3268,6 +3272,12 @@ private fun JSONArray?.toTurns() = buildList {
                     else -> "idle"
                 }, energy = if (voiceMode) inlineVoiceEnergy else 0f, reduceMotion = reduceMotion,
                 onSwipeDown = if (voiceMode && !voiceMinimized) ({ voiceMinimized = true }) else null,
+                compactTarget = with(LocalDensity.current) {
+                    val left = voiceColumnBounds.left
+                    val top = voiceColumnBounds.bottom - 124.dp.toPx()
+                    androidx.compose.ui.geometry.Rect(left, top, left + 64.dp.toPx(), top + 64.dp.toPx())
+                },
+                onDragProgress = { progress, dragging -> voiceDragProgress = progress; voiceDragging = dragging },
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     if (voiceMode && voiceMinimized) { voiceMinimized = false; typedSession = false }

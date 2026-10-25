@@ -1,3 +1,20 @@
+# Interactive Core drag verified — 25 October 2026
+
+The full voice Core follows the held finger, shrinking and revealing chat
+before release. Reversal and cancellation restore the full presentation;
+settling respects reduced motion. One renderer and its hitbox move together;
+presentation does not end voice or reacquire media. Controls stay clear of
+the revealed composer. Android uses window coordinates to prevent movement
+of the host feeding back into the gesture. The shared browser surface also
+supplies iOS; this is not an iOS device acceptance.
+
+35 voice unit tests, eight actual browser touch/layout/motion profiles,
+four synthetic voice conversations, real Chromium synthetic media and four
+offline formats pass. Source suite1257PASS/2SKIP, check/cloudcheck and Android
+build/lint pass. On Samsung28 native tests include held-finger geometry and
+cancellation before ACTION_UP. Deployment and final native visual matrix
+remain separate gates; existing production is retained until they pass.
+
 # Daily-use polish verified — 25 October 2026
 
 Runtime admission now awaits the same signature/version/vulnerability policy
