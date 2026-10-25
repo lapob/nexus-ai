@@ -1,3 +1,17 @@
+## Adaptive settings and web photographs — 25 October 2026
+
+Canonical shell synchronized from main5dbd509: responsive tabbed settings,
+shared neutral controls/motion, transient voice preferences, one observed
+activity step, and explicit attributed Wikimedia photo lookup. Search uses
+bounded fixed-host raster previews via local Blob URLs, without widening CSP.
+History keeps source links; previews are session-only. No native installer or
+model promotion. Main checks pass1218tests/2skips, responsive settings/CSP,
+offline/reconnect, late-result cancellation and synthetic browser voice.
+
+Production currently runs Worker959b26aa-3a94-4f33-877f-3b8899d41189 from
+site4733274 after its full release gate; rollback1ebc5850 remains available.
+This new source still requires exact-commit CI and the full release gate
+before candidate promotion. Preserve production until those checks pass.
 ## Progressive voice candidate — 24 October 2026
 
 Canonical public UI synchronized from main8940d5e: progressive bounded audio,
