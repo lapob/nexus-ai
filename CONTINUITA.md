@@ -1,3 +1,15 @@
+## Routine shell activated and verified — 25 October 2026
+
+Source2b6440e passed CI40224943404 and45unit/36browser release checks,
+security, runtime, performance and dry-run. Candidate4c9accc8 was promoted as
+Worker5a782d3d-491f-4e63-89d4-7f8e317d94df; rollback6dc3c1f6 is retained.
+Fourteen public routes and independent AI readiness pass. Four live HTTPS
+profiles, including200percent text and landscape, pass canonical local/public
+HTML, Core touch geometry, covered pause, private diagnostics and CSP checks.
+The final landscape image was inspected. No model or immutable native download
+was promoted. Cold service startup, human voice, physical iOS and production
+signing remain separate open gates. Documentation does not change deployed code.
+
 ## Routine recovery and covered-scene shell — 25 October 2026
 
 Canonical main shell adds opt-in text-only tab draft recovery, explicit reset,
