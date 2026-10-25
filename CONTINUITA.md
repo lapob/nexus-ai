@@ -1,3 +1,13 @@
+## Compact voice shell candidate — 25 October 2026
+
+Canonical shell synchronized from main7c97be0: full/compact voice presentation,
+Core-only downward swipe, persistent audio/history, shared end-call symbol,
+adaptive compact particle opacity and framing. Main CI passed on exact source;
+1249 unit tests/2 skips, eight presentation layouts, four synthetic voice
+conversations, four offline formats and27 native tests pass. No model, cloud
+setting or published native download changes. Production remains13478bda
+until exact-commit site CI, full release gates and candidate promotion pass.
+
 ## Adaptive web interface deployed — 25 October 2026
 
 Sourcea426447 passed CI40188964821 and the complete45unit/32browser release
@@ -409,3 +419,4 @@ The development dependency source-map-js is updated from1.2.1 to the patched1.2.
 Use Node 24 and `npm ci`, then `npm run cloud:check` for source checks. Production additionally requires `npm run verify:security`, the browser/performance checks and the existing prepare/promote pipeline. No Cloudflare credentials are needed for source work. Leave the agent's internet access disabled unless a task requires it; setup needs dependency access.
 
 Before resuming an interrupted operation, inspect Git and previous logs. Keep current production and rollback identifiers in the private workstation checkpoint. Update this public file with actual source checks and commits, excluding tokens, personal information and local data.
+
