@@ -1,3 +1,22 @@
+## Compact voice verified live — 25 October 2026
+
+Runtime UI revision7c97be0 and QA revision3c43edd passed exact-commit CI.
+The public edge shell was promoted from website84c64cd as Worker
+f4d67bde-b85e-4c25-a2d5-4f8af7a6d5a6; previous13478bda remains rollback.
+Local and HTTPS readiness pass; both HTML shells match the canonical source
+when response nonces are removed. Four live viewport/text profiles pass with
+synthetic microphone denial, no physical audio capture and no CSP errors.
+Four complete simulated conversations also pass continuity and late cleanup.
+
+Android final Preview6.5.26 passes build/lint,27 native tests and five online
+profiles. ART speed-profile is verified, but three-start median169→172ms
+shows no speedup. This APK is installed on the test device, not published as
+a new immutable native release. Existing Windows33 downloads remain unchanged.
+Startup took203s:93.8s runtime initialization and104.8s model warm-up.
+Startup optimization, human voice/echo acceptance, iOS hardware, production
+signing and the other roadmap prerequisites remain open. No model promotion,
+training or optional cloud activation occurred.
+
 # Voice presentation continuity — 25 October 2026
 
 The browser and Android public client keep one Core while switching between
