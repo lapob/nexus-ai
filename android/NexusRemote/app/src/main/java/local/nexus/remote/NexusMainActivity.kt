@@ -2998,6 +2998,8 @@ private fun JSONArray?.toTurns() = buildList {
         } else typedSession = false
     }
 
+    val cosmicPresentation = LocalCosmicScene.current
+    SideEffect { cosmicPresentation.paused = settingsOpen || attachmentSheet }
     Box(Modifier.fillMaxSize()) {
     Surface(color = Ink, contentColor = Ice, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {

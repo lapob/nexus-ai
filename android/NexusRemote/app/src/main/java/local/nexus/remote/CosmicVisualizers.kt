@@ -47,6 +47,7 @@ internal class CosmicSceneState {
     var energy by mutableFloatStateOf(0f)
     var reduced by mutableStateOf(false)
     var present by mutableStateOf(false)
+    var paused by mutableStateOf(false)
     var inspection by mutableStateOf(listOf(0f, 0f, 0f))
 }
 internal val LocalCosmicScene = staticCompositionLocalOf { CosmicSceneState() }
@@ -115,9 +116,9 @@ internal fun CosmicScene(modifier: Modifier = Modifier) {
         var previous = ""
         while (true) {
             val s = current; val b = s.bounds; val o = currentOrigin
-            val data = JSONObject().put("state", s.state).put("energy", if (s.energy.isFinite()) s.energy.coerceIn(0f, 1f) else 0f)
+            val data = JSONObject().put("state", s.state).put("energy", if (!s.paused && s.energy.isFinite()) s.energy.coerceIn(0f, 1f) else 0f)
                 .put("reduced", s.reduced).put("visible", s.present)
-                .put("inspection", JSONArray(s.inspection))
+                .put("paused", s.paused).put("inspection", JSONArray(if (s.paused) listOf(0f, 0f, 0f) else s.inspection))
                 .put("bounds", JSONArray(listOf((b.left-o.left)/density, (b.top-o.top)/density, b.width/density, b.height/density))).toString()
             if (data != previous && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 web?.evaluateJavascript("window.updateNexusVisual && window.updateNexusVisual($data)", null)

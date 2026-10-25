@@ -1,3 +1,15 @@
+## Recupero e preparazione quotidiana — 25 ottobre
+
+Budget preload180s distinto dalle risposte, singleflight cancellabile e cache
+catalogo legata alla configurazione verificati con38prove focused. Bozza testuale
+solo opt-in e solo nella sessione della scheda, nessun invio automatico; reset
+elimina anche il recupero. Diagnostica esportabile limitata a contatori/tempi,
+nessun contenuto o upload. Scene coperte in pausa su browser e Android.
+Suite1265PASS/2SKIP e prove browser/offline/sintetiche passano. TTSreale cold6161ms,
+warmmedian1174ms; due frasi sintetiche ASR non sostituiscono accettazione umana.
+Consegna firmata, iOSfisico, voceumana e confronto candidato isolato restano gate
+separati; baseline locale e cloudOFF invariati. Nessun training da dati utente.
+
 # Roadmap tecnica
 
 ## Programma quotidiano applicato — 25 ottobre

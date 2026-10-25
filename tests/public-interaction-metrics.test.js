@@ -19,3 +19,15 @@ test('unsupported event timing never reports a fabricated successful latency',()
  const factory=vm.runInNewContext('('+observePublicInteractions.toString()+')',{addEventListener(){}}),result=factory().snapshot();
  assert.equal(result.status,'unsupported');assert.equal(result.passing,null);assert.equal(result.worstInteractionMs,null);
 });
+
+test('local diagnostics count failures without reading private rejection values, filenames or messages',()=>{
+ const listeners=new Map();
+ const factory=vm.runInNewContext('('+observePublicInteractions.toString()+')',{
+  addEventListener:(name,callback)=>listeners.set(name,callback),removeEventListener:name=>listeners.delete(name)
+ }),api=factory();
+ const privateEvent=new Proxy({}, {get(){throw Error('Private event contents must never be inspected')}});
+ listeners.get('error')(privateEvent);listeners.get('unhandledrejection')(privateEvent);
+ const result=api.snapshot();assert.equal(result.scriptErrors,1);assert.equal(result.unhandledRejections,1);
+ assert.equal(result.persisted,false);assert.equal(result.uploaded,false);
+ api.stop();assert.equal(listeners.has('error'),false);assert.equal(listeners.has('unhandledrejection'),false);
+});

@@ -3,7 +3,11 @@
 function observePublicInteractions({ maximumLatencyMs = 200, minimumSamples = 10, limit = 200 } = {}) {
   limit = Number.isSafeInteger(limit) ? Math.max(10, Math.min(200, limit)) : 200;
   const records = new Map(), observers = [];
-  let supported = false, longTasks = 0, longTaskMs = 0, disposed = false;
+  let supported = false, longTasks = 0, longTaskMs = 0, disposed = false, scriptErrors = 0, unhandledRejections = 0;
+  // Count only; never inspect messages, filenames, rejected values or stacks.
+  const error = () => { if (!disposed) scriptErrors = Math.min(1000000, scriptErrors + 1); };
+  const rejection = () => { if (!disposed) unhandledRejections = Math.min(1000000, unhandledRejections + 1); };
+  addEventListener('error', error); addEventListener('unhandledrejection', rejection);
   const snapshot = () => {
     const durations = [...records.values()].sort((a, b) => a - b), count = durations.length;
     const ready = supported && count >= minimumSamples;
@@ -13,7 +17,7 @@ function observePublicInteractions({ maximumLatencyMs = 200, minimumSamples = 10
       worstInteractionMs: count ? durations[count - 1] : null,
       p95InteractionMs: count ? durations[Math.ceil(count * .95) - 1] : null,
       passing: ready ? durations[Math.ceil(count * .95) - 1] <= maximumLatencyMs : null,
-      longTasks, longTaskMs: Math.round(longTaskMs),
+      longTasks, longTaskMs: Math.round(longTaskMs), scriptErrors, unhandledRejections,
       scope: 'recent-observed-events-not-field-inp', persisted: false, uploaded: false
     });
   };
@@ -40,7 +44,7 @@ function observePublicInteractions({ maximumLatencyMs = 200, minimumSamples = 10
     } catch { /* Long Tasks is optional and independent from Event Timing. */ }
   }
   const pause = () => observers.forEach(({ observer }) => observer.disconnect());
-  const stop = () => { disposed = true; pause(); };
+  const stop = () => { disposed = true; pause(); globalThis.removeEventListener?.('error', error); globalThis.removeEventListener?.('unhandledrejection', rejection); };
   addEventListener('pagehide', event => { if (event.persisted) pause(); else stop(); });
   addEventListener('pageshow', event => {
     if (event.persisted && !disposed) for (const { observer, options } of observers) {

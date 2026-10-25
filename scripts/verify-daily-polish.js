@@ -41,6 +41,10 @@ const server = http.createServer(async (request, response) => {
       await page.goto(origin); await page.waitForFunction(() => document.documentElement.dataset.nxsBoot === 'ready');
       if (fontScale !== 100) await page.evaluate(value => { document.documentElement.style.fontSize = value + '%'; }, fontScale);
       await page.locator('#profileSettings').click(); await page.locator('#profileAppearanceTab').click();
+      await page.waitForTimeout(200);
+      const covered = await page.evaluate(() => nexusCosmicMetrics.renderer());
+      await page.waitForTimeout(250);
+      assert.equal(await page.evaluate(() => nexusCosmicMetrics.renderer().draws), covered.draws, 'An open modal must pause the covered renderer');
       await page.locator('#profile-appearance-motion').selectOption('reduce');
       await page.locator('#profile-appearance-reading').selectOption('large');
       await page.waitForFunction(() => document.documentElement.dataset.nxsMotion === 'reduce');
@@ -52,6 +56,10 @@ const server = http.createServer(async (request, response) => {
       await page.screenshot({ path: `qa-artifacts/daily-settings-${width}.png` });
       await page.locator('#profileConversationTab').click(); await page.locator('#profile-tone').selectOption('warm');
       await page.locator('#profileSheet .sheet-close').first().click();
+      await page.waitForTimeout(150);
+      const reducedUncovered = await page.evaluate(() => nexusCosmicMetrics.renderer().draws);
+      await page.waitForTimeout(150);
+      assert.equal(await page.evaluate(() => nexusCosmicMetrics.renderer().draws), reducedUncovered, 'Reduced motion must also stop continuous painting after closing settings');
       await page.locator('#keyboard').click(); await page.locator('#prompt').fill('Prova sintetica'); await page.locator('#send').click();
       await page.locator('.web-code-card').waitFor();
       await page.evaluate(() => { window.qaCode = document.querySelector('.web-code-card'); });

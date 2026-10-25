@@ -18,7 +18,7 @@ const { normalizeConversationPreferences } = require('../shared/conversation-pre
 const { colors: designColors, cosmicGlass, layout: designLayout } = require('../../config/nexus-design-tokens.json');
 const { publicReleaseTarget } = require('../shared/public-release');
 const { symbolSvg, symbolLicenseNotice } = require('../shared/symbols');
-const PROFILE_ICONS = Object.fromEntries(['Settings', 'Close', 'Restore', 'Chat', 'Mic', 'Lock', 'Download', 'DeleteOutline', 'Check', 'Tune'].map(name => [name, symbolSvg(name)]));
+const PROFILE_ICONS = Object.fromEntries(['Settings', 'Close', 'Restore', 'Chat', 'Mic', 'Lock', 'Download', 'DeleteOutline', 'Check', 'Tune', 'Pulse'].map(name => [name, symbolSvg(name)]));
 const { windowsDownload: WINDOWS_DOWNLOAD, androidDownload: ANDROID_DOWNLOAD } = publicReleaseTarget({
   version: require('../../package.json').version,
   tag: process.env.NEXUS_GITHUB_RELEASE_TAG,
@@ -319,6 +319,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const paint = field.getContext('2d');
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const reducedMotion = () => motion.matches || document.documentElement.dataset.nxsMotion === 'reduce';
+  const covered = () => Boolean(document.querySelector('dialog[open]'));
   const stars = Array.from({ length: efficient ? 140 : 360 }, (_, i) => ({
     x: ((i + 901) * .61803398875) % 1, y: ((i + 901) * .41421356237) % 1,
     radius: .55 + (i % 7) * .13, phase: i * 2.399963
@@ -326,6 +327,8 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   let fieldFrame = 0, width = 0, height = 0, elapsed = 0, previous = 0, lastPaint = 0;
   const resizeField = () => { width = innerWidth; height = innerHeight; const dpr = Math.min(devicePixelRatio || 1, 1.5, Math.sqrt(2073600 / (width * height))); field.width = width * dpr; field.height = height * dpr; paint?.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const drawField = now => {
+    fieldFrame = 0;
+    if (document.hidden || covered()) return;
     if (!reducedMotion() && now - lastPaint < 32) { fieldFrame = requestAnimationFrame(drawField); return; }
     lastPaint = now;
     elapsed += previous ? Math.min(.05, (now - previous) / 1000) : 0; previous = now;
@@ -347,7 +350,7 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
     }
     if (!document.hidden && !reducedMotion()) fieldFrame = requestAnimationFrame(drawField);
   };
-  const resumeField = () => { cancelAnimationFrame(fieldFrame); previous = 0; if (!document.hidden) fieldFrame = requestAnimationFrame(drawField); };
+  const resumeField = () => { cancelAnimationFrame(fieldFrame); fieldFrame = 0; previous = 0; if (!document.hidden && !covered()) fieldFrame = requestAnimationFrame(drawField); };
   resizeField(); resumeField();
   const onFieldResize = () => { resizeField(); resumeField(); };
   addEventListener('resize', onFieldResize, { passive: true });
@@ -357,10 +360,12 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const retainVoiceCore = () => { voiceCore = true; };
   button.addEventListener('click', retainVoiceCore, true);
   const desktopCore = matchMedia('(min-width: 960px) and (pointer: fine)');
-  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, expansive: true, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getReduced: () => reducedMotion(), getVisible: () => document.body.classList.contains('voice-session') || document.body.classList.contains('voice-minimized') || document.body.classList.contains('image-generating') || !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
+  const createRenderer = () => createCosmicVisualizers(canvas, { host: button, efficient, expansive: true, planetOnly: !desktopCore.matches, gatherBackground: true, disperseOnHide: true, getPaused: covered, getReduced: () => reducedMotion(), getVisible: () => document.body.classList.contains('voice-session') || document.body.classList.contains('voice-minimized') || document.body.classList.contains('image-generating') || !document.body.classList.contains('keyboard-open') && (voiceCore || (!document.body.classList.contains('conversation-active') && !document.body.classList.contains('request-active'))), getState: () => button.dataset.state || 'idle', getEnergy: () => Number(globalThis.nexusAiState?.voiceEnergy || 0) }, createDesktopRecipes);
   let renderer = createRenderer();
   const appearanceChanged = () => { renderer.refresh(); fitCore(); resumeField(); };
   document.addEventListener('nexusappearancechange', appearanceChanged);
+  const modalObserver = new MutationObserver(() => { renderer.refresh(); resumeField(); });
+  modalObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
   const switchCoreLayout = () => { renderer.dispose(); renderer = createRenderer(); fitCore(); resumeField(); };
   desktopCore.addEventListener('change', switchCoreLayout);
   // The GPU canvas belongs to the page, so host opacity cannot hide it.
@@ -370,13 +375,44 @@ function publicAiCosmicRuntime(corePalette, presentation, createCosmicVisualizer
   const observer = new MutationObserver(readExchange);
   observer.observe(exchange, { subtree: true, childList: true, characterData: true });
   globalThis.nexusCosmicMetrics = { tier: efficient ? 'efficient' : 'adaptive', particleCount: () => renderer.getMetrics().particles, renderer: () => renderer.getMetrics() };
-  addEventListener('pagehide', event => { if (event.persisted) return; document.removeEventListener('nexusappearancechange', appearanceChanged); observer.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); document.removeEventListener('transitionend', settleCore); removeEventListener('resize', fitCore); desktopCore.removeEventListener('change', switchCoreLayout); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
+  addEventListener('pagehide', event => { if (event.persisted) return; document.removeEventListener('nexusappearancechange', appearanceChanged); observer.disconnect(); modalObserver.disconnect(); layoutObserver.disconnect(); fitObserver.disconnect(); document.removeEventListener('transitionend', settleCore); removeEventListener('resize', fitCore); desktopCore.removeEventListener('change', switchCoreLayout); renderer.dispose(); cancelAnimationFrame(fieldFrame); removeEventListener('resize', onFieldResize); document.removeEventListener('visibilitychange', resumeField); motion.removeEventListener('change', resumeField); });
   readExchange();
 }
 
 function publicDraftRuntime() {
-  // Retire the opt-in tab cache without persisting private composer content.
-  try { sessionStorage.removeItem('nxs.tab-draft.v1'); } catch { /* Private storage may be unavailable. */ }
+  const key = 'nxs.tab-draft.v1', prompt = document.getElementById('prompt');
+  if (!prompt) return;
+  let timer;
+  const enabled = () => globalThis.nexusDraftRecoveryEnabled === true;
+  const save = () => {
+    clearTimeout(timer);
+    try {
+      if (!enabled()) { sessionStorage.removeItem(key); return; }
+      if (document.body.matches('.voice-session,.voice-minimized')) return;
+      const text = String(prompt.value || '').slice(0, 12000);
+      const attachments = Number(document.getElementById('attachment')?.dataset.count || 0) > 0 || Boolean(document.getElementById('attachmentInput')?.files?.length);
+      if (!text && !attachments) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, JSON.stringify({ version: 1, text, attachments, savedAt: Date.now() }));
+    } catch { /* A denied quota must not prevent typing or sending. */ }
+  };
+  const restore = () => {
+    try {
+      if (!enabled()) { sessionStorage.removeItem(key); return; }
+      const value = JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (!value || value.version !== 1 || typeof value.text !== 'string' || value.text.length > 12000 || !Number.isFinite(value.savedAt) || Date.now() - value.savedAt > 86400000 || value.savedAt > Date.now()) { sessionStorage.removeItem(key); return; }
+      if (!prompt.value && !document.body.matches('.voice-session,.voice-minimized')) {
+        prompt.value = value.text; prompt.dispatchEvent(new Event('input', { bubbles: true }));
+        document.body.classList.add('conversation-active', 'keyboard-open');
+        const phase = document.getElementById('phase');
+        if (value.attachments === true && phase) phase.textContent = /^it\b/i.test(navigator.language) ? 'Riaggiungi gli allegati alla bozza.' : 'Add the attachments to this draft again.';
+      }
+    } catch { /* Invalid local data never blocks the application. */ }
+  };
+  prompt.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(save, 250); });
+  document.addEventListener('nexusdraftpreferencechange', save);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  addEventListener('pagehide', save);
+  Promise.resolve(globalThis.nexusUiRestored).catch(() => {}).then(restore);
 }
 
 function publicUiReadyRuntime() {
@@ -783,7 +819,7 @@ prompt.addEventListener('input',updateSlashMenu);updateSlashMenu();`;
     .replace("pendingAnswer='';", "pendingAnswer='',rawAnswer='',followStream=true,lastAnswerScroll=0,lastStreamRender=0,lastStreamValue='',requestAbort=null,requestMessageId='',stopRequested=false,historyGeneration=0;")
     .replace("function flushAnswer(){rafFlush=0;if(pendingAnswer){answer.textContent+=pendingAnswer;pendingAnswer=''}}", "function flushAnswer(){rafFlush=0;if(pendingAnswer){rawAnswer+=pendingAnswer;pendingAnswer=''}const now=performance.now();if(busy&&now-lastStreamRender<48){rafFlush=requestAnimationFrame(flushAnswer);return}if(rawAnswer!==lastStreamValue){lastStreamRender=now;lastStreamValue=rawAnswer;formatAnswer(rawAnswer,{streaming:true});followAnswer()}}")
     .replace("answer.textContent=recentAnswer.content;setPhase", "rawAnswer=recentAnswer.content;answer.textContent=recentAnswer.content;setPhase")
-    .replace("const runtime={voiceState:'idle'}", `const runtime={voiceState:'idle',capabilities:{}};const conversationProfile=(${createPublicConversationPreferences.toString()})(${normalizeConversationPreferences.toString()},{getHistory:()=>turns,clearHistory:()=>memoryReset(),icons:${JSON.stringify(PROFILE_ICONS)}})`)
+    .replace("const runtime={voiceState:'idle'}", `const runtime={voiceState:'idle',capabilities:{}};const conversationProfile=(${createPublicConversationPreferences.toString()})(${normalizeConversationPreferences.toString()},{getHistory:()=>turns,clearHistory:()=>memoryReset(),getDiagnostics:()=>globalThis.nexusInteractionMetrics?.snapshot(),icons:${JSON.stringify(PROFILE_ICONS)}})`)
     .replace(/const openDb=\(\)=>[\s\S]*?(?=async function memoryWrite)/, `const localMemory=(${createPublicLocalMemory.toString()})(()=>void memoryReset(true));let memoryReady=Promise.resolve();function memoryUnavailable(){document.body.dataset.memoryStorage='temporary';const note=byId('memoryStorageNotice');if(note)note.textContent='Memoria temporanea: salvataggio locale non disponibile.'}`)
     .replace(/async function memoryWrite\(\)\{[\s\S]*?(?=async function memoryReset)/, "async function memoryWrite(){turns=turns.slice(-24).map(turn=>({role:turn.role==='assistant'?'assistant':'user',content:String(turn.content||'').slice(0,4000),...(turn.image?{image:turn.image}:{}),...(turn.requestId?{requestId:turn.requestId,rating:turn.rating||0}:{})}));releaseUnusedImages();try{if(!await localMemory.write(turns))memoryUnavailable()}catch{memoryUnavailable()}} ")
     .replace("async function memoryReset(){", "async function memoryReset(silent=false){imageResult.hidden=true;for(const url of generatedImageUrls)URL.revokeObjectURL(url);generatedImageUrls.clear();imageObjectUrl='';")

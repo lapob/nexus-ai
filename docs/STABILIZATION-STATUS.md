@@ -1,3 +1,31 @@
+# Routine recovery and preparation safeguards — 25 October 2026
+
+Model preparation has its own 180-second budget, cancellation and a single
+in-flight load. Superseded preparation cannot publish readiness; installed-model
+selection is cached by configuration and rejects stale catalog completions.
+Response timeouts and runtime security admission remain unchanged.
+
+Draft recovery is opt-in under Local data, limited to text in this tab session
+for 24 hours and 12,000 characters. Attachments must be added again; restoration
+never sends a request. Disabling recovery or clearing data removes the cache.
+Local diagnostics export only bounded counters and durations, without chat,
+filenames, audio or uploads. Covered browser and Android scenes pause and
+resume the same Core rather than recreating particles.
+
+Source checks and 1265 tests pass, with two explicit skips. Eight Core touch
+profiles, four offline formats, four simulated voice conversations, browser
+recovery/privacy checks, Android build/lint and a four-store backup drill pass.
+The 2,000-cycle stream soak uses a mock provider; it is not model quality or a
+long-running production soak. Synthetic Italian STT preserves both tested
+requests; this does not establish human speech accuracy. Actual Kokoro synthesis
+measures 6161ms cold and 1174ms warm median across six phrases; naturalness and
+human echo/interruption acceptance remain open at the owner's request.
+
+Exact-commit CI, native device acceptance and production activation are separate
+gates. Current native public downloads remain immutable. Production signing,
+physical iOS and an isolated measured model comparison remain prerequisites;
+no training, model promotion or optional cloud activation is implied.
+
 # Interactive Core activation — 25 October 2026
 
 Code9e96545 and website539e94f passed exact-commit CI. Worker6dc3c1f6 is

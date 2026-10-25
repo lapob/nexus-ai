@@ -1,6 +1,6 @@
 # Protocollo di accettazione vocale
 
-La sintesi e il riconoscimento sono verifiche distinte. `npm run voice:evaluate` controlla che la voce neurale locale produca audio valido, naturale e senza richieste duplicate. Il riconoscimento richiede registrazioni reali, perché un campione sintetico non rappresenta microfono, ambiente o pronuncia dell'utente.
+La sintesi e il riconoscimento sono verifiche distinte. `npm run voice:evaluate` controlla formato e tempi dell'audio neurale locale; la naturalezza richiede un ascolto umano. Il riconoscimento richiede registrazioni reali, perché un campione sintetico non rappresenta microfono, ambiente o pronuncia dell'utente.
 
 Il corpus di accettazione deve contenere almeno:
 

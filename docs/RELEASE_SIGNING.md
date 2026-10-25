@@ -12,6 +12,19 @@ encrypted hardware-backed or CI secret store. Run `npm run signing:doctor` for
 a redacted status report and `npm run signing:gate` before a Stable build.
 Neither command prints key material.
 
+Before a first production rollout, verify the signer of the installed Preview
+and the new artifact. Android updates require a compatible signing identity;
+changing from a Preview key is a migration, not an ordinary in-place update.
+Do not uninstall a user's Preview or discard its data to make installation
+pass. Test export/restore and the chosen migration on an isolated installation.
+See [Android app signing](https://developer.android.com/studio/publish/app-signing).
+
+On this workstation, missing publisher credentials must remain an explicit
+failed production gate. A successful unsigned/Preview build does not replace
+Authenticode, Android production signing or signed update-manifest validation.
+Physical iOS acceptance also requires the Mac/Xcode and device workflow in
+[the iOS guide](../ios/README.md); source checks on Windows cannot certify it.
+
 Give every active key a unique `NEXUS_RELEASE_MANIFEST_KEY_ID`, named owner,
 creation date, planned rotation date and revocation procedure in a private
 register. Never rotate by replacing a public key inside an already signed

@@ -51,12 +51,15 @@ html[data-nxs-reading=large] :is(.answer,.session-turn-content){font-size:1.3rem
 </style>`;
 // #endregion
 // #region 02 — Local preferences, service status and data actions
-function createPublicConversationPreferences(normalize, { getHistory = () => [], clearHistory = () => {}, icons } = {}) {
+function createPublicConversationPreferences(normalize, { getHistory = () => [], clearHistory = () => {}, getDiagnostics = () => null, icons } = {}) {
   const namespace = 'nexusnxs.conversation.preferences.v1';
   const copy = (it, en) => /^it\b/i.test(document.documentElement.lang || navigator.language) ? it : en;
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(namespace) || '{}') || {}; } catch { /* Private storage can be unavailable. */ }
   let profile = normalize(saved);
+  let draftRecovery = saved.recovery?.draft === true;
+  const applyRecovery = () => { globalThis.nexusDraftRecoveryEnabled = draftRecovery; document.dispatchEvent(new Event('nexusdraftpreferencechange')); };
+  applyRecovery();
   const defaultAppearance = () => ({ motion: 'system', reading: 'standard' });
   let appearance = { motion: saved.appearance?.motion === 'reduce' ? 'reduce' : 'system', reading: saved.appearance?.reading === 'large' ? 'large' : 'standard' };
   const applyAppearance = () => {
@@ -105,8 +108,8 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
     ['tone', copy('Tono', 'Tone'), [['neutral', copy('Equilibrato', 'Balanced')], ['warm', copy('Caloroso', 'Warm')], ['direct', copy('Diretto', 'Direct')]]],
     ['responseLanguage', copy('Lingua delle risposte', 'Response language'), [['auto', copy('Automatico', 'Automatic')], ['it', 'Italiano'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch']]]
   ];
-  const save = () => { try { localStorage.setItem(namespace, JSON.stringify({ ...profile, appearance })); } catch { /* Still usable without persistent storage. */ } };
-  const refresh = () => { for (const [key, select] of selects) select.value = profile[key]; for (const [key, select] of appearanceSelects) select.value = appearance[key]; };
+  const save = () => { try { localStorage.setItem(namespace, JSON.stringify({ ...profile, appearance, recovery: { draft: draftRecovery } })); } catch { /* Still usable without persistent storage. */ } };
+  const refresh = () => { for (const [key, select] of selects) select.value = profile[key]; for (const [key, select] of appearanceSelects) select.value = appearance[key]; recoverySelect.value = draftRecovery ? 'session' : 'off'; };
   for (const [key, labelText, options] of definitions) {
     const label = document.createElement('label'); label.textContent = labelText;
     const select = document.createElement('select'); select.id = `profile-${key}`;
@@ -180,10 +183,24 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const appearanceNote = document.createElement('p'); appearanceNote.textContent = copy('Seguiamo anche le preferenze di accessibilità del dispositivo. Queste scelte restano sul dispositivo.', 'Device accessibility preferences also apply. These choices stay on your device.');
   appearanceSection.append(appearanceFields, appearanceNote);
   const data = section('profileData', copy('Dati locali', 'Local data'), 'Lock');
+  const recoveryFields = document.createElement('div'); recoveryFields.className = 'profile-fields';
+  const recoveryLabel = document.createElement('label'); recoveryLabel.textContent = copy('Bozza in questa scheda', 'Draft in this tab');
+  const recoverySelect = document.createElement('select'); recoverySelect.id = 'profile-recovery-draft';
+  for (const [value, text] of [['off', copy('Non conservare', 'Do not retain')], ['session', copy('Riprendi dopo un aggiornamento', 'Restore after reload')]]) {
+    const option = document.createElement('option'); option.value = value; option.textContent = text; recoverySelect.append(option);
+  }
+  recoverySelect.value = draftRecovery ? 'session' : 'off';
+  recoverySelect.onchange = () => { draftRecovery = recoverySelect.value === 'session'; save(); applyRecovery(); };
+  recoveryLabel.append(recoverySelect); recoveryFields.append(recoveryLabel); data.append(recoveryFields);
+  const recoveryNote = document.createElement('p'); recoveryNote.className = 'profile-note'; recoveryNote.textContent = copy('Se attivo, il testo della bozza resta nella sessione di questa scheda. Gli allegati vanno riaggiunti e nulla viene inviato automaticamente.', 'When enabled, draft text stays in this tab session. Attachments must be added again and nothing is sent automatically.'); data.append(recoveryNote);
   const dataNote = document.createElement('p'); dataNote.textContent = copy('La cronologia è salvata in questo browser. Il file esportato non è cifrato e resta separato dalla cancellazione.', 'History is saved in this browser. Exported files are not encrypted and remain separate from deletion.'); data.append(dataNote);
   dataNote.id = 'profileDataDisclosure';
   const dataActions = document.createElement('div'); dataActions.className = 'profile-actions';
   const exportData = iconAction('profileExport', copy('Esporta conversazione', 'Export conversation'), 'Download');
+  const exportDiagnostics = iconAction('profileDiagnostics', copy('Esporta diagnostica locale', 'Export local diagnostics'), 'Pulse');
+  const diagnosticNote = document.createElement('p'); diagnosticNote.className = 'profile-note';
+  diagnosticNote.textContent = copy('La diagnostica contiene solo contatori e tempi di questa pagina, senza chat, file o audio. Il file viene scaricato, non inviato.', 'Diagnostics contain only counts and timings from this page, without chats, files or audio. The file is downloaded, not sent.');
+  diagnosticNote.id = 'profileDiagnosticsDisclosure'; exportDiagnostics.setAttribute('aria-describedby', diagnosticNote.id);
   exportData.setAttribute('aria-describedby', dataNote.id);
   const deleteData = iconAction('profileDelete', copy('Elimina cronologia e preferenze', 'Delete history and preferences'), 'DeleteOutline');
   const confirmation = document.createElement('div'); confirmation.className = 'profile-confirm'; confirmation.hidden = true;
@@ -193,7 +210,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const confirmDelete = iconAction('profileDeleteConfirm', copy('Conferma eliminazione', 'Confirm deletion'), 'Check');
   const cancelDelete = iconAction('profileDeleteCancel', copy('Annulla eliminazione', 'Cancel deletion'), 'Close');
   confirmDelete.setAttribute('aria-describedby', warning.id); cancelDelete.setAttribute('aria-describedby', warning.id);
-  confirmActions.append(cancelDelete, confirmDelete); confirmation.append(confirmActions); dataActions.append(exportData, deleteData); data.append(dataActions, confirmation);
+  confirmActions.append(cancelDelete, confirmDelete); confirmation.append(confirmActions); dataActions.append(exportDiagnostics, exportData, deleteData); data.append(diagnosticNote, dataActions, confirmation);
   const history = () => {
     try { return (getHistory() || []).filter(turn => ['user', 'assistant'].includes(turn?.role) && typeof turn.content === 'string').map(({ role, content }) => ({ role, content })); } catch { return []; }
   };
@@ -201,6 +218,17 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
     const turns = history(); if (!turns.length) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify({ schema: 'nexusnxs.conversation.export.v1', turns }, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'nexusnxs-conversazione.json'; document.body.append(anchor);
+    try { anchor.click(); } finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  };
+  exportDiagnostics.onclick = () => {
+    const source = getDiagnostics() || {}, observations = {};
+    for (const key of ['observedInteractions', 'maximumRecords', 'maximumLatencyMs', 'worstInteractionMs', 'p95InteractionMs', 'longTasks', 'longTaskMs', 'scriptErrors', 'unhandledRejections']) {
+      observations[key] = Number.isFinite(source[key]) && source[key] >= 0 ? source[key] : null;
+    }
+    observations.status = ['unsupported', 'insufficient', 'observed-window'].includes(source.status) ? source.status : 'unsupported';
+    observations.scope = 'recent-observed-events-not-field-inp';
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ schema: 'nexusnxs.diagnostics.v1', persisted: false, uploaded: false, observations }, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'nexusnxs-diagnostica.json'; document.body.append(anchor);
     try { anchor.click(); } finally { anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
   };
   deleteData.onclick = () => { confirmation.hidden = false; cancelDelete.focus(); };
@@ -245,7 +273,7 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   dialog.addEventListener('click', event => { if (event.target === dialog) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) void closeDialog(); } });
   dialog.addEventListener('close', () => { ++dialogGeneration; closingAnimation?.cancel(); ++statusEpoch; statusController?.abort(); confirmation.hidden = true; retry.disabled = false; services.removeAttribute('aria-busy'); trigger.focus({ preventScroll: true }); });
   return { value: () => normalize(profile), forVoice: language => normalize(profile, {}, { voice: true, voiceLanguage: language }),
-    clear: () => { profile = normalize({}); appearance = defaultAppearance(); applyAppearance(); refresh(); } };
+    clear: () => { profile = normalize({}); appearance = defaultAppearance(); draftRecovery = false; applyRecovery(); applyAppearance(); refresh(); } };
 }
 // #endregion
 module.exports = { createPublicConversationPreferences, PUBLIC_PROFILE_STYLE };

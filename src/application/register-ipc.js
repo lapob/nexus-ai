@@ -43,7 +43,7 @@ const { explicitMemoryInstruction } = require('../infrastructure/storage/persona
 const { configureContinuityTask, continuityTaskStatus, createTrackedExecFileRunner } = require('../infrastructure/windows/continuity-task');
 const { MODEL_PROFILES, adaptiveModelSelection, isUserSelectableModel, modelSuitability, profileModels, provisioningStatus, publicModelName } = require('../ai/model-manifest');
 const { CHANNELS, parseChatRequest, parseRelativeNotePath, parseClipboardText, parseExternalUrl, parseEmbeddingRequest, parseModelName, parseRequestId, parseAgentInstruction, parseAgentPlanningRequest, parseActionTicket, parseWorkflowId, parseWorkflowCreate, parseWorkflowDecision, parseTrainingExample, parseProvisioningProfile } = require('./ipc-contracts');
-const { createWarmupSingleflight, residentModelOptions } = require('./runtime-warmup-policy');
+const { MODEL_WARMUP_TIMEOUT_MS, createAdaptiveSettingsResolver, createWarmupSingleflight, residentModelOptions } = require('./runtime-warmup-policy');
 const { enforcePublicCitationUrls, ensurePublicCitation, researchLanguage, researchQuestion } = require('../research/research-orchestrator');
 const execFileAsync = promisify(execFile);
 
@@ -436,7 +436,6 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     senderRequests.delete(senderId);
     return cancelTrackedRequest(requestId, { requestSignals, aiRuntime });
   };
-  let adaptiveSettingsPromise = null;
   const regularWindowBounds = new Map();
   const configPath = () => path.join(app.getPath('userData'), 'settings.json');
   const workspacePath = () => path.join(app.getPath('userData'), 'workspace.json');
@@ -515,9 +514,10 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     error.code = AI_ERROR_CODES.REQUEST_CANCELLED;
     return error;
   };
-  const initializeRuntime = async (configuration) => {
+  const initializeRuntime = async (configuration, warmupContext) => {
+    warmupContext?.assertCurrent();
     if (shuttingDown) throw runtimeShutdownError();
-    aiWarmup.reset();
+    aiWarmup.reset({ preservePending: Boolean(warmupContext) });
     remoteGateway.invalidateReadiness?.();
     await aiRuntime.initialize(configuration);
     if (shuttingDown) {
@@ -528,33 +528,38 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     }
     activeConfig = JSON.stringify(configuration);
   };
-  const ensureRuntime = async (settings, { requireDistribution = false } = {}) => {
+  const ensureRuntime = async (settings, { requireDistribution = false, warmupContext } = {}) => {
+    warmupContext?.assertCurrent();
     if (shuttingDown) throw runtimeShutdownError();
     await assertRuntimeAdmission(managedRuntime, {
       provider: settings.ai.provider,
       requireDistribution: requireDistribution || distributionMode === 'server'
     });
     if (shuttingDown) throw runtimeShutdownError();
+    warmupContext?.assertCurrent();
     const key = JSON.stringify(settings.ai);
-    if (key !== activeConfig) await initializeRuntime(settings.ai);
+    if (key !== activeConfig) await initializeRuntime(settings.ai, warmupContext);
   };
-  const aiWarmup = createWarmupSingleflight(async ({ preserveLoadedModel = false } = {}) => {
+  const aiWarmup = createWarmupSingleflight(async ({ preserveLoadedModel = false } = {}, warmupContext) => {
     // Il bootstrap, il retry e il keep-warm possono cadere nello stesso
     // intervallo. Una sola richiesta raggiunge Ollama; gli altri chiamanti
     // attendono la medesima promise invece di caricare due volte il modello.
     const started = performance.now();
-    const settings = await adaptiveSettings();
+    const settings = await adaptiveSettings(warmupContext);
     const selectedAt = performance.now();
     const model = settings.fastModel || settings.chatModel || 'automatic';
-    await ensureRuntime(settings);
+    await ensureRuntime(settings, { warmupContext });
+    warmupContext.assertCurrent();
     const admittedAt = performance.now();
     const prepared = await aiRuntime.preloadModel(model, {
+      timeoutMs: MODEL_WARMUP_TIMEOUT_MS, signal: warmupContext.signal,
       keepAlive: runtimeTuning.keepAlive,
       numCtx: runtimeTuning.contextTokens,
       // Su GPU che possono ospitare un solo modello, il mantenimento in
       // background non deve espellere un modello profondo ancora caldo.
       preserveLoadedModel: preserveLoadedModel && (runtimeTuning.maxLoadedModels || 1) <= 1
     });
+    warmupContext.assertCurrent();
     logger.info('Servizio AI preparato in background.', {
       model: prepared?.model || model, tier: runtimeTuning.tier, remote: prepared?.remote === true, preserved: prepared?.preserved === true,
       selectionMs: Math.round(selectedAt - started), admissionMs: Math.round(admittedAt - selectedAt),
@@ -573,9 +578,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     runtimeConfig,
     runtimeEndpointLocked
   );
-  const resolveInstalledModels = async (settings) => {
-    await ensureRuntime(settings);
+  const resolveInstalledModels = async (settings, warmupContext, assertCurrent = () => {}) => {
+    assertCurrent();
+    await ensureRuntime(settings, { warmupContext });
+    assertCurrent();
     const models = await aiRuntime.listModels();
+    assertCurrent();
     if (distributionMode === 'public') return { settings, models, changed: false };
     if (!settings.autoSelectModel || !models.length) return { settings, models, changed: false };
     const chatModels = models.filter((model) => isUserSelectableModel(model) && model.capabilities?.chat !== false);
@@ -590,7 +598,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       : models.find((model) => model.capabilities?.embeddings)?.id || null;
     if (chatModel === settings.chatModel && fastModel === settings.fastModel && embeddingModel === settings.embeddingModel) return { settings, models, changed: false };
     const updated = mergeRuntimeSettings(settings, { chatModel, fastModel, embeddingModel });
-    await initializeRuntime(updated.ai);
+    await initializeRuntime(updated.ai, warmupContext);
+    assertCurrent();
     persistSettings(updated);
     logger.info('Configurazione Ollama adattata ai modelli installati.', {
       chatModel,
@@ -600,17 +609,9 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     });
     return { settings: updated, models, changed: true };
   };
-  const adaptiveSettings = async () => {
-    if (!adaptiveSettingsPromise) {
-      adaptiveSettingsPromise = resolveInstalledModels(getSettings())
-        .then((resolved) => resolved.settings)
-        .catch((error) => {
-          adaptiveSettingsPromise = null;
-          throw error;
-        });
-    }
-    return adaptiveSettingsPromise;
-  };
+  const adaptiveSettings = createAdaptiveSettingsResolver({ getSettings,
+    resolve: async (settings, { warmupContext, assertCurrent }) => (await resolveInstalledModels(settings, warmupContext, assertCurrent)).settings
+  });
   const requestTimeout = (mode) => mode === 'deep'
     ? runtimeTuning.deepTimeoutMs || 360_000
     : runtimeTuning.quickTimeoutMs || 180_000;

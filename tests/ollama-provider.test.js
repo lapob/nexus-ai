@@ -177,6 +177,18 @@ test('il keep-warm non espelle un modello diverso gia caricato su runtime a sing
     assert.equal(generated, false);
   } finally { await local.close(); }
 });
+
+test('il preload ha un budget separato senza allungare quello delle risposte normali', async () => {
+  const local = await server((_request, response) => setTimeout(() => json(response, { done: true, load_duration: 7 }), 400));
+  try {
+    const provider = await providerFor(local.url, { timeoutMs: 250 });
+    assert.equal((await provider.preloadModel('qwen:test', { timeoutMs: 800 })).loadDurationNs, 7);
+    await assert.rejects(provider.request('/api/version'), { code: 'AI_PROVIDER_TIMEOUT' });
+    for (const timeoutMs of [0, -1, 1.5, 300001, NaN]) await assert.rejects(provider.preloadModel('qwen:test', { timeoutMs }), { code: 'AI_CONFIGURATION_INVALID' });
+    const controller = new AbortController(); controller.abort();
+    await assert.rejects(provider.preloadModel('qwen:test', { timeoutMs: 800, signal: controller.signal }), { code: 'AI_REQUEST_CANCELLED' });
+  } finally { await local.close(); }
+});
 test('un turno rapido riusa il modello principale residente senza ricaricare quello rapido', async () => {
   let chatBody;
   const local = await server(async (request, response) => {

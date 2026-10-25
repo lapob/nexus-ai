@@ -171,7 +171,8 @@ class OllamaProvider {
     if (!final || final.status !== 'success') throw new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, 'Preparazione del modello incompleta.', { provider: this.name, retryable: true });
     return final;
   }
-  async preloadModel(requested, { keepAlive = '15m', numCtx, signal, preserveLoadedModel = false } = {}) {
+  async preloadModel(requested, { keepAlive = '15m', numCtx, signal, preserveLoadedModel = false, timeoutMs = Math.max(this.timeoutMs, 1000) } = {}) {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 250 || timeoutMs > 300000) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'Timeout di preparazione non valido.', { provider: this.name });
     const model = this.requireModel(requested);
     if (preserveLoadedModel) {
       try {
@@ -195,7 +196,7 @@ class OllamaProvider {
       method: 'POST',
       body: { model, prompt: '', stream: false, keep_alive: keepAlive, ...(numCtx ? { options: { num_ctx: numCtx } } : {}) },
       signal,
-      timeoutMs: Math.max(this.timeoutMs, 1000)
+      timeoutMs
     });
     const data = await response.json();
     if (data?.done !== true) throw new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, 'Preparazione rapida del modello non riuscita.', { provider: this.name, retryable: true });
