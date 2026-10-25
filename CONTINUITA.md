@@ -1,3 +1,16 @@
+## Interactive Core and daily-use shell candidate — 25 October 2026
+
+Canonical shell synchronized from main68ea818. The Core follows held touch,
+shrinks and reveals chat progressively; reversal/cancellation restore full
+presentation without ending media. Controls stay clear of the composer.
+The same source also adds local appearance settings, stable streamed blocks,
+exact code downloads, microphone-loss recovery and private duration-only
+interaction observations. Eight actual touch profiles,35 voice unit tests,
+four offline formats and four synthetic conversations pass; source suite
+1257PASS/2SKIP and28 Samsung native tests pass. Website45unit/cloudcheck pass.
+Exact-commit CI and the full release gate precede promotion; preserve current
+Workerf4d67bde and rollback. No native release or model promotion is implied.
+
 ## Compact voice deployed — 25 October 2026
 
 Code84c64cd passed CI40210622355 and the full45unit/32browser release gate,
