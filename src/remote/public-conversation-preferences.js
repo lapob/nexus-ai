@@ -1,40 +1,49 @@
 /** @module remote/public-conversation-preferences Minimal client-owned profile, shared by text and voice. */
-const { colors, cosmicGlass, layout } = require('../../config/nexus-design-tokens.json');
+const { colors, cosmicGlass, layout, motion } = require('../../config/nexus-design-tokens.json');
 // #region 01 — Shared settings surfaces
 // Present at response generation so the gateway adds its style-src nonce.
 // Dynamically appended inline styles are rejected by the public CSP.
 const PUBLIC_PROFILE_STYLE = `<style>
-#profileSheet{width:min(480px,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow-y:auto;color-scheme:dark;box-shadow:0 24px 80px #0006}
-#profileSheet .sheet-body{padding:clamp(20px,4vw,28px);container: nxs-profile / inline-size}
+#profileSheet{--profile-exit:${motion.modeExitMs};--profile-scale:${motion.modeScaleIn};--profile-easing:cubic-bezier(${motion.standardCurve.join(',')});width:min(740px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;color-scheme:dark;box-shadow:0 24px 80px #0006}
+#profileSheet .sheet-body{padding:clamp(20px,4vw,28px);container:nxs-profile / inline-size}
 #profileSheet .sheet-top{position:sticky;top:0;z-index:2;isolation:isolate;padding-top:clamp(20px,4vw,28px);padding-bottom:12px;margin-top:calc(-1 * clamp(20px,4vw,28px))}
 #profileSheet .sheet-top::before{content:'';position:absolute;z-index:-1;inset:0 calc(-1 * clamp(20px,4vw,28px)) -16px;background:${colors.surface};backdrop-filter:blur(${cosmicGlass.blurPx.preferred}px);-webkit-backdrop-filter:blur(${cosmicGlass.blurPx.preferred}px);mask-image:linear-gradient(#000 calc(100% - 16px),transparent);-webkit-mask-image:linear-gradient(#000 calc(100% - 16px),transparent);pointer-events:none}
 #profileSheet .sheet-close:focus-visible{outline:2px solid ${colors.cyan};outline-offset:2px}
 @media(hover:hover){#profileSheet .sheet-close:hover{background:${colors.surfaceRaised};color:${colors.ice}}}
-.identity .profile-trigger{width:44px;height:44px;padding:0;display:grid;place-items:center;flex:0 0 44px}
+.identity .profile-trigger{width:${layout.touchTargetDp}px;height:${layout.touchTargetDp}px;padding:0;display:grid;place-items:center;flex:0 0 ${layout.touchTargetDp}px}
 .identity .profile-trigger svg{display:block;width:20px;height:20px}
 #profileTitle{min-width:0;font-size:1.05rem;font-weight:650;line-height:1.3;overflow-wrap:anywhere}
-.profile-fields{display:grid;gap:12px;margin-block:12px}
-.profile-fields label{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);align-items:center;gap:12px;padding-block:4px;font-size:.875rem;line-height:1.45;font-weight:500;color:${colors.mist}}
-.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:${layout.touchTargetDp}px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;font-weight:500;color-scheme:dark}
+#profileSheet .sheet-close{width:${layout.touchTargetDp}px;height:${layout.touchTargetDp}px;min-width:${layout.touchTargetDp}px;min-height:${layout.touchTargetDp}px;padding:12px;border:0;background:transparent;border-radius:50%;color:${colors.mist}}
+.profile-layout{display:grid;grid-template-columns:164px minmax(0,1fr);gap:28px;margin-top:16px;align-items:start}
+.profile-nav{display:grid;gap:4px;align-content:start;min-width:0}
+.profile-nav button{position:relative;display:flex;align-items:center;gap:10px;width:100%;min-height:${layout.touchTargetDp}px;padding:10px 12px;border:0;border-radius:12px;background:transparent;color:${colors.mist};font:inherit;font-size:.875rem;font-weight:500;text-align:left;cursor:pointer}
+.profile-nav button .nxs-symbol{width:20px;height:20px;flex-shrink:0}
+.profile-nav button[aria-selected=true]{color:${colors.ice};background:${colors.surfaceRaised}}
+.profile-nav button[aria-selected=true] .nxs-symbol{color:${colors.cyan}}
+.profile-nav button:focus-visible{outline:2px solid ${colors.cyan};outline-offset:2px}
+.profile-main{min-width:0}.profile-panel[hidden]{display:none}.profile-panel h2{margin:0 0 12px;font-size:.95rem;line-height:1.5;font-weight:650;color:${colors.ice}}
+.profile-panel{animation:profile-content ${motion.quickMs}ms cubic-bezier(${motion.standardCurve.join(',')})}
+@keyframes profile-content{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.profile-fields{display:grid;gap:12px;margin-block:8px 16px}
+.profile-fields label{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-items:center;gap:12px;min-height:52px;padding-block:2px;font-size:.875rem;line-height:1.45;font-weight:500;color:${colors.mist}}
+.profile-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:${layout.touchTargetDp}px;padding:10px 8px;border:1px solid transparent;border-radius:10px;background:transparent;color:${colors.ice};font:inherit;font-weight:550;color-scheme:dark}
+.profile-fields select:hover{background:${colors.surfaceRaised}}
 .profile-fields select:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px}
 .profile-fields option{background:${colors.surfaceRaised};color:${colors.ice}}
 @supports(appearance:base-select){.profile-fields select,.profile-fields select::picker(select){appearance:base-select}.profile-fields select::picker(select){max-width:calc(100vw - 32px);max-height:min(320px,50dvh);padding:6px;border:1px solid ${colors.hairline};border-radius:14px;background:${colors.surfaceRaised};color:${colors.ice};font:inherit;box-shadow:0 18px 48px #0008}.profile-fields option{min-height:48px;padding:10px 12px;border-radius:9px;white-space:normal;overflow-wrap:anywhere}.profile-fields option:hover,.profile-fields option:focus{background:${colors.surface};color:${colors.ice}}.profile-fields option:focus{outline:none}.profile-fields option:focus-visible{outline:1px solid ${colors.cyan};outline-offset:-2px}.profile-fields option:checked{font-weight:650}.profile-fields option::checkmark{color:${colors.cyan}}.profile-fields select::picker-icon{content:"";width:7px;height:7px;flex:0 0 7px;margin-inline:auto 2px;border-right:1.5px solid ${colors.mist};border-bottom:1.5px solid ${colors.mist};transform:rotate(45deg)}.profile-fields select:open::picker-icon{transform:rotate(225deg)}}
-.profile-section{border:0;border-bottom:1px solid ${colors.hairline}70;border-radius:0;margin-top:0;padding:0;background:transparent}
-.profile-section:last-child{border-bottom:0}
-.profile-section summary{display:grid;grid-template-columns:24px minmax(0,1fr) 12px;align-items:center;gap:12px;min-height:64px;padding:14px 0;cursor:pointer;font-weight:600;list-style:none;overflow-wrap:normal}
-.profile-section summary>.nxs-symbol{width:22px;height:22px;color:${colors.mist}}
-.profile-section summary::-webkit-details-marker{display:none}.profile-section summary::after{content:'';width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .17s ease}.profile-section[open] summary::after{transform:rotate(225deg)}
-.profile-section summary:focus-visible{outline:2px solid ${colors.cyan};outline-offset:3px;border-radius:8px}
+.profile-section{border:0;border-radius:0;margin:0;padding:0;background:transparent}
+.profile-section summary{display:none;overflow-wrap:normal}
 .profile-section .profile-fields{margin-block:4px 12px}
 .profile-service-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:10px 0;font-size:.85rem;line-height:1.5;overflow-wrap:anywhere}.profile-service-row output{text-align:right;color:${colors.mist}}
 #profileSheet .profile-section p{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 .profile-confirm[hidden]{display:none}.profile-confirm{margin-top:12px;padding:12px;border:1px solid ${colors.hairline};border-radius:14px}
-.profile-section[open]{padding-bottom:18px}.profile-section[open] summary{margin-bottom:4px}
-#profileSheet[open]{animation:profile-reveal .2s cubic-bezier(.2,0,0,1)}
-@keyframes profile-reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+#profileSheet[open]{animation:profile-reveal ${motion.modeEnterMs}ms cubic-bezier(${motion.emphasizedCurve.join(',')})}
+@keyframes profile-reveal{from{opacity:0;transform:scale(${motion.modeScaleIn})}to{opacity:1;transform:none}}
 @container nxs-profile (max-width:18rem){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}}
-@media(max-width:340px){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}.profile-section summary{gap:8px}}
-@media(prefers-reduced-motion:reduce){.profile-section summary::after{transition:none}#profileSheet[open]{animation:none}}
+@media(max-width:839px){#profileSheet{width:min(560px,calc(100% - 24px))}.profile-layout{grid-template-columns:minmax(0,1fr);gap:20px}.profile-nav{display:flex;gap:4px}.profile-nav button{flex:1;justify-content:center;text-align:center;padding:10px 8px}.profile-nav button span{min-width:0;overflow-wrap:anywhere}}
+@media(max-width:599px){#profileSheet{width:100%;height:100dvh;max-width:100%;max-height:100dvh;margin:0;border:0;border-radius:0}#profileSheet .sheet-body{padding:20px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}.profile-layout{margin-top:12px}.profile-main{padding-top:4px}}
+@media(max-width:340px){.profile-fields label{grid-template-columns:minmax(0,1fr);gap:8px}.profile-nav button{gap:6px;font-size:.8rem}}
+@media(prefers-reduced-motion:reduce){#profileSheet[open],.profile-panel{animation:none}}
 .profile-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:12px}
 #profileSheet .profile-note{font-size:.8rem;color:${colors.mist};line-height:1.6;overflow-wrap:anywhere}
 </style>`;
@@ -54,13 +63,25 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   const dialog = document.createElement('dialog');
   dialog.id = 'profileSheet'; dialog.className = 'download-sheet';
   dialog.setAttribute('aria-labelledby', 'profileTitle');
+  let closingAnimation = null, dialogGeneration = 0;
+  const closeDialog = async () => {
+    if (!dialog.open || closingAnimation) return;
+    const generation = dialogGeneration;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && dialog.animate) {
+      const style = getComputedStyle(dialog);
+      closingAnimation = dialog.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: `scale(${style.getPropertyValue('--profile-scale').trim() || '1'})` }], { duration: Number(style.getPropertyValue('--profile-exit')) || 0, easing: style.getPropertyValue('--profile-easing').trim() || 'linear' });
+      try { await closingAnimation.finished; } catch { /* A native close cancels the transition. */ }
+      closingAnimation = null;
+    }
+    if (generation === dialogGeneration && dialog.open) dialog.close();
+  };
   const body = document.createElement('div'); body.className = 'sheet-body';
   const top = document.createElement('div'); top.className = 'sheet-top';
   const title = document.createElement('strong'); title.id = 'profileTitle'; title.textContent = copy('Impostazioni', 'Settings');
   const close = document.createElement('button'); close.type = 'button'; close.className = 'sheet-close';
   close.setAttribute('aria-label', copy('Chiudi', 'Close'));
   close.innerHTML = icons.Close;
-  close.onclick = () => dialog.close(); top.append(title, close);
+  close.onclick = () => void closeDialog(); top.append(title, close);
   const section = (id, heading, icon, open = false) => {
     const element = document.createElement('details'); element.id = id; element.className = 'profile-section'; element.open = open;
     const summary = document.createElement('summary'), label = document.createElement('span');
@@ -158,11 +179,45 @@ function createPublicConversationPreferences(normalize, { getHistory = () => [],
   cancelDelete.onclick = () => { confirmation.hidden = true; deleteData.focus(); };
   confirmDelete.onclick = () => { confirmation.hidden = true; dialog.close(); void clearHistory(); };
   data.addEventListener('toggle', () => { exportData.disabled = history().length === 0; });
-  body.append(top, conversation, services, data); dialog.append(body); document.body.append(dialog);
+  const layout = document.createElement('div'); layout.className = 'profile-layout';
+  const navigation = document.createElement('div'); navigation.className = 'profile-nav'; navigation.setAttribute('role', 'tablist'); navigation.setAttribute('aria-label', copy('Sezioni impostazioni', 'Settings sections'));
+  const main = document.createElement('div'); main.className = 'profile-main';
+  const tabs = [], panels = [];
+  let selected = conversation.id;
+  const selectSection = id => {
+    selected = id;
+    for (let index = 0; index < tabs.length; ++index) {
+      const active = tabs[index].getAttribute('aria-controls') === `${id}Panel`;
+      tabs[index].setAttribute('aria-selected', String(active)); tabs[index].tabIndex = active ? 0 : -1;
+      panels[index].hidden = !active;
+      const details = panels[index].querySelector('details'); if (details.open !== active) details.open = active;
+    }
+  };
+  for (const [details, shortName, icon] of [[conversation, 'Chat', 'Chat'], [services, copy('Voce', 'Voice'), 'Mic'], [data, copy('Dati', 'Data'), 'Lock']]) {
+    const tab = document.createElement('button'); tab.type = 'button'; tab.id = `${details.id}Tab`; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `${details.id}Panel`);
+    tab.innerHTML = icons[icon]; const label = document.createElement('span'); label.textContent = shortName; tab.append(label);
+    const panel = document.createElement('div'); panel.id = `${details.id}Panel`; panel.className = 'profile-panel'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', tab.id);
+    const heading = document.createElement('h2'); heading.textContent = details.querySelector('summary span').textContent;
+    panel.append(heading, details); main.append(panel); navigation.append(tab); tabs.push(tab); panels.push(panel);
+    tab.onclick = () => selectSection(details.id);
+    details.addEventListener('toggle', () => { if (details.open && selected !== details.id) selectSection(details.id); });
+  }
+  navigation.addEventListener('keydown', event => {
+    const index = tabs.indexOf(document.activeElement); if (index < 0) return;
+    const direction = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
+    const next = direction ? (index + direction + tabs.length) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+    if (next >= 0) { event.preventDefault(); tabs[next].click(); tabs[next].focus(); }
+  });
+  const wide = matchMedia('(min-width: 840px)');
+  const orient = () => navigation.setAttribute('aria-orientation', wide.matches ? 'vertical' : 'horizontal'); orient(); wide.addEventListener?.('change', orient);
+  selectSection(selected); layout.append(navigation, main);
+  body.append(top, layout); dialog.append(body); document.body.append(dialog);
   trigger.onclick = () => { refresh(); dialog.showModal(); };
-  dialog.addEventListener('click', event => { if (event.target === dialog) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
-  dialog.addEventListener('close', () => { ++statusEpoch; statusController?.abort(); confirmation.hidden = true; retry.disabled = false; services.removeAttribute('aria-busy'); trigger.focus({ preventScroll: true }); });
-  return { value: () => normalize(profile), clear: () => { profile = normalize({}); refresh(); } };
+  dialog.addEventListener('cancel', event => { event.preventDefault(); void closeDialog(); });
+  dialog.addEventListener('click', event => { if (event.target === dialog) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) void closeDialog(); } });
+  dialog.addEventListener('close', () => { ++dialogGeneration; closingAnimation?.cancel(); ++statusEpoch; statusController?.abort(); confirmation.hidden = true; retry.disabled = false; services.removeAttribute('aria-busy'); trigger.focus({ preventScroll: true }); });
+  return { value: () => normalize(profile), forVoice: language => normalize(profile, {}, { voice: true, voiceLanguage: language }),
+    clear: () => { profile = normalize({}); refresh(); } };
 }
 // #endregion
 module.exports = { createPublicConversationPreferences, PUBLIC_PROFILE_STYLE };

@@ -38,12 +38,16 @@ async function main() {
     await client.evaluate(`globalThis.qa={requests:[],cancels:[]};const originalFetch=fetch;globalThis.fetch=async(url,options={})=>{
       if(url==='/api/guest/messages/cancel'){qa.cancels.push(JSON.parse(options.body));return Response.json({status:'cancelled'})}
       if(url==='/api/guest/images/generate'){qa.imageSignal=options.signal;return new Promise(resolve=>qa.imageResponse=resolve)}
+      if(url==='/api/guest/images/search'){qa.webImageSignal=options.signal;qa.webImageBody=JSON.parse(options.body);return new Promise(resolve=>qa.webImageResponse=resolve)}
       if(url==='/api/guest/messages/stream'){qa.requests.push({body:JSON.parse(options.body),signal:options.signal});return new Response(new ReadableStream({start(controller){qa.controller=controller}}))}
       return originalFetch(url,options)
     };qa.frame=frame=>qa.controller.enqueue(new TextEncoder().encode(JSON.stringify(frame)+'\\n'));true`);
     const submit = text => client.evaluate(`document.querySelector('#prompt').value=${JSON.stringify(text)};document.querySelector('#prompt').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#send').click();true`);
     await submit('Prima richiesta sintetica');
     await waitFor(client, 'qa.requests.length===1');
+    await client.evaluate(`qa.frame({type:'phase',activity:{text:'Controllo sintetico',phase:'work',step:'verify'}});true`);
+    await waitFor(client, "document.querySelector('#cognition').dataset.step==='verify'");
+    assert.equal(await client.evaluate(`[...document.querySelectorAll('#cognition li')].filter(item=>getComputedStyle(item).display!=='none').length`), 1);
     await client.evaluate(`qa.frame({type:'token',token:'Risposta parziale'});true`);
     await waitFor(client, "document.querySelector('#answer').textContent.includes('parziale')");
     assert.equal(await client.evaluate("document.querySelector('#cognition').hidden"), false, 'Real response progress remains visible');
@@ -65,6 +69,32 @@ async function main() {
     await waitFor(client, "document.querySelector('#send').dataset.mode==='send'");
     assert.equal(await client.evaluate("document.querySelector('#imageResult').hidden"), true);
     assert.equal(await client.evaluate("document.querySelector('#sessionHistory').textContent"), '');
+    await submit('Mostrami foto di Saturno');
+    await waitFor(client, "typeof qa.webImageResponse==='function'");
+    assert.deepEqual(await client.evaluate('qa.webImageBody'), { query: 'Saturno' });
+    assert.equal(await client.evaluate('qa.webImageSignal instanceof AbortSignal'), true);
+    await client.evaluate(`document.querySelector('#memoryClear').click();true`);
+    await waitFor(client, 'qa.webImageSignal.aborted');
+    await client.evaluate(`qa.webImageResponse(Response.json({images:[]}));true`);
+    await waitFor(client, "document.querySelector('#send').dataset.mode==='send'");
+    assert.equal(await client.evaluate("document.querySelector('#answer').textContent"), '');
+    await client.evaluate(`qa.webImageResponse=null;true`);
+    await submit('Mostrami foto di Saturno');
+    await waitFor(client, "typeof qa.webImageResponse==='function'");
+    await client.evaluate(`(()=>{const canvas=document.createElement('canvas');canvas.width=480;canvas.height=240;const context=canvas.getContext('2d');context.fillStyle='#4be7e9';context.fillRect(0,0,480,240);qa.webImageResponse(Response.json({images:[{title:'Synthetic image fixture',alt:'Synthetic preview',author:'Test author',license:'CC0',sourceUrl:'https://commons.wikimedia.org/wiki/File:Fixture.png',url:canvas.toDataURL()}]}));return true})()`);
+    await waitFor(client, "document.querySelector('#send').dataset.mode==='send'");
+    await waitFor(client, "document.querySelector('.web-image-gallery img')?.naturalWidth===480");
+    assert.equal(await client.evaluate("document.querySelector('.web-image-gallery img').naturalWidth"), 480);
+    assert.match(await client.evaluate("document.querySelector('.web-image-gallery figcaption').textContent"), /Test author · CC0/);
+    for (const [width,height] of [[320,568],[844,390],[1440,900]]) {
+      await client.command('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:width<600});
+      assert.equal(await client.evaluate(`document.documentElement.scrollWidth<=innerWidth`), true);
+      const picture=await client.command('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+      fs.writeFileSync(path.join(output,'web-images-'+width+'.png'),Buffer.from(picture.data,'base64'));
+    }
+    await client.evaluate(`document.querySelector('#memoryClear').click();true`);
+    await waitFor(client, "document.querySelector('#answer').textContent===''");
+    assert.equal(await client.evaluate("document.querySelectorAll('.web-image-gallery img').length"), 0);
     await submit('Seconda richiesta sintetica');
     await waitFor(client, 'qa.requests.length===2');
     assert.deepEqual(await client.evaluate('qa.requests[1].body.history'), []);
@@ -123,7 +153,7 @@ async function main() {
     await secondClient.command('Page.bringToFront');
     await waitFor(secondClient, "document.body?.dataset.memoryStorage==='temporary'");
     assert.match(await secondClient.evaluate("document.querySelector('#memoryStorageNotice').textContent"), /temporanea/);
-    fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed: true, cancelled: true, lateFramesRejected: true, lateImagesRejected: true, pendingReadinessCancelled: true, nextHistoryEmpty: true, normalStopPreservesPartial: true, localReload: true, crossTabClear: true, draftCleared: true, unrelatedStoragePreserved: true }, null, 2));
+    fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ passed: true, cancelled: true, lateFramesRejected: true, lateImagesRejected: true, webImagePreview: true, webImageClear: true, explicitActivityStep: true, pendingReadinessCancelled: true, nextHistoryEmpty: true, normalStopPreservesPartial: true, localReload: true, crossTabClear: true, draftCleared: true, unrelatedStoragePreserved: true }, null, 2));
     console.log('PASS: history reset aborts, cancels server request, discards late frames and starts with empty history.');
   } finally {
     try { await client?.command('Browser.close'); } catch {}

@@ -2027,6 +2027,32 @@ test('la disconnessione del client annulla la richiesta al servizio immagini', a
   }finally{controller.abort();await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
 });
 
+test('web image lookup requires a guest, enforces quotas and cancels only the erased owner', async () => {
+  const { root, gateway } = fixture();
+  const calls = [];
+  gateway.webImageSearch = async (query, options) => { calls.push({ query, ...options }); return { provider: 'wikimedia-commons', images: [] }; };
+  try {
+    const port = await freePort(); await gateway.configure({ enabled: true, allowLan: false, port });
+    const base = `http://127.0.0.1:${port}`;
+    const owner = await bootstrapGuest(base, crypto.randomUUID()), other = await bootstrapGuest(base, crypto.randomUUID());
+    const request = (token, query) => fetch(base + '/api/guest/images/search', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
+    assert.equal((await request('', 'Saturn')).status, 401);
+    assert.equal((await request(owner.token, 'Z:\\private')).status, 400); assert.equal(calls.length, 0);
+    for (let i = 0; i < 8; i++) assert.equal((await request(owner.token, 'Saturn')).status, 200);
+    assert.equal((await request(owner.token, 'Saturn')).status, 429); assert.equal(calls.length, 8);
+    assert.equal(calls[0].limit, 3); assert.ok(calls[0].signal instanceof AbortSignal);
+    let entered; const ready = new Promise(resolve => { entered = resolve; });
+    gateway.webImageSearch = async (_query, { signal }) => { entered(signal); await new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })); };
+    const controller = new AbortController();
+    const pending = fetch(base + '/api/guest/images/search', { method: 'POST', signal: controller.signal, headers: { Authorization: `Bearer ${other.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'Mars' }) });
+    const cancelled = assert.rejects(pending, /abort/i), signal = await ready;
+    await fetch(base + '/api/guest/memory', { method: 'DELETE', headers: { Authorization: `Bearer ${owner.token}` } });
+    assert.equal(signal.aborted, false);
+    await fetch(base + '/api/guest/memory', { method: 'DELETE', headers: { Authorization: `Bearer ${other.token}` } });
+    assert.equal(signal.aborted, true); controller.abort(); await cancelled;
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('guest ratings are scoped to the installation and do not submit training content', async () => {
   const { root, gateway } = fixture();
   try {

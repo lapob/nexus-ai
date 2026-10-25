@@ -303,7 +303,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
           startConcurrentCapture(id);
         }
         state('thinking', copy('Sto preparando la risposta', 'Preparing a response'));
-        await ask(data.text);
+        await ask(data.text, { language: preferredLanguage() || capturedLanguage });
         if (document.getElementById('phase')?.classList.contains('error')) throw new Error(document.getElementById('phase').textContent);
       }
     } catch (error) {

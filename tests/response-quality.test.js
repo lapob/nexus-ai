@@ -2,8 +2,19 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   responseQualityDirective, responseRequirements, validateResponse, shouldReviewResponse,
+  responsePresentationDirective,
   wordCountConstraint, strictWordCountSchema, strictWordCountAnswer, hasStrictOutputConstraint
 } = require('../src/application/response-quality');
+
+test('presentation follows the task without overriding strict output formats',()=>{
+  assert.match(responsePresentationDirective('Come posso configurare una stampante?'),/passaggi numerati/);
+  assert.match(responsePresentationDirective('Confronta le due opzioni'),/stessi criteri/);
+  assert.match(responsePresentationDirective('Confronta le opzioni senza tabelle'),/in prosa/);
+  assert.doesNotMatch(responsePresentationDirective('Confronta le opzioni senza tabelle'),/tabella compatta/);
+  assert.match(responsePresentationDirective('Correggi questo codice Python'),/blocchi con il linguaggio/);
+  assert.match(responsePresentationDirective('Riscrivi questa email'),/testo utilizzabile direttamente/);
+  for(const prompt of ['Rispondi solo JSON valido','Scrivi esattamente tre parole','Rispondi con una sola frase'])assert.equal(responsePresentationDirective(prompt),'');
+});
 
 test('il totale numerico richiesto esclude formule e spiegazioni', () => {
   const question = 'Quattro file da 12 MB ridotti di un quarto. Rispondi solo con il totale.';
@@ -94,4 +105,11 @@ test('vincola e valida il risultato aritmetico semplice senza fidarsi del modell
   assert.equal(validateResponse(question, 'Il risultato è 102.').valid, true);
   assert.match(validateResponse(question, 'Il risultato è circa 2,83.').issues.join(','), /arithmetic-mismatch/u);
   assert.equal(validateResponse('Raccontami una storia ambientata nel 17 per 6.', 'C’era una volta.').valid, true);
+});
+
+test('non aggiunge formattazione alle richieste di output letterale', () => {
+  for (const question of ['Fermati, rispondi solo pronto', 'Rispondi solo con la parola ricevuto', 'Reply only acknowledged']) {
+    assert.equal(responsePresentationDirective(question), '');
+  }
+  assert.match(responsePresentationDirective('Rispondi solo con una spiegazione del fenomeno'), /FORMA DELLA RISPOSTA/);
 });

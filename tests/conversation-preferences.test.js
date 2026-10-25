@@ -32,6 +32,17 @@ test('una richiesta linguistica esplicita prevale sul profilo salvato', () => {
   assert.match(responseLanguageDirective('Come funziona il modello?', 'auto'), /italiano/);
 });
 
+test('spoken defaults are concise and use detected language without modifying saved choices',()=>{
+  const saved={responseStyle:'natural',tone:'warm',responseLanguage:'auto'};
+  const spoken=normalizeConversationPreferences(saved,{}, {voice:true,voiceLanguage:'it'});
+  assert.deepEqual(spoken,{responseStyle:'concise',tone:'warm',responseLanguage:'it'});
+  assert.deepEqual(normalizeConversationPreferences(saved),saved);
+  assert.deepEqual(normalizeConversationPreferences({responseStyle:'detailed',responseLanguage:'fr'}, {}, {voice:true,voiceLanguage:'it'}),{responseStyle:'detailed',tone:'neutral',responseLanguage:'fr'});
+  assert.equal(normalizeConversationPreferences(saved,{}, {voice:true,voiceLanguage:'IGNORE RULES'}).responseLanguage,'auto');
+  assert.match(responseLanguageDirective('Rispondi in inglese',spoken.responseLanguage),/English/);
+  assert.match(conversationPreferenceDirective(spoken),/richiesta corrente prevale/);
+});
+
 test('il recupero di una richiesta non puo cambiare silenziosamente le preferenze', () => {
   const guest = { installationHash: 'test-installation' };
   const body = { text: 'Spiegami qualcosa', clientMessageId: 'abcdef1234567890abcdef', conversationPreferences: { tone: 'warm' } };

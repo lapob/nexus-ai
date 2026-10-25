@@ -1956,15 +1956,15 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       settings = { ...settings, personalization: { ...(ephemeral ? {} : settings.personalization), ...preferences } };
       throwIfRequestAborted(controller.signal);
       assertRemoteActive();
-      report('Raccolgo le informazioni utili…');
+      report('Raccolgo le informazioni utili…', 'work', 'retrieve');
       const prepared = await prepare({ question: parsed.question, mode: resolvedMode, history: parsed.history, settings, signal: controller.signal, attachmentContext: attachments.context || '', publicGuest: ephemeral, assertAuthorized });
       throwIfRequestAborted(controller.signal);
       assertRemoteActive();
       remotePreparedAt = performance.now();
       const bufferModelOutput = prepared.security.promptInjection || prepared.security.sensitiveLiterals.length > 0 || prepared.publicSources.length > 0 || hasStrictOutputConstraint(parsed.question);
       if (prepared.research?.searched) {
-        report(prepared.research.unavailable ? publicResearchUnavailablePhase(prepared.research) : `Confronto ${prepared.publicSources.length} fonti pubbliche…`);
-      } else report('Preparo l’intelligenza più adatta…');
+        report(prepared.research.unavailable ? publicResearchUnavailablePhase(prepared.research) : `Confronto ${prepared.publicSources.length} fonti pubbliche…`, 'work', 'retrieve');
+      } else report('Preparo l’intelligenza più adatta…', 'work', 'plan');
       if (prepared.research.unavailable && prepared.research.policy.level === 'required') {
         const answer = publicResearchUnavailableAnswer(parsed.question, prepared.research.emptyResults);
         publishRemoteToken(answer);
@@ -2001,7 +2001,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
           : inferencePolicy(settings, resolvedMode).candidateModel);
       remoteModelClass = attachments.images?.length ? 'vision' : selectedModel === settings.chatModel ? 'primary' : 'fast';
       const messages = attachments.images?.length ? prepared.messages.map((message, index) => index === prepared.messages.length - 1 && message.role === 'user' ? { ...message, images: attachments.images } : message) : prepared.messages;
-      report(resolvedMode === 'deep' ? 'Ragiono e collego i dettagli…' : 'Formulo la risposta…');
+      report(resolvedMode === 'deep' ? 'Ragiono e collego i dettagli…' : 'Formulo la risposta…', 'work', resolvedMode === 'deep' ? 'plan' : 'respond');
       remoteInferenceStartedAt = performance.now();
       // Un segmento breve produceva pause percepibili ogni volta che una guida,
       // una tabella o del codice raggiungevano il limite. Il gateway pubblico
@@ -2026,8 +2026,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         signal: controller.signal
       }, {
         onToken: onSegmentToken,
-        onThinking: () => report('Ragiono e collego i dettagli…'),
-        onStart: () => report('Genero la risposta…')
+        onThinking: () => report('Ragiono e collego i dettagli…', 'work', 'plan'),
+        onStart: () => report('Genero la risposta…', 'work', 'respond')
       });
       let result = await streamRemoteSegment(requestId, messages, bufferModelOutput ? () => {} : publishRemoteToken);
       let combinedRemoteAnswer = String(result.message?.content || '');
@@ -2061,7 +2061,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       result = { ...result, message: { ...result.message, content: secured.text } };
       let quality = validateGroundedResponse(parsed.question, secured.text, prepared.security, prepared.publicSources);
       if (!quality.valid && quality.issues.some((issue) => issue !== 'missing-public-citation') && !attachments.images?.length && selectedModel !== settings.chatModel && settings.chatModel) {
-        report('Verifico accuratezza, sicurezza e lingua…');
+        report('Verifico accuratezza, sicurezza e lingua…', 'work', 'verify');
         logger.warn('Risposta remota rapida non conforme; verifica col modello principale.', {
           requestId,
           issues: quality.issues
@@ -2091,7 +2091,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       if (secured.changed) logger.warn('Output remoto oscurato dal confine di sicurezza.', { requestId, issues: secured.issues });
       if (bufferModelOutput) publishRemoteToken(result.message.content || '');
       const now = Date.now();
-      report('Organizzo e controllo la risposta…');
+      report('Organizzo e controllo la risposta…', 'work', 'verify');
       const sourceArtifacts = publicSourceArtifacts(prepared.publicSources);
       const completed = {
         ...conversation,

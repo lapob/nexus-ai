@@ -37,6 +37,7 @@ const { normalizeArtifacts } = require('../application/artifact-stream');
 const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 const { deviceGraph } = require('./device-graph');
 const { MAX_SPEECH_TEXT, MAX_SPEECH_AUDIO } = require('../voice/speech-segments');
+const { PRIVATE_LITERAL_PATTERN } = require('../research/research-policy');
 const { enhancePublicAiHtml, publicAiCosmicCoreScript } = require('./public-demo');
 
 const execFileAsync = promisify(execFile);
@@ -686,7 +687,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, webImageSearch = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -723,6 +724,8 @@ class RemoteSessionGateway {
       : null;
     this.modelProvider = modelProvider;
     this.readinessProvider = typeof readinessProvider === 'function' ? readinessProvider : null;
+    this.webImageSearch = typeof webImageSearch === 'function' ? webImageSearch : null;
+    this.activeWebImageRequests = new Map();
     this.researchAvailable = researchAvailable === true;
     this.researchCapabilityProvider = typeof researchCapabilityProvider === 'function' ? researchCapabilityProvider : null;
     this.imageCapabilityProvider = typeof imageCapabilityProvider === 'function' ? imageCapabilityProvider : null;
@@ -1038,16 +1041,16 @@ class RemoteSessionGateway {
       let release;
       try {
         release = await this.acquireGuestSlot(guest, (position) => {
-          const activity = { text: `In attesa · posizione ${position}`, phase: 'queued', updatedAt: Date.now() };
+          const activity = { text: `In attesa · posizione ${position}`, phase: 'queued', step: 'queued', updatedAt: Date.now() };
           guest.activity = activity;
           execution.emit({ type: 'phase', activity });
         }, controller.signal, descriptor.mode === 'fast' ? FAST_QUEUE_PRIORITY : DEEP_QUEUE_PRIORITY);
         this.assertServing();
-        const report = (message, phase = 'work') => {
-          guest.activity = { text: String(message || '').slice(0, 160), phase, updatedAt: Date.now() };
+        const report = (message, phase = 'work', step = '') => {
+          guest.activity = { text: String(message || '').slice(0, 160), phase, ...(['understand','plan','retrieve','verify','respond'].includes(step) ? {step} : {}), updatedAt: Date.now() };
           execution.emit({ type: 'phase', activity: guest.activity });
         };
-        report('Comprendo la richiesta…');
+        report('Comprendo la richiesta…', 'work', 'understand');
         const attachments = await guestAttachments(body.attachments, { signal: controller.signal });
         this.assertServing();
         if (controller.signal.aborted) throw Object.assign(new Error('Richiesta annullata.'), { name: 'AbortError', code: 'ABORT_ERR' });
@@ -1683,6 +1686,8 @@ class RemoteSessionGateway {
       queued.reject(Object.assign(new Error('Servizio in arresto.'), { code: 'GUEST_STOPPED' }));
     }
     for (const execution of this.activeGuestExecutions.values()) execution.controller.abort();
+    for (const controller of this.activeWebImageRequests.keys()) controller.abort();
+    this.activeWebImageRequests.clear();
     for (const controller of this.activeVoiceRequests) controller.abort();
     this.activeVoiceRequests.clear();
     for (const operation of this.activeConsoleOperations.values()) {
@@ -2218,6 +2223,30 @@ class RemoteSessionGateway {
           this.activeVoiceRequests.delete(controller);
         }
       }
+      if (request.method === 'POST' && url.pathname === '/api/guest/images/search') {
+        const guest = this.guestSession(request);
+        if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
+        if (!this.webImageSearch) return this.json(response, 503, { error: 'Ricerca immagini non disponibile.' });
+        if (this.activeWebImageRequests.size >= 8) return this.json(response, 429, { error: 'Ricerca immagini occupata. Riprova tra poco.' });
+        const body = await this.body(request), query = String(body.query || '').trim();
+        if (!query || query.length > 160 || PRIVATE_LITERAL_PATTERN.test(query)) return this.json(response, 400, { error: 'Soggetto pubblico non valido.' });
+        const address = requestAddress(request, { trustedCloudflare: publicIngress && this.trustPublicCloudflare });
+        if (!this.guestAllowed(`web-image:${guest.id}`, 8, REQUEST_WINDOW_MS)
+          || !this.guestDailyAllowed(guest, 'web-image', 1, 30)
+          || !this.persistentQuotas.allow(`web-image-ip:${address}`, { cost: 1, limit: 120 })) return this.json(response, 429, { error: 'Limite ricerca immagini raggiunto.' });
+        const controller = new AbortController();
+        const disconnect = () => { if (!response.writableFinished) controller.abort(); };
+        response.once('close', disconnect); this.activeWebImageRequests.set(controller, guest.installationHash);
+        try {
+          const result = await this.webImageSearch(query, { signal: controller.signal, limit: 3 });
+          if (controller.signal.aborted || response.destroyed) return;
+          this.assertServing();
+          return this.json(response, 200, result);
+        } catch {
+          if (controller.signal.aborted || response.destroyed) return;
+          return this.json(response, 503, { error: 'Ricerca immagini temporaneamente non disponibile.' });
+        } finally { response.off('close', disconnect); this.activeWebImageRequests.delete(controller); }
+      }
       if (request.method === 'POST' && url.pathname === '/api/guest/images/generate') {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
@@ -2281,6 +2310,9 @@ class RemoteSessionGateway {
       if (request.method === 'DELETE' && url.pathname === '/api/guest/memory') {
         const guest = this.guestSession(request);
         if (!guest) return this.json(response, 401, { error: 'Sessione anonima scaduta.' });
+        for (const [controller, owner] of this.activeWebImageRequests) {
+          if (owner === guest.installationHash) controller.abort();
+        }
         for (const execution of this.activeGuestExecutions.values()) {
           if (execution.owner === guest.installationHash) execution.controller.abort();
         }

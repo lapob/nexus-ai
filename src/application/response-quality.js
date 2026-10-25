@@ -69,6 +69,7 @@ function hasStrictOutputConstraint(question = '') {
   return Boolean(
     wordCountConstraint(text)
     || NUMERIC_ONLY_REQUEST.test(text)
+    || /\b(?:rispondi|restituisci|scrivi|reply|return|answer)\s+(?:soltanto|solo|esclusivamente|only)\s+(?:(?:con\s+la\s+parola|with\s+the\s+word)\s+)?[\p{L}\p{N}_-]+[.!]?\s*$/iu.test(text)
     || /\b(?:solo|soltanto)\s+(?:json|un json)|json valido\b/iu.test(text)
     || /\b(?:una|un')\s+(?:sola\s+)?frase\b|\bin one sentence\b/iu.test(text)
     || /\b(?:rispondi|restituisci|scrivi)\s+(?:soltanto|solo|esclusivamente)\s+(?:con\s+)?(?:l['’])?output\b/iu.test(text)
@@ -111,12 +112,31 @@ function responseRequirements(question = '') {
 // #endregion
 // #region Direttiva interna
 
+function responsePresentationDirective(question = '') {
+  if (hasStrictOutputConstraint(question)) return '';
+  const text = String(question);
+  let format = 'Parti dalla risposta utile. Usa paragrafi brevi; grassetto soltanto per conclusioni o valori importanti. Aggiungi titoli, elenchi o esempi solo quando aiutano a capire.';
+  if (/\b(?:confront\w*|differenz\w*|pro e contro|compare|comparison|versus)\b/iu.test(text)) {
+    format += /\b(?:senza|niente|non usare|no)\s+(?:le\s+)?(?:tabelle?|tables?)\b/iu.test(text)
+      ? ' Confronta le alternative sugli stessi criteri in prosa, spiegando differenze e compromessi.'
+      : ' Confronta le alternative sugli stessi criteri; usa una tabella compatta se facilita la scelta, spiegando differenze e compromessi.';
+  } else if (/\b(?:come (?:faccio|posso|si|fare)|passaggi|procedura|istruzioni|step.by.step|how (?:do|can|to))\b/iu.test(text)) {
+    format += ' Per una procedura, presenta passaggi numerati nell’ordine reale, prerequisiti essenziali e come verificare il risultato; non dichiarare operazioni eseguite senza prove.';
+  } else if (/\b(?:codice|javascript|typescript|python|sql|debug|code)\b/iu.test(text)) {
+    format += ' Presenta il codice in blocchi con il linguaggio corretto, separando comandi e spiegazioni. Indica le verifiche effettive e le ipotesi.';
+  } else if (/\b(?:scrivi|riscrivi|redigi|traduci|draft|rewrite|translate)\b/iu.test(text)) {
+    format += ' Se viene chiesto un testo pronto, restituisci il testo utilizzabile direttamente, rispettando destinatario, tono e formato.';
+  }
+  return `FORMA DELLA RISPOSTA: ${format} Rispetta prima di tutto il formato richiesto dall’utente. Non inventare fonti, immagini, strumenti usati o risultati.`;
+}
+
 function responseQualityDirective(question, { deep = false } = {}) {
   const requirements = responseRequirements(question);
-  if (!requirements.length) return deep
+  const presentation = responsePresentationDirective(question);
+  if (!requirements.length) return [deep
     ? 'REVISIONE INTERNA: controlla silenziosamente correttezza, completezza e coerenza prima dell’output.'
-    : 'CONTROLLO INTERNO: rispondi direttamente e non inventare dettagli.';
-  return `CHECKLIST DI RISPOSTA (non mostrarla):\n${requirements.map((item) => `- ${item}`).join('\n')}\nPrima di inviare, verifica ogni punto e correggi l’output se uno non è soddisfatto.`;
+    : 'CONTROLLO INTERNO: rispondi direttamente e non inventare dettagli.', presentation].filter(Boolean).join('\n');
+  return [`CHECKLIST DI RISPOSTA (non mostrarla):\n${requirements.map((item) => `- ${item}`).join('\n')}\nPrima di inviare, verifica ogni punto e correggi l’output se uno non è soddisfatto.`, presentation].filter(Boolean).join('\n');
 }
 
 function countWords(value) {
@@ -190,6 +210,7 @@ function shouldReviewResponse({ signals = {}, validation = {}, sourceCount = 0 }
 
 module.exports = {
   responseQualityDirective, responseRequirements, validateResponse, shouldReviewResponse,
+  responsePresentationDirective,
   countWords, wordCountConstraint, strictWordCountSchema, strictWordCountAnswer, hasStrictOutputConstraint
 };
 

@@ -83,7 +83,7 @@ async function main() {
       assert.equal(geometry.layout, 'grid');
       assert.ok(geometry.selectHeight >= 46);
       assert.equal(geometry.surface, rgb(colors.surface));
-      assert.equal(geometry.fieldSurface, rgb(colors.surfaceRaised));
+      assert.equal(geometry.fieldSurface, 'rgba(0, 0, 0, 0)');
       assert.equal(geometry.foreground, rgb(colors.ice));
       assert.match(geometry.font, /Inter/i);
       assert.ok(geometry.closeSize.width >= 48 && geometry.closeSize.height >= 48, JSON.stringify({ width, height, textScale, close: geometry.closeSize }));
@@ -105,7 +105,7 @@ async function main() {
     assert.equal(await client.evaluate(`(()=>{document.querySelector('#profileReset').click();return document.querySelector('#profile-tone').value==='neutral'})()`), true);
     await client.command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
     await client.command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-    assert.equal(await evaluateWhenReady(client, `new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(!document.querySelector('#profileSheet').open&&document.activeElement===document.querySelector('#profileSettings')))))`), true);
+    assert.equal(await evaluateWhenReady(client, `new Promise(resolve=>{const deadline=performance.now()+1500;const check=()=>{const closed=!document.querySelector('#profileSheet').open&&document.activeElement===document.querySelector('#profileSettings');if(closed||performance.now()>deadline)resolve(closed);else requestAnimationFrame(check)};check()})`), true);
     const actions = await client.evaluate(`(()=>{const a=document.querySelector('#profileSettings').getBoundingClientRect(),b=document.querySelector('#download').getBoundingClientRect();return {overlap:Math.min(a.right,b.right)-Math.max(a.left,b.left)>0,width:a.width,downloadWidth:b.width}})()`);
     assert.equal(actions.overlap, false);
     await client.evaluate(`document.querySelector('#profileSettings').click();document.querySelector('#profile-tone').focus();true`);
@@ -127,13 +127,23 @@ async function main() {
       assert.equal(await client.evaluate(`JSON.parse(localStorage.getItem('nexusnxs.conversation.preferences.v1')).tone`), 'warm');
       assert.equal(await client.evaluate(`document.querySelector('#profileSheet').open`), true);
     }
-    await client.evaluate(`document.querySelector('#profileServices').open=true;true`);
+    // Only the selected panel participates in focus and layout. Navigation
+    // must work without a pointer, including when the orientation changes.
+    for (const [key, code, expected] of [['End',35,'profileDataTab'],['Home',36,'profileConversationTab'],['ArrowRight',39,'profileServicesTab'],['ArrowLeft',37,'profileConversationTab']]) {
+      await client.evaluate(`document.querySelector('.profile-nav [aria-selected=true]').focus();true`);
+      await client.command('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: code });
+      await client.command('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: code });
+      assert.equal(await client.evaluate(`document.activeElement.id`), expected);
+      assert.equal(await client.evaluate(`document.querySelectorAll('.profile-panel:not([hidden])').length`), 1);
+    }
+    await client.evaluate(`document.querySelector('#profileServicesTab').click();true`);
     await evaluateWhenReady(client, `new Promise(resolve=>{const check=()=>document.querySelector('#profileServices').getAttribute('aria-busy')==='true'||document.querySelector('#profile-service-engine').textContent==='Da verificare'?setTimeout(check,30):resolve(true);check();})`);
     if (!live) {
       assert.equal(await client.evaluate(`document.querySelector('#profile-service-engine').textContent`), 'Non disponibile');
       assert.equal(await client.evaluate(`document.querySelector('#profile-service-voice-input').textContent`), 'Disponibile');
       assert.equal(await client.evaluate(`document.querySelector('#profile-service-voice-output').textContent`), 'Disponibile');
     }
+    await client.evaluate(`Promise.all(document.querySelector('#profileSheet').getAnimations({subtree:true}).map(animation=>animation.finished.catch(()=>{}))).then(()=>true)`);
     const expandedImage = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     fs.writeFileSync(path.join(output, 'public-personalization-services.png'), Buffer.from(expandedImage.data, 'base64'));
     // A deliberately late mock response must not mutate a dismissed sheet.
@@ -149,14 +159,14 @@ async function main() {
       await client.command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
       const expanded = await client.evaluate(`new Promise(resolve=>{
         document.documentElement.style.fontSize='${scale * 100}%';document.querySelector('#profileSettings').click();
-        document.querySelector('#profileConversation').open=false;document.querySelector('#profileServices').open=true;document.querySelector('#profileData').open=true;
+        document.querySelector('#profileServicesTab').click();document.querySelector('#profileDataTab').click();
         document.querySelector('#profileDelete').click();const dialog=document.querySelector('#profileSheet');dialog.scrollTop=dialog.scrollHeight;
         requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=dialog.getBoundingClientRect(),close=dialog.querySelector('.sheet-top .sheet-close').getBoundingClientRect();resolve({overflow:dialog.scrollWidth>dialog.clientWidth,closeVisible:close.top>=box.top&&close.bottom<=box.bottom&&close.right<=box.right});}));
       })`);
       assert.equal(expanded.overflow, false); assert.equal(expanded.closeVisible, true, 'close must remain reachable while scrolling expanded settings');
       const picture = await client.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
       fs.writeFileSync(path.join(output, `public-settings-expanded-${width}-${scale}.png`), Buffer.from(picture.data, 'base64'));
-      await client.evaluate(`document.querySelector('#profileDeleteCancel').click();document.querySelector('#profileConversation').open=true;document.querySelector('#profileServices').open=false;document.querySelector('#profileData').open=false;document.querySelector('#profileSheet').close();true`);
+      await client.evaluate(`document.querySelector('#profileDeleteCancel').click();document.querySelector('#profileConversationTab').click();document.querySelector('#profileSheet').close();true`);
     }
     if (!live) {
       await client.evaluate(`(async()=>{const memory=(${createPublicLocalMemory.toString()})(()=>{});await memory.read();await memory.write([{role:'user',content:'Synthetic settings question'},{role:'assistant',content:'Synthetic settings answer'}]);return true})()`);
@@ -164,7 +174,7 @@ async function main() {
       await client.command('Page.reload', { ignoreCache: true });
       await evaluateWhenReady(client, `new Promise(resolve=>{const check=()=>performance.timeOrigin===${timeOrigin}||document.documentElement.dataset.nxsBoot!=='ready'?setTimeout(check,30):resolve(true);check();})`);
       const data = await client.evaluate(`(async()=>{
-        document.querySelector('#profileSettings').click();document.querySelector('#profileData').open=true;
+        document.querySelector('#profileSettings').click();document.querySelector('#profileDataTab').click();
         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
         const create=URL.createObjectURL,click=HTMLAnchorElement.prototype.click;let exported;
         URL.createObjectURL=blob=>{exported=blob;return create(blob)};HTMLAnchorElement.prototype.click=function(){if(this.download!=='nexusnxs-conversazione.json')click.call(this)};

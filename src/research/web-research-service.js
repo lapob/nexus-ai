@@ -4,13 +4,28 @@
  */
 
 const { createHash } = require('node:crypto');
-const { boundedResponseText } = require('../security/bounded-response');
+const { boundedResponseText, boundedResponseBytes } = require('../security/bounded-response');
+const { detectImageMime } = require('../ai/image-generation-service');
+const { PRIVATE_LITERAL_PATTERN } = require('./research-policy');
 
 // #region 01 — Normalizzazione e cancellazione
 
 const MAX_RESPONSE_BYTES = 1_000_000;
 const PROVIDERS = new Set(['auto', 'searxng', 'brave', 'openai', 'wikipedia']);
 const DEFAULT_OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
+const MAX_THUMBNAIL_BYTES = 256 * 1024;
+
+function commonsUrl(value, thumbnail = false) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.hash) return '';
+    if (!(thumbnail ? ['upload.wikimedia.org', 'thumb.wikimedia.org'] : ['commons.wikimedia.org']).includes(url.hostname)) return '';
+    if (!url.pathname.startsWith(thumbnail ? '/wikipedia/commons/' : '/wiki/File:')) return '';
+    if ([...url.searchParams.keys()].some(key => !thumbnail || !/^utm_(?:source|campaign|content)$/.test(key))) return '';
+    url.search = '';
+    return url.href.replace(/\(/g, '%28').replace(/\)/g, '%29');
+  } catch { return ''; }
+}
 
 function cleanText(value, max = 1200) {
   return String(value || '')
@@ -158,6 +173,45 @@ class WebResearchService {
       clearTimeout(timer);
       unlink();
     }
+  }
+
+  async searchImages(query, { signal, limit = 3 } = {}) {
+    if (!this.enabled) throw new Error('Ricerca immagini disattivata.');
+    const subject = String(query || '').trim();
+    if (!subject || subject.length > 160 || PRIVATE_LITERAL_PATTERN.test(subject)) throw new Error('Soggetto pubblico non valido.');
+    const count = Math.max(1, Math.min(3, Number(limit) || 3));
+    const url = new URL('https://commons.wikimedia.org/w/api.php');
+    url.search = new URLSearchParams({ action: 'query', format: 'json', generator: 'search',
+      gsrsearch: `${subject} filetype:bitmap`, gsrnamespace: '6', gsrlimit: String(count * 2),
+      prop: 'imageinfo', iiprop: 'url|mime|extmetadata', iiurlwidth: '480',
+      iiextmetadatafilter: 'Artist|LicenseShortName|ImageDescription' }).toString();
+    const payload = await this.requestJson(url, { signal });
+    const candidates = Object.values(payload?.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+    const seen = new Set();
+    const selected = candidates.flatMap(page => {
+      const info = page.imageinfo?.[0], sourceUrl = commonsUrl(info?.descriptionurl), thumbnail = commonsUrl(info?.thumburl, true);
+      const author = cleanText(info?.extmetadata?.Artist?.value, 240), license = cleanText(info?.extmetadata?.LicenseShortName?.value, 100);
+      if (!sourceUrl || !thumbnail || seen.has(sourceUrl) || !author || !license
+        || !['image/jpeg', 'image/png', 'image/webp'].includes(info?.mime)) return [];
+      seen.add(sourceUrl);
+      return [{ title: cleanText(page.title, 180).replace(/^File:/, ''),
+        alt: cleanText(info?.extmetadata?.ImageDescription?.value, 400) || cleanText(page.title, 180),
+        sourceUrl, thumbnail, author, license }];
+    }).slice(0, count);
+    const outcomes = await Promise.allSettled(selected.map(async ({ thumbnail, ...item }) => {
+      const controller = new AbortController(), unlink = linkAbortSignal(controller, signal);
+      const timer = setTimeout(() => controller.abort(), this.timeoutMs); timer.unref?.();
+      try {
+        const response = await this.fetch(thumbnail, { redirect: 'error', signal: controller.signal,
+          headers: { Accept: 'image/jpeg,image/png,image/webp', 'User-Agent': 'NexusNXS/0.3 (+https://nexusnxs.com)' } });
+        const bytes = await boundedResponseBytes(response, MAX_THUMBNAIL_BYTES, 'Anteprima web', controller.signal);
+        const mime = detectImageMime(bytes);
+        if (!mime || mime !== String(response.headers.get('content-type') || '').split(';')[0].trim()) throw new Error('Anteprima non valida.');
+        return { ...item, url: `data:${mime};base64,${bytes.toString('base64')}` };
+      } finally { clearTimeout(timer); unlink(); }
+    }));
+    signal?.throwIfAborted();
+    return { provider: 'wikimedia-commons', images: outcomes.filter(item => item.status === 'fulfilled').map(item => item.value) };
   }
 
   async searchBrave(query, { limit, signal, timeRange }) {

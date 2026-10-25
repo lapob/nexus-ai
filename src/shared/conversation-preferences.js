@@ -1,20 +1,25 @@
 /** @module shared/conversation-preferences Explicit, non-sensitive conversational choices. */
 // #region Portable profile contract
-function normalizeConversationPreferences(value, fallback = {}) {
+function normalizeConversationPreferences(value, fallback = {}, { voice = false, voiceLanguage = '' } = {}) {
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const choose = (field, allowed, initial) => allowed.includes(input[field]) ? input[field]
     : allowed.includes(fallback[field]) ? fallback[field] : initial;
-  return {
+  const profile = {
     responseStyle: choose('responseStyle', ['concise', 'natural', 'detailed'], 'natural'),
     tone: choose('tone', ['neutral', 'warm', 'direct'], 'neutral'),
     responseLanguage: choose('responseLanguage', ['auto', 'it', 'en', 'es', 'fr', 'de'], 'auto')
   };
+  if (voice === true) {
+    if (profile.responseStyle === 'natural') profile.responseStyle = 'concise';
+    if (profile.responseLanguage === 'auto' && ['it', 'en', 'es', 'fr', 'de'].includes(voiceLanguage)) profile.responseLanguage = voiceLanguage;
+  }
+  return profile;
 }
 
 function conversationPreferenceDirective(value) {
   const profile = normalizeConversationPreferences(value);
   const detail = {
-    concise: 'Preferisce risposte concise: conserva fatti decisivi e istruzioni necessarie.',
+    concise: 'Preferisce risposte concise: di norma 2–3 frasi, senza preamboli o ripetizioni. Conserva fatti decisivi e istruzioni necessarie; amplia quando lo richiede il compito.',
     natural: 'Preferisce risposte proporzionate alla richiesta.',
     detailed: 'Preferisce spiegazioni dettagliate quando utili, senza ripetizioni.'
   }[profile.responseStyle];

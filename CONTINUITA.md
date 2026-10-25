@@ -1,3 +1,27 @@
+# Adaptive web settings and attributed images — 25 October 2026
+
+Settings reuse the shared Inter, symbols, neutral palette and motion values.
+Desktop navigation and compact fullscreen tabs retain a single visible panel,
+keyboard navigation, readable native pickers, focus and reduced motion.
+Voice requests derive a concise response profile and the recognized language
+without changing saved explicit choices. Task-dependent presentation preserves
+strict output formats; activity shows only the current observed step.
+
+Explicit public-photo requests can retrieve up to three Wikimedia previews
+with source, author and license. Requests use fixed Wikimedia hosts, reject
+redirects and unsupported/oversized raster responses, and reuse the existing
+artifact surface with CSP-compatible local Blob URLs. Search cancellation,
+history deletion and owner isolation are covered; photos are not generated.
+This initial route handles explicit photo lookup in the web app. On reload,
+the local transcript preserves source links; image previews are session-only.
+
+Source gate/check/cloud:check pass; suite1218PASS/2SKIP/zero failures. Browser
+settings pass five viewport/text profiles, keyboard and CSP; image results and
+late-result deletion pass three layouts, offline/reconnect pass, and the real
+Chromium recorder passes synthetic spoken interruption and queued cancellation.
+A live catalog probe returned attributed previews. These are not physical
+voice acceptance, native distribution, model superiority or full security
+certification. No model/training/cloud inference promotion or installer change.
 # Progressive speech and duplex admission — 24 October 2026
 
 Human feedback confirms Italian output but identifies touch-only mode in the
