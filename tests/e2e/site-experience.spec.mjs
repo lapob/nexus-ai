@@ -135,7 +135,8 @@ test("real PC captures use precise hover targets", async ({ page }) => {
   expect(await desktopFrame.evaluate((frame) => new DOMMatrix(getComputedStyle(frame).transform).m42)).toBeLessThan(-3);
 
   const desktopCardScreen = page.locator(".app-card-visual.desktop .app-card-visual__screen");
-  await desktopCardScreen.scrollIntoViewIfNeeded();
+  // Finish scrolling before measuring a hover target; smooth page scroll can move it after hover.
+  await desktopCardScreen.evaluate(el => el.scrollIntoView({ block: "center", behavior: "instant" }));
   const cardScreenBox = await desktopCardScreen.boundingBox();
   expect(cardScreenBox).not.toBeNull();
   await page.mouse.move(cardScreenBox.x - 8, cardScreenBox.y + cardScreenBox.height / 2);
@@ -143,7 +144,7 @@ test("real PC captures use precise hover targets", async ({ page }) => {
   expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeCloseTo(0, 1);
   await desktopCardScreen.hover();
   await page.waitForTimeout(460);
-  expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeLessThan(-3);
+  await expect.poll(() => desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeLessThan(-3);
 });
 
 test("core routes pass automated WCAG A/AA checks", async ({ page }) => {
