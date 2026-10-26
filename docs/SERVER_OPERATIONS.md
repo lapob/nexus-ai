@@ -420,3 +420,22 @@ la destinazione resta in `.nexus-data/desktop-shortcut.json`, esclusa dal reposi
 Dopo ogni installazione o aggiornamento locale eseguire `npm run shortcut:refresh`.
 Il comando aggiorna soltanto `NexusNXS.lnk`, verifica destinazione e argomenti e
 non avvia l'app. Non inserire il percorso personale nei sorgenti pubblici.
+## Startup I/O and accessory ordering — 26 October 2026
+
+The headless launcher admits the AI runtime with the full existing signature,
+identity, version and vulnerability checks. A local operational Grype database
+cache can be selected with `runtime/scanner-cache.json` under the private data
+root: `{"schemaVersion":1,"cacheDirectory":"<existing-local-directory>"}`.
+Explicit `GRYPE_DB_CACHE_DIR` takes precedence. Invalid or unavailable settings
+fall back to the portable cache. Keep this machine-specific configuration out
+of Git, provision the official database before selection, and retain the
+portable cache for rollback. Neither scan verdicts nor admission checks are
+cached or skipped; Grype database validation and updates remain enabled.
+
+Search and image managers start asynchronously after `/readyz` reports the AI
+ready. Their wait is bounded to ten minutes and tied to the launcher's PID and
+creation time, so an abandoned watcher cannot start services on a later boot.
+An unavailable accessory cannot block chat startup; its existing startup log
+records cancellation. Already running accessories remain running. This gives
+model preload priority over new accessory initialization; measure an actual
+restart and distinguish warm OS caches from cold-PC performance.

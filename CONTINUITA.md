@@ -1,3 +1,13 @@
+## Startup optimization prepared — 26 October 2026
+
+Headless startup supports an optional operational scanner cache and defers
+new search/image manager startup until AI readiness. Admission checks remain
+unchanged. Twelve Windows startup tests pass; full check/cloud gates and1220
+tests pass with two explicit skips. A full warm-cache runtime audit completed
+in3.53s with a valid signature and zero High/Critical findings. Exact-revision
+CI, local activation and a measured service restart are the next gates. This
+does not establish cold-PC startup performance or change the production model.
+
 ## Published PC/web/Control scope — 26 October 2026
 
 Native AI mobile retirement is published in cad2c27. GitHub CI40396001188 passed

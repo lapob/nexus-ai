@@ -40,13 +40,13 @@ $env:NEXUS_QA_SECRET_FILE = $qaSecretPath
 # Il motore di ricerca e confinato al loopback e viene gestito dallo stesso
 # avvio headless. Un errore del container non deve impedire chat e voce.
 $searchManager = Join-Path $projectRoot 'scripts\manage-self-hosted-search.ps1'
-Start-NexusOptionalService -ProjectRoot $projectRoot -Manager $searchManager
+Start-NexusOptionalService -ProjectRoot $projectRoot -Manager $searchManager -WaitForCore
 
 # Anche il generatore immagini resta loopback-only e parte senza finestre.
 # Se l'accelerazione o il modello non sono pronti, il Core rimane disponibile
 # e dichiara correttamente la capability immagini come degradata.
 $imageManager = Join-Path $projectRoot 'scripts\manage-local-image-service.ps1'
-Start-NexusOptionalService -ProjectRoot $projectRoot -Manager $imageManager
+Start-NexusOptionalService -ProjectRoot $projectRoot -Manager $imageManager -WaitForCore
 
 #region Headless gateway
 

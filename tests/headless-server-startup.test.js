@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const manager = path.join(root, 'scripts/manage-headless-server-task.ps1');
 const quote = (value) => `'${value.replaceAll("'", "''")}'`;
 const windows = process.platform === 'win32';
+const developmentPaths = path.join(root, 'scripts/lib/development-paths.ps1');
 function run(script) {
   const result = spawnSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
     encoding: 'utf8', timeout: 20000, windowsHide: true
@@ -23,6 +24,55 @@ function functions(names, file = manager) {
       if(-not $definition){throw "Missing function $name"}; Invoke-Expression $definition.Extent.Text
     }`;
 }
+
+test('optional services wait for real Core readiness and never outlive their owner', { skip: !windows }, () => {
+  const result = run(`${functions(['Wait-NexusCoreReady'], developmentPaths)}
+    $script:probes=0;$script:gone=$false;$script:stamp=123L;
+    function Get-Process {param($Id,$ErrorAction) if($script:gone){throw 'exited'}; @{StartTime=@{Ticks=$script:stamp};HasExited=$false}}
+    function Invoke-RestMethod {param($Uri,$TimeoutSec,[switch]$NoProxy,$MaximumRedirection)
+      if($Uri -ne 'http://127.0.0.1:32147/readyz' -or -not $NoProxy -or $MaximumRedirection -ne 0){throw 'Unexpected probe'}
+      $script:probes++;if($script:probes -eq 1){throw '503'}; @{status='ready'}
+    }
+    function Start-Sleep {}
+    $ready=Wait-NexusCoreReady -TimeoutSeconds 1 -OwnerProcessId 42 -OwnerStartTicks 123;
+    $script:gone=$true;$gone=Wait-NexusCoreReady -TimeoutSeconds 1 -OwnerProcessId 42 -OwnerStartTicks 123;
+    $script:gone=$false;$script:stamp=456L;$reused=Wait-NexusCoreReady -TimeoutSeconds 1 -OwnerProcessId 42 -OwnerStartTicks 123;
+    @{ready=$ready;gone=$gone;reused=$reused;probes=$script:probes}|ConvertTo-Json -Compress`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { ready: true, gone: false, reused: false, probes: 2 });
+});
+
+test('accessory readiness timeout never starts an unready service', { skip: !windows }, () => {
+  const result = run(`${functions(['Wait-NexusCoreReady'], developmentPaths)}
+    function Get-Process {param($Id,$ErrorAction) @{StartTime=@{Ticks=123L};HasExited=$false}}
+    function Invoke-RestMethod { @{status='warming'} }
+    function Start-Sleep {}
+    Wait-NexusCoreReady -TimeoutSeconds 0 -OwnerProcessId 42 -OwnerStartTicks 123`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'False');
+});
+
+test('scanner cache selection preserves explicit overrides and falls back without relaxing audit', { skip: !windows }, t => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-scanner-location-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  for (const directory of ['tools/cache/grype', 'data/runtime', 'fast-cache']) fs.mkdirSync(path.join(temporary, directory), { recursive: true });
+  fs.writeFileSync(path.join(temporary, 'data/runtime/scanner-cache.json'), JSON.stringify({ schemaVersion: 1, cacheDirectory: path.join(temporary, 'fast-cache') }));
+  const result = run(`${functions(['Resolve-NexusConfiguredPath', 'Initialize-NexusScannerEnvironment'], developmentPaths)}
+    $layout=@{ToolchainsRoot=${quote(path.join(temporary, 'tools'))};DataRoot=${quote(path.join(temporary, 'data'))}};
+    $env:GRYPE_DB_CACHE_DIR=$null;Initialize-NexusScannerEnvironment $layout;$selected=$env:GRYPE_DB_CACHE_DIR;
+    $env:GRYPE_DB_CACHE_DIR='explicit-cache';Initialize-NexusScannerEnvironment $layout;$explicit=$env:GRYPE_DB_CACHE_DIR;
+    $env:GRYPE_DB_CACHE_DIR=$null;
+    [IO.File]::WriteAllText((Join-Path $layout.DataRoot 'runtime/scanner-cache.json'),'{bad');
+    Initialize-NexusScannerEnvironment $layout 3>$null;
+    @{selected=$selected;explicit=$explicit;fallback=$env:GRYPE_DB_CACHE_DIR}|ConvertTo-Json -Compress`);
+  assert.equal(result.status, 0, result.stderr);
+  const values = JSON.parse(result.stdout);
+  assert.equal(values.selected, path.join(temporary, 'fast-cache'));
+  assert.equal(values.explicit, 'explicit-cache');
+  assert.equal(values.fallback, path.join(temporary, 'tools/cache/grype'));
+  const helper = fs.readFileSync(developmentPaths, 'utf8');
+  assert.doesNotMatch(helper, /GRYPE_DB_(?:AUTO_UPDATE|VALIDATE_BY_HASH_ON_START|VALIDATE_AGE)\s*=/);
+});
 
 test('startup progress separates missing ports, warming and readiness without changing the boolean gate', { skip: !windows }, () => {
   const result = run(`${functions(['Wait-ForGateway'])}

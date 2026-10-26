@@ -68,6 +68,19 @@ function Initialize-NexusScannerEnvironment {
     $env:NEXUS_GRYPE_EXECUTABLE = $scanner
   }
   $cache = Join-Path $Layout.ToolchainsRoot 'cache\grype'
+  # Optional operational cache on a faster local disk. This selects storage
+  # only: Grype still verifies database hash/age and performs every scan.
+  $cacheConfig = if ($Layout.DataRoot) { Join-Path $Layout.DataRoot 'runtime\scanner-cache.json' } else { '' }
+  if ([string]::IsNullOrWhiteSpace($env:GRYPE_DB_CACHE_DIR) -and $cacheConfig -and (Test-Path -LiteralPath $cacheConfig -PathType Leaf)) {
+    try {
+      $settings = Get-Content -LiteralPath $cacheConfig -Raw -Encoding utf8 | ConvertFrom-Json
+      if ($settings.schemaVersion -ne 1 -or $settings.cacheDirectory -isnot [string]) { throw 'Schema cache non valido.' }
+      $configured = Resolve-NexusConfiguredPath -Value $settings.cacheDirectory -BasePath $Layout.DataRoot
+      if (-not $configured -or -not (Test-Path -LiteralPath $configured -PathType Container)) { throw 'Cache non disponibile.' }
+      if ((Get-Item -LiteralPath $configured).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'La cache deve essere una directory reale.' }
+      $cache = $configured
+    } catch { Write-Warning 'Cache scanner configurata non disponibile: uso la cache portabile; i controlli Grype restano attivi.' }
+  }
   if ([string]::IsNullOrWhiteSpace($env:GRYPE_DB_CACHE_DIR) -and (Test-Path -LiteralPath $cache -PathType Container)) {
     $env:GRYPE_DB_CACHE_DIR = $cache
   }
@@ -242,11 +255,34 @@ function Resolve-NexusOllamaExecutable {
 
 #region 04 - Avvio asincrono servizi opzionali
 
+function Wait-NexusCoreReady {
+  param(
+    [int]$TimeoutSeconds = 600,
+    [int]$OwnerProcessId = $PID,
+    [long]$OwnerStartTicks = (Get-Process -Id $OwnerProcessId).StartTime.Ticks
+  )
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  do {
+    try {
+      $owner = Get-Process -Id $OwnerProcessId -ErrorAction Stop
+      if ($owner.StartTime.Ticks -ne $OwnerStartTicks -or $owner.HasExited) { return $false }
+    } catch { return $false }
+    try {
+      $ready = Invoke-RestMethod -Uri 'http://127.0.0.1:32147/readyz' -TimeoutSec 2 -NoProxy -MaximumRedirection 0
+      if ($ready.status -eq 'ready') { return $true }
+    } catch { # A starting Core legitimately returns503 or has no listener yet.
+    }
+    Start-Sleep -Milliseconds 750
+  } while ([DateTime]::UtcNow -lt $deadline)
+  return $false
+}
+
 function Start-NexusOptionalService {
   param(
     [Parameter(Mandatory)][string]$ProjectRoot,
     [Parameter(Mandatory)][string]$Manager,
-    [string]$LogDirectory = ''
+    [string]$LogDirectory = '',
+    [switch]$WaitForCore
   )
 
   # Literal paths preserve brackets in portable volume names. Each manager
@@ -266,6 +302,13 @@ function Start-NexusOptionalService {
     ' -Action start *>&1 | Out-File -LiteralPath ' + $logLiteral +
     ' -Append -Encoding utf8; exit $LASTEXITCODE } catch { $_ | Out-File -LiteralPath ' + $logLiteral +
     ' -Append -Encoding utf8; exit 1 }'
+  if ($WaitForCore) {
+    $helperLiteral = "'" + (Join-Path $serviceStart.WorkingDirectory 'scripts\lib\development-paths.ps1').Replace("'", "''") + "'"
+    $ownerTicks = (Get-Process -Id $PID).StartTime.Ticks
+    $command = '. ' + $helperLiteral + '; if (-not (Wait-NexusCoreReady -OwnerProcessId ' + $PID +
+      ' -OwnerStartTicks ' + $ownerTicks + ')) { ''Core non pronto o launcher terminato: avvio accessorio annullato.'' | Out-File -LiteralPath ' +
+      $logLiteral + ' -Append -Encoding utf8; exit 1 }; ' + $command
+  }
   foreach ($argument in @('-NoProfile', '-Command', $command)) {
     $serviceStart.ArgumentList.Add($argument)
   }
