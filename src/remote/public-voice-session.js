@@ -146,6 +146,7 @@ function createPublicVoiceSession({ core, prompt, runtime, session, fetchAudio, 
       suppressInteractionUntil = performance.now() + 500;
     }
   }
+  core.addEventListener('nexuscorezoomstart', () => { cancelDrag(); suppressInteractionUntil = performance.now() + 500; });
   core.addEventListener('pointercancel', cancelDrag);
   core.addEventListener('lostpointercapture', cancelDrag);
   addEventListener('resize', cancelDrag, { passive: true });

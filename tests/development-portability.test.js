@@ -9,9 +9,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 test('gli entry point developer non dipendono dalla lettera o dal profilo della workstation', () => {
   const operationalFiles = [
     'scripts/lib/development-paths.ps1',
-    'scripts/build-android-remote.ps1',
     'scripts/build-android-console.ps1',
-    'scripts/benchmark-android-ui.ps1',
     'scripts/start-portable-ollama.ps1',
     'scripts/manage-self-hosted-search.ps1',
     'scripts/ensure-ollama-runtime.js',
@@ -38,7 +36,7 @@ test('la ricerca self-hosted recupera i socket Docker bloccati senza toccare dat
 
 test('le build Android rigenerano la configurazione locale dalla toolchain risolta', () => {
   const helper = read('scripts/lib/development-paths.ps1');
-  for (const relative of ['scripts/build-android-remote.ps1', 'scripts/build-android-console.ps1']) {
+  for (const relative of ['scripts/build-android-console.ps1']) {
     const source = read(relative);
     assert.match(source, /development-paths\.ps1/);
     assert.match(source, /Initialize-NexusAndroidBuildEnvironment/);

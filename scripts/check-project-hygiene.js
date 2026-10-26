@@ -9,7 +9,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const appRoot = path.resolve(__dirname, '..');
-const roots = ['src', 'scripts', 'config', 'docs', 'knowledge-packs', 'knowledge-public', 'build', 'tests', 'android/NexusRemote/app/src'];
+const roots = ['src', 'scripts', 'config', 'docs', 'knowledge-packs', 'knowledge-public', 'build', 'tests', 'android/NexusConsole/app/src'];
 const temporaryName = /(?:\.tmp|\.temp|\.bak|\.old|\.orig|~)$/i;
 const ignoredEmptyNames = new Set([]);
 const officialReleaseDirectories = new Set(['release', 'release-android', 'release-private']);
@@ -61,7 +61,10 @@ for (const filePath of files) {
   const digest = crypto.createHash('sha256').update(content).digest('hex');
   const key = `${stat.size}:${digest}`;
   const duplicate = hashes.get(key);
-  if (duplicate) failures.push(`duplicato identico: ${relativePath} = ${duplicate}`);
+  // Android launchers request round and regular resources independently.
+  const launcherPair = relativePath.startsWith('android/NexusConsole/app/src/main/res/mipmap')
+    && relativePath.replace('ic_launcher_round.xml', 'ic_launcher.xml') === duplicate;
+  if (duplicate && !launcherPair) failures.push(`duplicato identico: ${relativePath} = ${duplicate}`);
   else hashes.set(key, relativePath);
 }
 

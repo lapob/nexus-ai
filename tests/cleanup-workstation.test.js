@@ -17,7 +17,7 @@ test('cleanup pianifica senza cancellare e rifiuta junction esterne', { skip: pr
   const scripts = path.join(root, 'scripts');
   const candidate = path.join(root, 'qa-artifacts', 'ollama-candidate');
   const outside = path.join(temporary, 'outside');
-  const link = path.join(root, 'android', 'NexusRemote', 'app', 'build');
+  const link = path.join(root, 'android', 'NexusConsole', 'app', 'build');
   fs.mkdirSync(scripts, { recursive: true });
   fs.mkdirSync(candidate, { recursive: true });
   fs.mkdirSync(outside);

@@ -36,7 +36,7 @@ function fixture(extra={}){
   const renderer=sandbox.module.exports.createCosmicVisualizers(canvas,{random:()=>.1,...extra},createDesktopRecipes);
   return {renderer,canvas,media,document,frames,listeners,tick(n=1,interval=1000/60){for(let i=0;i<n;i++){time+=interval;const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(time));}}};
 }
-test('generated GPU recipes and Android asset exactly match current desktop source', { skip: !process.features.typescript && 'Node build without TypeScript support; official Node 24 required' },()=>{
+test('generated GPU recipes exactly match current desktop source', { skip: !process.features.typescript && 'Node build without TypeScript support; official Node 24 required' },()=>{
   execFileSync(process.execPath,['scripts/generate-cosmic-visualizers.js','--check'],{cwd:root,stdio:'pipe'});
   const r=createDesktopRecipes();
   for(const data of [r.neural.build(1200),r.reactor(1200,'rings'),r.saturn.planet(1200),r.saturn.orbit(1200)]){
@@ -81,14 +81,6 @@ test('web writing releases the same matter to the background and holds it there'
   f.tick(200);assert.equal(f.renderer.getMetrics().arrival,0);assert.equal(f.renderer.getMetrics().phase,'background');
   shown=true;f.tick(250);assert.equal(f.renderer.getMetrics().arrival,1);f.renderer.dispose();
 });
-test('Android visual scene has no network, file, content or JavaScript bridge access',()=>{
-  const native=fs.readFileSync(path.join(root,'android/NexusRemote/app/src/main/java/local/nexus/remote/CosmicVisualizers.kt'),'utf8');
-  for(const token of ['allowFileAccess = false','allowContentAccess = false','blockNetworkLoads = true','domStorageEnabled = false','MIXED_CONTENT_NEVER_ALLOW'])assert.ok(native.includes(token));
-  assert.doesNotMatch(native,/addJavascriptInterface|loadUrl\s*\(/);
-  assert.match(native,/JSONObject\(\)/);assert.match(native,/web\?\.destroy\(\)/);
-});
-
-
 test('slow devices retain the complete particle field while adapting raster resolution',()=>{
   const f=fixture({planetOnly:true});
   const count=f.renderer.getMetrics().particles;

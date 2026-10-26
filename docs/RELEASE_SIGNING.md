@@ -4,7 +4,7 @@ NexusNXS does not create or store publisher credentials in the repository.
 Production releases require three independent trust chains:
 
 - Windows Authenticode through `CSC_LINK` and `CSC_KEY_PASSWORD`;
-- Android signing through `NEXUS_ANDROID_KEYSTORE` and the related alias/password variables;
+- Private Control signing through `NEXUS_ANDROID_KEYSTORE` and the related alias/password variables;
 - Ed25519 update-manifest signing through the three `NEXUS_RELEASE_MANIFEST_*` variables.
 
 Keep certificates and keystores outside source control, preferably in an
@@ -22,8 +22,6 @@ See [Android app signing](https://developer.android.com/studio/publish/app-signi
 On this workstation, missing publisher credentials must remain an explicit
 failed production gate. A successful unsigned/Preview build does not replace
 Authenticode, Android production signing or signed update-manifest validation.
-Physical iOS acceptance also requires the Mac/Xcode and device workflow in
-[the iOS guide](../ios/README.md); source checks on Windows cannot certify it.
 
 Give every active key a unique `NEXUS_RELEASE_MANIFEST_KEY_ID`, named owner,
 creation date, planned rotation date and revocation procedure in a private

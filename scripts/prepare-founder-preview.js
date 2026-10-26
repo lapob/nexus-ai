@@ -9,7 +9,7 @@ const { verifyArtifactRecords } = require('./release-manifest');
 
 // #region 01 - Contratto del pacchetto
 
-const REQUIRED_KINDS = Object.freeze(['installer', 'apk']);
+const REQUIRED_KINDS = Object.freeze(['installer']);
 
 function option(argumentsList, name, fallback) {
   const value = argumentsList.find((argument) => argument.startsWith(`--${name}=`));
@@ -46,16 +46,14 @@ function selectedPublicArtifacts(manifest) {
 
 function testerGuide({ manifest, artifacts }) {
   const installer = artifacts.find((artifact) => artifact.kind === 'installer');
-  const apk = artifacts.find((artifact) => artifact.kind === 'apk');
   return [
     'NexusNXS - Founder Preview su invito',
     '=====================================',
     '',
     `Versione desktop: ${manifest.version}`,
-    `Versione Android: ${apk.componentVersion}`,
     'Servizio AI: https://ai.nexusnxs.com',
     '',
-    'Questa e una Preview gratuita per un gruppo ristretto, non una release Stable o Play Store.',
+    'Questa e una Preview gratuita per un gruppo ristretto, non una release Stable.',
     'Build sperimentale per revisione tecnica: i gate Beta e inviti reali restano distinti e devono essere superati prima di distribuirla come prodotto.',
     'Le nuove funzioni richiedono prove fisiche e vocali; una build o un test automatico non dimostra eco, naturalezza o compatibilita di ogni dispositivo.',
     'Gli aggiornamenti sono manuali. Non disattivare antivirus, firewall o protezioni del dispositivo.',
@@ -66,12 +64,6 @@ function testerGuide({ manifest, artifacts }) {
     `2. Il risultato deve essere: ${installer.sha256}`,
     '3. Avvia l installer. Windows puo mostrare un avviso editore perche questa Preview non e ancora firmata commercialmente.',
     '4. Non procedere se il checksum non coincide o il file proviene da un canale diverso da quello concordato.',
-    '',
-    'ANDROID 8 O SUCCESSIVO',
-    `1. Installa ${apk.name} soltanto dal file ricevuto direttamente dal fondatore.`,
-    '2. Se richiesto, abilita temporaneamente Installa app sconosciute solo per l app usata ad aprire il file.',
-    '3. Dopo l installazione revoca nuovamente quel permesso.',
-    `4. SHA-256 APK: ${apk.sha256}`,
     '',
     'PROVA CONSIGLIATA',
     '- una domanda breve nella lingua del dispositivo;',
@@ -87,7 +79,7 @@ function testerGuide({ manifest, artifacts }) {
     'Il contributo al miglioramento e facoltativo e richiede consenso esplicito nell applicazione.',
     '',
     'LIMITI NOTI DELLA PREVIEW',
-    '- nessuna firma commerciale Windows o Android;',
+    '- nessuna firma commerciale Windows;',
     '- aggiornamento manuale;',
     '- disponibilita dipendente dal servizio NexusNXS online;',
     '- nessuna garanzia Stable o supporto di emergenza.',

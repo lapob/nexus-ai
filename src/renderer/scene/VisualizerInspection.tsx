@@ -3,17 +3,28 @@
  */
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import type { Group } from 'three';
+import { Vector3, type Group } from 'three';
+import { createCosmicZoom } from '../../shared/cosmic-zoom';
 import { VISUALIZER_MOTION } from '../systems/AnimationController';
 
 // #region Gesture ownership and time-based physics
 export function VisualizerInspection({ children, reduced }: { children: ReactNode; reduced: boolean }) {
   const group = useRef<Group>(null);
-  const { gl } = useThree();
+  const { gl, camera, invalidate } = useThree();
   const motion = useRef({ id: -1, startX: 0, startY: 0, dragging: false, suppressClickUntil: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 });
   useEffect(() => {
     const canvas = gl.domElement, state = motion.current;
     const originalCursor = canvas.style.cursor;
+    const originalTabIndex = canvas.getAttribute('tabindex');
+    const originalLabel = canvas.getAttribute('aria-label');
+    canvas.tabIndex = 0;
+    canvas.setAttribute('aria-label', 'NexusNXS Core · + / − / 0');
+    const initialCamera = camera.position.clone();
+    const zoom = createCosmicZoom(canvas, { onChange: value => {
+      const anchor = group.current?.children[0]?.getWorldPosition(new Vector3()) || new Vector3();
+      camera.position.copy(initialCamera).sub(anchor).divideScalar(value).add(anchor);
+      camera.updateMatrixWorld(); canvas.dataset.coreZoom = String(value); invalidate();
+    } });
     const host = canvas.closest('.voice-visualizer') || canvas;
     const release = () => {
       canvas.style.cursor = originalCursor;
@@ -42,6 +53,7 @@ export function VisualizerInspection({ children, reduced }: { children: ReactNod
       state.targetX = Math.max(-1.15, Math.min(1.15, dy / size * 2.8));
       state.targetY = Math.max(-1.15, Math.min(1.15, dx / size * 2.8));
     };
+    canvas.addEventListener('nexuscorezoomstart', release);
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
     canvas.addEventListener('pointerup', release);
@@ -51,6 +63,10 @@ export function VisualizerInspection({ children, reduced }: { children: ReactNod
     window.addEventListener('pointerup', release, true);
     window.addEventListener('blur', release);
     return () => {
+      zoom.dispose(); camera.position.copy(initialCamera); camera.updateMatrixWorld();
+      if (originalTabIndex === null) canvas.removeAttribute('tabindex'); else canvas.setAttribute('tabindex', originalTabIndex);
+      if (originalLabel === null) canvas.removeAttribute('aria-label'); else canvas.setAttribute('aria-label', originalLabel);
+      canvas.removeEventListener('nexuscorezoomstart', release);
       release(); canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', release); canvas.removeEventListener('pointercancel', release);
       canvas.removeEventListener('lostpointercapture', release);
@@ -58,7 +74,9 @@ export function VisualizerInspection({ children, reduced }: { children: ReactNod
       window.removeEventListener('pointerup', release, true);
       window.removeEventListener('blur', release);
     };
-  }, [gl, reduced]);
+  }, [gl, camera, invalidate, reduced]);
+  // #endregion
+  // #region Shared display clock
   useFrame((_, elapsed) => {
     if (!group.current) return;
     // Closed-form damping is stable even when Chromium throttles an inactive

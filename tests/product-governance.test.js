@@ -87,7 +87,6 @@ test('la policy SLO distingue prove conformi dalla disponibilita non misurata', 
     writeJson('gateway-load-test.json', { clients: 20, p95LatencyMs: 180, passed: true });
     writeJson('desktop-motion-qa.json', motionReport());
     for (const file of [
-      'android/NexusRemote/app/src/main/baseline-prof.txt',
       'android/NexusConsole/app/src/main/baseline-prof.txt'
     ]) {
       fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true });

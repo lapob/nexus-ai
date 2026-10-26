@@ -6,12 +6,10 @@ test('public download URLs follow the component version and publisher tag', () =
   const current = publicReleaseTarget({ version: require('../package.json').version, tag: process.env.NEXUS_GITHUB_RELEASE_TAG });
   const publicUi = require('../src/remote/public-demo');
   assert.equal(publicUi.WINDOWS_DOWNLOAD, current.windowsDownload);
-  assert.equal(publicUi.ANDROID_DOWNLOAD, current.androidDownload);
   for (const version of ['0.3.25', '1.2.3']) {
     const target = publicReleaseTarget({ version });
     assert.equal(target.tag, `v${version}-preview.1`);
     assert.equal(target.windowsDownload, `https://github.com/lapob/nexus-ai/releases/download/${target.tag}/NexusNXS-${version}-Setup.exe`);
-    assert.equal(target.androidDownload, `https://github.com/lapob/nexus-ai/releases/download/${target.tag}/NexusNXS-Android.apk`);
   }
 });
 

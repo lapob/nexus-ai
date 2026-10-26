@@ -13,15 +13,11 @@ const root = resolve(import.meta.dirname, '..');
 const sourceCommit = String(spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).stdout || '').trim();
 if (!/^[0-9a-f]{40}$/i.test(sourceCommit)) throw new Error('Revisione sorgente Git non disponibile.');
 const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
-const androidGradle = await readFile(resolve(root, 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
-const androidVersion = androidGradle.match(/versionName\s*(?:=\s*)?["']([^"']+)["']/)?.[1];
-if (!androidVersion) throw new Error('Versione Android pubblica non rilevata.');
 const { tag } = publicReleaseTarget({ version: packageJson.version, repository, tag: process.env.NEXUS_GITHUB_RELEASE_TAG });
 const assets = [
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), type: 'application/vnd.microsoft.portable-executable' },
   { path: resolve(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe.blockmap`), type: 'application/octet-stream' },
   { path: resolve(root, 'release', 'latest.yml'), type: 'text/yaml; charset=utf-8' },
-  { path: resolve(root, 'release-android', 'NexusNXS-Android.apk'), type: 'application/vnd.android.package-archive' },
   { path: resolve(root, 'release', 'nexus-sbom.cdx.json'), type: 'application/json' },
   { path: resolve(root, 'release', 'nexus-sbom.cdx.json.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'CHECKSUMS.sha256'), type: 'text/plain; charset=utf-8' },
@@ -96,10 +92,9 @@ if (!release) {
   });
 }
 const replaceNames = new Set(prepared.map((asset) => asset.name));
-const obsoleteAndroid = /^NexusNXS-Android-.*\.apk$/i;
 
 for (const current of release.assets || []) {
-  if (replaceNames.has(current.name) || obsoleteAndroid.test(current.name)) {
+  if (replaceNames.has(current.name)) {
     await request(`${apiRoot}/releases/assets/${current.id}`, token, { method: 'DELETE' });
   }
 }
@@ -134,7 +129,6 @@ const releaseBody = [
   'Build sperimentali per revisione tecnica. I client usano i servizi NexusNXS e non distribuiscono modelli o knowledge private. Non e una Beta approvata per inviti commerciali o una Stable.',
   '',
   `- Windows 11 x64: NexusNXS ${packageJson.version} Preview (non firmata Authenticode)`,
-  `- Android 8+: NexusNXS ${androidVersion} Preview (firma Android Debug, non Play Store)`,
   `- Revisione sorgente: \`${sourceCommit.slice(0, 12)}\``,
   '- Impronte complete: `CHECKSUMS.sha256`',
   '- Manifest pubblico: `release-manifest.preview.json`',

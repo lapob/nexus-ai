@@ -428,8 +428,24 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
         }
       }
       if (screenshotPath) {
+        if (process.env.NEXUS_SMOKE_CAPTURE_READY === '1') {
+          const ready = await win.webContents.executeJavaScript(`new Promise(resolve => {
+            const started = performance.now();
+            const check = () => {
+              const state = document.querySelector('#nexusShell')?.dataset.systemState;
+              if (state && state !== 'booting') return resolve(true);
+              if (performance.now() - started > 12000) return resolve(false);
+              setTimeout(check, 100);
+            }; check();
+          })`);
+          if (!ready) throw new Error('Product capture still booting; do not publish a startup frame.');
+        }
         if (smokeView) {
           win.showInactive();
+          if (process.env.NEXUS_SMOKE_CAPTURE_READY === '1') {
+            const bounds = win.getContentBounds();
+            win.webContents.sendInputEvent({ type: 'mouseMove', x: Math.round(bounds.width * .18), y: Math.round(bounds.height * .5) });
+          }
           await new Promise((resolve) => setTimeout(resolve, 620));
         }
         const image = await win.webContents.capturePage();

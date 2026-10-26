@@ -1,5 +1,5 @@
 // Generated from config/android-symbols.json; Google Material Symbols, Apache-2.0.
-// Source revision 10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7; license bundled in both APKs.
+// Source revision 10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7; license bundled in Control and the desktop app.
 package local.nexus.motion;
 
 public final class NexusSymbolPaths {

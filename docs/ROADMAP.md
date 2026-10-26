@@ -1,3 +1,13 @@
+## Product scope — 26 October
+
+Public native AI Android/iOS clients are retired by owner decision. Keep Windows,
+web and private Android Control. Complete verified removal of native AI sources,
+builds, downloads and tests without removing Control/shared resources or user data
+outside the retired app. Do not continue iOS signing or public Android development.
+
+Shared web/desktop zoom, voice latency/echo, local model evaluation, secure startup
+and signed Windows releases remain active priorities; no unmeasured quality claims.
+
 ## Attivazione routine verificata — 25 ottobre
 
 Sorgenti ac94e03 e sito2b6440e conCIesattaPASS; Worker5a782d3d attivo,

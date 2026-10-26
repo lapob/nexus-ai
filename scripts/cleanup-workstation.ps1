@@ -16,7 +16,6 @@ if ((Split-Path -Leaf $nexusRoot) -ne 'NexusNXS') { throw 'Radice NexusNXS non v
 $relativeTargets = @(
   'qa-artifacts\ollama-candidate\windows.zip',
   'qa-artifacts\ollama-candidate\rocm.zip',
-  'android\NexusRemote\app\build',
   'android\NexusConsole\app\build'
 )
 

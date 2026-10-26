@@ -23,7 +23,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run android:remote
       - run: npm run android:console
       - run: npm run qa:android:device:strict
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -31,7 +30,6 @@ jobs:
         with:
           name: nexusnxs-android-device-${{ github.run_id }}
           path: |
-            qa-artifacts/android-public-matrix
             qa-artifacts/android-control-matrix
           if-no-files-found: error
           retention-days: 30

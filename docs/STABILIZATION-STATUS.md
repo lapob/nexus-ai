@@ -1,3 +1,20 @@
+# Native AI mobile retirement — 26 October 2026
+
+The owner has retired the public Android AI client and iOS client. Windows,
+the public web app and private Android NexusNXS Control remain supported.
+Builds, generated symbols, release packaging and device tooling now target
+these retained products. Shared desktop/web particle inspection is preserved.
+
+The owner completed the reviewed retirement helper. Native AI sources, builds,
+local APKs and 37 published APK assets are removed. Samsung user 0 retains only
+Control among Nexus native packages. Source changes await publication gates.
+Historical Git revisions remain available; do not purge history or Control.
+
+Source checks and 1217 source tests pass, with two explicit skips. Revised
+website acceptance passes all 45 unit and 37 browser checks. Exact-revision
+CI/deployment gates precede activation. Human voice acceptance, production signing and measured
+candidate-model comparison remain separate open work.
+
 # Routine changes activated and device verified — 25 October 2026
 
 Application ac94e03 passed CI40224939502 on Windows and Linux. Website2b6440e

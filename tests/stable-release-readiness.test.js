@@ -101,7 +101,7 @@ test('la release Stable applica un gate non aggirabile sulle evidenze reali', ()
   assert.match(pkg.scripts['release:stable:gate'], /signing:gate/);
   assert.match(release, /if \(production\) \{[\s\S]*check-stable-release-readiness\.js/);
   assert.match(readiness, /penetrationTestReportEnvironment/);
-  assert.match(readiness, /android-public-matrix/);
+  assert.doesNotMatch(readiness, /android-public-matrix/);
   assert.match(readiness, /android-control-matrix/);
   assert.equal(policy.android.maximumJankyPercent, 18);
   assert.equal(policy.externalControls.length, 6);

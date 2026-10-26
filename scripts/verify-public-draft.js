@@ -72,19 +72,6 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#prompt').inputValue(),'');
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('nxs.tab-draft.v1')),null);
     assert.equal(messages,0,'Recovery must never submit a draft automatically');
-    const native = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await native.route('https://visualizer.nexus.invalid/', r => r.fulfill({ contentType:'text/html', body:require('node:fs').readFileSync(require('node:path').resolve(__dirname,'../android/NexusRemote/app/src/main/assets/cosmic-visualizers.html'),'utf8') }));
-    await native.goto('https://visualizer.nexus.invalid/');
-    await native.evaluate(()=>updateNexusVisual({visible:true,paused:false,state:'listening',energy:.3,bounds:[80,200,230,230]}));
-    await native.waitForTimeout(250);
-    await native.evaluate(()=>updateNexusVisual({visible:true,paused:true,state:'listening',energy:0,bounds:[80,200,230,230]}));
-    await native.waitForTimeout(150); const stopped = await native.evaluate(()=>nexusVisualizer.getMetrics());
-    await native.waitForTimeout(250); assert.equal(await native.evaluate(()=>nexusVisualizer.getMetrics().draws),stopped.draws);
-    await native.evaluate(()=>updateNexusVisual({visible:true,paused:false,state:'listening',energy:.3,bounds:[80,200,230,230]}));
-    await native.waitForTimeout(250);
-    const resumed = await native.evaluate(()=>nexusVisualizer.getMetrics());
-    assert.ok(resumed.draws>stopped.draws);assert.equal(resumed.preset,stopped.preset);assert.ok(resumed.elapsed-stopped.elapsed<.4);
-    await native.close();
     console.log('PASS: modal pause/resume, private defaults, explicit tab draft/attachment recovery, deletion and diagnostics without content or automatic requests.');
     // #endregion
   } finally { await browser.close(); }

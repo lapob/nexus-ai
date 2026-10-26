@@ -1,7 +1,7 @@
 <# @module scripts/verify-android-profiles
    Verify the exact installed APK's baseline profile, then measure ART compilation without clearing data. #>
 param(
-  [Parameter(Mandatory)][ValidateSet('Public', 'Control')][string]$App,
+  [Parameter(Mandatory)][ValidateSet('Control')][string]$App,
   [Parameter(Mandatory)][string]$ApkPath,
   [switch]$Apply,
   [ValidateRange(3,10)][int]$Iterations = 3
@@ -31,8 +31,8 @@ function Invoke-ProfileAdb {
 $devices = @((Invoke-ProfileAdb devices) -split "`n" | Where-Object { $_ -match '\sdevice\s*$' })
 if ($devices.Count -ne 1) { throw 'Collega un solo dispositivo Android autorizzato.' }
 $serial = ($devices[0] -split '\s+')[0]
-$package = if ($App -eq 'Public') { 'local.nexus.remote' } else { 'local.nexus.console' }
-$activity = if ($App -eq 'Public') { '.NexusMainActivity' } else { '.NativeMainActivity' }
+$package = 'local.nexus.console'
+$activity = '.NativeMainActivity'
 $file = (Get-Item -LiteralPath $ApkPath).FullName
 $digest = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
 $installed = (Invoke-ProfileAdb -s $serial shell pm path --user 0 $package).Trim() -replace '^package:', ''

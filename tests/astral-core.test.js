@@ -168,20 +168,6 @@ test('Presence and all desktop visualizers retain their decorative motion rates'
   assert.match(inspection, /dragging \? 9 : VISUALIZER_MOTION\.returnOmega/);
 });
 
-test('Android loads the shared desktop scene and keeps capture inline through recomposition', () => {
-  const base = path.join(__dirname, '../android/NexusRemote/app/src/main/java/local/nexus/remote');
-  const core = fs.readFileSync(path.join(base, 'CosmicVisualizers.kt'), 'utf8');
-  const activity = fs.readFileSync(path.join(base, 'NexusMainActivity.kt'), 'utf8');
-  assert.match(core, /assets.open\("cosmic-visualizers.html"\)/);
-  assert.equal(fs.existsSync(path.join(base, 'AstralCore.kt')), false);
-  assert.match(core, /LocalLifecycleOwner.current.lifecycle/);
-  assert.match(core, /Lifecycle.Event.ON_STOP/);
-  assert.doesNotMatch(core, /LaunchedEffect\(state/);
-  assert.match(activity, /if \(inlineState != null\) return/);
-  assert.match(activity, /generation != speechGeneration/);
-  assert.match(activity, /speechPlayback = "speaking"/);
-});
-
 test('quality sheds glow before particles and recovers with hysteresis', () => {
   const f = fixture(); let time = 1;
   f.frame(time); const initial = f.renderer.getMetrics().particles;

@@ -20,7 +20,7 @@ test('la distinta pubblica rifiuta artefatti riservati al proprietario', () => {
 test('le distinte pubblica e privata restano separate e verificabili', (context) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexusnxs-release-'));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const publicFile = path.join(root, 'release', 'NexusNXS-Android.apk');
+  const publicFile = path.join(root, 'release', 'NexusNXS-Setup.exe');
   const privateFile = path.join(root, 'release-private', 'NexusNXS-Control.apk');
   fs.mkdirSync(path.dirname(publicFile), { recursive: true });
   fs.mkdirSync(path.dirname(privateFile), { recursive: true });
@@ -45,7 +45,6 @@ test('le distinte pubblica e privata restano separate e verificabili', (context)
 });
 
 test('la distinta conserva le versioni reali dei componenti Android', () => {
-  assert.match(releaseScript, /androidVersion\('NexusRemote'\)/);
   assert.match(releaseScript, /androidVersion\('NexusConsole'\)/);
   assert.match(releaseScript, /componentVersion/);
   assert.match(releaseScript, /'preview', 'beta', 'stable'/);
@@ -67,7 +66,7 @@ test('la pipeline non propaga le credenziali di firma ai task che non le richied
   assert.match(releaseScript, /RELEASE_SECRET_KEYS/);
   assert.match(releaseScript, /delete environment\[key\]/);
   assert.match(releaseScript, /build:win:signed[^\n]+WINDOWS_SIGNING_SECRETS/);
-  assert.match(releaseScript, /android:remote:public[^\n]+ANDROID_SIGNING_SECRETS/);
+  assert.match(releaseScript, /android:console[^\n]+ANDROID_SIGNING_SECRETS/);
 });
 
 test('Preview resta esplicitamente non firmata mentre Beta e Stable richiedono firma', () => {

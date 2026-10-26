@@ -127,11 +127,10 @@ function evaluateArtifacts({ policy, artifactsRoot = path.join(root, 'qa-artifac
     : result('desktop-motion', 'not-measured', null, objectives.desktopMotion));
 
   const baselineFiles = [
-    'android/NexusRemote/app/src/main/baseline-prof.txt',
     'android/NexusConsole/app/src/main/baseline-prof.txt'
   ];
   const baselineObserved = baselineFiles.map((file) => ({ file, present: fs.existsSync(path.join(projectRoot, file)) && fs.statSync(path.join(projectRoot, file)).size > 0 }));
-  checks.push(result('android-baseline-profiles', baselineObserved.every((entry) => entry.present) ? 'pass' : 'fail', baselineObserved, { requiredForBothClients: true }));
+  checks.push(result('android-baseline-profiles', baselineObserved.every((entry) => entry.present) ? 'pass' : 'fail', baselineObserved, { requiredForControl: true }));
 
   const availability = [
     path.join(artifactsRoot, 'availability-samples.ndjson'),

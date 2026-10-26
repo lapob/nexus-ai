@@ -237,6 +237,13 @@ async function measureCore(view) {
       await delay(70);
     }
     process.stdout.write(`Puntatore ${view} verificato.\n`);
+    await runtime.client.evaluate("document.querySelector('.voice-visualizer canvas').focus()");
+    await runtime.client.command('Input.dispatchKeyEvent', { type: 'keyDown', key: '+', code: 'Equal', text: '+' });
+    const inspectedZoom = await runtime.client.evaluate("Number(document.querySelector('.voice-visualizer canvas').dataset.coreZoom)");
+    if (!(inspectedZoom > 1)) throw new Error('Desktop geometry zoom did not respond to its focused keyboard control');
+    await runtime.client.command('Input.dispatchKeyEvent', { type: 'keyDown', key: '0', code: 'Digit0', text: '0' });
+    const resetZoom = await runtime.client.evaluate("Number(document.querySelector('.voice-visualizer canvas').dataset.coreZoom)");
+    if (resetZoom !== 1) throw new Error('Desktop geometry zoom did not reset');
     const metrics = await runtime.client.evaluate(`(async () => {
       const canvas = document.querySelector('.voice-visualizer canvas');
       const rect = canvas.getBoundingClientRect();

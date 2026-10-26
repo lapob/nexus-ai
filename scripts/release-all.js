@@ -74,7 +74,6 @@ if (includePublic) {
   }
   run(signedChannel ? 'build:win:signed' : 'build:win', { secrets: signedChannel ? WINDOWS_SIGNING_SECRETS : [] });
   run('verify:installer');
-  run(signedChannel ? 'android:remote:public' : 'android:remote', { secrets: signedChannel ? ANDROID_SIGNING_SECRETS : [] });
   run('sbom');
 }
 if (includePrivate) run('android:console', { secrets: ANDROID_SIGNING_SECRETS });
@@ -97,12 +96,9 @@ if (includePublic) {
     [path.join(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe`), { platform: 'windows', kind: 'installer', componentVersion: packageJson.version, feedPath: `NexusNXS-${packageJson.version}-Setup.exe` }],
     [path.join(root, 'release', `NexusNXS-${packageJson.version}-Setup.exe.blockmap`), { platform: 'windows', kind: 'update-blockmap', componentVersion: packageJson.version, feedPath: `NexusNXS-${packageJson.version}-Setup.exe.blockmap` }],
     [path.join(root, 'release', 'latest.yml'), { platform: 'windows', kind: 'update-manifest', componentVersion: packageJson.version, feedPath: 'latest.yml' }],
-    [path.join(root, 'release-android', 'NexusNXS-Android.apk'), { platform: 'android', kind: 'apk', componentVersion: androidVersion('NexusRemote') }],
     [sbom, { platform: 'multi', kind: 'sbom-cyclonedx', componentVersion: packageJson.version }],
     [sbomDigest, { platform: 'multi', kind: 'sbom-digest', componentVersion: packageJson.version }],
   ];
-  const androidBundle = path.join(root, 'release-android', 'NexusNXS-Android.aab');
-  if (fs.existsSync(androidBundle)) publicArtifacts.push([androidBundle, { platform: 'android', kind: 'play-bundle', componentVersion: androidVersion('NexusRemote') }]);
   const manifest = releaseManifest({
     product: 'NexusNXS', version: packageJson.version, channel: releaseChannel,
     visibility: 'public', releaseClass: releaseChannel === 'stable' ? 'production' : releaseChannel === 'beta' ? 'beta' : 'preview',

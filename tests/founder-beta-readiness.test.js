@@ -18,7 +18,7 @@ function fixture() {
     fs.writeFileSync(target, `${JSON.stringify(value)}\n`, 'utf8');
   };
   fs.mkdirSync(path.join(projectRoot, 'release-android'));
-  for (const name of ['NexusNXS-Control.apk', 'NexusNXS-Android.apk']) fs.writeFileSync(path.join(projectRoot, 'release-android', name), 'synthetic APK');
+  for (const name of ['NexusNXS-Control.apk']) fs.writeFileSync(path.join(projectRoot, 'release-android', name), 'synthetic APK');
   const now = Date.now();
   write('config/founder-beta-policy.json', {
     schemaVersion: 1, maximumInvitedTesters: 20,
@@ -54,7 +54,7 @@ test('la Preview tecnica non finge che firma e dispositivi reali siano gia pront
     const report = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
     assert.equal(report.technicalPreviewReady, true);
     assert.equal(report.founderBetaReady, false);
-    assert.equal(report.checks.find((entry) => entry.id === 'android-public-device').status, 'blocked');
+    assert.equal(report.checks.find((entry) => entry.id === 'android-control-device').status, 'blocked');
     assert.equal(report.checks.find((entry) => entry.id === 'windows-signing').status, 'blocked');
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });
@@ -64,7 +64,6 @@ test('la Founder Beta richiede insieme prove automatiche firma dispositivi e res
   try {
     const matrix = { App: 'Public', ExpectedPublicState: 'Online', apkSha256: crypto.createHash('sha256').update('synthetic APK').digest('hex'), capturedAt: new Date(item.now).toISOString(), profiles: [1, 2, 3, 4, 5], frameMetrics: Array.from({ length: 5 }, (_, i) => ({ profile: i + 1, totalFrames: 120, jankyPercent: 2 })) };
     item.write('qa-artifacts/android-control-matrix/manifest.json', { ...matrix, App: 'Control', ExpectedPublicState: null, ExpectedControlState: 'Online' });
-    item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
     const environment = {
       CSC_LINK: 'certificate', CSC_KEY_PASSWORD: 'secret',
       NEXUS_ANDROID_KEYSTORE: 'keystore', NEXUS_ANDROID_STORE_PASSWORD: 'secret', NEXUS_ANDROID_KEY_ALIAS: 'nexus', NEXUS_ANDROID_KEY_PASSWORD: 'secret',
@@ -75,10 +74,10 @@ test('la Founder Beta richiede insieme prove automatiche firma dispositivi e res
     assert.equal(report.technicalPreviewReady, true);
     assert.equal(report.founderBetaReady, true);
     assert.equal(report.summary.blocked, 0);
-    fs.writeFileSync(path.join(item.projectRoot, 'release-android', 'NexusNXS-Android.apk'), 'new untested APK');
+    fs.writeFileSync(path.join(item.projectRoot, 'release-android', 'NexusNXS-Control.apk'), 'new untested APK');
     const updated = buildFounderBetaReport({ projectRoot: item.projectRoot, environment, now: item.now });
     assert.equal(updated.founderBetaReady, false);
-    assert.equal(updated.checks.find(entry => entry.id === 'android-public-device').status, 'blocked');
+    assert.equal(updated.checks.find(entry => entry.id === 'android-control-device').status, 'blocked');
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });
 
@@ -93,16 +92,15 @@ test('accetta timestamp e BOM UTF-8 dei report Android PowerShell senza ignorare
       FrameMetrics: Array.from({ length: 5 }, (_, i) => ({ Profile: i + 1, TotalFrames: 120, JankyPercent: 2 }))
     };
     item.write('qa-artifacts/android-control-matrix/manifest.json', { ...matrix, App: 'Control', ExpectedPublicState: null, ExpectedControlState: 'Online' });
-    item.write('qa-artifacts/android-public-matrix/manifest.json', matrix);
-    for (const app of ['control', 'public']) {
+    for (const app of ['control']) {
       const file = path.join(item.projectRoot, `qa-artifacts/android-${app}-matrix/manifest.json`);
       fs.writeFileSync(file, `\uFEFF${fs.readFileSync(file, 'utf8')}`, 'utf8');
     }
     const report = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
     assert.equal(report.checks.find((entry) => entry.id === 'android-control-device').status, 'pass');
-    assert.equal(report.checks.find((entry) => entry.id === 'android-public-device').status, 'pass');
-    fs.writeFileSync(path.join(item.projectRoot, 'qa-artifacts/android-public-matrix/manifest.json'), '\uFEFF{malformed', 'utf8');
+    assert.equal(report.checks.find((entry) => entry.id === 'android-control-device').status, 'pass');
+    fs.writeFileSync(path.join(item.projectRoot, 'qa-artifacts/android-control-matrix/manifest.json'), '\uFEFF{malformed', 'utf8');
     const invalid = buildFounderBetaReport({ projectRoot: item.projectRoot, environment: {}, now: item.now });
-    assert.equal(invalid.checks.find((entry) => entry.id === 'android-public-device').status, 'blocked');
+    assert.equal(invalid.checks.find((entry) => entry.id === 'android-control-device').status, 'blocked');
   } finally { fs.rmSync(item.projectRoot, { recursive: true, force: true }); }
 });

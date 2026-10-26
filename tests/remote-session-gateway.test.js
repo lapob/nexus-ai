@@ -8,8 +8,6 @@ const test = require('node:test');
 const vm = require('node:vm');
 const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed } = require('../src/remote/remote-session-gateway');
 
-const androidGradle = fs.readFileSync(path.join(__dirname, '..', 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
-const androidVersion = androidGradle.match(/versionName\s*=\s*"([^"]+)"/)?.[1];
 
 test('l osservabilità privata riconosce soltanto loopback e pseudonimizza gli accessi', () => {
   const secret = Buffer.alloc(32, 7);
@@ -1735,8 +1733,6 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     const windowsRelease = publicHtml.match(/https:\/\/github\.com\/lapob\/nexus-ai\/releases\/download\/v(\d+\.\d+\.\d+)-preview\.\d+\/NexusNXS-(\d+\.\d+\.\d+)-Setup\.exe/);
     assert.ok(windowsRelease, 'download Windows da una Preview esplicita');
     assert.equal(windowsRelease[1], windowsRelease[2], 'tag e installer devono avere la stessa versione');
-    assert.ok(androidVersion);
-    assert.match(publicHtml, /releases\/download\/v\d+\.\d+\.\d+-preview\.\d+\/NexusNXS-Android\.apk/);
     assert.match(publicHtml, /id="keyboard"/);
     assert.match(publicHtml, /id="downloadSheet"/);
     assert.match(publicHtml, /id="imageResult"/);

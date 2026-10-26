@@ -55,13 +55,12 @@ Il codice a sei cifre è monouso e scade dopo cinque minuti. Il dispositivo rice
 
 Il client remoto non pubblica direttamente Ollama, SQLite, filesystem o IPC Electron. Il controllo remoto del desktop, il microfono remoto e la voce sintetizzata nel browser non fanno parte di questa sessione chat.
 
-## App Android personale
+## Client supportati
 
-`NexusNXS Remote` racchiude il client HTTPS in un contenitore Android nativo limitato al dominio Tailscale della workstation. Dopo la prima associazione conserva nel proprio spazio privato il token, la bozza e l'ultima conversazione; una chiusura, un riavvio o un cambio rete non richiedono quindi un nuovo QR. Se Android interrompe il processo, la pagina viene ricostruita dallo stato persistente. In assenza di rete compare un pannello essenziale con riconnessione automatica e accesso diretto a Tailscale.
+L’app AI nativa Android e il client iOS sono ritirati. Restano disponibili il
+client Windows, la web app e il client operativo privato NexusNXS Control.
 
-L'APK si genera con `npm run android:remote`. Nessuna credenziale viene inserita nel pacchetto: cancellare i dati dell'app, revocare il telefono o ruotare le credenziali richiede correttamente una nuova associazione.
-
-## NexusNXS Console
+## NexusNXS Control
 
 `NexusNXS Console` è il client operativo separato dalla chat. Riceve una richiesta
 in linguaggio naturale, la trasforma in una proposta confinata alla cartella di

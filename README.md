@@ -1,5 +1,8 @@
 # NexusNXS
 
+Public native AI clients for Android and iOS are retired. The assistant continues
+on Windows and the web; the private Android NexusNXS Control app is retained.
+
 NexusNXS is a privacy-first AI assistant for Windows with native Android
 clients, voice interaction, private computer control, and an isolated public
 guest mode. Public clients use NexusNXS Core through HTTPS; local model tooling
@@ -44,7 +47,7 @@ The repository ignore rules enforce these boundaries for normal Git workflows.
 
 Windows conversation and memory databases use native SQLite without application-level
 database encryption. Their protection depends on the host account and storage controls;
-encrypted export archives and Android encrypted conversation fields are separate features.
+encrypted export archives and Android Keystore session fields are separate features.
 Public guest turns bypass the owner's conversation store, but generated responses are
 retained in a separate plaintext retry ledger for up to 24 hours by default. Guest mode
 does not mean zero server-side content retention.
@@ -61,12 +64,12 @@ operational phases and the streamed final answer.
 - Node.js 24 for reproducible source checks
 - PowerShell 7 recommended
 - A compatible local Ollama model library
-- Android Studio only when building the Android clients
+- Android Studio only when building the private Control client
 
 Large models and bundled runtimes are deliberately not stored in Git. NexusNXS
 discovers or provisions them on the workstation independently from source code.
 
-The public desktop and Android clients do not require a local model. They send
+The public desktop and web clients do not require a local model. They send
 requests to the configured NexusNXS HTTPS service; the development and server
 profiles retain the local model tooling used by the maintainer.
 
@@ -167,7 +170,7 @@ the operational scripts described in [`docs/SERVER_OPERATIONS.md`](docs/SERVER_O
 ## Repository layout
 
 - `src/` — desktop, AI runtime, voice, remote gateway, storage, and security
-- `android/` — two independent native Android clients
+- `android/` — private Android PC Control client
 - `knowledge-public/` — distributable public knowledge seed
 - `knowledge-packs/` — curated public knowledge manifests
 - `scripts/` — build, verification, provisioning, and operations

@@ -41,7 +41,7 @@ function androidMatrixCheck({ projectRoot, id, relativePath, policy, now }) {
     detail: `Matrice fisica recente con ${policy.android.requiredProfiles} profili e jank <= ${policy.android.maximumJankyPercent}%`,
     now,
     predicate: (artifact) => {
-      const name = id === 'android-control-device' ? 'NexusNXS-Control.apk' : 'NexusNXS-Android.apk';
+      const name = 'NexusNXS-Control.apk';
       return validAndroidMatrix(artifact, policy.android, path.join(projectRoot, 'release-android', name));
     }
   });
@@ -58,7 +58,6 @@ function buildFounderBetaReport({ projectRoot = root, environment = process.env,
   ];
   const device = [
     androidMatrixCheck({ projectRoot, id: 'android-control-device', relativePath: 'qa-artifacts/android-control-matrix/manifest.json', policy, now }),
-    androidMatrixCheck({ projectRoot, id: 'android-public-device', relativePath: 'qa-artifacts/android-public-matrix/manifest.json', policy, now })
   ];
   const distribution = [
     check('windows-signing', Boolean(String(environment.CSC_LINK || '').trim() && String(environment.CSC_KEY_PASSWORD || '').trim()), 'Installer Windows firmato', 'distribution'),

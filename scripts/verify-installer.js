@@ -76,7 +76,7 @@ if (fs.existsSync(unpackedAsar)) {
     'config/nexus-interaction-states.json',
     'config/access-profiles.json',
     'config/android-symbols.json',
-    'android/NexusRemote/app/src/main/assets/material-symbols-license.txt',
+    'android/NexusConsole/app/src/main/assets/material-symbols-license.txt',
     'src/shared/symbols.js',
     'config/public-client.release.json',
     'config/python-runtime.json',

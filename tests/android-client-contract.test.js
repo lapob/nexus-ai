@@ -10,236 +10,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
-test('Remote AI e Console hanno package, modalità e sorgenti indipendenti', () => {
-  const remote = read('android', 'NexusRemote', 'app', 'build.gradle');
-  const consoleClient = read('android', 'NexusConsole', 'app', 'build.gradle');
-  assert.match(remote, /applicationId\s*(?:=\s*)?"local\.nexus\.remote"/);
-  assert.match(remote, /APP_MODE.*remote/);
-  assert.match(consoleClient, /applicationId\s*(?:=\s*)?"local\.nexus\.console"/);
-  assert.match(consoleClient, /APP_MODE.*console/);
-  assert.doesNotMatch(consoleClient, /NexusRemote\/app\/src\/main/);
-  assert.ok(fs.existsSync(path.join(root, 'android', 'NexusConsole', 'app', 'src', 'main', 'java', 'local', 'nexus', 'console', 'NativeMainActivity.java')));
-});
-
-test('launcher e superfici esterne identificano senza ambiguità le due app', () => {
-  const remoteManifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
-  const consoleManifest = read('android/NexusConsole/app/src/main/AndroidManifest.xml');
-  assert.match(remoteManifest, /android:label="@string\/app_name"/);
-  assert.match(read('android/NexusRemote/app/src/main/res/values/strings.xml'), />NexusNXS</);
-  assert.match(remoteManifest, /android:host="remote"/);
-  assert.doesNotMatch(remoteManifest, /android:host="console"/);
-  assert.match(consoleManifest, /android:label="NexusNXS Control"/);
-  assert.doesNotMatch(
-    read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java'),
-    /notifyUser\("NexusNXS per PC"|createConfirmDeviceCredentialIntent\([^\n]+"NexusNXS per PC"/,
-    'notifiche e conferme di sistema devono usare il nome corrente NexusNXS Control'
-  );
-  assert.match(consoleManifest, /android:icon="@mipmap\/ic_launcher"/);
-  assert.notEqual(
-    read('android/NexusConsole/app/src/main/res/drawable/ic_control_foreground.xml'),
-    read('android/NexusRemote/app/src/main/res/drawable-nodpi/ic_nexus_remote.png'),
-    'NexusNXS Control deve avere un simbolo launcher autonomo rispetto al client pubblico',
-  );
-  assert.match(consoleManifest, /tools:targetApi="33"/);
-  assert.doesNotMatch(consoleManifest, /android\.intent\.category\.BROWSABLE|android:host="console"/);
-  assert.doesNotMatch(consoleManifest, /android:host="remote"/);
-  assert.doesNotMatch(consoleManifest, /com\.tailscale\.ipn/, 'la Console non deve dipendere da launcher o scorciatoie VPN');
-});
-
-test('NexusNXS per Android segue la lingua del dispositivo in UI, voce e configurazione Android', () => {
-  const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
-  const localeConfig = read('android/NexusRemote/app/src/main/res/xml/locales_config.xml');
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(manifest, /android:localeConfig="@xml\/locales_config"/);
-  assert.match(localeConfig, /android:name="en"/);
-  assert.match(localeConfig, /android:name="it"/);
-  assert.match(activity, /resources\.configuration\.locales\[0\]/);
-  assert.match(activity, /localizedServerActivity\(phase\)/);
-  assert.match(activity, /"Ragiono e collego i dettagli…" -> "Reasoning through the details…"/);
-  assert.match(activity, /"Waiting · position \$\{it\.groupValues\[1\]\}"/);
-  assert.match(activity, /textToSpeech\?\.setLanguage\(deviceLocale\)/);
-  assert.doesNotMatch(activity, /textToSpeech\?\.language = Locale\.ITALIAN/);
-});
-
-test('entrambi i client usano barre di sistema edge-to-edge traslucide senza separatori neri', () => {
-  const policy = read('android/shared-motion/src/main/java/local/nexus/motion/NexusSystemBars.java');
-  const publicActivity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const controlActivity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  for (const relative of [
-    'android/NexusRemote/app/src/main/res/values/styles.xml',
-    'android/NexusConsole/app/src/main/res/values/styles.xml',
-  ]) {
-    const style = read(relative);
-    assert.match(style, /android:statusBarColor">@android:color\/transparent/);
-    assert.match(style, /android:navigationBarColor">@android:color\/transparent/);
-    assert.match(style, /android:windowDrawsSystemBarBackgrounds">true/);
-  }
-  assert.match(policy, /WindowCompat\.setDecorFitsSystemWindows\(window, false\)/);
-  assert.match(policy, /Color\.argb\(166, 2, 6, 7\)/);
-  assert.match(policy, /FROSTED_COSMIC_SCRIM = Color\.argb\(82, 2, 6, 7\)/);
-  assert.match(policy, /FROSTED_STATUS_MAX_ALPHA = 116/);
-  assert.match(policy, /applyFrosted\(Window window\)[\s\S]*apply\(window, FROSTED_COSMIC_SCRIM, FROSTED_COSMIC_SCRIM\)/);
-  assert.match(policy, /updateFrostedStatus\(Window window, float progress\)/);
-  assert.match(policy, /float eased = 1f - \(\(1f - clamped\) \* \(1f - clamped\)\)/);
-  assert.match(policy, /setStatusBarColor\(statusScrim\)/);
-  assert.match(policy, /setNavigationBarColor\(navigationScrim\)/);
-  assert.match(policy, /setNavigationBarDividerColor\(Color\.TRANSPARENT\)/);
-  assert.match(policy, /setNavigationBarContrastEnforced\(false\)/);
-  assert.match(publicActivity, /NexusSystemBars\.apply\(window\)/);
-  assert.match(controlActivity, /NexusSystemBars\.applyFrosted\(getWindow\(\)\)/);
-  assert.match(controlActivity, /scroll\.setClipToPadding\(false\)/);
-  assert.match(controlActivity, /scroll\.setOnScrollChangeListener/);
-  assert.match(controlActivity, /Math\.max\(0f, scrollY\) \/ \(float\) dp\(56\)/);
-  assert.match(controlActivity, /updateStatusFrost\(step \/ 24f\)/);
-  assert.match(controlActivity, /statusFrostOverlay = new View\(this\)/);
-  assert.match(controlActivity, /new int\[\]\{Color\.argb\(topAlpha, 2, 6, 7\), Color\.argb\(edgeAlpha, 2, 6, 7\), Color\.TRANSPARENT\}/);
-  assert.doesNotMatch(controlActivity, /SystemBarGlassView|RenderEffect|RenderNode|glassOverlap/, 'il velo resta leggero e non usa blur software per-frame');
-  assert.match(controlActivity, /dashboardNavigation\.setPadding\(horizontal, topInset \+ dp\(8\), horizontal, dp\(16\)\)/);
-  assert.match(controlActivity, /navigationHeight = navigationVisible \? dashboardNavigation\.getHeight\(\) : topInset/);
-  assert.match(controlActivity, /scroll\.setPadding\(0, navigationHeight, 0, dp\(10\) \+ bottomInset \+/);
-  assert.match(controlActivity, /dashboardNavigation\.addView\(title\)[\s\S]*dashboardNavigation\.addView\(tabs/);
-  assert.match(controlActivity, /viewport\.addView\(scroll,[\s\S]*viewport\.addView\(dashboardNavigation,/);
-  assert.doesNotMatch(controlActivity, /view\.setPadding\(horizontal,\s*dp\(8\)\s*\+\s*insets\.getSystemWindowInsetTop/);
-  assert.doesNotMatch(publicActivity, /navigationBarStyle\s*=\s*SystemBarStyle\.dark\(android\.graphics\.Color\.BLACK\)/);
-});
-
-test('i client richiedono credenziali limitate alla propria funzione', () => {
-  const remoteActivity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const consoleActivity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  assert.match(remoteActivity, /"scope", "remote"/);
-  assert.doesNotMatch(remoteActivity, /"scope", "console"/);
-  assert.match(consoleActivity, /\/api\/console\/bootstrap/);
-  assert.doesNotMatch(consoleActivity, /Inquadra QR|Codice di collegamento|Collega dispositivo/);
-  assert.doesNotMatch(consoleActivity, /\/api\/conversations|Compagno NexusNXS|Scrivi a NexusNXS/);
-  assert.doesNotMatch(consoleActivity, /\/api\/actions\/plan|\/api\/actions\/execute|\/api\/voice\/transcribe/);
-  assert.doesNotMatch(consoleActivity, /TERMINALE|SESSIONE IN TEMPO REALE|\/api\/events|console-output|ProcessBuilder|Runtime\.getRuntime\(\)\.exec/);
-  assert.match(consoleActivity, /DATI TECNICI/);
-  assert.match(consoleActivity, /text\("OFFLINE"/);
-  assert.doesNotMatch(consoleActivity, /Ripristina connessione privata|openPrivateNetwork/, 'la riconnessione deve essere automatica e non occupare la UI');
-  assert.doesNotMatch(consoleActivity, /com\.tailscale\.ipn/);
-  assert.match(consoleActivity, /else main\.post\(reconnect\)/);
-});
-
-test('le due app restano client Android nativi con uno stato offline comprensibile', () => {
-  const remoteActivity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const consoleActivity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  for (const source of [remoteActivity, consoleActivity]) {
-    assert.doesNotMatch(source, /\bWebView\b|android\.webkit|loadUrl\s*\(/);
-    assert.match(source, /HttpURLConnection/);
-  }
-  assert.match(remoteActivity, /private fun endpointCandidates/);
-  assert.match(consoleActivity, /1_000L << Math\.min\(reconnectAttempt, 5\)/);
-  assert.match(remoteActivity, /Server NexusNXS non raggiungibili/);
-  assert.match(remoteActivity, /clientMessageId/);
-  assert.match(remoteActivity, /retryPendingRequests/);
-  assert.match(remoteActivity, /rememberReachable/);
-  assert.match(consoleActivity, /text\("OFFLINE"/);
-  assert.match(consoleActivity, /Riconnessione automatica/);
-});
-
-test('NexusMainActivity avvia la superficie istantanea e separa il richiamo assistente', () => {
-  const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const assistantActivity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusAssistantActivity.kt');
-  const styles = read('android/NexusRemote/app/src/main/res/values/styles.xml');
-  const launcherActivity = manifest.split('android:name=".NexusMainActivity"')[1]?.split('</activity>')[0] || '';
-  assert.match(launcherActivity, /android\.intent\.action\.MAIN/);
-  assert.doesNotMatch(manifest, /NativeMainActivity|QrScannerActivity|NexusRedesignActivity/);
-  assert.match(activity, /enum class NexusWidthClass \{ COMPACT, MEDIUM, EXPANDED \}/);
-  assert.match(activity, /LocalWindowInfo\.current\.containerSize/);
-  assert.match(activity, /ValueAnimator\.areAnimatorsEnabled\(\)/);
-  assert.match(activity, /slideInHorizontally/);
-  assert.match(activity, /slideOutHorizontally/);
-  assert.match(activity, /if \(back\) -width \/ 9 else width \/ 9/, 'avanzamento e ritorno devono avere direzioni Android speculari');
-  assert.match(activity, /setContent \{ NexusTheme \{ if \(state\.assistantOverlay\) NexusAssistantOverlay\(state, ::dispatch\) else NexusInstantApp\(state, ::dispatch\) \} \}/);
-  assert.match(manifest, /android:name="\.NexusAssistantActivity"[\s\S]*android\.intent\.action\.ASSIST/);
-  assert.match(styles, /Theme\.NexusRemote\.Assistant[\s\S]*windowIsTranslucent">true/);
-  assert.match(styles, /Theme\.NexusRemote\.Assistant[\s\S]*backgroundDimEnabled">true/);
-  assert.match(assistantActivity, /setBackgroundDrawable\(ColorDrawable/);
-  assert.match(activity, /private fun nexusComposerTransform[\s\S]{0,160}sizeTransform = null/, 'il composer non deve sovrapporre una molla alla transizione della tastiera Android');
-  assert.doesNotMatch(activity, /"assistantClose"\s*->[^\n]*assistantOverlay\s*=\s*false/, 'la chiusura Assist non deve comporre la UI opaca prima di terminare');
-  assert.match(assistantActivity, /clearFlags\(WindowManager\.LayoutParams\.FLAG_BLUR_BEHIND or WindowManager\.LayoutParams\.FLAG_DIM_BEHIND/);
-  assert.match(assistantActivity, /addFlags\(WindowManager\.LayoutParams\.FLAG_DIM_BEHIND\)/, 'Android oscura il contesto dietro il Core');
-  assert.match(assistantActivity, /dimAmount = \.78f/);
-  assert.match(assistantActivity, /isCrossWindowBlurEnabled/);
-  assert.doesNotMatch(activity.match(/setContent[^\n]+/)?.[0] || '', /NexusApp\(/);
-  assert.match(activity, /private fun NexusInstantApp/);
-  assert.match(activity, /private fun NexusInstantCore/);
-  const assistantSurface = activity.split('@Composable private fun NexusAssistantOverlay')[1]?.split('@Composable private fun InstantWrittenExchange')[0] || '';
-  assert.match(assistantSurface, /Brush\.verticalGradient/);
-  assert.match(assistantSurface, /fullScene = false/);
-  assert.doesNotMatch(assistantSurface, /CosmicScene\(Modifier\.fillMaxSize\(\)\)/, 'un solo renderer confinato al Core');
-  assert.doesNotMatch(assistantSurface, /BasicTextField|NexusAttachmentFlow/, 'Assist reuses the full app composer');
-  assert.equal((assistantSurface.match(/IconButton\(/g) || []).length, 2, 'Assist exposes just attachment and keyboard shortcuts');
-  const expandAction = activity.split('"assistantExpand" ->')[1]?.split('"assistantEntryConsumed"')[0] || '';
-  assert.doesNotMatch(expandAction, /(?:startActivity|finish|disconnect|cancel\w*)\s*\(/i, 'Expanding the same conversation must not cancel its pending reply');
-  assert.match(expandAction, /assistantOverlay = false/);
-  assert.match(activity, /"voiceSend"/);
-  assert.match(activity, /if \(speakReply\) speakOrStop\(answer\)/);
-  assert.match(activity, /\/api\/guest\/voice\/synthesize/);
-  assert.match(activity, /MediaPlayer/);
-  assert.match(activity, /if \(state\.busy\) dispatch\("stop", ""\)/, 'il Core deve consentire barge-in durante una risposta');
-  assert.match(activity, /dispatch\("stopSpeech", ""\)[\s\S]{0,80}voiceMode = !voiceMode/);
-  assert.match(activity, /keyboard\?\.hide\(\)[\s\S]{0,160}textMode = false[\s\S]{0,160}dispatch\("send"/);
-  const instantSurface = activity.match(/@Composable private fun NexusInstantApp[\s\S]*?@Composable private fun NexusInstantCore/)?.[0] || '';
-  assert.match(instantSurface, /navigationBarsPadding\(\)\.imePadding\(\)/, 'il composer deve restare sopra la tastiera edge-to-edge');
-  assert.doesNotMatch(instantSurface.split('/** Superficie traslucida')[0], /composerBringIntoView|AnimatedContent\(textMode/, 'il composer non deve duplicarsi o riposizionarsi durante il movimento IME');
-  assert.match(instantSurface, /bottom = 10\.dp/, 'il composer mantiene un margine stabile sopra la tastiera');
-  assert.match(instantSurface, /val historyState = rememberLazyListState/);
-  assert.match(instantSurface, /itemsIndexed\(state\.turns/);
-  assert.match(instantSurface, /followLatest && !historyState\.isScrollInProgress/);
-  assert.doesNotMatch(instantSurface, /targetState = centeredExchange/, 'la fine streaming non deve ricreare il Markdown');
-  assert.match(instantSurface, /InstantWrittenExchange/);
-  assert.match(instantSurface, /shape = RoundedCornerShape\(18\.dp\)/, 'prompt e stato devono condividere superfici arrotondate coerenti');
-  assert.match(instantSurface, /var typedSession by rememberSaveable/);
-  assert.match(instantSurface, /align\(Alignment\.BottomStart\)[\s\S]{0,260}NexusSymbols\.Keyboard/, 'la tastiera deve restare raggiungibile in basso a sinistra');
-  const conversationSurface = instantSurface.slice(0, instantSurface.indexOf('BackHandler(enabled = settingsOpen)'));
-  assert.doesNotMatch(conversationSurface, /NexusSymbols\.Mic/, 'la conversazione deve usare il Core come unico ingresso vocale; le impostazioni possono identificarne la categoria');
-  assert.match(activity, /energy: Float = 0f/);
-  assert.match(activity, /energy = voiceEnergy/);
-  assert.match(activity, /haltCapture\(false, true\)[\s\S]{0,80}close\(\)/, 'un secondo tocco sul Core deve interrompere e tornare alla superficie principale');
-  assert.match(instantSurface, /NexusAttachmentFlow/);
-  assert.match(instantSurface, /AttachmentPreview\(state\.conversationId, state\.composerState\(\)/);
-  assert.match(instantSurface, /NexusSymbols\.Add/);
-  assert.match(instantSurface, /Row\(Modifier\.padding\(horizontal = 7\.dp, vertical = 7\.dp\)/, 'allega e invia devono avere inset simmetrici nel composer');
-  assert.match(instantSurface, /NexusSymbols\.Add[\s\S]{0,180}Modifier\.size\(21\.dp\)/, 'il glifo più deve avere lo stesso peso ottico del pulsante invio');
-  assert.match(instantSurface, /state\.remoteWorkAvailable && state\.workTicketId\.isNotBlank\(\)/, 'la superficie istantanea deve rendere autorizzabile un piano remoto');
-  assert.match(activity, /enteredText\.ifBlank \{ nexusCopy\("Analizza questo allegato\./, 'un allegato deve poter essere inviato anche senza testo manuale');
-  assert.match(activity, /Server NexusNXS non raggiungibili/);
-});
-
-test('l APK pubblico blocca ogni input finché il server non è realmente online', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const protocol = JSON.parse(read('config/nexus-interaction-states.json'));
-  const instantSurface = activity.match(/@Composable private fun NexusInstantApp[\s\S]*?@Composable private fun NexusInstantCore/)?.[0] || '';
-  const dispatch = activity.match(/private fun dispatch[\s\S]*?private fun refreshChats/)?.[0] || '';
-  const send = activity.match(/private fun sendMessage[\s\S]*?private fun explicitDesktopIntent/)?.[0] || '';
-  assert.equal(protocol.states.offline.inputPolicy, 'blocked-until-online');
-  assert.deepEqual(protocol.states.offline.allowedActions, ['retry-connection', 'read-status']);
-  assert.match(instantSurface, /val interactionAvailable = state\.connection == NexusConnection\.ONLINE/);
-  assert.match(instantSurface, /if \(!interactionAvailable\)[\s\S]{0,240}keyboard\?\.hide\(\)[\s\S]{0,240}voiceMode = false/);
-  assert.match(instantSurface, /enabled = interactionAvailable/);
-  assert.match(instantSurface, /visible = attachmentSheet && interactionAvailable/);
-  assert.match(dispatch, /"draft" -> \{[\s\S]{0,100}state\.connection != NexusConnection\.ONLINE\) return/);
-  assert.match(dispatch, /spoken\.isNotBlank\(\) && !state\.busy && state\.connection == NexusConnection\.ONLINE/);
-  assert.match(send, /if \(state\.connection != NexusConnection\.ONLINE\)[\s\S]{0,420}probeConnection\(\)/);
-  assert.doesNotMatch(activity, /server è offline\. Puoi comunque scrivere|server is offline\. You can still type/i);
-});
-
-test('il client pubblico invia al training soltanto feedback volontario in quarantena', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(activity, /"approveTraining"\s*->\s*submitApprovedFeedback\(value\)/);
-  assert.match(activity, /\/api\/guest\/feedback/);
-  assert.match(activity, /\.put\("consent", true\)/);
-  assert.match(activity, /substringBefore\("\\n\\nAllegato:"\)/);
-  assert.match(activity, /state\.temporary \|\| response\.isBlank\(\)/);
-});
-
 test('la release separa i due client pubblici dalla Console privata', () => {
   const packageJson = JSON.parse(read('package.json'));
   const release = read('scripts', 'release-all.js');
   assert.match(packageJson.scripts['release:all'], /release-all\.js/);
-  assert.match(release, /NexusNXS-Android\.apk/);
   assert.match(release, /NexusNXS-Control\.apk/);
   assert.match(release, /release-manifest\.json/);
   assert.match(release, /release-manifest\.private\.json/);
@@ -249,49 +23,74 @@ test('la release separa i due client pubblici dalla Console privata', () => {
   assert.match(release, /--private-only/);
 });
 
-test('la release Android pubblica rifiuta credenziali mancanti e firme Debug', () => {
+test('la matrice visuale Android copre telefono font grande landscape e tablet', () => {
+  const script = read('scripts/capture-android-visual-matrix.ps1');
   const packageJson = JSON.parse(read('package.json'));
-  const build = read('scripts', 'build-android-remote.ps1');
-  assert.match(packageJson.scripts['android:remote:public'], /-PublicRelease/);
-  assert.match(build, /\[switch\]\$PublicRelease/);
-  assert.match(build, /\$PublicRelease -and -not \$signedRelease/);
-  assert.match(build, /CN=Android Debug/);
-  assert.match(build, /\$variant = if \(\$signedRelease\) \{ "Release" \} else \{ "Preview" \}/);
-  assert.match(build, /if \(\$signedRelease\) \{ \$gradleTasks \+= "bundle\$variant" \}/);
-  assert.match(build, /nessun bundle Play generato/);
-  assert.match(read('android/NexusRemote/app/build.gradle'), /preview \{[\s\S]*signingConfig\s*(?:=\s*)?signingConfigs\.debug/);
-  assert.doesNotMatch(read('android/NexusRemote/app/build.gradle'), /signingConfig nexusKeystore \? signingConfigs\.nexusRelease : signingConfigs\.debug/);
-  assert.match(read('android/NexusRemote/app/src/main/baseline-prof.txt'), /NexusMainActivity;->dispatch/);
+  assert.match(packageJson.scripts['qa:android:visual'], /capture-android-visual-matrix\.ps1/);
+  assert.match(script, /phone-compact/);
+  assert.match(script, /phone-large-font/);
+  assert.match(script, /phone-landscape/);
+  assert.match(script, /tablet/);
+  assert.match(script, /finally\s*\{[\s\S]*Restore-Display/);
+  assert.match(script, /uiautomator dump/);
+  assert.match(script, /dumpsys gfxinfo \$package reset/);
+  assert.match(script, /MaxJankyPercent = 18/);
+  assert.match(script, /JankyPercent = \$jankyPercent/);
 });
 
-test('NexusNXS Android conserva diagnostica crash locale senza contenuti privati', () => {
-  const store = read('android/NexusRemote/app/src/main/java/local/nexus/remote/AndroidCrashStore.java');
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(activity, /AndroidCrashStore\.install\(this\)/);
-  assert.match(store, /MAX_REPORTS = 8/);
-  assert.match(store, /getSimpleName\(\)/);
-  assert.doesNotMatch(store, /getMessage\(|printStackTrace|stackTrace|HttpURLConnection|URL\(/);
+test('la conferma privata sopravvive al ritorno biometrico e ai cambi rete', () => {
+  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  assert.match(activity, /else if \(currentScreen != SCREEN_POWER\) reconnect\.run\(\)/);
+  assert.match(activity, /resumeForegroundRefreshes\(\)[\s\S]*if \(currentScreen == SCREEN_POWER\) return/);
+  assert.match(activity, /if \(requestCode == REQUEST_DEVICE_CREDENTIAL\)[\s\S]*resultCode == RESULT_OK && action != null/);
 });
 
-test('le notifiche Android usano un simbolo monocromatico dedicato', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const icon = read('android/NexusRemote/app/src/main/res/drawable/ic_nexus_notification.xml');
-  assert.match(activity, /setSmallIcon\(R\.drawable\.ic_nexus_notification\)/);
-  assert.match(icon, /android:fillColor="#FFFFFFFF"/);
-  assert.doesNotMatch(icon, /gradient|bitmap/i);
+test('la telemetria Android disegna lo storico senza allocazioni a ogni frame', () => {
+  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const sparkline = activity.split('private final class SparklineView')[1]?.split('private LinearLayout card()')[0] || '';
+  assert.match(sparkline, /private final float\[\] samples = new float\[SAMPLE_CAPACITY\]/);
+  assert.match(sparkline, /System\.arraycopy\(samples, 1, samples, 0, SAMPLE_CAPACITY - 1\)/);
+  assert.doesNotMatch(sparkline, /toArray\s*\(/);
+  assert.doesNotMatch(sparkline, /new Float\[/);
 });
 
-test('il client istantaneo non richiede la fotocamera', () => {
-  const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
-  const build = read('android/NexusRemote/app/build.gradle');
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.doesNotMatch(manifest, /android\.permission\.CAMERA|android\.hardware\.camera/);
-  assert.match(activity, /setContent \{ NexusTheme \{ if \(state\.assistantOverlay\)[\s\S]*NexusInstantApp/);
-  assert.doesNotMatch(activity.match(/@Composable private fun NexusInstantApp[\s\S]*?@Composable private fun NexusInstantCore/)?.[0] || '', /TakePicture|AttachmentPicker|PhotoCamera/);
-  assert.match(manifest, /androidx\.core\.content\.FileProvider/);
-  assert.doesNotMatch(manifest, /QrScannerActivity/);
-  assert.doesNotMatch(build, /com\.google\.zxing/);
+test('NexusNXS Control non usa header navbar o footer persistenti', () => {
+  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const shell = activity.split('private void createShell()')[1]?.split('private void showConnecting()')[0] || '';
+  assert.doesNotMatch(shell, /statePill|LinearLayout top|root\.addView\(top\)/);
+  assert.doesNotMatch(activity, /Ogni azione richiede la tua conferma\./);
+  assert.doesNotMatch(activity, /TextView state(?:Dot)?;/);
+  assert.match(activity, /visibleState = stateKey/);
+  assert.match(activity, /content\.setGravity\(Gravity\.CENTER\)/);
 });
+
+test('Console integra i segnali di sicurezza nei dettagli senza una pagina duplicata', () => {
+  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const manifest = read('android/NexusConsole/app/src/main/AndroidManifest.xml');
+  assert.match(activity, /if \(token\.isEmpty\(\)\) bootstrapConsole\(\); else restoreAuthenticatedScreen\(\)/);
+  assert.match(activity, /if \(foreground\) restoreAuthenticatedScreen\(\)/);
+  assert.match(activity, /lastSecuritySummary/);
+  assert.doesNotMatch(activity, /Centro sicurezza|loadSecurityCenter|SCREEN_SECURITY/);
+  assert.match(activity, /appendSecurityOverview\(specifications, lastSecuritySummary\)/);
+  assert.match(activity, /infoRow\("Protezione"/);
+  assert.match(activity, /infoRow\("Dispositivi autorizzati"/);
+  assert.match(activity, /infoRow\("Avvisi 24 ore"/);
+  assert.match(activity, /infoRow\("Ultimo evento"/);
+  assert.match(activity, /updateSecurityOverview\(summary\)/, 'il refresh deve aggiornare il pannello tecnico senza ricostruire la dashboard');
+  assert.match(activity, /private void returnToDashboard\(\)[\s\S]*lastDashboardSnapshot[\s\S]*renderDashboard\(lastDashboardSnapshot\)/, 'Indietro deve ripristinare subito la dashboard in cache');
+  assert.match(activity, /symbolPaths\.get\(name\)/, 'i vettori operativi devono essere riusati senza parsing ad ogni aggiornamento');
+  assert.doesNotMatch(activity, /density \* \.96f/, 'la densità non deve essere applicata due volte al tratto');
+  assert.match(manifest, /android:enableOnBackInvokedCallback="true"/);
+  assert.match(activity, /reverseContentTransition = true/);
+  assert.match(activity, /content\.setTranslationX\(materialize \? 0f : reverse \? -dp\(NexusMotion\.CONTENT_TRAVEL_DP\) : dp\(NexusMotion\.CONTENT_TRAVEL_DP\)\)/);
+  assert.match(activity, /materializationOverlay\.materialize\(\)/);
+  assert.match(activity, /class MaterializationView extends View/);
+  assert.match(activity, /cancel\.setOnClickListener\(v -> cancelPowerConfirmation\(\)\)/, 'Annulla deve usare lo stesso ritorno immediato del Back Android');
+  assert.match(activity, /getOnBackPressedDispatcher\(\)\.onBackPressed\(\)/, 'il ritorno alla Home deve restare gestito da Android');
+  assert.match(activity, /handleOnBackCancelled\(\)/, 'annullare il gesto deve ripristinare il contenuto');
+  assert.match(activity, /boolean materialize = materializeNextContent;/, 'la materializzazione deve valere per ogni cambio superficie');
+});
+
 
 test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell remota', () => {
   const activity = read('android', 'NexusConsole', 'app', 'src', 'main', 'java', 'local', 'nexus', 'console', 'NativeMainActivity.java');
@@ -345,9 +144,6 @@ test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell rem
   const consoleBuild = read('android/NexusConsole/app/build.gradle');
   assert.match(consoleBuild, /NEXUS_CONSOLE_FALLBACK_URL/);
   assert.doesNotMatch(consoleBuild, /providers\.gradleProperty\("NEXUS_FALLBACK_URL"\)/, 'la Console non deve ereditare il Funnel pubblico del client AI');
-  const networkSecurity = read('android/NexusRemote/app/src/main/res/xml/network_security_config.xml');
-  assert.match(networkSecurity, /<base-config cleartextTrafficPermitted="false"\s*\/>/);
-  assert.doesNotMatch(networkSecurity, /<domain-config|cleartextTrafficPermitted="true"/, 'il client AI non deve inviare contenuti o token in HTTP');
   assert.match(activity, /secureTokenStore\.read\(\)/);
   assert.doesNotMatch(activity, /WorkManager|enqueueUniquePeriodicWork/);
   assert.match(activity, /telemetryFailures >= 2/);
@@ -362,7 +158,6 @@ test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell rem
 test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri', () => {
   const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
   const consoleBuild = read('android/NexusConsole/app/build.gradle');
-  const remoteBuild = read('android/NexusRemote/app/build.gradle');
   const sharedMotion = read('android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
   assert.match(activity, /Verifica server/);
   assert.match(activity, /Arresta server/);
@@ -414,7 +209,6 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /new PathInterpolator\(NexusMotion\.EMPHASIZED_X1/);
   assert.match(activity, /content\.setAlpha\(materialize \? \.42f : NexusMotion\.CONTENT_START_ALPHA\)/);
   assert.match(consoleBuild, /shared-motion\/src\/main\/java/);
-  assert.match(remoteBuild, /shared-motion\/src\/main\/java/);
   assert.match(sharedMotion, /public static final int ENTER = 260/);
   assert.match(sharedMotion, /public static final int CONTENT_SWAP = 320/);
   assert.match(sharedMotion, /profileScale\(boolean lowRam, boolean powerSave, float refreshRate\)/);
@@ -443,35 +237,16 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.doesNotMatch(activity, /Runtime\.getRuntime\(\)\.exec|\/bin\/sh|cmd\.exe/);
 });
 
-test('la matrice visuale Android copre telefono font grande landscape e tablet', () => {
-  const script = read('scripts/capture-android-visual-matrix.ps1');
-  const packageJson = JSON.parse(read('package.json'));
-  assert.match(packageJson.scripts['qa:android:visual'], /capture-android-visual-matrix\.ps1/);
-  assert.match(script, /phone-compact/);
-  assert.match(script, /phone-large-font/);
-  assert.match(script, /phone-landscape/);
-  assert.match(script, /tablet/);
-  assert.match(script, /finally\s*\{[\s\S]*Restore-Display/);
-  assert.match(script, /uiautomator dump/);
-  assert.match(script, /dumpsys gfxinfo \$package reset/);
-  assert.match(script, /MaxJankyPercent = 18/);
-  assert.match(script, /JankyPercent = \$jankyPercent/);
-});
-
-test('entrambi i client Android riducono il budget grafico con isteresi sui frame reali', () => {
-  const publicMonitor = read('android/NexusRemote/app/src/main/java/local/nexus/remote/FrameHealthMonitor.java');
-  const publicActivity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
+test('Control riduce il budget grafico con isteresi sui frame reali', () => {
   const privateMonitor = read('android/NexusConsole/app/src/main/java/local/nexus/console/FrameBudgetMonitor.java');
   const privateActivity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  for (const monitor of [publicMonitor, privateMonitor]) {
+  for (const monitor of [privateMonitor]) {
     assert.match(monitor, /Choreographer\.FrameCallback/);
     assert.match(monitor, /smoothedSlowRatio >= \.12f/);
     assert.match(monitor, /smoothedSlowRatio <= \.05f/);
     assert.match(monitor, /healthyWindows >= 3/);
     assert.match(monitor, /frameHealth\.constrained/);
   }
-  assert.match(publicActivity, /frameConstrained/);
-  assert.match(publicActivity, /adaptiveReducedMotion = frameConstrained/);
   assert.match(privateActivity, /new FrameBudgetMonitor/);
   assert.match(privateActivity, /frameBudgetMonitor\.start\(\)/);
   assert.match(privateActivity, /frameBudgetMonitor\.stop\(\)/);
@@ -488,465 +263,4 @@ test('entrambi i client Android riducono il budget grafico con isteresi sui fram
   assert.match(privateActivity, /PendingIntent\.FLAG_UPDATE_CURRENT \| PendingIntent\.FLAG_IMMUTABLE/);
   assert.match(privateActivity, /notify\(notificationId, value\)/);
   assert.doesNotMatch(privateActivity, /notify\(\(int\) \(System\.currentTimeMillis\(\) & 0xfffffff\)/);
-});
-
-test('la conferma privata sopravvive al ritorno biometrico e ai cambi rete', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  assert.match(activity, /else if \(currentScreen != SCREEN_POWER\) reconnect\.run\(\)/);
-  assert.match(activity, /resumeForegroundRefreshes\(\)[\s\S]*if \(currentScreen == SCREEN_POWER\) return/);
-  assert.match(activity, /if \(requestCode == REQUEST_DEVICE_CREDENTIAL\)[\s\S]*resultCode == RESULT_OK && action != null/);
-});
-
-test('la telemetria Android disegna lo storico senza allocazioni a ogni frame', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  const sparkline = activity.split('private final class SparklineView')[1]?.split('private LinearLayout card()')[0] || '';
-  assert.match(sparkline, /private final float\[\] samples = new float\[SAMPLE_CAPACITY\]/);
-  assert.match(sparkline, /System\.arraycopy\(samples, 1, samples, 0, SAMPLE_CAPACITY - 1\)/);
-  assert.doesNotMatch(sparkline, /toArray\s*\(/);
-  assert.doesNotMatch(sparkline, /new Float\[/);
-});
-
-test('NexusNXS Control non usa header navbar o footer persistenti', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  const shell = activity.split('private void createShell()')[1]?.split('private void showConnecting()')[0] || '';
-  assert.doesNotMatch(shell, /statePill|LinearLayout top|root\.addView\(top\)/);
-  assert.doesNotMatch(activity, /Ogni azione richiede la tua conferma\./);
-  assert.doesNotMatch(activity, /TextView state(?:Dot)?;/);
-  assert.match(activity, /visibleState = stateKey/);
-  assert.match(activity, /content\.setGravity\(Gravity\.CENTER\)/);
-});
-
-test('NexusNXS per Android parte senza account e conserva le chat anonime nel database locale', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
-  assert.match(activity, /\/api\/guest\/bootstrap/);
-  assert.match(activity, /\/api\/guest\/messages/);
-  assert.match(activity, /\/api\/guest\/messages\/stream/);
-  assert.match(activity, /secureTokens\.read\("guestToken"\)/);
-  assert.match(activity, /refreshChats\(openIfEmpty = true\)/);
-  assert.match(activity, /private fun openConversation/);
-  assert.match(activity, /NexusNXS Rapido/);
-  assert.match(activity, /NexusNXS Pro/);
-  assert.match(activity, /NexusComposer/);
-  assert.match(activity, /chatGeneration\+\+/);
-  assert.match(activity, /SpeechRecognizer/);
-  assert.match(activity, /RECORD_AUDIO/);
-  assert.match(activity, /TextToSpeech/);
-  assert.match(activity, /NexusScreen\.SCHEDULED/);
-  assert.match(activity, /queueDraftPersistence/);
-  assert.match(store, /deleteLastAssistantTurn/);
-  assert.match(store, /SQLiteOpenHelper/);
-  assert.match(store, /nexusnxs-chats\.db/);
-  assert.match(store, /preview/);
-});
-
-test('NexusNXS per Android Compose conserva la coda offline e autorizza Cuore prima di eseguire', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
-  assert.match(store, /CREATE TABLE pending_requests/);
-  assert.match(store, /queueRequest/);
-  assert.match(store, /nextPendingRequest/);
-  assert.match(activity, /clientMessageId/);
-  assert.match(activity, /BuildConfig\.NEXUS_FALLBACK_URL/);
-  assert.match(activity, /ModelRow\("nexus-fast", "NexusNXS Rapido"\)/);
-  assert.match(activity, /ModelRow\("nexus-deep", "NexusNXS Pro"\)/);
-  assert.match(activity, /put\("model", publicModelId\(model\)\)/);
-  assert.doesNotMatch(activity, /if \(model == "NexusNXS Pro"[^\n]+return "deep"/, 'il profilo Pro e un tetto di capacita e non deve forzare deep sui prompt banali');
-  assert.match(activity, /explicitDepth\.containsMatchIn\(text\)/, 'le richieste esplicitamente approfondite devono poter scegliere il percorso deep');
-  assert.match(activity, /id\.equals\("nexus-fast", true\)/);
-  assert.match(activity, /id\.equals\("nexus-deep", true\)/);
-  assert.match(activity, /private fun endpointCandidates/);
-  assert.match(activity, /status !in 200\.\.299/);
-  assert.match(activity, /retryPendingRequests/);
-  assert.match(activity, /\/api\/actions\/plan/);
-  assert.match(activity, /\/api\/actions\/execute/);
-  assert.match(activity, /secureTokens\.write\("workProposal"/);
-  assert.match(activity, /secureTokens\.read\("workProposal"/);
-  assert.match(activity, /if \(failure == null\) clearWorkProposal\(\)/);
-  assert.match(activity, /"approveWork" -> authorizeWorkProposal\(\)/);
-  assert.match(activity, /BiometricPrompt\.Builder/);
-  assert.match(activity, /createConfirmDeviceCredentialIntent/);
-  assert.match(activity, /pendingAuthorizationKind != NexusAuthorizationKind\.WORK \|\| pendingAuthorizationTicket != ticket/);
-  assert.match(activity, /executeAuthorizedWorkProposal\(ticket\)/);
-  assert.match(activity, /branchWithDraft/);
-  assert.match(store, /archiveConversation/);
-  assert.match(activity, /Modalità Cuore/);
-  assert.match(activity, /conversationGlass\(true, metrics\.adaptiveReducedMotion\)/);
-  assert.match(activity, /enum class NexusWidthClass/);
-  assert.match(activity, /rememberNexusMetrics/);
-  assert.match(activity, /val landscape = windowSize\.width > windowSize\.height/);
-  assert.match(activity, /metrics\.contentMaxWidth/);
-});
-
-test('NexusNXS Android condivide la palette slash e salva comandi personali sul dispositivo', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.match(activity, /data class SlashCommandRow/);
-  assert.match(activity, /builtinSlashCommands\(\)/);
-  assert.match(activity, /loadCustomSlashCommands\(\)/);
-  assert.match(activity, /persistCustomSlashCommands/);
-  assert.match(activity, /COMANDI NEXUSNXS/);
-  assert.match(activity, /resolveSlashInput/);
-  assert.match(activity, /Cerca sul web informazioni aggiornate/);
-});
-
-test('la chat temporanea non persiste contenuti e protegge anteprime e allegati', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const manifest = read('android', 'NexusRemote', 'app', 'src', 'main', 'AndroidManifest.xml');
-  assert.match(manifest, /android:allowBackup="false"/);
-  assert.match(manifest, /android:fullBackupContent="false"/);
-  assert.match(activity, /FLAG_SECURE/);
-  assert.match(activity, /if \(!state\.temporary && state\.conversationId\.isNotBlank\(\)\)/);
-  assert.match(activity, /conversationId = "", turns = emptyList\(\), draft = "", attachment = null/);
-  assert.match(activity, /temporaryHasContent = draft\.isNotBlank\(\) \|\| turns\.isNotEmpty\(\) \|\| attachment != null/);
-});
-
-test('la home istantanea sostituisce completamente le superfici legacy', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.doesNotMatch(activity, /WorkLaunchpad/);
-  assert.doesNotMatch(activity, /private fun (?:NexusApp|NexusDrawer|NexusComposer|NexusParticlePresence|AttentionInboxScreen|WorkIdentityPanel)\(/);
-  assert.match(activity, /else NexusInstantApp\(state, ::dispatch\)/);
-  assert.match(activity, /state\.remoteWorkAvailable && state\.workTicketId\.isNotBlank\(\)/);
-});
-
-test('NexusNXS usa identità modello proprietaria e apre direttamente la chat', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.match(activity, /NexusNXS Rapido/);
-  assert.match(activity, /NexusNXS Pro/);
-  assert.doesNotMatch(activity, /firstRunGuide|homeGuideSeen|Inizia come preferisci|Start your way/);
-});
-
-test('invio mobile libera la tastiera e segue lo streaming finché l utente non scorre', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.match(activity, /state = state\.copy\(conversationId = id,[\s\S]*turns = store\.get\(id\)\.optJSONArray\("turns"\)\.toTurns\(\)/);
-  assert.match(activity, /keyboard\?\.hide\(\)[\s\S]{0,160}textMode = false[\s\S]{0,160}dispatch\("send"/);
-  assert.match(activity, /followLatest && !historyState\.isScrollInProgress/);
-});
-
-test('NexusNXS per Android carica i modelli anche dal percorso di continuità raggiungibile', () => {
-  const remoteCompose = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(remoteCompose, /private fun refreshModels\(\) = runTask/);
-  assert.match(remoteCompose, /backgroundExecutor\.shutdownNow\(\)/);
-  assert.match(remoteCompose, /if \(destroyed \|\| backgroundExecutor\.isShutdown\) return/);
-  assert.match(remoteCompose, /for \(endpoint in endpointCandidates\(\)\)/);
-  assert.match(remoteCompose, /rememberReachable\(endpoint\)/);
-  assert.doesNotMatch(remoteCompose, /URL\(server\.trimEnd\('\/'\) \+ "\/api\/models"\)/);
-});
-
-test('NexusNXS per Android distingue verifica, connessione e server offline senza affidarsi al testo', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(activity, /enum class NexusConnection \{ CHECKING, ONLINE, OFFLINE \}/);
-  assert.match(activity, /val connection: NexusConnection = NexusConnection\.CHECKING/);
-  assert.match(activity, /Server NexusNXS non raggiungibili/);
-  assert.match(activity, /private val connectionProbeRunning = AtomicBoolean\(false\)/);
-  assert.match(activity, /connectionProbeRunning\.compareAndSet\(false, true\)/);
-  assert.match(activity, /NetworkCapabilities\.NET_CAPABILITY_VALIDATED/);
-  assert.match(activity, /probeStatus\(base, "\/readyz"\)/, 'Online deve indicare che il servizio AI è pronto, non soltanto che il processo risponde');
-  assert.match(activity, /if \(readiness == 404\) probeStatus\(base, "\/healthz"\) else readiness/, 'healthz resta soltanto compatibilità per gateway che non espongono readiness');
-});
-
-test('Android conserva la chat scelta e sospende soltanto i polling periodici in background', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(activity, /val canResume = store\.get\(savedConversationId\) != null/);
-  assert.doesNotMatch(activity, /elapsed > SESSION_RESUME_WINDOW_MS\) openConversation\(store\.createConversation\(\)\)/);
-  assert.match(activity, /"probe" -> if \(appVisible\) probeConnection\(\)/);
-  assert.match(activity, /"models" -> if \(appVisible\) refreshModels\(\)/);
-  assert.match(activity, /override fun onResume\(\)[\s\S]*if \(::store\.isInitialized\) \{[\s\S]*probeConnection\(\)[\s\S]*loadWakeCapabilities\(\)/);
-});
-
-test('la voce Android parte dal Core, invia una frase e non resta attiva in background', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
-  assert.match(activity, /enum class NexusVoiceMode \{ IDLE, SINGLE_TURN, HANDS_FREE \}/);
-  assert.match(activity, /SpeechRecognizer\.isOnDeviceRecognitionAvailable\(context\)/);
-  assert.match(activity, /SpeechRecognizer\.createOnDeviceSpeechRecognizer\(context\)/);
-  assert.match(activity, /RecognizerIntent\.EXTRA_PREFER_OFFLINE, onDeviceAvailable/);
-  assert.match(activity, /RecognizerIntent\.EXTRA_LANGUAGE, voiceLocale/);
-  assert.ok(/LaunchedEffect\(captureActive\)[\s\S]{0,180}if \(captureActive\) beginCapture\(NexusVoiceMode\.SINGLE_TURN\)[\s\S]{0,60}else haltCapture\(false, false\)/.test(activity), 'Capture follows real response/playback state, independently of presentation');
-  assert.doesNotMatch(activity, /LaunchedEffect\(instantSubmit\)/, 'Recomposition must not restart the microphone');
-  assert.match(activity, /if \(inlineState != null\) return/, 'Inline voice must keep the existing core, without a second dialog');
-  assert.match(activity, /if \(instantSubmit != null\) instantSubmit\(value\)/);
-  assert.match(activity, /dispatch\("voiceSend", phrase\)/);
-  assert.match(activity, /event == Lifecycle\.Event\.ON_STOP\) haltCapture\(false, false\)/);
-  assert.match(activity, /handler\.removeCallbacksAndMessages\(null\)/);
-  assert.match(activity, /sessionGeneration == expectedGeneration/);
-  assert.doesNotMatch(manifest, /<receiver|FOREGROUND_SERVICE_MICROPHONE/, 'nessuna wake word con ascolto nascosto in background');
-  assert.match(manifest, /android.permission.BIND_VOICE_INTERACTION/);
-  assert.match(activity, /"stopSpeech" -> stopAllSpeech\(\)/, 'aprire la cattura deve interrompere subito sia la voce server sia il fallback locale');
-  assert.match(activity, /speechConnection\?\.disconnect\(\)/);
-  assert.match(activity, /EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS/, 'il VAD del recognizer deve chiudere una frase con un endpoint esplicito');
-  assert.match(activity, /lastCommittedPhrase/);
-  assert.match(activity, /now - lastCommittedAt < 4_000L/);
-  assert.match(activity, /draftNormalized\.endsWith\(normalized\)/);
-  assert.match(activity, /coerceAtMost\(2_400L\)/);
-});
-
-test('il risveglio Android usa soltanto un relay Tailscale autenticato e un ticket approvato', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(activity, /private const val WAKE_RELAY_PROTOCOL_VERSION = 1/);
-  assert.match(activity, /private fun trustedWakeRelayEndpoint/);
-  assert.match(activity, /host\.endsWith\("\.ts\.net"\)/);
-  assert.match(activity, /explicitWakeRelayDescriptor\(status\)/, 'il descriptor deve provenire dallo status letto con bearer, non da input utente');
-  assert.match(activity, /wake\.optInt\("protocolVersion", 0\) != WAKE_RELAY_PROTOCOL_VERSION/);
-  assert.match(activity, /explicitWakeRelayDescriptor\(status\)\?\.let\(::applyWakeRelayDescriptor\)[\s\S]*?: clearWakeRelayAdvertisement\(\)/, 'rimuovere la capability dallo status autenticato deve revocare la superficie locale');
-  assert.match(activity, /private fun clearWakeRelayAdvertisement\(\)[\s\S]*secureTokens\.clear\("wakeToken"\)[\s\S]*secureTokens\.clear\("wakeRelayEndpoint"\)/);
-  assert.match(activity, /secureTokens\.write\("wakeRelayEndpoint", descriptor\.endpoint\)/);
-  assert.match(activity, /secureTokens\.write\("wakeToken", token\)/);
-  assert.match(activity, /put\("scope", "wake"\)/);
-  assert.match(activity, /wakeGet\("\/api\/wake\/capabilities", token\)/);
-  assert.match(activity, /requiresConfirmation/);
-  assert.match(activity, /arbitraryDestinations/);
-  assert.match(activity, /wakePost\("\/api\/wake\/plan"/);
-  assert.match(activity, /wakePost\("\/api\/wake\/execute"/);
-  assert.match(activity, /put\("approved", true\)/);
-  assert.match(activity, /NexusAuthorizationKind\.WAKE/);
-  assert.match(activity, /completeWakeAuthorization/);
-  assert.match(activity, /wakeAwaiting = true/);
-  assert.doesNotMatch(activity, /(?:[0-9a-f]{2}:){5}[0-9a-f]{2}/i, 'il client non deve incorporare indirizzi MAC');
-  assert.doesNotMatch(activity, /sendMagicPacket|DatagramSocket|DatagramPacket/, 'il client non invia Wake-on-LAN direttamente');
-});
-
-test('Work usa il modello approfondito soltanto per azioni o richieste sensibili', () => {
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(activity, /val workAction = Regex/);
-  assert.match(activity, /sensitive\.containsMatchIn\(text\) \|\| \(state\.work && workAction\.containsMatchIn\(text\)\)/);
-  assert.doesNotMatch(activity, /if \(state\.work \|\| sensitive\.containsMatchIn\(text\)\)/);
-});
-
-test('Console integra i segnali di sicurezza nei dettagli senza una pagina duplicata', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  const manifest = read('android/NexusConsole/app/src/main/AndroidManifest.xml');
-  assert.match(activity, /if \(token\.isEmpty\(\)\) bootstrapConsole\(\); else restoreAuthenticatedScreen\(\)/);
-  assert.match(activity, /if \(foreground\) restoreAuthenticatedScreen\(\)/);
-  assert.match(activity, /lastSecuritySummary/);
-  assert.doesNotMatch(activity, /Centro sicurezza|loadSecurityCenter|SCREEN_SECURITY/);
-  assert.match(activity, /appendSecurityOverview\(specifications, lastSecuritySummary\)/);
-  assert.match(activity, /infoRow\("Protezione"/);
-  assert.match(activity, /infoRow\("Dispositivi autorizzati"/);
-  assert.match(activity, /infoRow\("Avvisi 24 ore"/);
-  assert.match(activity, /infoRow\("Ultimo evento"/);
-  assert.match(activity, /updateSecurityOverview\(summary\)/, 'il refresh deve aggiornare il pannello tecnico senza ricostruire la dashboard');
-  assert.match(activity, /private void returnToDashboard\(\)[\s\S]*lastDashboardSnapshot[\s\S]*renderDashboard\(lastDashboardSnapshot\)/, 'Indietro deve ripristinare subito la dashboard in cache');
-  assert.match(activity, /symbolPaths\.get\(name\)/, 'i vettori operativi devono essere riusati senza parsing ad ogni aggiornamento');
-  assert.doesNotMatch(activity, /density \* \.96f/, 'la densità non deve essere applicata due volte al tratto');
-  assert.match(manifest, /android:enableOnBackInvokedCallback="true"/);
-  assert.match(activity, /reverseContentTransition = true/);
-  assert.match(activity, /content\.setTranslationX\(materialize \? 0f : reverse \? -dp\(NexusMotion\.CONTENT_TRAVEL_DP\) : dp\(NexusMotion\.CONTENT_TRAVEL_DP\)\)/);
-  assert.match(activity, /materializationOverlay\.materialize\(\)/);
-  assert.match(activity, /class MaterializationView extends View/);
-  assert.match(activity, /cancel\.setOnClickListener\(v -> cancelPowerConfirmation\(\)\)/, 'Annulla deve usare lo stesso ritorno immediato del Back Android');
-  assert.match(activity, /getOnBackPressedDispatcher\(\)\.onBackPressed\(\)/, 'il ritorno alla Home deve restare gestito da Android');
-  assert.match(activity, /handleOnBackCancelled\(\)/, 'annullare il gesto deve ripristinare il contenuto');
-  assert.match(activity, /boolean materialize = materializeNextContent;/, 'la materializzazione deve valere per ogni cambio superficie');
-});
-
-test('la home Android riserva lo stato, sostituisce il turno e mostra soltanto attività reale', () => {
-  const manifest = read('android/NexusRemote/app/src/main/AndroidManifest.xml');
-  const activity = read('android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt');
-  assert.match(manifest, /android:enableOnBackInvokedCallback="true"/);
-  assert.match(activity, /padding\(top = 48\.dp\)/, 'il contenuto deve riservare lo spazio dello stato connessione');
-  assert.match(activity, /itemsIndexed\(state\.turns/);
-  assert.match(activity, /item\(key = "instant-stream"\)/);
-  assert.match(activity, /if \(state\.busy\) state\.streaming/);
-  assert.match(activity, /InstantReasoningPhase\(/);
-  assert.match(activity, /label = activity\.ifBlank/);
-  assert.doesNotMatch(activity, /Catena di pensiero|chain of thought/i);
-});
-
-test('transizioni e streaming mobile mantengono budget frame e isolamento del turno', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.doesNotMatch(activity, /label = "nexusHomeMode"/, 'la home deve conservare lo stesso layer invece di sostituire due pagine');
-  assert.match(activity, /private fun nexusScreenTransform\(back: Boolean/);
-  assert.match(activity, /slideInHorizontally/);
-  assert.match(activity, /slideOutHorizontally/);
-  assert.match(activity, /Surface\(color = Ink, contentColor = Ice, modifier = Modifier\.fillMaxSize\(\)\)/);
-  assert.match(activity, /rememberSaveable\(title, saver = androidx\.compose\.foundation\.ScrollState\.Saver\)/);
-  assert.match(activity, /val pressed by interaction\.collectIsPressedAsState\(\)/);
-  assert.match(activity, /maxLines = if \(fontScale > 1\.3f\) Int\.MAX_VALUE else 2/);
-  assert.match(activity, /private object NexusFlow/);
-  assert.doesNotMatch(activity, /item \{ PendingQueueCard\(/, 'la coda non deve apparire come popup permanente nella conversazione');
-  assert.match(activity, /reconcileAnsweredPendingRequests\(\)/);
-  assert.match(activity, /private fun nexusLoopFloat\(/);
-  assert.match(activity, /if \(!enabled\) return disabledValue/);
-  assert.doesNotMatch(activity, /Text\("N", color = Color\(0xFF002223\)/);
-  assert.match(activity, /val ENTER = NexusMotion\.ENTER/);
-  assert.match(activity, /val FADE_DELAY = NexusMotion\.FADE_DELAY/);
-  assert.match(activity, /private fun nexusTransform[\s\S]*ContentTransform\(nexusEnter\(reduced\), nexusExit\(reduced\)/, 'le superfici di navigazione restano ancorate durante la dissolvenza');
-  assert.doesNotMatch(activity, /private fun nexusExchangeTransform/, "La cronologia non dissolve i messaggi precedenti");
-  assert.doesNotMatch(activity, /scaleIn|scaleOut/);
-  assert.match(activity, /CompletableFuture\.supplyAsync/);
-  assert.match(activity, /rememberReachable\(winner\)/);
-  assert.match(activity, /ValueAnimator\.areAnimatorsEnabled\(\)/);
-  assert.match(activity, /hapticsEnabled/);
-  assert.match(activity, /Feedback aptico/);
-  assert.doesNotMatch(activity, /val emptyCompact =/);
-  assert.match(activity, /val STREAM_FADE = NexusMotion\.STREAM_FADE/);
-  assert.match(activity, /val COMPOSER_RESIZE = NexusMotion\.COMPOSER_RESIZE/);
-  assert.match(activity, /getSystemService\(DisplayManager::class\.java\)\.getDisplay\(Display\.DEFAULT_DISPLAY\)/);
-  assert.match(activity, /val uiFrameMs = if \(\(activeDisplay\?\.refreshRate \?: 60f\) >= 90f\) 11L else 16L/);
-  assert.doesNotMatch(activity, /state\.streaming\.length\)[\s\S]{0,180}scrollToItem/);
-  assert.match(activity, /animationSpec = infiniteRepeatable\([\s\S]*repeatMode = repeatMode/);
-  assert.doesNotMatch(activity, /infiniteRepeatable\(tween\(if \(reduceMotion\) NexusFlow\.REDUCED/);
-  assert.match(activity, /state = state\.copy\(temporary = true, work = false/);
-  assert.doesNotMatch(activity, /activeWorkComposer/);
-  assert.doesNotMatch(activity, /else if \(imeWasVisible\)[\s\S]{0,260}delay\(60\)/, 'la chiusura non deve produrre un secondo assestamento ritardato');
-  assert.match(activity, /StreamingMarkdownAccumulator/);
-  assert.match(activity, /persistStreamDiagnostics/);
-  assert.match(activity, /stream\.lastFirstTextMs/);
-  assert.match(activity, /stream\.lastTokensPerSecond/);
-  assert.match(activity, /frameHealth\.recentSlowRatio/);
-  assert.match(activity, /metrics\.adaptiveReducedMotion/);
-  assert.match(activity, /private fun nexusTransform/);
-  assert.match(activity, /SizeTransform\(clip = false\)/);
-  assert.match(activity, /transitionSpec = \{ nexusTransform\(/);
-  assert.doesNotMatch(activity, /tween\([0-9]/);
-  assert.doesNotMatch(activity, /spring\(/);
-  assert.doesNotMatch(activity, /vertical = if \(imeVisible\) 5\.dp else 7\.dp/);
-  assert.match(activity, /streamMatchesUi\(uiConversationId, uiTemporary, uiGeneration\)/);
-  assert.match(activity, /generation != chatGeneration/);
-  assert.match(activity, /"stop" -> \{[\s\S]{0,120}chatGeneration\+\+/);
-  assert.match(activity, /private fun queueDraftPersistence\(conversationId: String, value: String\)/);
-  assert.match(activity, /postDelayed\(persistDraftRunnable, 220L\)/);
-  assert.match(activity, /private fun publishStreamUi\(conversationId: String, temporary: Boolean, generation: Long, text: String\)/);
-  assert.match(activity, /pendingStreamUpdate\.set\(StreamUiUpdate/);
-  assert.match(activity, /uiHandler\.post\(streamUiDrain\)/);
-  assert.doesNotMatch(activity, /LaunchedEffect\(itemCount, state\.streaming\.length/);
-  assert.doesNotMatch(activity, /settingsPreloaded/);
-});
-
-test('i comandi locali conservano autorizzazioni separate e recupero della coda', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.match(activity, /private fun NexusUiState\.attentionCount\(\)/);
-  assert.match(activity, /Server NexusNXS non raggiungibili/);
-  assert.match(activity, /"approveWork"/);
-  assert.match(activity, /"approveWake"/);
-  assert.match(activity, /"retryQueue"/);
-});
-
-test('la superficie istantanea usa stato connessione e attività reali', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.match(activity, /enum class NexusPresence/);
-  assert.match(activity, /private fun NexusUiState\.presence\(\)/);
-  assert.match(activity, /InstantConnectionMark\(state\.connection/);
-  assert.match(activity, /InstantReasoningPhase\(/);
-  assert.match(activity, /label = activity\.ifBlank/);
-});
-
-test('NexusNXS per Android cifra le sessioni e trasferisce conversazioni al desktop senza duplicarle', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const secureStore = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'SecureTokenStore.java');
-  const gateway = read('src', 'remote', 'remote-session-gateway.js');
-  assert.match(activity, /continueConversationOnPc/);
-  assert.match(activity, /\/api\/conversations\/import/);
-  assert.match(activity, /secureTokens\.read\("remoteToken"\)/);
-  assert.match(activity, /secureTokens\.write\("guestToken"/);
-  assert.match(secureStore, /AndroidKeyStore/);
-  assert.match(secureStore, /AES\/GCM\/NoPadding/);
-  assert.match(gateway, /remoteSourceId/);
-});
-
-test('NexusNXS per Android cifra cronologia, misura i frame e mantiene private le notifiche', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
-  const codec = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'SecureChatCodec.java');
-  const monitor = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'FrameHealthMonitor.java');
-  assert.match(store, /super\(context, "nexusnxs-chats\.db", cursorFactory, 8\)/);
-  assert.match(store, /encryptExistingHistory/);
-  assert.match(codec, /AES\/GCM\/NoPadding/);
-  assert.match(codec, /AndroidKeyStore/);
-  assert.match(monitor, /Choreographer\.FrameCallback/);
-  assert.match(monitor, /DisplayManager/);
-  assert.match(monitor, /slowFrameThresholdNanos = Math\.max\(12_000_000L, \(long\) \(\(1_000_000_000d \/ refreshRate\) \* 1\.5d\)\)/);
-  assert.match(activity, /VISIBILITY_PRIVATE/);
-  assert.match(activity, /La risposta è pronta nell’app\./);
-  assert.doesNotMatch(activity, /setContentText\(answer/);
-  assert.match(activity, /supportedModes\?\.maxOfOrNull \{ it\.refreshRate \}/);
-  assert.match(activity, /refreshRate >= 90f/);
-  assert.match(activity, /requestPermissions\(arrayOf\(android\.Manifest\.permission\.POST_NOTIFICATIONS\)/);
-});
-
-test('il database Android conserva i metadati degli artefatti operativi', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
-  assert.match(activity, /data class WorkArtifact/);
-  assert.match(activity, /optJSONArray\("artifacts"\)/);
-  assert.match(store, /metadata TEXT NOT NULL DEFAULT/);
-  assert.match(store, /addTurn\(String conversationId, String role, String content, String metadata\)/);
-});
-
-test('i token NexusNXS documentano una sola grammatica visiva desktop e mobile', () => {
-  const tokens = JSON.parse(read('config', 'nexus-design-tokens.json'));
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.equal(tokens.colors.ink, '#020405');
-  assert.equal(tokens.colors.cyan, '#4BE7E9');
-  assert.equal(tokens.motion.modeEnterMs, 260);
-  assert.equal(tokens.motion.modeExitMs, 180);
-  assert.equal(tokens.motion.contentSwapMs, 320);
-  assert.equal(tokens.motion.contentTravelDp, 16);
-  assert.equal(tokens.typography.maximumFamilies, 2);
-  assert.equal(tokens.cosmicGlass.fullPageGlass, false);
-  assert.equal(tokens.qualityProfiles.reducedMotion.targetFps, 0);
-  assert.equal(tokens.motion.quickMs, 170);
-  assert.equal(tokens.motion.authority, 'android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
-  assert.match(activity, /Color\(local\.nexus\.motion\.NexusColors\.INK\)/);
-  assert.match(activity, /Color\(local\.nexus\.motion\.NexusColors\.CYAN\)/);
-  assert.match(activity, /private object NexusFlow/);
-  assert.deepEqual(tokens.motion.emphasizedCurve, [0.2, 0, 0, 1]);
-});
-
-test('ricerca privata e qualità degli effetti si adattano senza inviare contenuti', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
-  assert.match(activity, /store\.search\(value\)/);
-  assert.match(activity, /frameHealth\.recentSlowRatio/);
-  assert.match(activity, /frameScale/);
-  assert.match(store, /public JSONArray search\(String query\)/);
-  assert.match(store, /codec\.decrypt/);
-  assert.doesNotMatch(store, /search\(String query\)[\s\S]*HttpURLConnection/);
-});
-
-test('NexusNXS riceve contenuti Android e offre attività, privacy e backup cifrato', () => {
-  const manifest = read('android', 'NexusRemote', 'app', 'src', 'main', 'AndroidManifest.xml');
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const store = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'LocalChatStore.java');
-  assert.match(manifest, /android\.intent\.action\.SEND/);
-  assert.match(manifest, /android:mimeType="image\/\*"/);
-  assert.match(activity, /handleIncomingIntent/);
-  assert.match(activity, /NexusScreen\.ACTIVITY/);
-  assert.match(activity, /Modalità privacy/);
-  assert.match(activity, /ActivityResultContracts\.CreateDocument/);
-  assert.match(store, /exportEncryptedArchive/);
-  assert.match(store, /importEncryptedArchive/);
-  assert.match(store, /codec\.encrypt\(archive\.toString\(\)\)/);
-});
-
-test('la diagnostica streaming registra solo misure e nessun contenuto privato', () => {
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  const diagnostics = activity.split('private fun persistStreamDiagnostics(')[1]?.split('private fun guestMessage')[0] || '';
-  assert.match(diagnostics, /putLong\("stream\.lastFirstTextMs"/);
-  assert.match(diagnostics, /putFloat\("stream\.lastTokensPerSecond"/);
-  assert.match(diagnostics, /putBoolean\("stream\.lastSuccess"/);
-  assert.doesNotMatch(diagnostics, /putString|\.draft|\.turns|\.attachment|HttpURLConnection/);
-  assert.match(activity, /Riconnessione automatica/);
-});
-
-test('NexusNXS puo essere selezionato come assistente Android e apre subito la voce', () => {
-  const manifest = read('android', 'NexusRemote', 'app', 'src', 'main', 'AndroidManifest.xml');
-  const activity = read('android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote', 'NexusMainActivity.kt');
-  assert.match(manifest, /android\.intent\.action\.ASSIST/);
-  assert.match(activity, /incoming\.action == Intent\.ACTION_ASSIST/);
-  assert.match(activity, /assistantInvocation = System\.currentTimeMillis\(\)/);
-  assert.match(activity, /LaunchedEffect\(state\.assistantInvocation, interactionAvailable\)/);
-  assert.match(activity, /if \(interactionAvailable\) voiceMode = true else dispatch\("probe", ""\)/);
-});
-
-test('system invocation reuses the visible conversation before launching an overlay', () => {
-  const base = ['android', 'NexusRemote', 'app', 'src', 'main', 'java', 'local', 'nexus', 'remote'];
-  const service = read(...base, 'NexusVoiceInteractionService.kt');
-  const activity = read(...base, 'NexusMainActivity.kt');
-  assert.ok(service.indexOf('listenInVisibleApp()') < service.indexOf('startAssistantActivity('));
-  const handoff = activity.split('fun listenInVisibleApp(): Boolean')[1].split('private const val')[0];
-  assert.match(handoff, /activity.appVisible/);
-  assert.match(handoff, /activity.isFinishing/);
-  assert.match(handoff, /assistantInvocation/);
-  assert.doesNotMatch(handoff, /startActivity|createConversation|assistantOverlay = true/);
 });

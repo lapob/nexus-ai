@@ -14,6 +14,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   let arrival = 0, hold = 24, last = 0, raf = 0, disposed = false, lost = false, visible = true;
   let draws = 0, drawMs = 0, quality = 1, strain = 0, healthy = 0, state = 'idle', audio = 0;
   let resolutionScale = 1, releaseAge = 0, releaseArrival = 0, releaseStage = null;
+  let zoom = 1, sourceDpr = 1;
   let width = 1, height = 1, dpr = 1, rect = {left:0,top:0,width:1,height:1};
   let pointer = [0,0], pointerStrength = 0, touching = false, dragging = false, dragStart = [0,0], rotation = [0,0], targetRotation = [0,0];
   let pointerClient = null, hoverAt = 0;
@@ -42,7 +43,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   };
   const basicVertex = `precision highp float;uniform float uTime;uniform float uEnergy;uniform float uKind;uniform vec3 uAccent;varying float vAlpha;void main(){vec3 p=position;float angle=uTime*(uKind<.5?.07:uKind<1.5?-.12:-.09);float c=cos(angle),s=sin(angle);p.xy=mat2(c,-s,s,c)*p.xy;p*=1.+sin(uTime*1.1)*.025+uEnergy*.025;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);gl_PointSize=1.25;vAlpha=uKind>2.5?.12:uKind>.5&&uKind<1.5?.6:.42;}`;
   const basicFragment = `precision highp float;uniform vec3 uAccent;varying float vAlpha;void main(){float a=smoothstep(.5,.13,length(gl_PointCoord-.5));gl_FragColor=vec4(uAccent,a*vAlpha);}`;
-  const prefix = `precision highp float;attribute vec3 position;attribute vec4 aJourney;uniform mat4 modelViewMatrix;uniform mat4 projectionMatrix;uniform vec4 uStage;uniform vec2 uViewport;uniform float uElapsed;uniform float uArrival;uniform float uDpr;uniform float uTaper;uniform float uWide;varying float vJourney;varying float vEdge;varying float vCarrier;varying float vSourceAlpha;`;
+  const prefix = `precision highp float;attribute vec3 position;attribute vec4 aJourney;uniform mat4 modelViewMatrix;uniform mat4 projectionMatrix;uniform vec4 uStage;uniform vec2 uViewport;uniform float uElapsed;uniform float uArrival;uniform float uDpr;uniform float uZoom;uniform float uTaper;uniform float uWide;varying float vJourney;varying float vEdge;varying float vCarrier;varying float vSourceAlpha;`;
   function vertex(source) {
     const index=source.lastIndexOf('}');
     return prefix + source.slice(0,index) + `
@@ -51,7 +52,11 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
       // The field can fill the screen horizontally while matter fades before
       // reaching the title and controls reserved above/below the host.
       float readingEdge=1.-smoothstep(.78,1.,abs(target.y-uStage.w)/max(.001,uStage.y/1.25));
-      shapeEdge*=readingEdge;
+      // Magnification reveals existing grains through a feathered lens, never a rectangular crop.
+      vec2 lens=(target-uStage.zw)/max(abs(uStage.xy),vec2(.001));
+      lens.x*=mix(1.,min(1.,uStage.x),uWide);
+      float lensEdge=1.-smoothstep(.65,.86,length(lens));
+      shapeEdge*=mix(readingEdge,lensEdge,smoothstep(1.,1.2,uZoom));
       float journeyProgress=clamp((uArrival-aJourney.z*.16)/(1.-aJourney.z*.16),0.,1.);
       float settle=journeyProgress*journeyProgress*(3.-2.*journeyProgress);
       vec2 origin=vec2(aJourney.x*2.-1.,1.-aJourney.y*2.);
@@ -63,7 +68,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
       vSourceAlpha=.04+.5*sourceSide*sourceSide;
       vec2 curl=vec2(sin(aJourney.z*19.),cos(aJourney.z*23.))*sin(journeyProgress*3.14159)*.12;
       gl_Position=vec4(mix(origin,target,settle)+curl,0.,1.);
-      gl_PointSize=mix(max(${planetOnly ? '.55' : '.8'},gl_PointSize),1.1+mod(starIndex,7.)*.26,vCarrier*(1.-settle))*uDpr;
+      gl_PointSize=mix(max(${planetOnly ? '.55' : '.8'},gl_PointSize),1.1+mod(starIndex,7.)*.26,vCarrier*(1.-settle))*uDpr*uZoom;
       vJourney=settle;
       vEdge=smoothstep(0.,.08,1.-abs(gl_Position.x))*smoothstep(0.,.08,1.-abs(gl_Position.y))*mix(1.,shapeEdge,settle);
     }`;
@@ -104,7 +109,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   // A GPU compilation failure can only obtain 2D on a fresh canvas.
   if(lost){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);const replacement=canvas.cloneNode(false);canvas.replaceWith(replacement);canvas=replacement;gl=null;lost=false;context2d=canvas.getContext('2d');}
   const profile={...recipes.profiles.idle};
-  function resize(){const bounds=canvas.getBoundingClientRect();width=Math.max(1,bounds.width);height=Math.max(1,bounds.height);dpr=Math.min(devicePixelRatio||1,planetOnly?3:efficient?1.5:2.5,Math.sqrt(8294400/(width*height)))*resolutionScale;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);if(gl)gl.viewport(0,0,canvas.width,canvas.height);paintedReduced=false;}
+  function resize(){sourceDpr=devicePixelRatio||1;const bounds=canvas.getBoundingClientRect();width=Math.max(1,bounds.width);height=Math.max(1,bounds.height);dpr=Math.min(devicePixelRatio||1,planetOnly?3:efficient?1.5:2.5,Math.sqrt(8294400/(width*height)))*resolutionScale;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);if(gl)gl.viewport(0,0,canvas.width,canvas.height);paintedReduced=false;}
   function uniform(p,name,value){if(!p.uniforms.has(name))p.uniforms.set(name,gl.getUniformLocation(p.p,name));const loc=p.uniforms.get(name);if(loc===null)return;if(Array.isArray(value)||value instanceof Float32Array){if(value.length===16)gl.uniformMatrix4fv(loc,false,value);else gl['uniform'+value.length+'fv'](loc,value);}else gl.uniform1f(loc,value);}
   function matrix(rx,ry,rz,scale=1){const x=Math.cos(rx),a=Math.sin(rx),y=Math.cos(ry),b=Math.sin(ry),z=Math.cos(rz),c=Math.sin(rz);return new Float32Array([y*z*scale,(a*b*z+x*c)*scale,(-x*b*z+a*c)*scale,0,-y*c*scale,(-a*b*c+x*z)*scale,(x*b*c+a*z)*scale,0,b*scale,-a*y*scale,x*y*scale,0,0,0,-8,1]);}
   const projection=new Float32Array([1/6.6,0,0,0,0,1/6.6,0,0,0,0,-.01,0,0,0,0,1]);
@@ -115,6 +120,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     raf=0;if(disposed||lost||!visible||document.hidden||options.getPaused?.())return;
     const next=options.getState?.()||state;const normalized=next==='ready'?'idle':next==='transcribing'?'thinking':next;
     if(state!==normalized){state=Object.hasOwn(recipes.profiles,normalized)?normalized:'idle';paintedReduced=false;}
+    if(sourceDpr!==(devicePixelRatio||1))resize();
     const isReduced=reduced();if(isReduced&&paintedReduced){raf=requestAnimationFrame(draw);return;}
     if(options.expansive&&!dragging&&now-hoverAt>180)touching=false;
     const input=options.getInspection?.();if(input){touching=!isReduced&&input[2]>0;dragging=touching;if(touching&&Number.isFinite(input[0])&&Number.isFinite(input[1])){const x=Math.max(-1,Math.min(1,input[0])),y=Math.max(-1,Math.min(1,input[1]));pointer=[x*6.6,-y*6.6];targetRotation=[y*.5,x*.5];}}
@@ -144,9 +150,10 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     // State changes affect light and motion while the planet retains its framing.
     const ringTarget=planetOnly ? 0 : {listening:.86,speaking:.58+audio*.42,thinking:.56,responding:.72,executing:.82,permission:.48,error:.58}[state]||0;
     ringVisibility=isReduced?ringTarget:ringVisibility+(ringTarget-ringVisibility)*(1-Math.exp(-dt*1.65));
+    const requestedZoom=Number(options.getZoom?.() ?? 1);zoom=Number.isFinite(requestedZoom)?Math.max(1,Math.min(2.25,requestedZoom)):1;
     const saturnFraming=planetOnly?4:2.85;
     const expansiveScale=side<180?1.18:preset==='neural'?Math.max(1.18,Math.min(options.expansive&&height>540?3:1.8,width*.94/Math.max(1,side))):options.expansive&&height>540&&!planetOnly?1.38:1.18;
-    const fieldScale=kind=>expansiveScale*(preset==='saturn-experimental'?saturnFraming*(kind===0?.94:1):preset==='jarvis-reactor'?1.48:1);
+    const fieldScale=kind=>zoom*expansiveScale*(preset==='saturn-experimental'?saturnFraming*(kind===0?.94:1):preset==='jarvis-reactor'?1.48:1);
     // Adaptive detail does not change point positions or restart the shared clock.
     strain=dt>.028||drawMs>8?strain+dt:Math.max(0,strain-dt);healthy=dt<.021&&drawMs<5?healthy+dt:0;
     // Preserve the complete geometry: adapt raster resolution, never remove particles.
@@ -159,7 +166,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
     }
     if(gl){
       gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);const p=programs[preset];gl.useProgram(p.p);
-      for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uViewport:[width,height],uElapsed:isReduced?0:elapsed,uTaper:preset==='neural'?1:0,uWide:options.expansive&&height>540&&side>=180?1:0,uArrival:arrival,uDpr:dpr,uCompactOpacity:Math.min(1,Math.max(.06,(side/240)**2)),uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:planetOnly?1.2:1.08,uPointScale:planetOnly?.48:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
+      for(const [name,value] of Object.entries({projectionMatrix:projection,uStage:stage,uViewport:[width,height],uElapsed:isReduced?0:elapsed,uTaper:preset==='neural'?1:0,uWide:options.expansive&&height>540&&side>=180?1:0,uArrival:arrival,uDpr:dpr,uZoom:zoom,uCompactOpacity:Math.min(1,Math.max(.06,(side/240)**2)),uTime:t,uAudio:[audio,audio*.65,audio*.45,audio*.25],uAccent:accent,uLuminosity:planetOnly?1.2:1.08,uPointScale:planetOnly?.48:1.05,uStateBlend:1,uStateEnergy:profile.energy,uTransition:0,uRingVisibility:ringVisibility,uDisintegration:0,uPointer:pointer,uPointerStrength:pointerStrength}))uniform(p,name,value);
       for(const [key,value] of Object.entries(profile))uniform(p,'u'+key[0].toUpperCase()+key.slice(1),value);
       for(const field of coreVisible?fields[preset]:[]){
         const saturn=preset==='saturn-experimental',reactor=preset==='jarvis-reactor';
@@ -188,7 +195,7 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
           const originX=((i+1)*.61803398875%1)*width,originY=((i+1)*.41421356237%1)*height;
           const readingEdge=1-smooth((Math.abs(y-rect.top-rect.height/2)/Math.max(1,rect.height/2)-.78)/.22);
           ctx.globalAlpha=(1-arrival+arrival*Math.min(1,Math.max(.06,(side/240)**2)))*(.15+arrival*.5)*(saturn&&field.kind>0?ringVisibility:1)*(1-arrival+arrival*readingEdge);
-          ctx.fillRect(originX+(x-originX)*arrival,originY+(y-originY)*arrival,1,1);
+          ctx.fillRect(originX+(x-originX)*arrival,originY+(y-originY)*arrival,zoom,zoom);
         }
       }
       ctx.globalAlpha=1;
@@ -214,12 +221,13 @@ function createCosmicVisualizers(canvas, options = {}, createRecipes) {
   function click(e){if(host.contains(e.target)&&performance.now()<suppressClick){e.preventDefault();e.stopImmediatePropagation();}}
   function contextLost(e){e.preventDefault();lost=true;cancelAnimationFrame(raf);raf=0;}
   function contextRestored(){try{buffers=[];upload();lost=false;resize();refresh();}catch(e){fallbackReason=String(e.message);}}
+  host.addEventListener('nexuscorezoomstart',leave);
   const ro=new ResizeObserver(()=>{resize();refresh();});ro.observe(canvas);ro.observe(host);
   const io=new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;visibility();});io.observe(canvas);
   hoverSurface.addEventListener('pointermove',hover,{passive:true});host.addEventListener('pointerdown',down);host.addEventListener('pointerup',leave);hoverSurface.addEventListener('pointerleave',leave);host.addEventListener('pointercancel',leave);document.addEventListener('click',click,true);
   canvas.addEventListener('webglcontextlost',contextLost);canvas.addEventListener('webglcontextrestored',contextRestored);
   document.addEventListener('visibilitychange',visibility);media.addEventListener('change',refresh);globalThis.addEventListener('resize',refresh);globalThis.addEventListener('scroll',refresh,{passive:true});globalThis.addEventListener('blur',leave);
   resize();refresh();
-  return {refresh,setState(value){state=value;refresh();},getMetrics:()=>({state,phase,preset,previousPreset,arrival,energy:profile.energy,audio,pointer:[...pointer],pointerStrength,touching,quality,particles:Math.floor(budget*quality),draws,drawMs,elapsed,resolutionScale,pixelRatio:dpr,renderWidth:canvas.width,renderHeight:canvas.height,planetOnly,ringVisibility,backend:gl?'webgl':'canvas',fallbackReason}),dispose(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();io.disconnect();ambient?.remove();document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',refresh);globalThis.removeEventListener('resize',refresh);globalThis.removeEventListener('scroll',refresh);globalThis.removeEventListener('blur',leave);hoverSurface.removeEventListener('pointermove',hover);host.removeEventListener('pointerdown',down);host.removeEventListener('pointerup',leave);hoverSurface.removeEventListener('pointerleave',leave);host.removeEventListener('pointercancel',leave);document.removeEventListener('click',click,true);canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('webglcontextrestored',contextRestored);if(gl){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);}}};
+  return {refresh,setState(value){state=value;refresh();},getMetrics:()=>({state,phase,preset,previousPreset,arrival,energy:profile.energy,audio,pointer:[...pointer],pointerStrength,touching,quality,particles:Math.floor(budget*quality),draws,drawMs,elapsed,zoom,resolutionScale,pixelRatio:dpr,renderWidth:canvas.width,renderHeight:canvas.height,planetOnly,ringVisibility,backend:gl?'webgl':'canvas',fallbackReason}),dispose(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();io.disconnect();ambient?.remove();document.removeEventListener('visibilitychange',visibility);media.removeEventListener('change',refresh);globalThis.removeEventListener('resize',refresh);globalThis.removeEventListener('scroll',refresh);globalThis.removeEventListener('blur',leave);hoverSurface.removeEventListener('pointermove',hover);host.removeEventListener('nexuscorezoomstart',leave);host.removeEventListener('pointerdown',down);host.removeEventListener('pointerup',leave);hoverSurface.removeEventListener('pointerleave',leave);host.removeEventListener('pointercancel',leave);document.removeEventListener('click',click,true);canvas.removeEventListener('webglcontextlost',contextLost);canvas.removeEventListener('webglcontextrestored',contextRestored);if(gl){for(const b of buffers)gl.deleteBuffer(b);for(const p of Object.values(programs))gl.deleteProgram(p.p);}}};
 }
 module.exports = {createCosmicVisualizers};

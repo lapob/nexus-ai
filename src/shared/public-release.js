@@ -8,7 +8,7 @@ function publicReleaseTarget({ version, repository = 'lapob/nexus-ai', tag } = {
   const releaseTag = tag || `v${version}-preview.1`;
   if (!new RegExp(`^v${version.replace(/\./g, '\\.')}\\-preview\\.[1-9]\\d*$`).test(releaseTag)) throw new Error('Release tag must match the component version.');
   const base = `https://github.com/${repository}/releases/download/${releaseTag}/`;
-  return Object.freeze({ tag: releaseTag, windowsDownload: `${base}NexusNXS-${version}-Setup.exe`, androidDownload: `${base}NexusNXS-Android.apk` });
+  return Object.freeze({ tag: releaseTag, windowsDownload: `${base}NexusNXS-${version}-Setup.exe` });
 }
 
 function assertPublishedReleaseMatches(release, prepared) {

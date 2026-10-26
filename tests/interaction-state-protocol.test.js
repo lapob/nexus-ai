@@ -52,7 +52,6 @@ test('i contratti visuali condividono identità e palette generata tra i client'
   const desktop = fs.readFileSync(path.join(root, 'src/renderer/scene/NexusCore.tsx'), 'utf8');
   const presence = fs.readFileSync(path.join(root, 'src/infrastructure/electron/companion-window.js'), 'utf8');
   const gateway = fs.readFileSync(path.join(root, 'src/remote/remote-session-gateway.js'), 'utf8');
-  const android = fs.readFileSync(path.join(root, 'android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt'), 'utf8');
   const generatedAndroid = fs.readFileSync(path.join(root, 'android/shared-motion/src/main/java/local/nexus/motion/NexusInteractionStates.java'), 'utf8');
   const generatedDesktop = fs.readFileSync(path.join(root, 'src/renderer/types/interaction-states.generated.ts'), 'utf8');
   assert.match(desktop, /nexus-interaction-states\.json/);
@@ -60,8 +59,6 @@ test('i contratti visuali condividono identità e palette generata tra i client'
   assert.match(gateway, /PUBLIC_AI_CORE_CONTRACT = interactionClientContract/);
   assert.match(gateway, /publicAiCosmicCoreScript/);
   assert.match(desktop, /interactionStates\.states\[state\]/);
-  assert.match(android, /NEXUS_COSMIC_CONTINUUM_ID = NexusInteractionStates\.CONTINUUM_ID/);
-  assert.match(android, /CosmicScene\(/);
   assert.match(generatedDesktop, /nexus-cosmic-continuum-v1/);
   for (const state of ['booting', 'idle', 'listening', 'thinking', 'responding', 'executing', 'offline', 'error']) {
     assert.match(generatedAndroid, new RegExp(palette[state].replace('#', '0xFF'), 'i'));

@@ -15,15 +15,11 @@ const {
 const root = path.resolve(__dirname, '..');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const releaseRoot = path.join(root, 'release');
-const androidGradle = fs.readFileSync(path.join(root, 'android', 'NexusRemote', 'app', 'build.gradle'), 'utf8');
-const androidVersion = androidGradle.match(/versionName\s*(?:=\s*)?["']([^"']+)["']/)?.[1];
-if (!androidVersion) throw new Error('Versione Android non rilevata.');
 
 const artifacts = [
   [path.join(releaseRoot, `NexusNXS-${packageJson.version}-Setup.exe`), { platform: 'windows', kind: 'installer', componentVersion: packageJson.version, feedPath: `NexusNXS-${packageJson.version}-Setup.exe` }],
   [path.join(releaseRoot, `NexusNXS-${packageJson.version}-Setup.exe.blockmap`), { platform: 'windows', kind: 'update-blockmap', componentVersion: packageJson.version, feedPath: `NexusNXS-${packageJson.version}-Setup.exe.blockmap` }],
-  [path.join(releaseRoot, 'latest.yml'), { platform: 'windows', kind: 'update-manifest', componentVersion: packageJson.version, feedPath: 'latest.yml' }],
-  [path.join(root, 'release-android', 'NexusNXS-Android.apk'), { platform: 'android', kind: 'apk', componentVersion: androidVersion }]
+  [path.join(releaseRoot, 'latest.yml'), { platform: 'windows', kind: 'update-manifest', componentVersion: packageJson.version, feedPath: 'latest.yml' }]
 ];
 
 for (const name of ['nexus-sbom.cdx.json', 'nexus-sbom.cdx.json.sha256']) {

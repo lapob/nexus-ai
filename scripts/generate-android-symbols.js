@@ -1,4 +1,4 @@
-/** @module scripts/generate-android-symbols Pinned, offline Material Symbols for both Android clients. */
+/** @module scripts/generate-android-symbols Pinned, offline Material Symbols for Control and desktop/web clients. */
 // #region Manifest and generated contracts
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,9 +6,8 @@ const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const manifestPath = path.join(root, 'config/android-symbols.json');
 const javaPath = path.join(root, 'android/shared-motion/src/main/java/local/nexus/motion/NexusSymbolPaths.java');
-const kotlinPath = path.join(root, 'android/NexusRemote/app/src/main/java/local/nexus/remote/NexusSymbols.kt');
 const rendererPath = path.join(root, 'src/renderer/components/NexusSymbolPaths.ts');
-const assets = ['NexusRemote', 'NexusConsole'].map(app => path.join(root, `android/${app}/app/src/main/assets/material-symbols-license.txt`));
+const assets = ['NexusConsole'].map(app => path.join(root, `android/${app}/app/src/main/assets/material-symbols-license.txt`));
 const sha = value => createHash('sha256').update(value).digest('hex');
 
 function validateManifest(manifest) {
@@ -24,13 +23,12 @@ function validateManifest(manifest) {
 function render(manifest) {
   validateManifest(manifest);
   const names = Object.keys(manifest.icons), revision = manifest.revision;
-  const java = `// Generated from config/android-symbols.json; Google Material Symbols, Apache-2.0.\n// Source revision ${revision}; license bundled in both APKs.\npackage local.nexus.motion;\n\npublic final class NexusSymbolPaths {\n    private NexusSymbolPaths() {}\n    public static String path(String name) {\n        switch (name) {\n${names.map(name => `            case "${name}": return "${manifest.icons[name].path}";`).join('\n')}\n            default: throw new IllegalArgumentException("Unknown Nexus symbol: " + name);\n        }\n    }\n}\n`;
-  const kotlin = `// Generated from config/android-symbols.json; Google Material Symbols, Apache-2.0.\npackage local.nexus.remote\n\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.graphics.SolidColor\nimport androidx.compose.ui.graphics.vector.ImageVector\nimport androidx.compose.ui.graphics.vector.addPathNodes\nimport androidx.compose.ui.unit.dp\nimport local.nexus.motion.NexusSymbolPaths\n\ninternal object NexusSymbols {\n    private val cache = java.util.concurrent.ConcurrentHashMap<String, ImageVector>()\n    private fun vector(name: String): ImageVector = cache.getOrPut(name) {\n        ImageVector.Builder(name = "Nexus" + name, defaultWidth = 24.dp, defaultHeight = 24.dp,\n            viewportWidth = 960f, viewportHeight = 960f, autoMirror = name == "ArrowBack" || name == "ChevronRight").apply {\n            addGroup(translationY = 960f)\n            addPath(pathData = addPathNodes(NexusSymbolPaths.path(name)), fill = SolidColor(Color.Black))\n            clearGroup()\n        }.build()\n    }\n${names.map(name => `    val ${name}: ImageVector get() = vector("${name}")`).join('\n')}\n}\n`;
+  const java = `// Generated from config/android-symbols.json; Google Material Symbols, Apache-2.0.\n// Source revision ${revision}; license bundled in Control and the desktop app.\npackage local.nexus.motion;\n\npublic final class NexusSymbolPaths {\n    private NexusSymbolPaths() {}\n    public static String path(String name) {\n        switch (name) {\n${names.map(name => `            case "${name}": return "${manifest.icons[name].path}";`).join('\n')}\n            default: throw new IllegalArgumentException("Unknown Nexus symbol: " + name);\n        }\n    }\n}\n`;
   // Keep the initial desktop bundle bounded: emit only its actual controls.
   const rendererNames = ['ContentCopy', 'Check', 'Restore', 'Download'];
   const renderer = '/** @module renderer/components/NexusSymbolPaths Generated from config/android-symbols.json; Material Symbols, Apache-2.0. */\n'
     + `export const symbolPaths = ${JSON.stringify(Object.fromEntries(rendererNames.map(name => [name, manifest.icons[name].path])), null, 2)} as const;\n`;
-  return new Map([[javaPath, java], [kotlinPath, kotlin], [rendererPath, renderer]]);
+  return new Map([[javaPath, java], [rendererPath, renderer]]);
 }
 // #endregion
 

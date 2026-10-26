@@ -14,9 +14,7 @@ SOURCE = ROOT / "build" / "branding" / "nexus-mark.png"
 OUTPUT_PNG = ROOT / "build" / "icon.png"
 OUTPUT_ICO = ROOT / "build" / "icon.ico"
 OUTPUT_UI = ROOT / "src" / "renderer" / "assets" / "nexus-mark-ui.png"
-ANDROID_REMOTE_DRAWABLE = ROOT / "android" / "NexusRemote" / "app" / "src" / "main" / "res" / "drawable-nodpi"
 ANDROID_CONSOLE_DRAWABLE = ROOT / "android" / "NexusConsole" / "app" / "src" / "main" / "res" / "drawable-nodpi"
-OUTPUT_ANDROID_REMOTE = ANDROID_REMOTE_DRAWABLE / "ic_nexus_remote.png"
 OUTPUT_ANDROID_CONSOLE = ANDROID_CONSOLE_DRAWABLE / "ic_nexus_console.png"
 
 CANVAS = 1024
@@ -101,11 +99,8 @@ def main() -> None:
     icon.save(OUTPUT_ICO, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
     OUTPUT_UI.parent.mkdir(parents=True, exist_ok=True)
     compose_ui_mark().save(OUTPUT_UI, optimize=True)
-    ANDROID_REMOTE_DRAWABLE.mkdir(parents=True, exist_ok=True)
     ANDROID_CONSOLE_DRAWABLE.mkdir(parents=True, exist_ok=True)
-    compose_android_variant("remote").save(OUTPUT_ANDROID_REMOTE, optimize=True)
     compose_android_variant("console").save(OUTPUT_ANDROID_CONSOLE, optimize=True)
-    print(f"Brand NEXUSNXS generato: {OUTPUT_PNG.name}, {OUTPUT_ICO.name}, {OUTPUT_UI.name}, {OUTPUT_ANDROID_REMOTE.name}, {OUTPUT_ANDROID_CONSOLE.name}")
 
 
 if __name__ == "__main__":

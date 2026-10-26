@@ -3,9 +3,8 @@
   @description Installa e cattura una matrice reale di NexusNXS Control, ripristinando sempre display e font del dispositivo.
 #>
 param(
-  [ValidateSet('Control', 'Public')][string]$App = 'Control',
+  [ValidateSet('Control')][string]$App = 'Control',
   [ValidateSet('Online', 'Offline')][string]$ControlState = 'Online',
-  [ValidateSet('Online', 'Offline')][string]$PublicState = 'Online',
   [string]$ApkPath = "",
   [string]$OutputDirectory = "",
   [ValidateRange(1, 100)][double]$MaxJankyPercent = 18,
@@ -31,17 +30,17 @@ if (-not $device) {
 }
 
 if (-not $ApkPath) {
-  $ApkPath = Join-Path $projectRoot $(if ($App -eq 'Public') { 'release-android\NexusNXS-Android.apk' } else { 'release-android\NexusNXS-Control.apk' })
+  $ApkPath = Join-Path $projectRoot 'release-android\NexusNXS-Control.apk'
 }
 if (-not [IO.Path]::IsPathRooted($ApkPath)) { $ApkPath = Join-Path $projectRoot $ApkPath }
 if (-not (Test-Path -LiteralPath $ApkPath)) { throw "APK non trovato: $ApkPath" }
 $apkSha256 = (Get-FileHash -LiteralPath $ApkPath -Algorithm SHA256).Hash.ToLowerInvariant()
-if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot $(if ($App -eq 'Public') { 'qa-artifacts\android-public-matrix' } else { 'qa-artifacts\android-control-matrix' }) }
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot 'qa-artifacts\android-control-matrix' }
 if (-not [IO.Path]::IsPathRooted($OutputDirectory)) { $OutputDirectory = Join-Path $projectRoot $OutputDirectory }
 [IO.Directory]::CreateDirectory($OutputDirectory) | Out-Null
 
-$package = if ($App -eq 'Public') { 'local.nexus.remote' } else { 'local.nexus.console' }
-$activity = if ($App -eq 'Public') { "$package/.NexusMainActivity" } else { "$package/.NativeMainActivity" }
+$package = 'local.nexus.console'
+$activity = "$package/.NativeMainActivity"
 $sizeState = (Invoke-CheckedAdb -s $device shell wm size) -join "`n"
 $densityState = (Invoke-CheckedAdb -s $device shell wm density) -join "`n"
 $fontScale = ((Invoke-CheckedAdb -s $device shell settings get system font_scale) -join '').Trim()
@@ -50,6 +49,21 @@ $userRotation = ((Invoke-CheckedAdb -s $device shell settings get system user_ro
 $screenTimeout = ((Invoke-CheckedAdb -s $device shell settings --user 0 get system screen_off_timeout) -join '').Trim()
 $windowBefore = (Invoke-CheckedAdb -s $device shell dumpsys window) -join "`n"
 if ($windowBefore -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { throw 'Dispositivo bloccato: nessuna impostazione display modificata.' }
+$testingHomeActivity = (Invoke-CheckedAdb -s $device shell cmd package resolve-activity --brief --user 0 -a android.intent.action.MAIN -c android.intent.category.HOME) -join "`n"
+$testingHomePackage = [regex]::Match($testingHomeActivity, '(?m)^([^/\s]+)/').Groups[1].Value
+function Test-TestingSurface {
+  # Installation/rotation briefly clears focus. Retry only that read-only state.
+  $deadline = [DateTime]::UtcNow.AddSeconds(2)
+  do {
+    $snapshot = (Invoke-CheckedAdb -s $device shell dumpsys window) -join "`n"
+    if ($snapshot -match 'mDreamingLockscreen=true|mShowingLockscreen=true') { return $false }
+    $foreground = [regex]::Match($snapshot, 'mCurrentFocus=.*?\su0\s+([^/\s]+)/').Groups[1].Value
+    if ($foreground) { return [bool]($foreground -in @('local.nexus.console', $testingHomePackage)) }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $deadline)
+  return $false
+}
+if (-not (Test-TestingSurface)) { throw 'Un altra app e in primo piano: matrice sospesa prima delle modifiche.' }
 $profiles = @(
   @{ Name = 'phone-small'; Size = '720x1280'; Density = '320'; Font = '1.0' },
   @{ Name = 'phone-compact'; Size = '1080x2400'; Density = '480'; Font = '1.0' },
@@ -81,6 +95,7 @@ try {
   $frameMetrics = @()
   $jankFailures = @()
   foreach ($profile in $profiles) {
+    if (-not (Test-TestingSurface)) { throw 'Foreground cambiato: nessun altro profilo avviato.' }
     Invoke-CheckedAdb -s $device shell settings put system user_rotation $(if ($profile.ContainsKey('Rotation')) { $profile.Rotation } else { 0 }) | Out-Null
     Invoke-CheckedAdb -s $device shell wm size $profile.Size | Out-Null
     Invoke-CheckedAdb -s $device shell wm density $profile.Density | Out-Null
@@ -137,21 +152,6 @@ try {
       if (($ControlState -eq 'Online' -and -not $dashboard) -or ($ControlState -eq 'Offline' -and -not $offline)) {
         throw "Control $($profile.Name): atteso stato $ControlState. La schermata di connessione non dimostra il layout della dashboard."
       }
-    } else {
-      $publicDeadline = [DateTime]::UtcNow.AddSeconds(25)
-      while ($PublicState -eq 'Online' -and -not $capturedXml.SelectSingleNode("//node[@package='$package' and @text='Online']") -and [DateTime]::UtcNow -lt $publicDeadline) {
-        Start-Sleep -Milliseconds 800
-        Invoke-CheckedAdb -s $device shell uiautomator dump $remoteXml | Out-Null
-        Invoke-CheckedAdb -s $device pull $remoteXml (Join-Path $OutputDirectory "$($profile.Name).xml") | Out-Null
-        $capturedXml = [xml](Get-Content -LiteralPath (Join-Path $OutputDirectory "$($profile.Name).xml") -Raw)
-        if (-not $capturedXml.SelectSingleNode("//node[@package='$package']")) { throw 'Foreground cambiato durante il probe pubblico.' }
-      }
-      $connection = $capturedXml.SelectSingleNode("//node[@package='$package' and @text='$PublicState']")
-      if (-not $connection) {
-        throw "Public $($profile.Name): atteso stato $PublicState. Una schermata offline non dimostra il percorso online."
-      }
-      Invoke-CheckedAdb -s $device shell screencap -p $remotePng | Out-Null
-      Invoke-CheckedAdb -s $device pull $remotePng (Join-Path $OutputDirectory "$($profile.Name).png") | Out-Null
     }
     Invoke-CheckedAdb -s $device shell rm $remotePng $remoteXml | Out-Null
     $capturedPng = [IO.File]::ReadAllBytes((Join-Path $OutputDirectory "$($profile.Name).png"))
@@ -185,8 +185,7 @@ try {
     Device = $device
     ApkSha256 = $apkSha256
     App = $App
-    ExpectedControlState = if ($App -eq 'Control') { $ControlState } else { $null }
-    ExpectedPublicState = if ($App -eq 'Public') { $PublicState } else { $null }
+    ExpectedControlState = $ControlState
     Package = $package
     CapturedAt = (Get-Date).ToString('o')
     Profiles = @($profiles.Name)
@@ -202,16 +201,16 @@ try {
     })
     if ($emptyLayouts.Count) { throw "Layout Control non acquisito: $($emptyLayouts.Name -join ', ')" }
     Write-Output "Android visual/layout matrix $ControlState`: PASS ($($profiles.Count) profili in $OutputDirectory)."
-  } else {
-    Write-Output "Android visual matrix $PublicState`: PASS ($($profiles.Count) profili in $OutputDirectory)."
   }
   $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $OutputDirectory 'manifest.json') -Encoding utf8
 }
 finally {
   Restore-Display
   if ($screenTimeout -match '^\d+$') { Invoke-CheckedAdb -s $device shell settings --user 0 put system screen_off_timeout $screenTimeout | Out-Null }
-  Invoke-CheckedAdb -s $device shell am force-stop $package | Out-Null
-  Invoke-CheckedAdb -s $device shell am start -n $activity | Out-Null
+  if (Test-TestingSurface) {
+    Invoke-CheckedAdb -s $device shell am force-stop $package | Out-Null
+    Invoke-CheckedAdb -s $device shell am start -n $activity | Out-Null
+  }
 }
 
 #endregion

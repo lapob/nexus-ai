@@ -54,7 +54,7 @@ tailscale-state/
 *.apks
 NexusNXS-Founder-Preview-*.zip
 
-# Native Android remote client: keep only reproducible sources.
+# Private Android Control client: keep only reproducible sources.
 android/**/.gradle/
 android/**/.kotlin/
 android/**/build/

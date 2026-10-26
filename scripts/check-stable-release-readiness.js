@@ -67,7 +67,6 @@ function buildStableReadinessReport() {
     artifactCheck('product-slo', 'qa-artifacts/product-slo-report.json', policy.artifactMaximumAgeHours.productSlo, (artifact) => artifact.releaseReady === true && artifact.onlineReadinessVerified === true, 'SLO automatici recenti e readiness pubblica verificata online'),
     artifactCheck('backup-recovery', 'qa-artifacts/backup-recovery-drill.json', policy.artifactMaximumAgeHours.backupRecoveryDrill, validApplicationRecoveryReport, 'Ripristino di conversazioni, memorie e revisioni con dati sintetici negli archivi reali'),
     androidMatrixCheck('android-control-device', 'qa-artifacts/android-control-matrix/manifest.json', 'release-android/NexusNXS-Control.apk'),
-    androidMatrixCheck('android-public-device', 'qa-artifacts/android-public-matrix/manifest.json', 'release-android/NexusNXS-Android.apk'),
     ...policy.externalControls.map((control) => check(control.id, String(process.env[control.environment] || '').trim().toLowerCase() === 'true', control.description))
   ];
   const reportPath = String(process.env[policy.penetrationTestReportEnvironment] || '').trim();

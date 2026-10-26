@@ -123,27 +123,6 @@ test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () 
   }
 });
 
-test('Android condivide gerarchia, stream sicuro e codice evidenziato', () => {
-  const activity = fs.readFileSync(path.join(root, 'android/NexusRemote/app/src/main/java/local/nexus/remote/NexusMainActivity.kt'), 'utf8');
-  assert.match(activity, /enum class ResponsePresentationKind/);
-  assert.match(activity, /InstantWrittenExchange\(/);
-  assert.match(activity, /MarkdownMessage\(streamSafeMarkdown\(latestAnswer\), streamingTailChars = if \(busy\) 48 else 0/);
-  assert.match(activity, /streamSafeMarkdown\(value\)/);
-  assert.match(activity, /HighlightedCodeText\(code/);
-  assert.match(activity, /\[!\(NOTE\|TIP\|WARNING\|RESULT\)\]/);
-  assert.match(activity, /LinkAnnotation\.Url\(url/);
-  assert.match(activity, /TextLinkStyles\(style = SpanStyle\(color = Cyan/);
-  assert.match(activity, /horizontalScroll\(rememberScrollState\(\)\)/);
-  assert.match(activity, /private fun readableMathNotation/);
-  assert.match(activity, /private fun normalizeInlineMath/);
-  assert.match(activity, /val superscripts/);
-  assert.match(activity, /§NEXUS_MATH§/);
-  assert.match(activity, /fontFamily = FontFamily\.Serif/);
-  assert.match(activity, /private fun spokenLocale\(/);
-  assert.match(activity, /val language = spokenLocale\(text/);
-  assert.match(activity, /textToSpeech\?\.language = spokenLocale\(text/);
-});
-
 test('il prompt impedisce marcatori incompleti e abilita blocchi semantici', () => {
   const ipc = fs.readFileSync(path.join(root, 'src/application/register-ipc.js'), 'utf8');
   assert.match(ipc, /> \[!RESULT\]/);
