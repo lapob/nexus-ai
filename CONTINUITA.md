@@ -1,3 +1,17 @@
+## Published PC/web/Control scope — 26 October 2026
+
+Native AI mobile retirement is published in cad2c27. GitHub CI40396001188 passed
+Windows/Linux source verification; local check/cloud and1217 tests pass with two
+explicit skips. The active headless service has loaded this revision and public
+readiness returns200. A synthetic Italian arithmetic request completed in2.2s;
+it is a smoke test, not an intelligence benchmark or voice acceptance.
+
+Windows downloads remain the previous0.3.33 Preview: no new installer was built
+or installed. The owner-run retirement removed native AI copies and public APKs;
+Control remains installed. Service restart took218s, including109s runtime
+admission and104s model warm-up, so startup remains a measured improvement item.
+Website release acceptance/deployment is tracked separately on the website branch.
+
 # Native AI mobile retirement — 26 October 2026
 
 The owner has retired the public Android AI client and iOS client. Windows,
