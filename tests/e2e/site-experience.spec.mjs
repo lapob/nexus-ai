@@ -147,6 +147,21 @@ test("real PC captures use precise hover targets", async ({ page }) => {
   await expect.poll(() => desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeLessThan(-3);
 });
 
+test("the PC image follows its copy without a retired mobile frame gap", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/", { waitUntil: "networkidle" });
+    const gap = await page.locator(".narrative-apps .app-card").evaluate(card => {
+      const copy = card.querySelector(".narrative-app-copy").getBoundingClientRect();
+      const image = card.querySelector(".app-card-visual__screen").getBoundingClientRect();
+      return image.top - copy.bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(16);
+    expect(gap).toBeLessThanOrEqual(40);
+  }
+});
+
 test("core routes pass automated WCAG A/AA checks", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   for (const route of publicRoutes) {
