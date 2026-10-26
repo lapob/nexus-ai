@@ -1,3 +1,24 @@
+# Published desktop/web scope — 26 October 2026
+
+Production Worker a37e5c89-3987-485a-8720-bc6a4d0055f5 serves application code
+fac96da. Candidate587d06c5 passed the complete release gate:45 unit and39 browser
+checks, dependency/signature audit, performance budget and deployment dry-run.
+GitHub Security verification40398928016 passed. Previous production5a782d3d
+is retained as rollback; this checkpoint changes documentation only.
+
+Public verification confirms13 routes, the Android-to-desktop308 redirect,
+HTTP404 for the withdrawn Android screenshot, and current SHA-256 bytes for
+both desktop photographs. Main/public AI shells match, readiness is200 and four
+live profiles pass settings, touch/voice presentation and CSP checks with a
+synthetic microphone denial. Offline draft/attachment/reconnection checks pass.
+Native Android AI/iOS source, assets and downloads are retired; Control remains.
+
+The reduced-motion canvas now survives layout/resize/scroll and live system
+preference changes without a permanent animation loop. Desktop and mobile
+screenshots were inspected, including the corrected PC image spacing. These
+checks do not certify human voice quality, every device or commercial readiness.
+Windows download remains0.3.33 Preview; no new installer was built or installed.
+
 ## Adaptive motion correction — 26 October 2026
 
 A real reduced-motion preview exposed a blank canvas after layout observation.
