@@ -1,3 +1,64 @@
+## Prossimi perfezionamenti verificabili — ricerca del 26 ottobre 2026
+
+Le proposte seguenti riusano componenti presenti. Non sono funzioni attivate né
+promesse di superiorità; richiedono confronti misurati e rollback. Restano PC,
+web e Control, inferenza locale predefinita e cloud disattivato.
+
+1. **Latenza dopo il primo avvio.** Estendere gli span già presenti con I/O,
+   caricamento GPU, primo token e primo audio, separando cache calda/fredda e
+   p50/p95. Il modello resta residente secondo la policy esistente: non creare
+   un secondo keep-warm o precaricamenti concorrenti. Valutare cache KV q8_0 e
+   contesti per richiesta soltanto con confronto italiano/tool/RAG separato.
+   [Configurazione e memoria Ollama](https://docs.ollama.com/faq).
+2. **Candidati locali adatti alle risorse.** Completare il percorso di confronto
+   già predisposto per Gemma4 12B e Qwen3.8-27B, prima verificando supporto del
+   runtime, quantizzazione, licenza e memoria totale, non soltanto il peso.
+   Gemma12B supporta input audio/visivi: questo non certifica un'intera voce
+   duplex o una sintesi vocale. Qwen27B resta più esigente su16GBVRAM. Nessun
+   nuovo download/train senza stima e risorse, nessuna promozione automatica.
+   [Gemma](https://developers.googleblog.com/gemma-4-12b-the-developer-guide/),
+   [Qwen](https://huggingface.co/Qwen/Qwen3.8-27B).
+3. **Generazione speculativa isolata.** Provare i meccanismi supportati da
+   llama.cpp nel percorso alternativo già presente. Misurare token accettati,
+   VRAM e tempo totale, includendo il costo del draft. Non migrare produzione
+   per una velocità pubblicizzata e non avviare due runtime sulla GPU attiva.
+   [Speculative decoding](https://github.com/ggml-org/llama.cpp/blob/master/docs/speculative.md).
+4. **Voce con conversazione verificata.** Riutilizzare ASR/TTS e cancellazione
+   esistenti; misurare fine frase, primo audio e interruzione, con riconoscimento
+   incrementale e segmentazione che rispetta l'italiano. Separare eco da voce
+   utente e preservare il testo interrotto. Il collaudo umano con altoparlanti
+   resta aperto; test sintetici e input audio nativo non lo sostituiscono.
+   [Architetture vocali](https://developers.openai.com/api/docs/guides/voice-agents).
+5. **Transizioni continue.** Inter e simboli già distribuiti restano la base.
+   Sperimentare View Transitions solo su pannelli web compatibili, senza
+   sovrapporle alle animazioni esistenti o fotografare la scena3D viva.
+   Conservare focus/bozze e cancellazione; fallback e reduced-motion obbligatori.
+   In Control approfondire il predictive-back già implementato e i passaggi
+   cartelle/schede con rotazione, aggiornamenti di stato e gesto annullato;
+   nessuna riscrittura Compose necessaria.
+   [Web](https://developer.chrome.com/docs/web-platform/view-transitions/same-document),
+   [Android](https://developer.android.com/guide/navigation/custom-back/predictive-back-gesture).
+6. **Core nitido e budget reale.** Estendere le prove di qualità adattiva e
+   recupero contesto già presenti a4K,120Hz, risparmio energia e zoom continuo.
+   Misurare separatamente particelle, bloom e hitbox durante la transizione;
+   privilegiare contorni nitidi prima di aumentare la densità. Il budget di
+   frame è16.7ms a60Hz e8.3ms a120Hz: evitare4K forzato su ogni GPU. Spostare
+   solo lavoro misurato fuori dal thread principale, riusando i worker attivi.
+   [Long tasks](https://web.dev/articles/optimize-long-tasks).
+7. **Azioni da assistente affidabile.** Rafforzare registry plugin e workflow
+   esistenti con prove di esito finale, ripresa dopo arresto e doppio invio,
+   permessi revocati a metà operazione e fonti web ostili. Le ricevute e il
+   consenso per azioni sensibili restano obbligatori. RAG: rendere evidenti
+   fonte, data e correzione della memoria, con scadenza e conflitti verificati.
+8. **Qualità prima della promozione.** Ampliare l'eval locale già presente con
+   richieste quotidiane multi-turno, citazioni verificabili e completamento
+   dell'azione, non solo correttezza della prima risposta. Holdout separato dal
+   training, regressioni obbligatorie e costo/latenza accanto al punteggio.
+   Dati utente e voti non sono consenso; oggi non c'è una nuova valutazione
+   comparativa che dimostri superiorità rispetto ad assistenti commerciali.
+   [Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices).
+
+
 ## Product scope — 26 October
 
 Public native AI Android/iOS clients are retired by owner decision. Keep Windows,

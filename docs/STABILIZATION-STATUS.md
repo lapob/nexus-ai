@@ -1,3 +1,21 @@
+## Startup optimization activated — 26 October 2026
+
+Source ab13bfb passed CI40404325024 on Windows/Linux and local check/cloud;
+1220 tests pass, two explicit skips. One real service restart completed in116s
+(previous observation218s). Runtime admission fell108749 to8395ms, including
+full Grype1475ms, valid signature and unchanged before/after identity. Model
+preload104197ms is essentially unchanged and remains the main bottleneck.
+The scanner database was staged/read beforehand: this is a warm-cache service
+restart, not a controlled cold-PC benchmark or a guarantee for every boot.
+
+Local/public readiness and marketing HTTPS return200. A public Italian smoke
+request completed in2.104s with the expected answer. Accessory managers ran
+only after Core readiness: image loopback is available; Docker Desktop search
+still requires the owner's interactive session, with the existing search
+fallback retained. No model promotion, training, cloud enablement or Windows
+installer build occurred. Human duplex/echo acceptance and production signing
+remain open. The roadmap records researched proposals separately from changes.
+
 ## Published PC/web/Control scope — 26 October 2026
 
 Native AI mobile retirement is published in cad2c27. GitHub CI40396001188 passed
