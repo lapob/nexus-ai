@@ -94,6 +94,7 @@ export function SiteMotionRuntime() {
     let heroCore: { x: number; y: number; size: number } | null = null;
     let sceneProgress = 0;
     let paintMs = 0;
+    let drawCount = 0;
     const fieldStarted = performance.now();
     const arrivalDelay = 3.2;
     const arrivalDuration = 8.2;
@@ -149,8 +150,10 @@ export function SiteMotionRuntime() {
       const ratio = Math.min(window.devicePixelRatio || 1, tier === "lite" ? 1.5 : 2.5, Math.sqrt(6_000_000 / Math.max(1, innerWidth * innerHeight)));
       cosmicWidth = Math.max(1, window.innerWidth);
       cosmicHeight = Math.max(1, window.innerHeight);
-      cosmicCanvas.width = Math.round(cosmicWidth * ratio);
-      cosmicCanvas.height = Math.round(cosmicHeight * ratio);
+      const pixelWidth = Math.round(cosmicWidth * ratio), pixelHeight = Math.round(cosmicHeight * ratio);
+      // Setting a canvas dimension clears it, even when the value is unchanged.
+      if (cosmicCanvas.width !== pixelWidth) cosmicCanvas.width = pixelWidth;
+      if (cosmicCanvas.height !== pixelHeight) cosmicCanvas.height = pixelHeight;
       cosmicContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       const heroBounds = document.querySelector('.home-neural-core')?.getBoundingClientRect();
       heroCore = heroBounds ? { x: heroBounds.left + heroBounds.width / 2,
@@ -161,6 +164,10 @@ export function SiteMotionRuntime() {
         const rect=element.getBoundingClientRect();
         return {left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY};
       });
+      if (reducedMotion.matches && !document.hidden) {
+        cancelAnimationFrame(cosmicFrame);
+        cosmicFrame = requestAnimationFrame(drawCosmicField);
+      }
     };
 
     let interactivePoints: {x:number;y:number}[] = [];
@@ -420,6 +427,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
       cosmicCanvas.dataset.arrival = (reduced ? 1 : entranceTime).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
+      cosmicCanvas.dataset.draws = String(++drawCount);
       cosmicCanvas.dataset.particles = String(activeParticles);
       cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
       cosmicCanvas.dataset.rotation = `${inspection.x.toFixed(3)},${inspection.y.toFixed(3)}`;
@@ -445,6 +453,7 @@ export function SiteMotionRuntime() {
     };
     syncVisibility();
     document.addEventListener("visibilitychange", syncVisibility);
+    reducedMotion.addEventListener("change", syncVisibility);
 
     const ambientObserver = typeof IntersectionObserver === "function" && !reducedMotion.matches && tier !== "lite"
       ? new IntersectionObserver((entries) => {
@@ -508,6 +517,7 @@ export function SiteMotionRuntime() {
         hero.style.setProperty("--hero-label-opacity", String(opacity));
 
       }
+      if (reducedMotion.matches && !document.hidden) drawCosmicField(performance.now());
     };
     const onScroll = () => {
       if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll);
@@ -572,6 +582,7 @@ export function SiteMotionRuntime() {
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
       document.removeEventListener("visibilitychange", syncVisibility);
+      reducedMotion.removeEventListener("change", syncVisibility);
       root.removeAttribute("data-motion-paused");
       root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
       delete root.dataset.motionTier;

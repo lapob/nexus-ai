@@ -1,3 +1,13 @@
+## Adaptive motion correction — 26 October 2026
+
+A real reduced-motion preview exposed a blank canvas after layout observation.
+The backing store now resizes only when physical dimensions change; layout,
+scroll and OS preference changes request a single coalesced static repaint.
+Preference changes resume/stop animation without rebuilding the particle field.
+A browser regression checks actual painted pixels, resize, scrolling and frame
+counts, including a live preference change. Three focused browser checks and
+45 source tests pass; the complete 39-case release gate follows this revision.
+
 # Desktop and web product scope — 26 October 2026
 
 The public native Android AI/iOS clients are retired by owner decision. The site

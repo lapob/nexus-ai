@@ -650,3 +650,35 @@ test("returning to the hero retains the completed form",async({page})=>{
     await expect(canvas).toHaveAttribute('data-arrival','1.000');
   }
 });
+
+
+test("reduced motion preserves painted particles through layout resize scroll and preference changes", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/", { waitUntil: "networkidle" });
+  const field = page.locator(".nxs-cosmic-field");
+  const painted = () => field.evaluate(canvas => {
+    const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+    let visible = 0;
+    for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) visible++;
+    return visible;
+  });
+  await expect.poll(painted).toBeGreaterThan(500);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(painted).toBeGreaterThan(500);
+    await page.locator("#apps").evaluate(el => el.scrollIntoView({ behavior: "instant" }));
+    await expect.poll(painted).toBeGreaterThan(500);
+  }
+  await page.waitForTimeout(250);
+  const paused = Number(await field.getAttribute("data-draws"));
+  await page.waitForTimeout(150);
+  expect(Number(await field.getAttribute("data-draws"))).toBe(paused);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect.poll(async () => Number(await field.getAttribute("data-draws"))).toBeGreaterThan(paused + 3);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForTimeout(200);
+  const settled = Number(await field.getAttribute("data-draws"));
+  await page.waitForTimeout(150);
+  expect(Number(await field.getAttribute("data-draws"))).toBe(settled);
+  expect(await painted()).toBeGreaterThan(500);
+});
