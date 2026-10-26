@@ -135,7 +135,7 @@ html { scroll-padding-top: 96px; }
 .narrative-apps .app-card::before, .narrative-apps .app-card::after { display: none; }
 .narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
 .narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: clamp(300px, 40vw, 540px); overflow: visible; }
-.narrative-apps .app-card-visual.android .app-card-visual__screen { width: min(50%, 220px); }
+
 .narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; max-width: 680px; transform: none; border: 1px solid #5b696a; border-radius: 12px; overflow: hidden; }
 .narrative-apps .app-card-visual.desktop img { display: block; width: 100%; height: auto; }
 .narrative-apps .app-card-visual__screen { background: transparent; border: 0; box-shadow: none; mix-blend-mode: screen; }
@@ -175,8 +175,8 @@ html { scroll-padding-top: 96px; }
   .narrative-apps .app-card { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .narrative-apps .app-card:nth-child(2) .narrative-app-copy { order: initial; }
   .narrative-apps .app-card-visual { height:64svh; }
-  .narrative-apps .app-card-visual.android { height: 440px; }
-  .narrative-apps .app-card-visual.android .app-card-visual__screen { width: 210px; }
+
+
 }
 @media (prefers-reduced-motion: reduce) {
   .astral-hero__track { min-height: 0; }
@@ -193,5 +193,14 @@ html { scroll-padding-top: 96px; }
   .nxs-motion-ready .narrative-apps .nxs-motion-candidate {
     transition-duration: 1.2s, 1.6s;
     transition-delay: .12s;
+  }
+}
+
+/* The native AI mobile client is retired; center the remaining PC showcase. */
+.nexus-stage { justify-content: center; }
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .narrative-apps .app-card-visual.desktop .app-card-visual__screen:hover {
+    transform: translate3d(0, -5px, 0);
   }
 }

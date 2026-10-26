@@ -699,13 +699,9 @@ body { isolation: isolate; }
   object-fit: cover;
 }
 
-.app-card-visual.android .app-card-visual__screen {
-  width: min(41%, 8.9rem);
-  aspect-ratio: 360 / 640;
-  border-radius: 1.35rem;
-}
 
-.app-card-visual.android .app-card-visual__screen img { object-fit: contain; }
+
+
 
 @media (max-width: 560px) {
   .app-card-visual {
@@ -715,7 +711,7 @@ body { isolation: isolate; }
   }
 
   .app-card-visual.desktop .app-card-visual__screen { width: 96%; }
-  .app-card-visual.android .app-card-visual__screen { width: 7.25rem; }
+
 }
 
 .astral-interlude{position:relative;max-width:1100px;margin:auto;padding:clamp(20px,5vw,72px) 24px;text-align:center;isolation:isolate}

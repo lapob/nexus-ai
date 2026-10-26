@@ -95,24 +95,9 @@
   object-fit: contain;
 }
 
-.product-mockup--real.android .product-screen {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 9 / 16;
-  border-radius: 0 0 25px 25px;
-}
 
-.product-mockup--real.android .product-screen img {
-  object-fit: contain;
-  object-position: center;
-}
 
-/* The Android frame contains a genuine 9:16 capture plus the small website
-   label bar. Let its content define the height so Android's status and
-   navigation bars are never sacrificed to a decorative frame ratio. */
-.product-mockup--real.android .device-frame {
-  aspect-ratio: auto;
-}
+
 
 .product-mockup--real figcaption {
   position: absolute;
@@ -200,7 +185,7 @@
     width: 100%;
     border-radius: 15px;
   }
-  .product-mockup--real.android .device-frame { width: min(60vw, 245px); }
+
   .product-mockup--real figcaption { font-size: 7px; }
 }
 

@@ -29,8 +29,8 @@ const checks = [
   { label: "CSS applicazione", actual: sum((file) => file.relative.endsWith(".css") && file.relative !== "nexus-operational.css"), maximum: 100 * 1024 },
   { label: "CSS fallback operativo", actual: find("nexus-operational.css"), maximum: 12 * 1024 },
   { label: "Font condiviso Inter", actual: find("fonts/inter-latin.woff2"), maximum: 50 * 1024 },
-  { label: "Cattura Android", actual: find("products/android-home-astral.png"), maximum: 190 * 1024 },
-  { label: "Cattura desktop", actual: find("products/desktop-core.png"), maximum: 190 * 1024 },
+  { label: "Cattura desktop", actual: find("products/desktop-home.png"), maximum: 190 * 1024 },
+  { label: "Cattura desktop", actual: find("products/desktop-conversation.png"), maximum: 190 * 1024 },
   { label: "Icona prodotto", actual: find("nexus-icon.png"), maximum: 240 * 1024 },
   { label: "Anteprima social", actual: find("og.png"), maximum: 1280 * 1024 },
 ];

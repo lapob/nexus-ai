@@ -25,11 +25,11 @@ test("server-renders the NexusNXS public homepage", async () => {
   assert.match(html, /<html lang="it">/i);
   assert.match(html, /NEXUSNXS/);
   assert.match(html, /hero-product-name/);
-  assert.match(html, /Il tuo assistente AI su PC, Android e web\./);
+  assert.match(html, /Il tuo assistente AI su PC e web\./);
   assert.match(html, /UN DIALOGO CONTINUO/);
   assert.match(html, /IL CONTROLLO RESTA TUO/);
   assert.match(html, /NexusNXS per PC/);
-  assert.match(html, /NexusNXS per Android/);
+  assert.doesNotMatch(html, /NexusNXS per Android/);
   assert.match(html, /NexusNXS è in Preview/);
   assert.match(html, /application\/ld\+json/);
   assert.doesNotMatch(html, /codex-preview|starter loading skeleton|Your site is taking shape/i);
@@ -72,7 +72,7 @@ test("selects a private client motion tier without rendering device telemetry", 
   assert.match(styles, /\.nxs-motion-ultra/);
   assert.match(packageJson, /verify:performance/);
   assert.match(budget, /JavaScript client/);
-  assert.match(budget, /products\/android-home-astral\.png/);
+  assert.match(budget, /products\/desktop-home\.png/);
 });
 
 test("animates initially visible product cards after the prepared frame", async () => {
@@ -141,8 +141,8 @@ test("uses one semantic NexusNXS AI health check everywhere", async () => {
 });
 
 test("renders every public route with one shared, complete navigation", async () => {
-  const routes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
-  const expectedNavigation = ["/desktop", "/android", "/security", "/status", "/downloads"];
+  const routes = ["/", "/desktop", "/downloads", "/security", "/status", "/privacy", "/terms"];
+  const expectedNavigation = ["/desktop", "/security", "/status", "/downloads"];
 
   for (const route of routes) {
     const response = await render(route);
@@ -253,7 +253,7 @@ test("switches HTML navigations to maintenance without hiding operational routes
   assert.equal(legacy.headers.get("x-content-type-options"), "nosniff");
   assert.match(legacy.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
 
-  const rscNavigation = await fetchWorker("https://nexusnxs.com/android?_rsc=maintenance-check", {
+  const rscNavigation = await fetchWorker("https://nexusnxs.com/desktop?_rsc=maintenance-check", {
     env: { NEXUSNXS_SITE_MODE: "maintenance" },
     headers: { accept: "text/x-component", rsc: "1" },
   });

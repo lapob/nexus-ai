@@ -63,7 +63,7 @@ test("status transports one immutable display label rather than formatting in th
 test("asset aliases dispatch to ASSETS and missing API/files stay HTTP 404", async () => {
   const paths = [];
   const assets = { ASSETS: { fetch: async (request) => { paths.push(new URL(request.url).pathname); return new Response("PNG", { headers: { "Content-Type": "image/png" } }); } } };
-  for (const path of ["/icon.png", "/apple-icon.png", "/products/android-home-astral.png"]) assert.equal((await get(path, "GET", assets)).headers.get("content-type"), "image/png");
-  assert.deepEqual(paths, ["/nexus-icon.png", "/nexus-icon.png", "/products/android-home-astral.png"]);
+  for (const path of ["/icon.png", "/apple-icon.png", "/products/desktop-home.png"]) assert.equal((await get(path, "GET", assets)).headers.get("content-type"), "image/png");
+  assert.deepEqual(paths, ["/nexus-icon.png", "/nexus-icon.png", "/products/desktop-home.png"]);
   for (const path of ["/api/unknown", "/assets/missing.js"]) assert.equal((await get(path)).status, 404);
 });

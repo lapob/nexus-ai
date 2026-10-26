@@ -18,8 +18,7 @@ const request = async (pathname, options = {}) => fetchWithTrustedDns(new URL(pa
 const routeChecks = [
   ["/", 200, /NEXUSNXS/],
   ["/desktop", 200, /NEXUSNXS/],
-  ["/android", 200, /NEXUSNXS/],
-  ["/downloads", 200, /NEXUSNXS/],
+    ["/downloads", 200, /NEXUSNXS/],
   ["/security", 200, /NEXUSNXS/],
   ["/status", 200, /NEXUSNXS/],
   ["/privacy", 200, /NEXUSNXS/],
@@ -38,9 +37,13 @@ for (const [pathname, status, expected] of routeChecks) {
   assert.match(await response.text(), expected, `${pathname} returned unexpected content`);
 }
 
+const retired = await request("/android");
+assert.equal(retired.status, 308);
+assert.equal(new URL(retired.headers.get("location"), baseUrl).pathname, "/desktop");
+
 const home = await request("/", { headers: { accept: "text/html" } });
 const homeHtml = await home.text();
-for (const href of ["/desktop", "/android", "/security", "/status", "/downloads"]) {
+for (const href of ["/desktop", "/security", "/status", "/downloads"]) {
   assert.match(homeHtml, new RegExp(`href=["']${href}["']`), `navbar is missing ${href}`);
 }
 assert.equal(home.headers.get("x-content-type-options"), "nosniff");

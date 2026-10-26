@@ -8,7 +8,7 @@ test("local preview serves product assets and rejects encoded traversal paths", 
   try {
     await Promise.race([once(child.stdout, "data"), once(child, "exit").then(() => { throw new Error("Preview failed to start"); }), new Promise((_, reject) => setTimeout(() => reject(new Error("Preview startup timed out")), 5000).unref())]);
     const origin = "http://127.0.0.1:41796";
-    const image = await fetch(`${origin}/products/android-home-astral.png`);
+    const image = await fetch(`${origin}/products/desktop-home.png`);
     assert.equal(image.status, 200);
     assert.equal(image.headers.get("content-type"), "image/png");
     for (const path of ["/%2f..%2f..%2fpackage.json", "/%5c..%5cpackage.json", "/%00package.json", "/%252e%252e/package.json"]) {

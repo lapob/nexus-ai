@@ -164,3 +164,20 @@ test('reload restores a slow local conversation before revealing its controls', 
   await expect(page.locator('#answer')).toContainText('Risposta ripristinata');
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
+
+
+test('Core inspection zoom retains geometry and renders points without CSS scaling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/readyz', route => route.fulfill({ json: { status: 'ready' } }));
+  await page.goto(origin);
+  await expect(page.locator('html')).toHaveAttribute('data-nxs-boot', 'ready');
+  await page.waitForFunction(() => globalThis.nexusCosmicMetrics?.renderer().draws > 0);
+  const before = await page.evaluate(() => globalThis.nexusCosmicMetrics.renderer());
+  await page.locator('#core').hover(); await page.mouse.wheel(0, -600);
+  await expect.poll(() => page.evaluate(() => globalThis.nexusCosmicMetrics.renderer().zoom)).toBeGreaterThan(1.2);
+  const after = await page.evaluate(() => globalThis.nexusCosmicMetrics.renderer());
+  expect(after.particles).toBe(before.particles); expect(after.preset).toBe(before.preset);
+  expect(await page.locator('#coreCanvas').evaluate(el => getComputedStyle(el).transform)).toBe('none');
+  await page.locator('#core').focus(); await page.keyboard.press('0');
+  await expect.poll(() => page.evaluate(() => globalThis.nexusCosmicMetrics.renderer().zoom)).toBe(1);
+});

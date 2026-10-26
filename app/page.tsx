@@ -1,6 +1,4 @@
 import { DesktopHomePreview } from "./components/DesktopHomePreview";
-import Image from "./components/SiteImage";
-import { ProductImageZoom } from "./components/ProductImageZoom";
 import { ArrowUpRight, BrainCircuit, MessageCircle, Mic2, Zap } from "lucide-react";
 import { ProductMockup, SiteFooter } from "./components/SiteChrome";
 import { StructuredData } from "./components/StructuredData";
@@ -9,7 +7,6 @@ import { AstralHero } from "./components/AstralHero";
 
 const apps = [
   { name: "Sul tuo computer.", platform: "NexusNXS per Windows", description: "Scrivi, analizza documenti e prepara codice. Con gli strumenti autorizzati, Nexus può aprire applicazioni e lavorare sui tuoi file. Il pet resta a portata di voce anche quando chiudi la finestra.", device: "desktop", image: "/products/desktop-conversation.png", alt: "Conversazione dimostrativa nell’app NexusNXS per PC", href: "/desktop" },
-  { name: "Dove nasce un’idea.", platform: "NexusNXS per Android", description: "Tocca il Core e parla, oppure scrivi e allega una foto o un documento. Imposta Nexus come assistente di sistema sui dispositivi compatibili e richiama la voce senza aprire l’intera app.", device: "android", image: "/products/android-home-astral.png", alt: "Interfaccia reale di NexusNXS per Android", href: "/android" },
 ];
 const presenceStates = [
   { Icon: Mic2, label: "Ascolta", detail: "La tua voce diventa una richiesta.", state: "listening" },
@@ -31,9 +28,9 @@ export default function Home() {
       <div className="cosmic-stage" aria-hidden="true" />
     </section>
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
-      <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene={app.device === "desktop" ? "right" : "left"} data-cosmic-form="ambient">
-        <div className="narrative-app-copy"><p className="platform">{app.platform}</p><h2>{app.name}</h2><p>{app.description}</p><HardNavigationLink className="text-link" href={app.href}>Esplora {app.device === "desktop" ? "NexusNXS per PC" : "NexusNXS per Android"} <ArrowUpRight size={16} /></HardNavigationLink></div>
-        <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen">{app.device === "desktop" ? <DesktopHomePreview /> : <ProductImageZoom src={app.image} label={app.alt}><Image src={app.image} alt={app.alt} width={app.device === "desktop" ? 1090 : 360} height={app.device === "desktop" ? 613 : 640} sizes={app.device === "desktop" ? "(max-width: 800px) 92vw, 640px" : "220px"} unoptimized /></ProductImageZoom>}</div></div>
+      <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene="right" data-cosmic-form="ambient">
+        <div className="narrative-app-copy"><p className="platform">{app.platform}</p><h2>{app.name}</h2><p>{app.description}</p><HardNavigationLink className="text-link" href={app.href}>Esplora NexusNXS per PC <ArrowUpRight size={16} /></HardNavigationLink></div>
+        <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen"><DesktopHomePreview /></div></div>
       </article>)}</div>
     </section>
     <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right" data-cosmic-form="ambient">
@@ -42,8 +39,8 @@ export default function Home() {
     </section>
     <section className="astral-interlude narrative-forms" aria-label="Saturno particellare" data-cosmic-scene="center" data-cosmic-form="saturn"><div className="cosmic-stage" aria-hidden="true" /></section>
     <section className="one-nexus reveal" data-cosmic-scene="left" data-cosmic-form="ambient">
-      <div className="one-nexus-copy"><p className="section-label">PC · ANDROID · WEB</p><h2>Un solo prodotto.<br /><em>Più modi di esserci.</em></h2><p>Le app condividono il servizio NexusNXS. Collega il telefono al tuo desktop con una sessione remota autorizzata, oppure apri il web per iniziare senza installazioni.</p><HardNavigationLink className="text-link" href="https://ai.nexusnxs.com">Provalo nel browser <ArrowUpRight size={16}/></HardNavigationLink></div>
-      <div className="nexus-stage"><ProductMockup type="desktop"/><ProductMockup type="android"/></div>
+      <div className="one-nexus-copy"><p className="section-label">PC · WEB</p><h2>Un solo prodotto.<br /><em>Più modi di esserci.</em></h2><p>Le app condividono il servizio NexusNXS. Lavora con l’assistente sul PC, oppure apri il web per iniziare senza installazioni.</p><HardNavigationLink className="text-link" href="https://ai.nexusnxs.com">Provalo nel browser <ArrowUpRight size={16}/></HardNavigationLink></div>
+      <div className="nexus-stage"><ProductMockup type="desktop"/></div>
     </section>
     <section className="narrative-copy narrative-copy--right reveal" id="security" data-cosmic-scene="left" data-cosmic-form="torus">
       <p className="section-label">IL CONTROLLO RESTA TUO</p><h2>Capace di aiutarti.<br /><em>Non di decidere per te.</em></h2>

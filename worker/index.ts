@@ -159,6 +159,11 @@ const worker = {
       return secureResponse(Response.redirect(url, 308), url, nonce, env.CF_VERSION_METADATA?.id);
     }
 
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/android") {
+      url.pathname = "/desktop"; url.search = "";
+      return secureResponse(Response.redirect(url, 308), url, nonce, env.CF_VERSION_METADATA?.id);
+    }
+
     const securedRequest = requestWithSecurityPolicy(request, nonce);
 
     const accept = request.headers.get("accept") ?? "";

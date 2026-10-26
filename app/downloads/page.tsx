@@ -1,12 +1,12 @@
 import type { Metadata } from "../lib/site-metadata";
 import release from "../data/public-release.json";
-import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert, Smartphone } from "lucide-react";
+import { BadgeCheck, CalendarDays, Copy, Download, FileCheck2, HardDrive, Laptop, ShieldAlert } from "lucide-react";
 import Image from "../components/SiteImage";
 import { SiteFooter } from "../components/SiteChrome";
 
 export const metadata: Metadata = {
   title: "Download NexusNXS — Release e verifiche",
-  description: "Stato delle release NexusNXS per PC e Android, requisiti, firma e procedura di verifica.",
+  description: "Stato delle release NexusNXS per PC, requisiti, firma e procedura di verifica.",
   alternates: { canonical: "/downloads" },
   openGraph: { title: "Download NexusNXS", description: "Release NexusNXS e controlli di integrità.", images: [] },
   twitter: { title: "Download NexusNXS", description: "Release NexusNXS e controlli di integrità.", images: [] },
@@ -29,21 +29,6 @@ const releases = [
     action: "Scarica per Windows",
     sha256: release.windows.sha256,
     url: release.windows.url,
-  },
-  {
-    Icon: Smartphone,
-    name: "NexusNXS per Android",
-    version: release.android.version,
-    platform: "Android 8+",
-    size: sizeLabel(release.android.bytes),
-    date: releaseDate,
-    state: "PREVIEW · FIRMA DEBUG",
-    text: "Esperienza mobile nativa per conversazioni e continuità.",
-    requirements: "Android 8 o successivo, installazione APK consentita e connessione ai servizi NexusNXS.",
-    warning: "Firma APK v2 valida con certificato Android Debug; non è una firma Play Store.",
-    action: "Scarica per Android",
-    sha256: release.android.sha256,
-    url: release.android.url,
   },
 ];
 
@@ -80,7 +65,7 @@ export default function Downloads() {
       <div className="hash-preview"><Copy size={16} /><code>{`Get-FileHash .\\NexusNXS-${release.windows.version}-Setup.exe -Algorithm SHA256`}</code></div>
       <p><BadgeCheck /> Versioni, avvisi e impronte sono pubblicati insieme ai file.</p>
     </section>
-    <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili i client PC e Android con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>
-    <SiteFooter ctaHref="/#apps" ctaLabel="Scopri le applicazioni" />
+    <section className="release-notes"><div><CalendarDays /><p className="section-label">CRONOLOGIA RELEASE</p><h2>Versioni documentate,<br /><em>senza sorprese.</em></h2></div><p>La prima Preview pubblica rende disponibili il client PC con impronte verificabili. Firma di produzione, aggiornamenti automatici e distribuzione tramite store restano passaggi successivi esplicitamente separati.</p></section>
+    <SiteFooter ctaHref="/#apps" ctaLabel="Scopri l’app per PC" />
   </main>;
 }

@@ -30,7 +30,7 @@ test('hero entry stays separate from the introduction throughout scrolling', asy
   }
 });
 
-const publicRoutes = ["/", "/desktop", "/android", "/downloads", "/security", "/status", "/privacy", "/terms"];
+const publicRoutes = ["/", "/desktop", "/downloads", "/security", "/status", "/privacy", "/terms"];
 const responsiveRoutes = [...publicRoutes, "/maintenance", "/percorso-che-non-esiste"];
 
 test("fast scroll reversals retain one field and recover the current chapter",async({page})=>{
@@ -103,10 +103,10 @@ test("the homepage loads real product captures without CSP or runtime errors", a
 
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator(".app-card-visual").first().scrollIntoViewIfNeeded();
-  // Both clients show real captures; the ambient field remains shared.
-  await expect(page.locator(".app-card-visual.android img")).toHaveCount(1);
+  // The PC client uses its real capture; the ambient field remains shared.
+  await expect(page.locator("a[href='/android']")).toHaveCount(0);
   await expect(page.locator(".app-card-visual.desktop img")).toHaveCount(1);
-  await expect(page.locator(".app-card[data-cosmic-form='ambient']")).toHaveCount(2);
+  await expect(page.locator(".app-card[data-cosmic-form='ambient']")).toHaveCount(1);
   const captures = await page.locator(".app-card-visual img").evaluateAll((images) =>
     images.map((image) => ({ width: image.naturalWidth, height: image.naturalHeight })),
   );
@@ -114,31 +114,12 @@ test("the homepage loads real product captures without CSP or runtime errors", a
   expect(errors).toEqual([]);
 });
 
-test("real product captures keep Android system bars visible and use precise hover targets", async ({ page }) => {
+test("real PC captures use precise hover targets", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/", { waitUntil: "load" });
 
   const showcase = page.locator(".one-nexus");
   await showcase.scrollIntoViewIfNeeded();
-  const androidScreen = showcase.locator(".product-mockup--real.android .product-screen");
-  const androidImage = androidScreen.locator("img");
-  await expect.poll(() => androidImage.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
-  const androidGeometry = await androidScreen.evaluate((screen) => {
-    const image = screen.querySelector("img");
-    const screenRect = screen.getBoundingClientRect();
-    const imageRect = image?.getBoundingClientRect();
-    return {
-      ratio: screenRect.width / screenRect.height,
-      imageRatio: imageRect ? imageRect.width / imageRect.height : 0,
-      naturalRatio: image ? image.naturalWidth / image.naturalHeight : 0,
-      objectFit: image ? getComputedStyle(image).objectFit : "",
-    };
-  });
-  expect(androidGeometry.objectFit).toBe("contain");
-  expect(androidGeometry.ratio).toBeCloseTo(9 / 16, 2);
-  expect(androidGeometry.imageRatio).toBeCloseTo(androidGeometry.naturalRatio, 2);
-  await expect(androidImage).toBeVisible();
-
   const desktopFrame = showcase.locator(".product-mockup--real.desktop .device-frame");
   await expect(desktopFrame.locator("canvas")).toHaveCount(0);
   await expect(desktopFrame.locator("img")).toHaveAttribute("src", "/products/desktop-home.png");
@@ -153,14 +134,14 @@ test("real product captures keep Android system bars visible and use precise hov
   await page.waitForTimeout(520);
   expect(await desktopFrame.evaluate((frame) => new DOMMatrix(getComputedStyle(frame).transform).m42)).toBeLessThan(-3);
 
-  const desktopCardScreen = page.locator(".app-card-visual.android .app-card-visual__screen");
+  const desktopCardScreen = page.locator(".app-card-visual.desktop .app-card-visual__screen");
   await desktopCardScreen.scrollIntoViewIfNeeded();
   const cardScreenBox = await desktopCardScreen.boundingBox();
   expect(cardScreenBox).not.toBeNull();
   await page.mouse.move(cardScreenBox.x - 8, cardScreenBox.y + cardScreenBox.height / 2);
   await page.waitForTimeout(460);
   expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeCloseTo(0, 1);
-  await page.mouse.move(cardScreenBox.x + cardScreenBox.width / 2, cardScreenBox.y + cardScreenBox.height / 2);
+  await desktopCardScreen.hover();
   await page.waitForTimeout(460);
   expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeLessThan(-3);
 });
@@ -268,7 +249,6 @@ test("desktop navigation stays stable while scrolling and adapts to zoom", async
 test("product pages use real accessible app captures without hydration flashes", async ({ page }) => {
   for (const product of [
     { route: "/desktop", image: "desktop-home.png", alt: /schermata principale.*PC/i },
-    { route: "/android", image: "android-home-astral.png", alt: /interfaccia reale.*Android/i },
   ]) {
     await page.goto(product.route, { waitUntil: "domcontentloaded" });
     const hero = page.locator(".product-hero");
@@ -284,7 +264,6 @@ test("every mobile navigation destination opens and marks the current page", asy
   await page.setViewportSize({ width: 390, height: 844 });
   for (const destination of [
     { label: "PC", href: "/desktop" },
-    { label: "Android", href: "/android" },
     { label: "Sicurezza", href: "/security" },
     { label: "Stato", href: "/status" },
     { label: "Download", href: "/downloads" },
@@ -534,7 +513,7 @@ test("the product title enters once and plans no longer appear", async ({page}) 
 });
 
 test("a single background stays continuous on the internal pages", async ({page}) => {
-  for (const route of ["/status", "/desktop", "/android", "/downloads", "/security"]) {
+  for (const route of ["/status", "/desktop", "/downloads", "/security"]) {
     await page.goto(route);
     await expect(page.locator('.nxs-cosmic-field')).toHaveCount(1);
     const backgrounds = await page.locator('main.inner-page > section').evaluateAll(nodes => nodes.map(n => getComputedStyle(n).backgroundColor));
@@ -592,11 +571,11 @@ test("the continuous field moves particles locally without scaling the interface
   await page.screenshot({ path: 'outputs/particles-settled.png' });
 });
 
-test("real desktop and Android image zoom is centered and keyboard dismissible", async ({page}) => {
+test("real desktop image zoom is centered and keyboard dismissible", async ({page}) => {
   for (const viewport of [{width:1440,height:1000},{width:960,height:720},{width:844,height:390},{width:390,height:844}]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
-    for (const device of ['desktop','android']) {
+    for (const device of ['desktop']) {
       const trigger=page.locator('.app-card-visual.'+device+' .product-image-open');
       await trigger.click();
       const dialog=page.getByRole('dialog');

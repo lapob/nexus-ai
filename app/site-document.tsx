@@ -2,7 +2,6 @@ import { Component, type ReactNode } from "react";
 import RootLayout, { generateMetadata } from "./layout";
 import Home from "./page";
 import Desktop, { metadata as desktop } from "./desktop/page";
-import Android, { metadata as android } from "./android/page";
 import Downloads, { metadata as downloads } from "./downloads/page";
 import Security, { metadata as security } from "./security/page";
 import Status, { metadata as status } from "./status/page";
@@ -21,7 +20,6 @@ import type { Metadata, SiteDocumentData } from "./lib/site-metadata";
 const pages = {
   "/": { Page: Home, metadata: {} },
   "/desktop": { Page: Desktop, metadata: desktop },
-  "/android": { Page: Android, metadata: android },
   "/downloads": { Page: Downloads, metadata: downloads },
   "/security": { Page: Security, metadata: security },
   "/privacy": { Page: Privacy, metadata: privacy },

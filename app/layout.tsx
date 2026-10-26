@@ -13,7 +13,7 @@ export const viewport = { themeColor: "#020405", colorScheme: "dark" };
 export function generateMetadata() {
   const origin = "https://nexusnxs.com";
   const title = "NexusNXS — AI privata, protetta e connessa";
-  const description = "AI per PC e Android, con NexusNXS Core, accessi revocabili e continuità protetta tra dispositivi.";
+  const description = "AI per PC e web, con NexusNXS Core, accessi revocabili e continuità protetta tra dispositivi.";
   return {
     metadataBase: new URL("https://nexusnxs.com"),
     title,

@@ -1,3 +1,18 @@
+# Desktop and web product scope — 26 October 2026
+
+The public native Android AI/iOS clients are retired by owner decision. The site
+now presents Windows and the web, removes the native Android download card and
+navigation, and redirects the old Android product URL to the desktop page. The
+private Control app is unaffected. Shared Core zoom remains in the canonical AI
+shell. Native source/screenshot cleanup is complete, and both current desktop captures
+are replaced with inspected Electron screenshots. No new production deployment yet.
+
+Typecheck, lint, build, performance budget, 45 unit and 37 browser checks pass.
+Windows captures are from the current isolated Electron UI; conversation content
+is a synthetic demonstration. Keep current Worker/rollback until exact-commit CI
+and release preparation/promotion pass. Native public APK assets and their three
+obsolete Dependabot branches are withdrawn; private Control is retained.
+
 ## Routine shell activated and verified — 25 October 2026
 
 Source2b6440e passed CI40224943404 and45unit/36browser release checks,

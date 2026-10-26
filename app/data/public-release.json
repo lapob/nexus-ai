@@ -6,11 +6,5 @@
     "bytes": 111849581,
     "sha256": "EA4D9F2516ED1B719FD0BCF97366E329A5DE75681C84965FAB966FF24E4D407B",
     "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.33-preview.1/NexusNXS-0.3.33-Setup.exe"
-  },
-  "android": {
-    "version": "6.5.25",
-    "bytes": 2002708,
-    "sha256": "D93A025AD150507AB3D52A3B95CC4B936182DE5062BE7C6C1355A386601BB5E9",
-    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.33-preview.1/NexusNXS-Android.apk"
   }
 }

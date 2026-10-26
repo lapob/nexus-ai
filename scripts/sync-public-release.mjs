@@ -16,7 +16,7 @@ assert.equal(manifest.visibility, 'public');
 assert.equal(manifest.containsPrivateArtifacts, false);
 assert.equal(manifest.channel, 'preview');
 const data = { tag, date: new Date(manifest.generatedAt).toISOString().slice(0, 10) };
-for (const [platform, kind] of [['windows', 'installer'], ['android', 'apk']]) {
+for (const [platform, kind] of [['windows', 'installer']]) {
   const artifact = manifest.artifacts.find(item => item.platform === platform && item.kind === kind);
   assert.ok(artifact && artifact.visibility === 'public');
   assert.match(artifact.sha256, /^[A-Fa-f0-9]{64}$/);
@@ -31,4 +31,4 @@ for (const [platform, kind] of [['windows', 'installer'], ['android', 'apk']]) {
 const directory = new URL('../app/data/', import.meta.url);
 await mkdir(directory, { recursive: true });
 await writeFile(new URL('public-release.json', directory), JSON.stringify(data, null, 2) + '\n');
-console.log(`Metadati verificati: Windows ${data.windows.version}, Android ${data.android.version}.`);
+console.log(`Metadati verificati: Windows ${data.windows.version}.`);
