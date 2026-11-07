@@ -370,7 +370,7 @@ test("proves the exact Cloudflare Worker version across the site and AI edge", a
   assert.equal(ai.status, 200);
   assert.equal(ai.headers.get("x-nexusnxs-worker-version"), versionId);
   assert.equal(ai.headers.get("x-nexusnxs-edge-state"), "shell");
-  assert.match(await ai.text(), /publicUiReadyRuntime/);
+  assert.match(await ai.text(), /<div id="root"><\/div>/);
 });
 
 test("serves one canonical UI independently of the tunnel while readiness remains offline", async () => {
@@ -384,8 +384,9 @@ test("serves one canonical UI independently of the tunnel while readiness remain
   assert.match(navigation.headers.get("content-security-policy") ?? "", /script-src 'nonce-/);
   const html = await navigation.text();
   assert.match(html, /<title>NexusNXS AI<\/title>/);
-  assert.match(html, /publicReadinessRuntime/);
-  assert.match(html, /ambientParticles/);
+  assert.match(html, /<div id="root"><\/div>/);
+  assert.match(html, /<script nonce="[^"]+" type="module">/);
+  assert.match(navigation.headers.get("permissions-policy") ?? "", /microphone=\(self\)/);
   assert.doesNotMatch(html, /Cloudflare|1033|workstation|tunnel/i);
 
   const health = await fetchWorker("https://ai.nexusnxs.com/readyz", {
@@ -406,7 +407,7 @@ test("offline installation artifacts stay available without forwarding credentia
     assert.equal(serviceWorker.headers.get("cache-control"), "no-cache");
     assert.match(serviceWorker.headers.get("content-type"), /application\/javascript/);
     const script = await serviceWorker.text();
-    if (method === "GET") assert.match(script, /nexusnxs-ai-shell-[\s\S]*v6-/);
+    if (method === "GET") assert.match(script, /registration\.unregister\(\)/);
     else assert.equal(script, "");
     const manifest = await fetchWorker("https://ai.nexusnxs.com/manifest.webmanifest", { method, env });
     assert.equal(manifest.status, 200);
@@ -424,14 +425,14 @@ test("canonical AI navigation never forwards credentials and API responses remai
     const page = await fetchWorker(`https://ai.nexusnxs.com${pathname}`, { env: { AI_UPSTREAM: upstream } });
     assert.equal(page.status, 200);
     const html = await page.text();
-    assert.match(html, /data-nxs-boot="pending"/);
+    assert.match(html, /<div id="root"><\/div>/);
     const nonce = /script-src 'nonce-([^']+)'/.exec(page.headers.get("content-security-policy"))[1];
     for (const tag of html.matchAll(/<(?:script|style)\b([^>]*)>/g)) assert.ok(tag[1].includes(`nonce="${nonce}"`));
   }
   assert.equal(requests.length, 0);
   const cachedShell = await fetchWorker("https://ai.nexusnxs.com/", { headers: { accept: "*/*" }, env: { AI_UPSTREAM: upstream } });
   assert.equal(cachedShell.headers.get("x-nexusnxs-edge-state"), "shell");
-  assert.match(await cachedShell.text(), /publicUiReadyRuntime/);
+  assert.match(await cachedShell.text(), /<div id="root"><\/div>/);
   const head = await fetchWorker("https://ai.nexusnxs.com/", { method: "HEAD", env: { AI_UPSTREAM: upstream } });
   assert.equal(head.status, 200);
   assert.equal(head.headers.get("content-type"), "text/html; charset=utf-8");

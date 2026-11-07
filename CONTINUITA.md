@@ -1,3 +1,20 @@
+# Single NexusNXS AI web app at the edge — 7 November 2026 (RELEASE IN PROGRESS)
+
+`ai.nexusnxs.com/` now serves the single NexusNXS AI web app (React/WebGPU,
+built in the AI source `web/`), identical on the gateway and on this edge. The
+classic public shell is retired in the AI source. `sync-ai-shell` now refuses
+to run unless the AI web build exists (`PUBLIC_AI_BUILT`). The edge shell adds
+`Permissions-Policy: microphone=(self)` for live voice. The service-worker
+artifact is now a cleanup worker: it deletes old `nexusnxs-ai-shell-*` caches
+and unregisters itself.
+
+Local checks before release: rendered-html 19/19; `ai-startup` e2e rewritten
+for the new app, 5/5 at 320/844/1440 (edge CSP, no CSP errors, no horizontal
+overflow, axe WCAG 2.1 AA clean, sidebar persistence, Ctrl+K palette, offline
+error ends the turn). Planned: commit → `release:prepare` (full
+`verify:release` gate + candidate upload) → `release:promote` with automatic
+rollback. Not pushed to GitHub from this session.
+
 # Published desktop/web scope — 26 October 2026
 
 Production Worker a37e5c89-3987-485a-8720-bc6a4d0055f5 serves application code

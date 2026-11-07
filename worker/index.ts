@@ -97,7 +97,9 @@ async function proxyAi(request: Request, env: Env, nonce: string): Promise<Respo
   if ((request.method === "GET" || request.method === "HEAD") && (url.pathname === "/" || url.pathname === "/index.html")) {
     return secureAiResponse(new Response(request.method === "HEAD" ? null : aiOfflineHtml(nonce), {
       headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
-        "Content-Security-Policy": aiUiContentSecurityPolicy(nonce) },
+        "Content-Security-Policy": aiUiContentSecurityPolicy(nonce),
+        // Live voice needs the microphone on this origin only, after the browser prompt.
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=(), payment=(), usb=()" },
     }), env.CF_VERSION_METADATA?.id, "shell");
   }
   if (request.method === "GET" && (url.pathname === "/nexus-icon.png" || url.pathname === "/inter-latin.woff2")) {
