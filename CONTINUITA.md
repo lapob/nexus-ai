@@ -1,3 +1,12 @@
+## Preview 0.3.34 — 8 November 2026 (IN PROGRESS)
+
+Operation (owner asked to "execute everything", including GitHub): version
+0.3.34 → `npm run release:public:preview` (verify, unsigned Preview build:win,
+verify:installer, sbom) → push `main` → `founder:publish` (tag
+v0.3.34-preview.1, assets + checksums) → `.SITE release:sync` + site release.
+Expected: installer verification passes; release assets' digests verified;
+site download points to 0.3.34. Logs in the session scratchpad.
+
 ## Agent trail, ratings, microphone choice, paired mode — 8 November 2026
 
 - WebGPU: already active in the real desktop app (GPU off only in smoke
