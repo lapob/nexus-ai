@@ -1,4 +1,9 @@
-# One cosmic theme for the site — 8 November 2026 (RELEASE IN PROGRESS)
+# One cosmic theme for the site — 8 November 2026 (PUBLISHED)
+
+Commit 9d0ae68. Gate: unit 45/45, e2e 34/34; candidate a8205e88. Production
+version 90096cc2-966d-446a-87c8-ddd2564b9f5d (13 routes, AI readiness verified);
+browser check on nexusnxs.com and ai.nexusnxs.com (new app, WebGPU, Online).
+This checkpoint edit is uncommitted; nothing pushed.
 
 - Palette: every violet/indigo literal in `app/globals.css` (112) mapped to the
   app's cyan hue (182°) with lightness preserved; final "Tema unico" layer adds
