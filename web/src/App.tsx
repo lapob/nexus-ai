@@ -546,7 +546,7 @@ export function App() {
                 }}><Icon name="paperclip" /></button>
               </>}
               <button type="button" className="mode" data-mode={mode} onClick={toggleMode} aria-pressed={mode === 'deep'}
-                title="Approfondito: più ragionamento e verifiche, risposte più lente">
+                title="Approfondito: modello più grande e preciso, risposte più lente">
                 <Icon name={mode === 'deep' ? 'sparkles' : 'bolt'} />{mode === 'deep' ? 'Approfondito' : 'Rapido'}
               </button>
               <span className="hint">Invio per inviare · Maiusc+Invio per andare a capo</span>

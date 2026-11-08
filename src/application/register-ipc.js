@@ -17,6 +17,7 @@ const { fileURLToPath } = require('node:url');
 const { resolveVaultNotePath } = require('../core/security');
 const { conversationalGuidance, deriveSearchQueries, parsePlannerOutput, mergeSources } = require('./reasoning');
 const { intelligenceSignals, resolveIntelligenceMode, shouldUseDeliberateThinking, shouldPreferFastExecutionModel, instantConversationalReply } = require('./intelligence-routing');
+const { resolveDeepModel, DEEP_MODEL_REQUEST } = require('./deep-model');
 const {
   responseQualityDirective, validateResponse, shouldReviewResponse, hasStrictOutputConstraint,
   strictWordCountSchema, strictWordCountAnswer
@@ -46,7 +47,7 @@ const { fitAttachmentContext } = require('./attachment-context');
 const { decryptArchive, encryptArchive } = require('../infrastructure/storage/encrypted-backup');
 const { explicitMemoryInstruction, memoryQueryText } = require('../infrastructure/storage/personal-memory-store');
 const { configureContinuityTask, continuityTaskStatus, createTrackedExecFileRunner } = require('../infrastructure/windows/continuity-task');
-const { MODEL_PROFILES, adaptiveModelSelection, isUserSelectableModel, modelSuitability, profileModels, provisioningStatus, publicModelName } = require('../ai/model-manifest');
+const { MODEL_PROFILES, adaptiveModelSelection, automaticChatCandidates, isUserSelectableModel, modelSuitability, profileModels, provisioningStatus, publicModelName } = require('../ai/model-manifest');
 const { CHANNELS, parseChatRequest, parseRelativeNotePath, parseClipboardText, parseExternalUrl, parseEmbeddingRequest, parseModelName, parseRequestId, parseAgentInstruction, parseAgentPlanningRequest, parseActionTicket, parseWorkflowId, parseWorkflowCreate, parseWorkflowDecision, parseTrainingExample, parseProvisioningProfile } = require('./ipc-contracts');
 const { MODEL_WARMUP_TIMEOUT_MS, createAdaptiveSettingsResolver, createWarmupSingleflight, residentModelOptions } = require('./runtime-warmup-policy');
 const { enforcePublicCitationUrls, ensurePublicCitation, researchLanguage, researchQuestion } = require('../research/research-orchestrator');
@@ -604,7 +605,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     assertCurrent();
     if (distributionMode === 'public') return { settings, models, changed: false };
     if (!settings.autoSelectModel || !models.length) return { settings, models, changed: false };
-    const chatModels = models.filter((model) => isUserSelectableModel(model) && model.capabilities?.chat !== false);
+    const chatModels = automaticChatCandidates(models.filter((model) => isUserSelectableModel(model) && model.capabilities?.chat !== false));
     const compatibleChatModels = chatModels.filter((model) => modelSuitability(model.id, hardwareProfile).compatible);
     const selectableChatModels = compatibleChatModels.length ? compatibleChatModels : chatModels;
     const currentEmbeddingAvailable = Boolean(settings.embeddingModel && models.some((model) => model.id === settings.embeddingModel && model.capabilities?.embeddings));
@@ -1656,22 +1657,24 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         return { answer: publicResearchUnavailableAnswer(question, prepared.research.emptyResults), sources: [], mode, requestId, usage: { promptTokens: 0, completionTokens: 0 } };
       }
       await ensureRuntime(settings);
-      const selectedModel = shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
+      const deepModel = await resolveDeepModel({ requestedMode: parsed.mode, distributionMode }, () => aiRuntime.listModels());
+      const selectedModel = deepModel || (shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
         ? settings.fastModel
-        : inferencePolicy(settings, mode).candidateModel;
+        : inferencePolicy(settings, mode).candidateModel);
       let result = await aiRuntime.chat({
         requestId, model: selectedModel, messages: prepared.messages, mode: mode === 'deep' ? 'deep' : 'quick',
         ...residencyOptions(settings, mode),
         think: deliberateThinking,
         temperature: settings.temperature, maxTokens: mode === 'deep' ? runtimeTuning.deepTokens : runtimeTuning.quickTokens,
-        numCtx: runtimeTuning.contextTokens, keepAlive: runtimeTuning.keepAlive, timeoutMs: requestTimeout(mode), signal: controller.signal
+        numCtx: runtimeTuning.contextTokens, keepAlive: runtimeTuning.keepAlive, timeoutMs: requestTimeout(mode), signal: controller.signal,
+        ...(deepModel ? DEEP_MODEL_REQUEST : {})
       });
       let secured = secureModelOutput(result.message.content, prepared.security);
       const grounded = enforcePublicCitationUrls(secured.text, prepared.publicSources);
       if (grounded.changed) logger.warn('Citazioni non restituite dal provider rimosse.', { requestId, rejected: grounded.rejected });
       secured = { ...secured, text: grounded.text };
       let quality = validateGroundedResponse(question, secured.text, prepared.security, prepared.publicSources);
-      if (!quality.valid && quality.issues.some((issue) => issue !== 'missing-public-citation') && selectedModel !== settings.chatModel) {
+      if (!quality.valid && quality.issues.some((issue) => issue !== 'missing-public-citation') && selectedModel !== settings.chatModel && !deepModel) {
         logger.warn('Risposta rapida non conforme; verifica con il modello principale.', { requestId, issues: quality.issues });
         result = await aiRuntime.chat({
           requestId: `${requestId}-quality`, model: settings.chatModel, messages: prepared.messages, mode: 'deep',
@@ -1785,10 +1788,11 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         return result;
       }
       await ensureRuntime(settings);
-      selectedModel = shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
+      const deepModel = await resolveDeepModel({ requestedMode: parsed.mode, distributionMode }, () => aiRuntime.listModels());
+      selectedModel = deepModel || (shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
         ? settings.fastModel
-        : inferencePolicy(settings, mode).candidateModel;
-      emit(event, { type: 'phase', requestId, phase: { step: 'execute', label: mode === 'deep' ? 'Ragiono e costruisco una soluzione completa' : 'Formulo una risposta chiara' } });
+        : inferencePolicy(settings, mode).candidateModel);
+      emit(event, { type: 'phase', requestId, phase: { step: 'execute', label: deepModel ? 'Attivo il modello approfondito: la prima risposta può richiedere un minuto' : mode === 'deep' ? 'Ragiono e costruisco una soluzione completa' : 'Formulo una risposta chiara' } });
 
       // Modalità agente (opt-in): ciclo multi-step con strumenti tipizzati.
       // Un guasto non annullato ripiega sul percorso ordinario qui sotto.
@@ -1808,7 +1812,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
             // nexusnxs-agent-v1 su qwen3:14b: thinking 93.75% con mediana 87s
             // contro 96.88% e 16s senza. Nel ciclo agentico resta disattivato.
             mode: mode === 'deep' ? 'deep' : 'quick', think: false, temperature: settings.temperature, signal: controller.signal,
-            requestOptions: { maxTokens: mode === 'deep' ? runtimeTuning.deepTokens : runtimeTuning.quickTokens, numCtx: runtimeTuning.contextTokens, keepAlive: runtimeTuning.keepAlive, timeoutMs: requestTimeout(mode) },
+            requestOptions: { maxTokens: mode === 'deep' ? runtimeTuning.deepTokens : runtimeTuning.quickTokens, numCtx: runtimeTuning.contextTokens, keepAlive: runtimeTuning.keepAlive, timeoutMs: requestTimeout(mode), ...(deepModel ? { maxTokens: DEEP_MODEL_REQUEST.maxTokens, timeoutMs: DEEP_MODEL_REQUEST.timeoutMs } : {}) },
             tools,
             requestConsent: createNativeToolConsent({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) }),
             onPhase: (label) => emit(event, { type: 'phase', requestId, phase: { step: 'execute', label } })
@@ -1857,7 +1861,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         numCtx: runtimeTuning.contextTokens,
         keepAlive: runtimeTuning.keepAlive,
         timeoutMs: requestTimeout(mode),
-        signal: controller.signal
+        signal: controller.signal,
+        ...(deepModel && model === deepModel ? DEEP_MODEL_REQUEST : {})
       }, {
         onStart: (metadata) => emit(event, { type: 'start', requestId, metadata: { ...metadata, requestId } }),
         onToken: (token) => {
@@ -2112,7 +2117,9 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       const explicitModel = requestedModel !== 'automatic'
         ? (await aiRuntime.listModels()).find((model) => model.id === requestedModel && model.capabilities?.chat !== false)?.id
         : null;
-      const selectedModel = explicitModel || (attachments.images?.length
+      const deepModel = (explicitModel || attachments.images?.length) ? null
+        : await resolveDeepModel({ requestedMode: parsed.mode, publicGuest: ephemeral, distributionMode }, () => aiRuntime.listModels());
+      const selectedModel = explicitModel || deepModel || (attachments.images?.length
         ? 'qwen3-vl:4b'
         : shouldPreferFastExecutionModel({
           question: parsed.question,
@@ -2123,7 +2130,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
           : inferencePolicy(settings, resolvedMode).candidateModel);
       remoteModelClass = attachments.images?.length ? 'vision' : selectedModel === settings.chatModel ? 'primary' : 'fast';
       const messages = attachments.images?.length ? prepared.messages.map((message, index) => index === prepared.messages.length - 1 && message.role === 'user' ? { ...message, images: attachments.images } : message) : prepared.messages;
-      report(resolvedMode === 'deep' ? 'Ragiono e collego i dettagli…' : 'Formulo la risposta…', 'work', resolvedMode === 'deep' ? 'plan' : 'respond');
+      report(deepModel ? 'Attivo il modello approfondito: la prima risposta può richiedere un minuto…' : resolvedMode === 'deep' ? 'Ragiono e collego i dettagli…' : 'Formulo la risposta…', 'work', resolvedMode === 'deep' ? 'plan' : 'respond');
       remoteInferenceStartedAt = performance.now();
       // Un segmento breve produceva pause percepibili ogni volta che una guida,
       // una tabella o del codice raggiungevano il limite. Il gateway pubblico
@@ -2145,7 +2152,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         numCtx: runtimeTuning.contextTokens,
         keepAlive: runtimeTuning.keepAlive,
         timeoutMs: requestTimeout(resolvedMode),
-        signal: controller.signal
+        signal: controller.signal,
+        ...(deepModel ? DEEP_MODEL_REQUEST : {})
       }, {
         onToken: onSegmentToken,
         onThinking: () => report('Ragiono e collego i dettagli…', 'work', 'plan'),
@@ -2182,7 +2190,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       secured = { ...secured, text: grounded.text };
       result = { ...result, message: { ...result.message, content: secured.text } };
       let quality = validateGroundedResponse(parsed.question, secured.text, prepared.security, prepared.publicSources);
-      if (!quality.valid && quality.issues.some((issue) => issue !== 'missing-public-citation') && !attachments.images?.length && selectedModel !== settings.chatModel && settings.chatModel) {
+      if (!quality.valid && quality.issues.some((issue) => issue !== 'missing-public-citation') && !attachments.images?.length && selectedModel !== settings.chatModel && settings.chatModel && !deepModel) {
         report('Verifico accuratezza, sicurezza e lingua…', 'work', 'verify');
         logger.warn('Risposta remota rapida non conforme; verifica col modello principale.', {
           requestId,

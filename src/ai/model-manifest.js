@@ -59,6 +59,10 @@ const MODEL_PROFILES = Object.freeze({
   })
 });
 
+// Opzionale e mai scaricato in automatico: usato solo dal pulsante
+// "Approfondito" quando è già installato (vedi application/deep-model).
+const DEEP_MODEL = 'qwen3.8:27b-q4_K_M';
+
 const TIER_ORDER = Object.freeze({ lite: 0, balanced: 1, performance: 2, ultra: 3 });
 
 // #endregion
@@ -90,6 +94,16 @@ function isUserSelectableModel(value) {
   // e comprensibile nell'interfaccia pubblica.
   return !/^nexus-nexus-personal(?::|$)/i.test(id)
     && id !== 'qwen3:30b';
+}
+
+/**
+ * La selezione automatica sceglie solo tra i modelli del catalogo, misurati e
+ * promossi. Un modello scaricato per prova (es. gpt-oss:20b, 87% nell'eval
+ * dell'8/11/2026) non deve diventare il principale solo perché entra in memoria.
+ */
+function automaticChatCandidates(models = []) {
+  const promoted = models.filter((model) => MODEL_CATALOG[canonicalModelId(model)]?.role === 'chat');
+  return promoted.length ? promoted : models;
 }
 
 function modelSet(models = []) {
@@ -228,9 +242,11 @@ function provisioningStatus(installedModels, hardware, freeDiskBytes = null) {
 
 module.exports = {
   adaptiveModelSelection,
+  automaticChatCandidates,
   MODEL_CATALOG,
   MODEL_PROFILES,
   canonicalModelId,
+  DEEP_MODEL,
   developmentProfile,
   modelMemoryBudget,
   modelSet,

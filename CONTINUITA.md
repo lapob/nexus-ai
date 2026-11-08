@@ -37,6 +37,19 @@
   explicit "deep" slot: qwen3.8:27b (quality, too slow for voice). gemma4 worth
   re-testing after investigating the consent flow. Synthetic suite, not a
   general quality claim.
+- **Deep model wired (owner approved)**: `application/deep-model.js` routes
+  qwen3.8:27b-q4_K_M (`DEEP_MODEL` in model-manifest) only when the user presses
+  "Approfondito" (explicit `mode: 'deep'`), never on automatic escalation, never
+  for public guests/public client, only if installed; think:false, 4096 tokens,
+  900 s timeout; no fallback re-ask to the 14B. Desktop chat, stream and remote
+  paths. Live smoke on the service runtime: correct answer, no <think>; cold
+  load ~57 s (first request up to ~3 min incl. swap), warm ~1 s; a phase label
+  warns the first answer can take a minute.
+- **Bug fixed**: automatic selection picked the largest model fitting the
+  budget, so after the downloads the service loaded gpt-oss:20b (87% in eval)
+  as main model (since the 20:48 boot). `automaticChatCandidates` restricts
+  auto-selection to catalog models; after restart the service loads qwen3:14b.
+  Tests 1170 (1168 pass, 2 skip, 0 fail); `npm run check` PASS before the fix.
 - **Owner limits** (desktop): no file count/size cap (1 GiB technical ceiling
   per file), PDFs supported with an owner profile (all pages, big heap, 15 min),
   more text formats (.log, .csv…); large attachments are fitted to the model
