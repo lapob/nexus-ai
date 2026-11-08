@@ -1,4 +1,32 @@
-# Single NexusNXS AI web app at the edge — 7 November 2026 (RELEASE IN PROGRESS)
+# One cosmic theme for the site — 8 November 2026 (RELEASE IN PROGRESS)
+
+- Palette: every violet/indigo literal in `app/globals.css` (112) mapped to the
+  app's cyan hue (182°) with lightness preserved; final "Tema unico" layer adds
+  the app tokens (#020405 ink, #4be7e9 cyan), radial cosmic background, glass
+  surfaces with luminous hairline, gradient accent text, cyan primary buttons
+  with dark text, dark-glass security/architecture bands (AA contrast),
+  scroll-driven reveal (`animation-timeline: view()`, reduced-motion aware)
+  and cross-document view transitions.
+- Dead CSS removed: 178 rules whose selectors only referenced classes absent
+  from app/worker/public markup (≈19 KiB source); app CSS 100.9 → 86.7 KiB
+  built (budget 100). Unused `public/products/desktop-core.png` removed.
+- Product photos replaced with real captures of the unified desktop UI
+  (isolated Electron profile, demonstrative conversation, status pill hidden
+  only in the photo because the test profile has no AI engine), quantized
+  PNG 50 KB each.
+- AI shell resynced (Markdown tables/callouts/formulas, edit-and-resend,
+  export, short-window layout).
+- Local checks: unit 45/45, e2e 34/34 (incl. WCAG A/AA on core routes and the
+  AI startup spec), performance budget OK.
+
+# Single NexusNXS AI web app at the edge — 7 November 2026 (PUBLISHED)
+
+Commit f1613b1. `release:prepare` passed the full gate (45 unit, 34 e2e incl.
+WCAG A/AA, security, dry-run); candidate 25d139ec. `release:promote`: production
+version b8dc8fae-cce2-4078-b20e-a742d75833b4, 13 routes verified, AI readiness
+verified. Browser on https://ai.nexusnxs.com/: new app, WebGPU, Online, live
+voice button, no service worker left, zero console errors. Rollback target:
+the previous production version (automatic rollback was not needed).
 
 `ai.nexusnxs.com/` now serves the single NexusNXS AI web app (React/WebGPU,
 built in the AI source `web/`), identical on the gateway and on this edge. The

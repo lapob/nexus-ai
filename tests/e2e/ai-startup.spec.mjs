@@ -75,5 +75,5 @@ test('an unavailable service ends the turn with a readable error instead of hang
   await page.keyboard.press('Enter');
   await expect(page.locator('.thread .message.user')).toContainText('Ciao');
   await expect(page.locator('.thread .message.assistant')).toContainText(/non disponibile|non riuscita|Servizio/i);
-  await expect(page.getByRole('button', { name: 'Invia' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Invia', exact: true })).toBeVisible();
 });

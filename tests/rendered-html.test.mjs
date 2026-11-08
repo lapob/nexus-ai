@@ -197,7 +197,7 @@ test("keeps the floating navigation fullscreen, accessible, and paired with the 
   assert.match(navigationStyles, /prefers-reduced-motion: reduce/);
   assert.match(globalStyles, /--font-geist-mono:var\(--font-inter\)/);
   assert.equal((globalStyles.match(/@font-face/g) || []).length, 1, 'Import only the shared Inter family');
-  assert.match(globalStyles, /\.card-top,\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);
+  assert.match(globalStyles, /\.platform\{color:rgba\(176,210,214,\.60\)!important\}/);
   assert.match(globalStyles, /\.presence-grid small\{color:rgba\(176,210,214,\.60\)\}/);
   assert.match(globalStyles, /\.trust-hero > \*,[\s\S]*\.data-flow > \*[\s\S]*min-width: 0/);
   assert.match(globalStyles, /\.trust-hero h1,[\s\S]*\.data-flow h2[\s\S]*overflow-wrap: anywhere/);

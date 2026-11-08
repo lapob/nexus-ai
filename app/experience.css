@@ -42,10 +42,6 @@
   pointer-events: auto;
 }
 
-.nexus-stage .orbit-line {
-  pointer-events: none;
-}
-
 .product-mockup--real .device-bar {
   position: relative;
   z-index: 2;
@@ -311,14 +307,6 @@
 
 /* Commercial surface: concrete plans, no simulated checkout. */
 
-
-
-@media (max-width: 900px) {
-}
-
-@media (max-width: 560px) {
-}
-
 .nxs-motion-lite .product-mockup--real .mockup-glow {
   filter: none;
   opacity: .24;
@@ -347,7 +335,6 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .nxs-header,
   .nxs-nav,
   .product-mockup--real figcaption {
     -webkit-backdrop-filter: none;
@@ -357,15 +344,6 @@
 }
 
 /* Mobile route polish: content leaves the fixed chrome cleanly and never clips. */
-.nxs-header::after {
-  content: "";
-  position: absolute;
-  inset: 100% 0 auto;
-  height: 18px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(2, 4, 5, .68), transparent);
-  opacity: .78;
-}
 
 .trust-seal {
   position: relative;
