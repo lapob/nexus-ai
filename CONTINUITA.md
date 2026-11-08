@@ -1,3 +1,18 @@
+# Preview 0.3.34 download, PC photo frame, entity layout — 8 November 2026 (RELEASE IN PROGRESS)
+
+- Download metadata synced to v0.3.34-preview.1 (GitHub release verified:
+  installer 113212163 bytes, SHA-256 C13F8435…C0C4).
+- /desktop frame: no inner padding/fixed ratio, so the 1090×613 capture is
+  shown whole (composer and Control Center visible); "APP PC REALE" moved into
+  the frame's top bar instead of covering the send button.
+- Product photos recaptured after the app's home fix (entity in its own slot,
+  no longer behind the title); 45 / 43 KB.
+- Removed the scroll-driven reveal added in the previous release: it doubled
+  the site's own motion system and made the home card hover test flaky
+  (3/9 failures before, 0/6 after).
+- AI shell resynced from AI source c0c476f.
+- Local checks: unit 45/45, e2e 34/34, performance budget OK.
+
 # One cosmic theme for the site — 8 November 2026 (PUBLISHED)
 
 Commit 9d0ae68. Gate: unit 45/45, e2e 34/34; candidate a8205e88. Production

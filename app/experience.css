@@ -91,6 +91,21 @@
   object-fit: contain;
 }
 
+/* La cornice segue la foto: niente padding interno né altezza fissa, così la
+   cattura 1090x613 resta intera (composer e barra laterale compresi). */
+.product-mockup--real.desktop .device-frame {
+  aspect-ratio: auto;
+  padding: 0;
+}
+
+.product-mockup--real.desktop .product-screen {
+  height: auto;
+  border-radius: 0;
+}
+
+/* Il badge vive nella barra superiore e non copre mai i controlli della cattura. */
+.product-mockup--real .device-bar span { visibility: hidden; }
+
 
 
 
@@ -98,8 +113,8 @@
 .product-mockup--real figcaption {
   position: absolute;
   z-index: 3;
-  inset: auto 14px 13px auto;
-  min-height: 26px;
+  inset: 2px 12px auto auto;
+  min-height: 24px;
   padding: 0 10px;
   display: inline-flex;
   align-items: center;
@@ -173,7 +188,7 @@
 
 @media (max-width: 1024px) {
   #site-content { padding-left: 0; }
-  .product-mockup--real figcaption { inset: auto 10px 10px auto; }
+  .product-mockup--real figcaption { inset: 2px 10px auto auto; }
 }
 
 @media (max-width: 560px) {
