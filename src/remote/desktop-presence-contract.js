@@ -14,15 +14,15 @@ const PRESENCE_ACTIONS = Object.freeze([
   'hide-nucleus',
   'open-full-app',
   'close-full-app',
-  'open-chatgpt',
-  'close-chatgpt',
+  'open-claude',
+  'close-claude',
   'open-application',
   'close-application',
   'select-display'
 ]);
 const PRESENCE_ACTION_SET = new Set(PRESENCE_ACTIONS);
 const LOGICAL_DISPLAY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const APPLICATION_ID = /^(?:brave|terminal|supremo|notepad|steam|epic)$/;
+const APPLICATION_ID = /^(?:brave|terminal|supremo|notepad)$/;
 
 // #region 01 — Normalizzazione metadata-only
 
@@ -91,7 +91,7 @@ function normalizeDesktopPresenceStatus(value, { mutationsAvailable = true, now 
     available,
     nucleus: source.nucleusVisible === true ? 'visible' : source.nucleusVisible === false ? 'hidden' : 'unknown',
     fullApp: source.fullAppOpen === true ? 'open' : source.fullAppOpen === false ? 'closed' : 'unknown',
-    chatGpt: source.chatGptOpen === true ? 'open' : source.chatGptOpen === false ? 'closed' : 'unknown',
+    claude: source.claudeOpen === true ? 'open' : source.claudeOpen === false ? 'closed' : 'unknown',
     applications,
     foregroundApplicationId,
     selectedDisplayId,
@@ -159,8 +159,8 @@ function presenceActionChangesState(status, request) {
   if (request.action === 'hide-nucleus') return status.nucleus !== 'hidden';
   if (request.action === 'open-full-app') return status.fullApp !== 'open';
   if (request.action === 'close-full-app') return status.fullApp !== 'closed';
-  if (request.action === 'open-chatgpt') return status.chatGpt !== 'open';
-  if (request.action === 'close-chatgpt') return status.chatGpt !== 'closed';
+  if (request.action === 'open-claude') return status.claude !== 'open';
+  if (request.action === 'close-claude') return status.claude !== 'closed';
   if (request.action === 'open-application') {
     return status.applications.find((entry) => entry.id === request.applicationId)?.state !== 'open';
   }
@@ -176,8 +176,8 @@ function presencePostconditionSatisfied(status, request) {
   if (request.action === 'hide-nucleus') return status.nucleus === 'hidden';
   if (request.action === 'open-full-app') return status.fullApp === 'open';
   if (request.action === 'close-full-app') return status.fullApp === 'closed';
-  if (request.action === 'open-chatgpt') return status.chatGpt === 'open';
-  if (request.action === 'close-chatgpt') return status.chatGpt === 'closed';
+  if (request.action === 'open-claude') return status.claude === 'open';
+  if (request.action === 'close-claude') return status.claude === 'closed';
   if (request.action === 'open-application') {
     return status.applications.some((entry) => entry.id === request.applicationId && entry.state === 'open');
   }
@@ -192,8 +192,8 @@ function presenceActionPreview(request) {
   if (request.action === 'hide-nucleus') return 'Nascondi il nucleo dal desktop.';
   if (request.action === 'open-full-app') return 'Apri l applicazione completa.';
   if (request.action === 'close-full-app') return 'Chiudi in modo ordinato l applicazione completa.';
-  if (request.action === 'open-chatgpt') return 'Apri ChatGPT sul computer.';
-  if (request.action === 'close-chatgpt') return 'Chiudi ChatGPT sul computer.';
+  if (request.action === 'open-claude') return 'Apri Claude sul computer.';
+  if (request.action === 'close-claude') return 'Chiudi Claude sul computer.';
   if (request.action === 'open-application') return 'Apri una applicazione autorizzata sul computer.';
   if (request.action === 'close-application') return 'Chiudi una applicazione autorizzata sul computer.';
   return 'Sposta il nucleo su un display autorizzato.';

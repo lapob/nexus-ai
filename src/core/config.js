@@ -18,6 +18,12 @@ const DEFAULTS = Object.freeze({
     embeddingModel: null,
     autoSelectModel: true,
     actionApprovalMode: 'dangerous-only',
+    // Ciclo agentico con strumenti: opt-in esplicito finché la qualità del
+    // tool use non è misurata sul modello ammesso.
+    agentMode: false,
+    // 'explicit': solo «ricordati che». 'automatic': anche riassunti delle
+    // conversazioni e fatti dichiarati, consolidati in locale e modificabili.
+    memoryMode: 'explicit',
     temperature: 0.3,
     requestTimeoutMs: 120000,
     personalization: Object.freeze({
@@ -85,6 +91,9 @@ function validateSettings(input = {}, fallback = DEFAULTS.ai) {
   const actionApprovalMode = ['always', 'dangerous-only', 'full-access'].includes(source.actionApprovalMode)
     ? source.actionApprovalMode
     : fallback.actionApprovalMode || 'dangerous-only';
+  const agentMode = source.agentMode === undefined ? fallback.agentMode === true : source.agentMode === true;
+  const memoryMode = ['explicit', 'automatic'].includes(source.memoryMode) ? source.memoryMode
+    : source.memoryMode === undefined && fallback.memoryMode === 'automatic' ? 'automatic' : 'explicit';
   const temperature = finiteNumber(source.temperature, fallback.temperature ?? 0.3, { min: 0, max: 1, name: 'La temperatura' });
   const personalInput = source.personalization || {};
   const personalFallback = fallback.personalization || DEFAULTS.ai.personalization;
@@ -102,8 +111,8 @@ function validateSettings(input = {}, fallback = DEFAULTS.ai) {
       ? personalFallback.attentiveFollowUp !== false
       : personalInput.attentiveFollowUp !== false
   };
-  const ai = { provider, ollama: { baseUrl, timeoutMs, allowLan }, service: { baseUrl: serviceBaseUrl, fallbackUrls: serviceFallbackUrls, timeoutMs: serviceTimeoutMs }, allowLan, chatModel, fastModel, embeddingModel, autoSelectModel, actionApprovalMode, temperature, requestTimeoutMs: fallback.requestTimeoutMs || 120000, personalization };
-  return { ai, provider, baseUrl, allowLan, model: chatModel || '', chatModel, fastModel, embeddingModel, autoSelectModel, actionApprovalMode, timeoutMs, temperature, personalization };
+  const ai = { provider, ollama: { baseUrl, timeoutMs, allowLan }, service: { baseUrl: serviceBaseUrl, fallbackUrls: serviceFallbackUrls, timeoutMs: serviceTimeoutMs }, allowLan, chatModel, fastModel, embeddingModel, autoSelectModel, actionApprovalMode, agentMode, memoryMode, temperature, requestTimeoutMs: fallback.requestTimeoutMs || 120000, personalization };
+  return { ai, provider, baseUrl, allowLan, model: chatModel || '', chatModel, fastModel, embeddingModel, autoSelectModel, actionApprovalMode, agentMode, memoryMode, timeoutMs, temperature, personalization };
 }
 function mergeSettings(current = {}, patch = {}) {
   const currentSource = current.ai || current;

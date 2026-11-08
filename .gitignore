@@ -2,6 +2,8 @@ node_modules/
 vendor/
 dist/
 renderer-dist/
+web-dist/
+renderer-cosmic-dist/
 out/
 release*/
 artifacts/

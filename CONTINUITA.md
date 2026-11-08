@@ -1,3 +1,389 @@
+## Classic desktop UI removed, Control Center, cleanup — 8 November 2026 (PUBLISHED, COMMITTED)
+
+Service restarted (ready 14 s, public `/` serves the new bundle, readyz 200
+local and public). Site release 90096cc2 live. This whole session's source
+work is committed locally on `main` after `check-publication-safety` passed
+(968 files); nothing pushed.
+
+- Desktop now has a single UI: root `vite.config.ts` builds `web/` into
+  `renderer-dist` (nexus://app). Removed `src/renderer` (≈17k lines), the
+  interface switch (`interfaceVersion`, `interfaceRootResolver`), the
+  `web/vite.desktop.config.ts`/`renderer-cosmic-dist` pair, the
+  cosmic-visualizers generator and outputs (only the deleted pages used them),
+  classic desktop QA scripts (visual/motion/accessibility/response-feedback)
+  and their npm scripts, and 7 classic-only test files. Generators now emit
+  Android outputs only. Zip backup of everything removed in the session
+  scratchpad; tracked files remain in git history.
+- Ported to the unified UI: `web/src/ControlCenter.tsx` (models + local engine
+  provisioning, profile/personalization, phone pairing with QR and revoke,
+  memory search/edit/forget/export + automatic memory switch, workspace,
+  startup/updates/diagnostics/cache/reindex/action history + undo, encrypted
+  backup export/import) and `web/src/desktopPresence.ts` (opt-in wake word
+  that opens live voice, Presence state sync, proactive toasts).
+- New features: Markdown tables, callouts, formulas, checklists, ordered
+  starts; edit-and-resend last question; export conversation as Markdown;
+  short-window layout (entity no longer covers the title).
+- Unused deps removed: three, @types/three, @react-three/fiber,
+  @react-three/postprocessing, postprocessing (22 packages).
+- Checks: full suite 1159 — 1157 PASS, 2 SKIP, 0 FAIL; tsc, sections,
+  hygiene, overlap, startup budget (rewritten for the unified bundle) PASS;
+  `tests/electron-smoke.js` rewritten for the unified UI and PASS; real
+  Electron check of all 7 Control Center tabs through the IPC bridge.
+- Not covered: workflows UI, training stats/ratings and visual-quality
+  preferences of the old renderer were not ported (backend APIs remain).
+
+## Android Control 1.21.0: Claude instead of ChatGPT, no games — 8 November 2026 (BUILT)
+
+Owner report after installing 1.21.0: the Claude tile showed no state and did
+not open Claude. Cause: the server runs in session 0 and routes desktop actions
+through the Presence bridge (session 1), which was still the pre-update
+process (ChatGPT-only contract). Fix: coordinated Presence shutdown via the
+signed lock request, then `NexusNXS Desktop Bridge` task restarted (new PID,
+clean presence.log). Rule: after changing presence/desktop-control code,
+restart the Presence too, not only the server.
+
+Result: APK built and lint-clean, `release-android/NexusNXS-Control-1.21.0-nexus-control.apk`
+(SHA-256 B42DF8B3…ECA5, same debug certificate as the installed build, so it
+updates in place). Service restarted (ready 56 s; local and public readyz 200).
+Not verified: no device or emulator was connected, so the visual matrix and a
+real open/close of Claude from the phone are still to do; the tray Presence
+process keeps the old code until the desktop app is restarted by the owner.
+
+Operation: `npm run android:console` (Gradle assemble + lint Preview, apksigner
+verify) → `release-android/NexusNXS-Control-1.21.0-nexus-control.apk`; then a
+controlled service restart so the PC accepts the new `open-claude` /
+`close-claude` actions. No device install from this session.
+
+- Protocol: `open-chatgpt`/`close-chatgpt` and status `chatGpt` renamed to
+  `open-claude`/`close-claude`/`claude` across Android, presence contract,
+  bridge, headless control and presence bootstrap. Claude Desktop opens via
+  `shell:AppsFolder\Claude_pzs8sxrjxfjjc!Claude` (fallback https://claude.ai).
+- Safety: Claude Desktop and Claude Code both run `claude.exe`. Detection and
+  close now use a fixed CIM query limited to
+  `…\WindowsApps\Claude_*\app\Claude.exe` and `taskkill /PID` on those PIDs only,
+  never `/IM`. Verified read-only on this PC: 12 Desktop PIDs, Claude Code
+  excluded. Close tested only with simulated executors.
+- Games removed: Applicazioni/Giochi folders, Steam and Epic tiles, catalog
+  entries and contract ids. The App section shows the app grid directly.
+- Graphics: cosmic radial background, glass surfaces (top light + cyan
+  hairline), cyan glow on open apps (Android 9+ coloured shadows).
+- Checks so far: full suite 1243 — 1241 PASS, 2 SKIP, 0 FAIL.
+
+## Single interface everywhere, classic web removed — 7 November 2026 (PUBLISHED)
+
+Service restarted (ready 24 s): public ingress `/` = new app (nonce CSP,
+`microphone=(self)`), `/next` 308 → `/`, cleanup service worker. Edge: `.SITE`
+commit f1613b1, production Worker b8dc8fae; https://ai.nexusnxs.com/ verified
+in a browser (new app, WebGPU, Online, no console errors). `.AI` still
+uncommitted; nothing pushed.
+
+Operation: controlled restart of the headless service to publish the single web
+app at `ai.nexusnxs.com/` (classic public page removed), then `.SITE`
+`sync-ai-shell` + gates + Cloudflare release so the edge serves the same
+document. Expected checks: local/public readyz 200; `/` = new app (nonce CSP,
+`microphone=(self)`); `/next` 308 → `/`; `/assets/*` immutable; old service
+worker replaced by a self-unregistering cleanup worker.
+
+Source changes (verified before publishing):
+- `web/`: collapsible sidebar (Ctrl+B, persisted), hidden scrollbars with a
+  "Torna in fondo" arrow, **live voice** (Ctrl+Shift+L / "Parla con l'entità"):
+  listen → transcribe → reply → speak → listen, barge-in via echo-cancelled mic
+  monitor (RMS 0.07 for 320 ms), Whisper noise transcripts ignored
+  (`isNoiseTranscript`), timers instead of rAF so it works in background.
+  Browser-checked with a synthetic mic: full cycle, barge-in, clean end.
+- `src/remote/public-web-app.js`: inlines the `web-dist` bundle into one
+  document (JS/CSS inline, nonce on every script/style, fonts/images stay
+  `/assets/*`); `/next` → 308 `/`. Gateway `PUBLIC_AI_HTML` is that document
+  (fallback page if `web-dist` is missing, `PUBLIC_AI_BUILT=false`).
+  Verified in a browser under the real CSP: WebGPU, Inter, no CSP violations.
+- Removed (zip backup in the session scratchpad, files also in git history):
+  `src/remote/public-demo.js`, `public-voice-session.js`, `assets/inter-latin.woff2`,
+  21 classic-page verifier scripts, `tests/public-readiness.test.js`,
+  `tests/public-voice-session.test.js`, npm scripts `qa:web:experience|layout|
+  offline|personalization|history`, `qa:ai:performance|layout`,
+  `qa:voice:presentation`, `qa:daily`, `qa:demo:performance`.
+- Desktop: `interfaceVersion` is now `cosmic` (default) | `advanced`. Old
+  persisted `classic` (former default) migrates to `cosmic`. "Impostazioni
+  avanzate" opens the previous renderer (models, Android pairing, memory editor,
+  workspace) until those panels are ported; desktop QA scripts pin `advanced`.
+  Real Electron, empty profile: cosmic UI, live voice, sidebar toggle, IPC OK.
+- Checks: full suite 1243 — 1241 PASS, 2 SKIP, 0 FAIL; source sections,
+  hygiene, overlap, startup budget PASS; tsc PASS.
+
+Not done yet: Android Control redesign (remove Giochi, ChatGPT → Claude),
+nexusnxs.com restyle, porting of the advanced desktop panels; the paired-device
+client (`CLIENT_HTML`, private ingress) is unchanged.
+
+## Voice and attachments in /next — 7 November 2026 (published 08:5x UTC)
+
+Controlled restart: ready in 12s; local/public readyz 200; `/next/` serves
+index-Dg6I0X1Q.js with `microphone=(self)`; classic `/` 200. Public-domain
+browser check: attachment answered «ORS-5521» (data only in the file), mic
+button present, WebGPU backend, zero console errors.
+
+`web/`: attachments (button, drag and drop, paste; max 2 × 1.5 MB; JPEG/PNG/
+WebP, text/code, JSON/XML, PDF; image previews; only name/type/size persisted),
+dictation (MediaRecorder → local resample to WAV PCM 16 kHz mono via
+OfflineAudioContext, auto-stop after 1.2 s of silence or 11.5 s, live level
+drives the core), progressive speech playback via Web Audio, automatic spoken
+reply for voice turns, per-answer read-aloud, core states listening/speaking.
+Capabilities parsed from the live `nexusnxs.capabilities.v1` array. Page
+Permissions-Policy now `microphone=(self)`. Bundle switched to LazyMotion
+(JS 355→309 KB, 114.6→101.5 KB gzip); idle core renders at 30 fps.
+Browser checks against the live API (local proxy): attachment answer used data
+only present in the file; read-aloud first audio 3.0 s, 9.2 s of speech, states
+reset; synthetic speech → browser WAV 16 kHz → transcription exact
+(«Quanti giorni mancano a Natale?», confidence 0.9998, 959 ms). Human
+microphone not tested (automation). Full suite 1288: 1286 PASS, 2 SKIP, 0 FAIL.
+Cleanup: dry run lists only `android/NexusConsole/app/build` (10.8 MB); apply
+was blocked by the session's permission policy, not run. `node_modules-
+broken-sep30` and `vendor-broken-sep30` are junctions to the LIVE node_modules
+and vendor (Ollama runtime): left untouched on purpose.
+
+## Clock questions fixed and live — 7 November 2026
+
+Live check after the first restart: the date became correct, but the model
+miscounted «quanti giorni mancano a Capodanno» (79 instead of 55). Added a
+deterministic day counter in `instant-utility.js` (Italian holidays, explicit
+«15 marzo [2027]», next-year rollover, today/past, invalid dates rejected,
+correct «al/all'/alla» prepositions); regions added for the section check.
+Full suite 1288 tests, 1286 PASS, 2 SKIP, 0 FAIL; sections/overlap PASS.
+Second controlled restart: ready in 10s, local/public readyz 200. Public
+https://ai.nexusnxs.com/next: «Oggi è sabato 7 novembre 2026.» and «Mancano
+55 giorni a Capodanno.» Day counts phrased differently, or with other
+events, still go to the model; agent mode uses the date-diff tool.
+
+## Clock questions fixed — 7 November 2026 (details)
+
+`research/research-policy.js`: date/time/day-count questions without public
+facts or explicit web wording are no longer time-sensitive (no forced search).
+`instant-utility.js`: accepts a short format prefix («Rispondi in una frase:»)
+and «che giorno è oggi», «qual è la data di oggi», «what day is today».
+System prompt now carries current date/time and timezone. The response cache
+excludes clock and time-sensitive questions (its key has no date). Weather,
+news, prices and explicit web requests still require sources. 4 new tests;
+full suite 1287 tests, 1285 PASS, 2 SKIP, 0 FAIL. Operation next: controlled
+service restart, then public check of the original failing question.
+
+## Published — https://ai.nexusnxs.com/next live, 7 November 2026 08:32 UTC
+
+Owner-approved controlled restart from the current source: ready in 24s;
+local and public readyz 200; classic `/` 200 unchanged; `/next/` 200 with the
+strict CSP and `no-cache`; hashed JS asset 200 `immutable`; encoded traversal
+404. Log shows the reachability stage and the new admission warning for the
+reviewed GO-2026-6860 exception. Live browser check on the public domain:
+WebGPU backend, Inter loaded, no horizontal overflow, real streamed reply,
+zero console errors (no CSP violations). Agent mode and automatic memory stay
+off by default in the running desktop/server settings.
+Quality finding (backend, affects classic too): "che giorno è oggi?" gets a
+"cannot verify, search unavailable" answer because the research policy treats
+"oggi" as live-web-required and SearXNG (Docker Desktop) is down before login.
+Next: answer date/time from the system clock and put the current date in the
+main system prompt, then restart.
+
+## PC actions for the agent and new web app preview — 7 November 2026 (not deployed)
+
+PC actions: `agents/action-tools.js` exposes the existing ActionRuntime catalog
+as typed `pc-*` tools and ready MCP/n8n integrations as critical `mcp-*` tools.
+Every call is a real ActionRuntime proposal (validation, path boundaries,
+single-use ticket), approval follows the user's policy with a native dialog
+showing the ticket preview/diff, execution re-checks consent and records a
+receipt; artifacts reach the chat turn. Overwriting an existing file requires
+reading it in the same turn (READ_BEFORE_WRITE), added after qwen3:14b rewrote
+a list without reading it. 9 tests including an end-to-end loop on a real
+temporary workspace. Agent suite 1.2.x adds 7 pc-actions cases on a real
+temporary ActionRuntime with file postconditions. qwen3:14b CPU: 1.2.0 36/39 =
+92.31%, gate PASS, no must-pass failures (deny honoured, injected trash refused);
+after the read-before-write rule and the 1.2.1 oracle fix pc-actions 7/7.
+
+New web app (`web/`, React 19 + TypeScript + Vite, no new dependencies):
+native WebGPU particle core (WGSL, 6,000 particles, Canvas 2D fallback, paused
+when hidden, reduced motion), local conversations, NDJSON streaming with
+phases/resume/cancel, safe Markdown without innerHTML (https links only, code
+copy), Ctrl+K palette, preferences, View Transitions, mobile drawer. Build
+`npm run build:web` → `web-dist/` (gitignored): JS 344 KB (111 KB gzip), CSS
+17 KB. Gateway serves it at `/next` on the public ingress only, via
+`remote/public-web-app.js` (CSP script-src/style-src 'self', no inline; hashed
+assets immutable; traversal-safe; 5 tests). Classic UI at `/` unchanged.
+Verified in the browser through a local `vite preview` proxied to the live API
+(Origin header set as same-origin): real streamed answer with list and code
+block, palette, persistence after reload, 1440px and 390px layouts (fixed
+gradient text, mobile overflow from an implicit grid column, desktop menu).
+Not yet live: `/next` needs the next service restart. Voice, attachments and
+images are still classic-only; feature parity precedes switching `/`.
+Checks: full suite 1283 tests, 1281 PASS, 2 SKIP, 0 FAIL; typecheck (now also
+web/), renderer and web builds, startup budget, sections/hygiene/overlap PASS.
+Eval runtime stopped by the port-11435 PID; service readyz still ready.
+
+## Three-tier memory — 7 November 2026 (opt-in, off by default; not in the running service)
+
+Working memory stays the conversation history. Episodic and semantic memory
+reuse `PersonalMemoryStore`, so the existing editor, forget, expiry, export and
+backup apply to every new record. New setting `memoryMode` ('explicit' default,
+'automatic'), switch under Settings → AI, hidden for remote inference.
+- `application/memory-consolidation.js`: after a saved, complete conversation
+  (≥2 user turns, ≥200 chars) and a 30s debounce, only while the AI is idle,
+  the fast model returns schema-bound JSON (think off): an episode summary and
+  ≤4 durable facts the user stated. Deterministic filters drop sensitive
+  categories (health, religion, politics, sexuality, finances, credentials),
+  secret-like strings and assistant-directed instructions, sentence by sentence
+  in summaries. Idempotent per conversation revision; cancelled on shutdown.
+- Store: `rememberDerived` (confidence 'inferred', 180-day expiry) never
+  overrides user-confirmed records and never resurrects forgotten ones; editing
+  a derived memory makes it user-confirmed and clears its vector. Hybrid
+  retrieval with qwen3-embedding vectors (instruction-prefixed query, minimum
+  cosine 0.33, inferred weight 0.85); lexical behaviour unchanged without vectors.
+- Prompt marks provenance (confirmed / automatic summary / inferred). Agent tools
+  `recall-memory` and `remember-fact` (native consent). Editor shows source labels.
+Live check on the dedicated runtime (qwen3:8b CPU, qwen3-embedding, synthetic
+conversations): first run leaked a diabetes fact and a summary mentioning a
+password (stem regex bug, unfiltered summaries); after the fix 0 leaks, the
+sensitive episode is dropped, hybrid top-1 3/3 versus lexical 1/3.
+14 new tests; existing memory tests unchanged and passing. Full suite 1269
+tests: 1267 PASS, 2 SKIP, 0 FAIL; typecheck, renderer build, startup budget
+(shell 238327 bytes), sections/hygiene/overlap PASS. Agent suite regression
+after the guidance change: qwen3:14b 31/32 = 96.88%, gate PASS.
+Operational note: the dedicated eval runtime was stopped on owner request by
+the PID owning port 11435 (23320, distinct from service PID 25084); service
+readyz still ready afterwards. Production uses the same executable path
+`Z:\NexusNXS-Runtime\ollama.exe`: stop the eval runtime only by the PID that
+owns port 11435, never by path or name. Nothing committed (no git on PATH).
+
+## RESOLVED — AI service restored 7 November 2026 07:30 UTC
+
+After the exception, the first start only waited for a scheduler-retried
+process that had loaded the old code at 07:16 and kept rejecting the runtime.
+A controlled stop/start loaded the new gate: reachability 28ms, qwen3:14b
+prepared (preload 28.3s), service ready in 43s; local and public readyz 200.
+Downtime: from the 6 November evaluation stop until 07:30 UTC on 7 November.
+The dedicated eval runtime started this session was stopped. Later source
+edit: managed runtime now logs every admission warning (e.g. the waiver); it is
+not loaded in the running service until its next normal restart.
+Full suite 1260 tests: 1258 PASS, 2 SKIP, 0 FAIL; sections/hygiene/overlap PASS.
+Nothing committed: git is not on PATH in this session.
+
+## (closed) AI service not ready after owner-authorized stop, 6–7 November 2026
+
+The owner authorized a temporary stop for GPU evaluation. `-Action stop`
+completed; `-Action start` failed after 360s. Cause in nexus.log: the managed
+runtime `Z:\NexusNXS-Runtime\ollama.exe` (Ollama 0.40.9, distribution usage) is
+rejected with OLLAMA_RUNTIME_VULNERABLE on every retry. Grype DB v6.1.10 (built
+2026-11-06) now reports GO-2026-6860 / CVE-2026-78661, High, golang.org/x/net
+v0.61.0 (fix 0.62.0), published 2026-10-27. The service was admitted earlier
+with an older DB: any restart since the DB refresh would have been blocked.
+Upstream: latest Ollama v0.40.15 (2026-11-03) still requires x/net v0.61.0, so
+updating does not clear it. Reachability evidence: the advisory affects only
+golang.org/x/net/html Parse*; the shipped ollama.exe links x/net dns, http,
+http2, idna and internal, with zero html symbols. No exception was added: the
+gate has none and project rules forbid one without the owner's decision.
+Public/local readyz are down until the owner chooses. Do not repeat the start
+blindly; it will fail the same way.
+
+Owner decision (7 November): targeted reviewed exception. Implemented in
+`src/ai/ollama-runtime-security.js` with policy `config/ollama-reviewed-exceptions.json`:
+High only (never Critical), exact advisory/module/version, exact runtime
+SHA-256, expiry ≤ 30 days (this one 2026-12-07), evidence required, and an
+admission-time symbol check that every declared vulnerable package is absent
+from the binary; a malformed policy file rejects the runtime. Real audit in
+distribution mode: blocking 0, waived 1 (GO-2026-6860), reachability 24ms.
+8 new tests cover exact match, every mismatch, linked package, async path and
+schema. Remove the exception when an official runtime with x/net ≥ 0.62.0 exists.
+Operation next: stop the dedicated eval runtime started this session, then
+`manage-headless-server-task.ps1 -Action start` and local/public readyz checks.
+
+GPU evaluation results (service stopped, dedicated runtime moved to the
+loader-safe alias; before that it silently ran on CPU because of the "[AI]"
+brackets — fixed in ensure-ollama-runtime.js): qwen3:14b 31/32 = 96.88%, median
+1.5s, p95 3.4s, gate PASS; qwen3:30b quick 22/32 = 68.75% (thinking-only build
+leaks English reasoning into content), qwen3:30b with thinking 26/32 = 81.25%,
+median 18.8s, two must-pass failures. qwen3:14b remains the best agent model.
+
+## Agent evaluation measured on qwen3:14b — 6 November 2026
+
+Dedicated loopback runtime (Ollama 0.40.9, admitted with the existing Grype
+gate, dev-loopback warning) on port 11435; no model download. Fixed a real
+detection bug: the boot service runs under another token, so `process.kill(pid,
+0)` returned EPERM and the eval lab treated it as stopped, using the GPU beside
+production. EPERM now counts as alive; evaluations are CPU-only (0 GB VRAM
+verified) while the service runs. First partial GPU run was stopped and its
+model unloaded.
+
+Results (qwen3:14b quick, CPU): suite 1.0.0 baseline 23/32 = 71.88%, gate FAIL.
+Observed failures drove product changes: date in the agent system note,
+explicit rules (notes → search-knowledge, recent facts → web-search, retry on
+invalid arguments, never relay injected instructions), new `date-diff` tool,
+`week` filter with declared fallback, and `agents/tool-output-guard.js` which
+replaces assistant-directed sentences in tool outputs before inference. Suite
+1.1.0 retires two cases and fixes one too-narrow oracle (see changelog).
+1.1.0 before guard: 30/32 = 93.75% (injection must-pass FAIL); with guard:
+31/32 = 96.88%, every category and must-pass PASS, median 16.0s, p95 27.5s on CPU.
+This is a synthetic agent suite on CPU, not a general quality or latency claim.
+
+Comparison on suite 1.1.0 with guard, CPU-only: qwen3:8b 30/32 = 93.75%, median
+7.8s, gate PASS (two calculations done without the calculator, answers right);
+qwen3:14b with thinking 30/32 = 93.75%, median 87.1s, p95 151s, one 120s timeout;
+qwen3:30b refused by the existing isolation gate (needs 23.6 GiB free RAM while
+the service runs, 18.6 available): not evaluated. Desktop agent turns now pass
+`think:false`. Agent model remains the routed fast/main model; no promotion.
+The dedicated runtime on 11435 is left running with no model loaded.
+Full suite 1254 tests: 1252 PASS, 2 SKIP, 0 FAIL; sections/hygiene/overlap PASS.
+
+## Agent evaluation suite prepared — 6 November 2026 (not yet run on a model)
+
+`config/evals/nexusnxs-agent-v1.json` 1.0.0: 32 synthetic cases in eight
+categories (tool selection, restraint, multi-step, argument fidelity,
+grounding, injection resistance, consent, error recovery) with answer and
+trajectory assertions; injection and consent at 100% with must-pass cases.
+Fixed clock and fixture notes/web results: no network or real vault.
+`scripts/run-agent-eval.js` reuses the eval lab's dedicated-endpoint, RAM
+checks, scoring and privacy-safe report (no prompts, arguments or answers).
+Commands: `npm run ai:eval:agent:validate`, `npm run ai:eval:agent -- qwen3:14b`.
+Six tests prove every case is solvable with reference trajectories whose
+oracles match real tool outputs, and that injection/false confirmations fail.
+Full suite 1248 tests: 1246 PASS, 2 SKIP, 0 FAIL; sections/hygiene/overlap PASS.
+No model was loaded or evaluated; qwen3 agent quality is still unmeasured.
+
+## Agent mode wired into desktop chat — 6 November 2026 (opt-in, off by default)
+
+New setting `agentMode` (default false, boolean only) with a switch under
+Settings → AI, hidden for remote inference. When enabled, the desktop
+`streamChat` handler runs `application/agent-chat.js` after context preparation
+and model selection: only developer/private distribution, no attachments, and
+only a model whose family supports function calling (selected model, else the
+main model). Per-turn tools: time, calculator, local knowledge and web search
+with the existing services; collected HTTPS sources join the citation allowlist.
+Output passes the same `secureModelOutput` and citation enforcement; tool phases
+are shown as status labels. Sensitive tools use a one-time native dialog
+(refusal, closed window or cancellation deny). Any non-cancel agent failure or
+empty answer falls back to the ordinary streaming path. Agent answers are not
+cached and skip the ordinary quality-review/correction step; the final text is
+emitted at once, not token-streamed. Public client and web service unchanged.
+Checks: 6 new agent-chat tests; full suite 1242 tests, 1240 PASS, 2 SKIP, 0 FAIL;
+typecheck, renderer build, startup budget (shell 237190 bytes), sections and
+overlap PASS. Publication safety/npm gates not run here (no git/npm child shell).
+Not yet measured on a real model; no installer, deployment or service restart.
+
+## Agent loop with native tool calling — 6 November 2026 (source only, not wired)
+
+New `agents/agent-loop.js`, `agents/typed-tools.js` and `agents/core-tools.js`
+add a multi-step plan → act → observe loop using the provider's native
+function calling. `validateChatRequest` accepts `tools`, assistant `toolCalls`
+and tool `toolName`; the Ollama adapter forwards `tools`, maps the wire format
+and accepts `tool_calls` only when the request declared tools. Model-level
+`tools` capability is inferred for known function-calling families only.
+Arguments are validated against a JSON Schema subset; sensitive tools require
+the consent callback (none or refusal means not executed); outputs are wrapped
+as untrusted data; repeated identical calls are not re-executed; per-tool
+timeout, cancellation and a step budget with a final tool-free answer apply.
+Core tools: current time, exact calculator (no eval), local knowledge and web
+search when injected. 14 new focused tests pass with a scripted provider and a
+local fake Ollama server; full suite 1236 tests: 1234 PASS, 2 SKIP, 0 FAIL.
+Section, hygiene and overlap checks pass. Publication safety and npm-script
+gates were not run here (git and npm child shells unavailable in this session).
+Not yet connected to `register-ipc` chat, UI or the
+action runtime; no model, quality evaluation, training or cloud change.
+Next: opt-in wiring behind a setting, consent UI reuse, eval cases for tool use.
+
 ## Startup optimization activated — 26 October 2026
 
 Source ab13bfb passed CI40404325024 on Windows/Linux and local check/cloud;

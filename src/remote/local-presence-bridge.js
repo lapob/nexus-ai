@@ -171,7 +171,7 @@ function sanitizeStatus(value, { mutationsAvailable = true } = {}) {
     available: normalized.available,
     nucleusVisible: normalized.nucleus === 'visible' ? true : normalized.nucleus === 'hidden' ? false : null,
     fullAppOpen: normalized.fullApp === 'open' ? true : normalized.fullApp === 'closed' ? false : null,
-    chatGptOpen: normalized.chatGpt === 'open' ? true : normalized.chatGpt === 'closed' ? false : null,
+    claudeOpen: normalized.claude === 'open' ? true : normalized.claude === 'closed' ? false : null,
     applications: Object.freeze(normalized.applications.map((entry) => Object.freeze({
       id: entry.id,
       label: entry.label,

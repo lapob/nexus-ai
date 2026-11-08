@@ -6,9 +6,9 @@ const path = require('node:path');
 const { launchInteractiveDesktop, processLockState } = require('../infrastructure/electron/desktop-launcher');
 const { requestProcessShutdown } = require('../infrastructure/electron/process-lock');
 const { closeDesktopApplication, desktopApplicationStatus, foregroundDesktopApplication, openDesktopApplication } = require('../infrastructure/windows/desktop-application-catalog');
-const { closeChatGptDesktop, isChatGptDesktopRunning, openChatGptDesktop } = require('./presence-bootstrap');
+const { closeClaudeDesktop, isClaudeDesktopRunning, openClaudeDesktop } = require('./presence-bootstrap');
 
-const DIRECT_ACTIONS = Object.freeze(['open-full-app', 'close-full-app', 'open-chatgpt', 'close-chatgpt', 'open-application', 'close-application']);
+const DIRECT_ACTIONS = Object.freeze(['open-full-app', 'close-full-app', 'open-claude', 'close-claude', 'open-application', 'close-application']);
 const STATUS_CACHE_MS = 750;
 const APPLICATION_TRANSITION_TIMEOUT_MS = 8_000;
 
@@ -41,10 +41,10 @@ function createHeadlessDesktopControl({
   bridgeClient,
   launchDesktop = launchInteractiveDesktop,
   desktopState = processLockState,
-  chatGptState = isChatGptDesktopRunning,
-  launchChatGpt = openChatGptDesktop,
+  claudeState = isClaudeDesktopRunning,
+  launchClaude = openClaudeDesktop,
   closeDesktop = requestProcessShutdown,
-  closeChatGpt = closeChatGptDesktop,
+  closeClaude = closeClaudeDesktop,
   applicationStatus = desktopApplicationStatus,
   foregroundApplication = foregroundDesktopApplication,
   launchApplication = openDesktopApplication,
@@ -52,19 +52,19 @@ function createHeadlessDesktopControl({
   now = Date.now
 } = {}) {
   const uiLockPath = path.join(path.resolve(sharedDataRoot), 'desktop-ui.lock');
-  let cachedChatGptOpen = false;
+  let cachedClaudeOpen = false;
   let statusCheckedAt = 0;
   let cachedApplications = [];
 
   async function directStatus() {
     if (env.NEXUS_WINDOWS_NONINTERACTIVE === '1') {
-      return Object.freeze({ available: false, fullAppOpen: false, chatGptOpen: false,
+      return Object.freeze({ available: false, fullAppOpen: false, claudeOpen: false,
         applications: [], allowedActions: Object.freeze([]), foregroundApplicationId: '',
         logicalDisplays: Object.freeze([]), selectedDisplayId: '', nucleusVisible: null });
     }
     if (now() - statusCheckedAt >= STATUS_CACHE_MS) {
-      [cachedChatGptOpen, cachedApplications] = await Promise.all([
-        chatGptState(),
+      [cachedClaudeOpen, cachedApplications] = await Promise.all([
+        claudeState(),
         applicationStatus({ env })
       ]);
       statusCheckedAt = now();
@@ -74,7 +74,7 @@ function createHeadlessDesktopControl({
       available: true,
       nucleusVisible: null,
       fullAppOpen: desktopState(uiLockPath).running,
-      chatGptOpen: cachedChatGptOpen,
+      claudeOpen: cachedClaudeOpen,
       applications: cachedApplications,
       foregroundApplicationId: foreground?.id || '',
       selectedDisplayId: '',
@@ -121,17 +121,17 @@ function createHeadlessDesktopControl({
       }
       return directStatus();
     }
-    if (action === 'close-chatgpt') {
-      await closeChatGpt();
-      let closed = await waitFor(async () => !await chatGptState(), { timeoutMs: 1_500, intervalMs: 120 });
+    if (action === 'close-claude') {
+      await closeClaude();
+      let closed = await waitFor(async () => !await claudeState(), { timeoutMs: 1_500, intervalMs: 120 });
       if (!closed) {
-        await closeChatGpt({ force: true });
-        closed = await waitFor(async () => !await chatGptState(), { timeoutMs: 4_000, intervalMs: 120 });
+        await closeClaude({ force: true });
+        closed = await waitFor(async () => !await claudeState(), { timeoutMs: 4_000, intervalMs: 120 });
       }
       if (!closed) {
-        throw controlError('ChatGPT non si e chiusa in tempo.', 'CHATGPT_STOP_TIMEOUT');
+        throw controlError('Claude non si e chiusa in tempo.', 'CLAUDE_STOP_TIMEOUT');
       }
-      cachedChatGptOpen = false;
+      cachedClaudeOpen = false;
       statusCheckedAt = now();
       return directStatus();
     }
@@ -155,11 +155,11 @@ function createHeadlessDesktopControl({
       }
       return directStatus();
     }
-    await launchChatGpt();
-    if (!await waitFor(chatGptState, { timeoutMs: 4_000, intervalMs: 120 })) {
-      throw controlError('ChatGPT non si e aperta in tempo.', 'CHATGPT_START_TIMEOUT');
+    await launchClaude();
+    if (!await waitFor(claudeState, { timeoutMs: 4_000, intervalMs: 120 })) {
+      throw controlError('Claude non si e aperta in tempo.', 'CLAUDE_START_TIMEOUT');
     }
-    cachedChatGptOpen = true;
+    cachedClaudeOpen = true;
     statusCheckedAt = now();
     return directStatus();
   }

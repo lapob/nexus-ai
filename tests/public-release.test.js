@@ -3,9 +3,6 @@ const test = require('node:test');
 const { publicReleaseTarget, assertPublishedReleaseMatches } = require('../src/shared/public-release');
 
 test('public download URLs follow the component version and publisher tag', () => {
-  const current = publicReleaseTarget({ version: require('../package.json').version, tag: process.env.NEXUS_GITHUB_RELEASE_TAG });
-  const publicUi = require('../src/remote/public-demo');
-  assert.equal(publicUi.WINDOWS_DOWNLOAD, current.windowsDownload);
   for (const version of ['0.3.25', '1.2.3']) {
     const target = publicReleaseTarget({ version });
     assert.equal(target.tag, `v${version}-preview.1`);

@@ -12,15 +12,15 @@ function deferred() {
 test('cold desktop status responds immediately while a native probe is blocked', async () => {
   const probe = deferred();
   let calls = 0;
-  const sampler = createDesktopStatusSampler({ initial: { chatGptOpen: null }, load: () => { calls++; return probe.promise; } });
-  assert.deepEqual(sampler.read(), { chatGptOpen: null });
+  const sampler = createDesktopStatusSampler({ initial: { claudeOpen: null }, load: () => { calls++; return probe.promise; } });
+  assert.deepEqual(sampler.read(), { claudeOpen: null });
   for (let index = 0; index < 100; index++) sampler.read();
   await Promise.resolve();
   assert.equal(calls, 1);
   const pending = sampler.refresh();
-  probe.resolve({ chatGptOpen: true });
+  probe.resolve({ claudeOpen: true });
   await pending;
-  assert.equal(sampler.read().chatGptOpen, true);
+  assert.equal(sampler.read().claudeOpen, true);
 });
 
 test('fresh observations are shared and expired observations refresh in the background', async () => {

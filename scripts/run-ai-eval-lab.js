@@ -320,13 +320,20 @@ function persistedPrivateEndpoint() {
   return '';
 }
 
-function activeManagedEndpoint() {
-  const dataRoot = String(process.env.NEXUS_USER_DATA_ROOT || path.resolve(__dirname, '..', '..', '.nexus-data')).trim();
+// Il servizio al boot gira come attività S4U di un altro token: il segnale 0
+// restituisce EPERM pur con processo vivo. Solo ESRCH dimostra che è terminato;
+// trattare EPERM come spento faceva usare la GPU durante il servizio attivo.
+function processAlive(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; }
+  catch (error) { return error?.code === 'EPERM'; }
+}
+
+function activeManagedEndpoint({ dataRoot = String(process.env.NEXUS_USER_DATA_ROOT || path.resolve(__dirname, '..', '..', '.nexus-data')).trim(), kill } = {}) {
   try {
     const descriptor = JSON.parse(fs.readFileSync(path.join(dataRoot, 'headless-server.lock'), 'utf8'));
     const pid = Number(descriptor?.pid);
     if (!Number.isInteger(pid) || pid <= 0) return '';
-    process.kill(pid, 0);
+    if (!processAlive(pid, kill)) return '';
     return `http://127.0.0.1:${selectManagedRuntimePort(pid)}`;
   } catch {}
   return '';
@@ -472,6 +479,8 @@ if (require.main === module) main().catch((error) => {
 });
 
 module.exports = {
+  activeManagedEndpoint,
+  processAlive,
   buildModelReport,
   buildReport,
   buildInferencePayload,

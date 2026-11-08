@@ -164,8 +164,8 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /\/api\/system\/service/);
   assert.match(activity, /controlDesktopApp\("open-full-app"/);
   assert.match(activity, /controlDesktopApp\("close-full-app"/);
-  assert.match(activity, /controlDesktopApp\("open-chatgpt"/);
-  assert.match(activity, /controlDesktopApp\("close-chatgpt"/);
+  assert.match(activity, /controlDesktopApp\("open-claude"/);
+  assert.match(activity, /controlDesktopApp\("close-claude"/);
   assert.match(activity, /applicationGrid\(\)/);
   assert.match(activity, /screenWidthDp < 360/);
   assert.match(activity, /fontScale >= 1\.25f/);
@@ -194,7 +194,7 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /\/api\/system\/service\/plan/);
   assert.match(activity, /\/api\/system\/service\/execute/);
   assert.match(activity, /authenticateThen\(\(\) -> executeServerStop/);
-  assert.match(activity, /ChatGPT è già aperto/);
+  assert.match(activity, /Claude è già aperto/);
   assert.match(activity, /requestCommandWithProof\("presence-plan"/);
   assert.match(activity, /requestWithProof\(purpose, path, body, done, true/);
   assert.match(activity, /verifyDesktopCommandOutcome/);
@@ -233,7 +233,7 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
     /showOffline/,
     'un timeout di apertura non deve trasformarsi in una falsa disconnessione'
   );
-  assert.doesNotMatch(activity, /ACTION_VIEW, Uri\.parse\("https:\/\/chatgpt\.com"\)/);
+  assert.doesNotMatch(activity, /ACTION_VIEW, Uri\.parse\("https:\/\/claude\.com"\)/);
   assert.doesNotMatch(activity, /Runtime\.getRuntime\(\)\.exec|\/bin\/sh|cmd\.exe/);
 });
 

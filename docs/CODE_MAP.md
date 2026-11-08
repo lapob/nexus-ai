@@ -18,28 +18,20 @@ src/main.js
         -> agents/action-runtime.js
 ```
 
-## Renderer
+## Interfaccia unica (web e desktop)
 
 ```text
-renderer/main.tsx                        Mount React
-renderer/App.tsx                         Composition root della UI
-renderer/hooks/useNexusController.ts     Chat, voce, task, azioni e settings
-renderer/components/UIOverlay.tsx        Isola contestuale dinamica
-renderer/components/SettingsOverlay.tsx  Voce, aspetto e identità personale
-renderer/components/ModelSwitcher.tsx    Selettore rapido del modello attivo
-renderer/components/VoiceVisualizer.tsx  Confine della presenza WebGL
-renderer/scene/MainScene.tsx             Canvas adattivo e caricamento lazy
-renderer/scene/ParticleEngine.tsx        Presenza neurale GPU
-renderer/scene/SaturnVisualizer.tsx      Presenza planetaria GPU
-renderer/systems/VoiceRecognition.ts     Dispositivi, calibrazione e spettro
-renderer/systems/AnimationController.ts  Profili e transizioni degli stati
-renderer/systems/InterfacePreferences.ts Preferenze e qualità adattiva
-renderer/systems/PublicError.ts          Sanitizzazione degli errori pubblici
-renderer/styles/app.css                  Layout, tipografia e responsive
-renderer/styles/settings-minimal.css     Tema isolato delle impostazioni
-renderer/styles/surfaces-minimal.css     Composer, modelli e superfici temporanee
+web/src/main.tsx            Mount React, font Inter e JetBrains Mono
+web/src/App.tsx             Shell: conversazioni, composer, voce live, palette, preferenze
+web/src/Core.tsx            Entità cosmica: particelle WebGPU (WGSL) con fallback Canvas
+web/src/voice.ts            Registrazione, barge-in, filtro rumore, riproduzione progressiva
+web/src/Markdown.tsx        Markdown sicuro: codice, tabelle, callout, formule, checklist
+web/src/platform.ts         Web (API guest) o desktop (ponte IPC del preload)
+web/src/ControlCenter.tsx   Desktop: modelli, profilo, telefono, memoria, workspace, sistema, dati
+web/src/desktopPresence.ts  Desktop: parola di attivazione, Presence, avvisi proattivi
+vite.config.ts              Build desktop → renderer-dist (nexus://app)
+web/vite.config.ts          Build pubblica → web-dist, incorporata dal gateway e dall'edge
 ```
-
 ## Processo privilegiato
 
 | File | Responsabilità |
@@ -48,6 +40,15 @@ renderer/styles/surfaces-minimal.css     Composer, modelli e superfici temporane
 | `application/register-ipc.js` | handler IPC e confine renderer/main |
 | `application/reasoning.js` | modalità Quick/Deep e fusione delle fonti |
 | `agents/action-runtime.js` | piano, consenso monouso, esecuzione e audit |
+| `agents/agent-loop.js` | ciclo multi-step con function calling nativo, consenso, budget e annullamento |
+| `agents/typed-tools.js` | strumenti con schema JSON validato, sopra il ToolBus |
+| `agents/core-tools.js` | strumenti base: ora, calcolo esatto, giorni tra date, knowledge locale, ricerca web |
+| `agents/action-tools.js` | azioni PC e integrazioni MCP/n8n come strumenti `pc-*`/`mcp-*`, solo via ActionRuntime; lettura obbligatoria prima di sovrascrivere |
+| `remote/public-web-app.js` | web app pubblica unica: incorpora `web-dist` in un documento firmato con nonce (gateway ed edge), serve `/assets/*`, `/next` → `/` |
+| `web/` | nuova web app pubblica React/TypeScript: streaming, nucleo WebGPU, palette ⌘K, Markdown sicuro |
+| `agents/tool-output-guard.js` | rimuove dagli output degli strumenti le frasi che istruiscono l'assistente |
+| `application/memory-consolidation.js` | memoria automatica opt-in: riassunti episodici e fatti dichiarati, filtri sensibili/injection, vettori |
+| `application/agent-chat.js` | modalità agente opt-in nella chat desktop: idoneità, strumenti del turno, fonti, consenso nativo |
 | `core/security.js` | endpoint locali e percorsi autorizzati |
 | `infrastructure/storage/portable-paths.js` | risoluzione della vault e storage locale |
 | `infrastructure/electron/window-state.js` | stato e posizione sicura della finestra |

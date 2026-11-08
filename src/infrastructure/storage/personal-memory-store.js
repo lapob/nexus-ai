@@ -43,6 +43,12 @@ function classifyMemory(content) {
   return 'semantic';
 }
 
+// qwen3-embedding e modelli simili distinguono query e documenti: la query con
+// istruzione separa meglio il ricordo giusto (misurato: 0.39–0.53 contro ≤0.28).
+function memoryQueryText(query) {
+  return `Instruct: Given a question about the user, retrieve the personal memory that answers it\nQuery: ${normalizeText(query, 2000)}`;
+}
+
 function explicitMemoryInstruction(question) {
   const text = normalizeText(question, 12_000);
   const correction = text.match(/^(?:correggi il ricordo|update memory)\s+#?(\d+)\s*:\s*(.+)$/iu);
@@ -87,6 +93,16 @@ class PersonalMemoryStore {
       if (!columns.includes('expires_at')) this.database.exec('ALTER TABLE memories ADD COLUMN expires_at INTEGER;');
       if (!columns.includes('subject_key')) this.database.exec('ALTER TABLE memories ADD COLUMN subject_key TEXT;');
       if (!columns.includes('superseded_by')) this.database.exec('ALTER TABLE memories ADD COLUMN superseded_by INTEGER;');
+      // Vettori semantici opzionali: il retrieval lessicale resta il fallback.
+      if (!columns.includes('embedding')) this.database.exec('ALTER TABLE memories ADD COLUMN embedding TEXT;');
+      if (!columns.includes('embedding_model')) this.database.exec('ALTER TABLE memories ADD COLUMN embedding_model TEXT;');
+      // Una conversazione già consolidata alla stessa revisione non viene rielaborata.
+      this.database.exec(`CREATE TABLE IF NOT EXISTS memory_consolidations (
+          conversation_id TEXT PRIMARY KEY,
+          conversation_updated_at INTEGER NOT NULL,
+          consolidated_at INTEGER NOT NULL,
+          facts INTEGER NOT NULL DEFAULT 0
+        );`);
     } catch (error) {
       try { database.close(); } catch { /* conserva l'errore di apertura originale */ }
       throw error;
@@ -106,8 +122,8 @@ class PersonalMemoryStore {
       this.database.prepare(`INSERT INTO memories(memory_key,type,content,status,confidence,source_kind,source_id,subject_key,created_at,updated_at,expires_at)
         VALUES(?,?,?,'active','user-confirmed','explicit-user-statement',?,?,?,?,?)
         ON CONFLICT(memory_key) DO UPDATE SET type=excluded.type, content=excluded.content, status='active',
-        confidence='user-confirmed', source_id=excluded.source_id, subject_key=excluded.subject_key,
-        superseded_by=NULL, updated_at=excluded.updated_at, expires_at=excluded.expires_at`).run(key, resolvedType, clean, sourceId, subjectKey, now, now, resolvedExpiry);
+        confidence='user-confirmed', source_kind='explicit-user-statement', source_id=excluded.source_id, subject_key=excluded.subject_key,
+        superseded_by=NULL, updated_at=excluded.updated_at, expires_at=excluded.expires_at, embedding=NULL, embedding_model=NULL`).run(key, resolvedType, clean, sourceId, subjectKey, now, now, resolvedExpiry);
       const current = this.database.prepare('SELECT * FROM memories WHERE memory_key=?').get(key);
       if (subjectKey) {
         this.database.prepare("UPDATE memories SET status='superseded', superseded_by=?, updated_at=? WHERE subject_key=? AND id<>? AND status='active'")
@@ -119,6 +135,51 @@ class PersonalMemoryStore {
       this.database.exec('ROLLBACK TO nexus_memory_remember; RELEASE nexus_memory_remember');
       throw error;
     }
+  }
+
+  /**
+   * Ricordo derivato (riassunto o fatto dedotto da una conversazione). Non
+   * sovrascrive mai un ricordo confermato dall'utente, non resuscita un ricordo
+   * dimenticato e non sostituisce altri ricordi dello stesso soggetto.
+   */
+  rememberDerived({ content, type, key = null, sourceKind, sourceId, expiresAt = null, now = Date.now() }) {
+    const clean = normalizeText(content);
+    if (clean.length < 3) throw new Error('Il ricordo è troppo breve.');
+    if (!['conversation-summary', 'conversation-extraction'].includes(sourceKind)) throw new Error('Origine del ricordo derivato non valida.');
+    const resolvedType = MEMORY_TYPES.has(type) ? type : classifyMemory(clean);
+    const memoryKeyValue = key ? memoryKey(key) : memoryKey(clean);
+    const existing = this.database.prepare('SELECT id,status,confidence FROM memories WHERE memory_key=?').get(memoryKeyValue);
+    if (existing && (existing.status === 'forgotten' || existing.confidence === 'user-confirmed')) return null;
+    const expiry = Number.isFinite(expiresAt) ? Math.max(now, expiresAt) : now + 180 * 86_400_000;
+    this.database.prepare(`INSERT INTO memories(memory_key,type,content,status,confidence,source_kind,source_id,subject_key,created_at,updated_at,expires_at)
+      VALUES(?,?,?,'active','inferred',?,?,NULL,?,?,?)
+      ON CONFLICT(memory_key) DO UPDATE SET type=excluded.type, content=excluded.content, status='active',
+      source_kind=excluded.source_kind, source_id=excluded.source_id, updated_at=excluded.updated_at, expires_at=excluded.expires_at,
+      embedding=NULL, embedding_model=NULL
+      WHERE memories.status<>'forgotten' AND memories.confidence<>'user-confirmed'`)
+      .run(memoryKeyValue, resolvedType, clean, sourceKind, String(sourceId || '').slice(0, 128) || null, now, now, expiry);
+    return this.publicRecord(this.database.prepare('SELECT * FROM memories WHERE memory_key=?').get(memoryKeyValue));
+  }
+
+  consolidationRevision(conversationId) {
+    return this.database.prepare('SELECT conversation_updated_at FROM memory_consolidations WHERE conversation_id=?').get(String(conversationId))?.conversation_updated_at ?? null;
+  }
+
+  markConsolidated(conversationId, conversationUpdatedAt, facts = 0, now = Date.now()) {
+    this.database.prepare(`INSERT INTO memory_consolidations(conversation_id,conversation_updated_at,consolidated_at,facts) VALUES(?,?,?,?)
+      ON CONFLICT(conversation_id) DO UPDATE SET conversation_updated_at=excluded.conversation_updated_at, consolidated_at=excluded.consolidated_at, facts=excluded.facts`)
+      .run(String(conversationId).slice(0, 128), conversationUpdatedAt, now, facts);
+  }
+
+  missingEmbeddings(model, limit = 32) {
+    this.expireStale();
+    return this.database.prepare("SELECT id,content FROM memories WHERE status='active' AND (embedding IS NULL OR embedding_model IS NOT ?) ORDER BY updated_at DESC LIMIT ?")
+      .all(String(model), Math.min(128, Math.max(1, limit)));
+  }
+
+  setEmbedding(id, vector, model) {
+    if (!Array.isArray(vector) || !vector.length || vector.length > 8192 || vector.some((value) => !Number.isFinite(value))) throw new Error('Vettore del ricordo non valido.');
+    return this.database.prepare('UPDATE memories SET embedding=?, embedding_model=? WHERE id=?').run(JSON.stringify(vector), String(model), id).changes;
   }
 
   expireStale(now = Date.now()) {
@@ -149,11 +210,22 @@ class PersonalMemoryStore {
     };
   }
 
-  findRelevant(query, { limit = 6 } = {}) {
+  findRelevant(query, { limit = 6, queryVector = null, embeddingModel = null, minSemantic = 0.33 } = {}) {
     const all = this.list({ limit: 500 }).filter((record) => !record.expiresAt || record.expiresAt > Date.now());
     const queryTokens = tokens(query);
     const asksEverything = /\b(?:cosa ricordi|che cosa ricordi|mostra la memoria|what do you remember)\b/iu.test(query);
     const now = Date.now();
+    // Retrieval ibrido: con un vettore della query e ricordi indicizzati dallo
+    // stesso modello, la similarità semantica trova anche parafrasi; senza
+    // vettori il comportamento lessicale precedente resta identico.
+    const vectors = new Map();
+    if (Array.isArray(queryVector) && queryVector.length && embeddingModel) {
+      for (const row of this.database.prepare("SELECT id,embedding FROM memories WHERE status='active' AND embedding IS NOT NULL AND embedding_model=?").all(String(embeddingModel))) {
+        try { const vector = JSON.parse(row.embedding); if (Array.isArray(vector) && vector.length === queryVector.length) vectors.set(row.id, vector); } catch { /* vettore corrotto: solo lessicale */ }
+      }
+    }
+    const queryNorm = Math.sqrt((queryVector || []).reduce((total, value) => total + value * value, 0)) || 1;
+    const cosine = (vector) => vector.reduce((total, value, index) => total + value * queryVector[index], 0) / ((Math.sqrt(vector.reduce((total, value) => total + value * value, 0)) || 1) * queryNorm);
     const ranked = all.map((record) => {
       const recordTokens = tokens(record.content);
       const overlap = queryTokens.filter((token) => recordTokens.includes(token)).length;
@@ -161,10 +233,20 @@ class PersonalMemoryStore {
       const ageDays = Math.max(0, (now - record.updatedAt) / 86_400_000);
       // Gli eventi sono contesto temporaneo: dopo un mese non influenzano più
       // una risposta normale, ma restano consultabili su richiesta esplicita.
-      const temporalWeight = record.type === 'episodic' && !asksEverything
+      // I riassunti di conversazione durano di più: sono il ricordo episodico.
+      const temporalWeight = record.type === 'episodic' && !asksEverything && record.sourceKind !== 'conversation-summary'
         ? ageDays > 30 ? 0 : Math.max(0.15, 1 - ageDays / 35)
         : 1;
-      return { record, score: (asksEverything ? 1 : overlap / Math.max(2, queryTokens.length) + preferenceBoost) * temporalWeight };
+      const lexical = overlap / Math.max(2, queryTokens.length);
+      const vector = vectors.get(record.id);
+      const semantic = vector ? cosine(vector) : 0;
+      const relevance = vector ? (semantic >= minSemantic ? semantic * 0.7 + lexical * 0.3 : lexical * 0.3) : lexical;
+      // I ricordi dedotti pesano meno di quelli confermati dall'utente.
+      const trust = record.confidence === 'inferred' ? 0.85 : 1;
+      // Con il ranking semantico il bonus fisso delle preferenze riempiva i
+      // risultati di preferenze non pertinenti: vale solo se il ricordo è pertinente.
+      const boost = vectors.size ? (relevance > 0 ? preferenceBoost / 2 : 0) : preferenceBoost;
+      return { record, score: (asksEverything ? 1 : (relevance + boost) * trust) * temporalWeight };
     }).filter(({ score }) => score > 0).sort((left, right) => right.score - left.score || right.record.updatedAt - left.record.updatedAt).slice(0, limit);
     if (ranked.length) {
       const statement = this.database.prepare('UPDATE memories SET last_used_at=?, use_count=use_count+1 WHERE id=?');
@@ -210,7 +292,8 @@ class PersonalMemoryStore {
     const subject = exclusiveMemorySubject(clean, type) || null;
     this.database.exec('BEGIN IMMEDIATE');
     try {
-      this.database.prepare('UPDATE memories SET content=?, memory_key=?, type=?, subject_key=?, updated_at=?, expires_at=? WHERE id=?')
+      // Una correzione dell'utente rende il ricordo confermato e invalida il vettore.
+      this.database.prepare("UPDATE memories SET content=?, memory_key=?, type=?, subject_key=?, updated_at=?, expires_at=?, confidence='user-confirmed', embedding=NULL, embedding_model=NULL WHERE id=?")
         .run(clean, key, type, subject, now, expiresAt, id);
       if (subject) this.database.prepare("UPDATE memories SET status='superseded', superseded_by=?, updated_at=? WHERE subject_key=? AND id<>? AND status='active'").run(id, now, subject, id);
       this.database.exec('COMMIT');
@@ -258,4 +341,4 @@ class PersonalMemoryStore {
 
 // #endregion
 
-module.exports = { PersonalMemoryStore, classifyMemory, exclusiveMemorySubject, explicitMemoryInstruction, memoryKey };
+module.exports = { PersonalMemoryStore, classifyMemory, exclusiveMemorySubject, explicitMemoryInstruction, memoryKey, memoryQueryText };

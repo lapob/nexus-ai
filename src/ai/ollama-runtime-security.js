@@ -39,9 +39,64 @@ function blockingFindings(payload) {
     .map((match) => ({
       id: String(match?.vulnerability?.id || ''),
       severity: String(match?.vulnerability?.severity || ''),
-      package: String(match?.artifact?.name || '')
+      package: String(match?.artifact?.name || ''),
+      version: String(match?.artifact?.version || '')
     }))
     .filter((finding) => BLOCKING_SEVERITIES.has(finding.severity.toLowerCase()));
+}
+
+// #endregion
+
+// #region 01b — Eccezioni revisionate (strette e fail-closed)
+
+const REVIEWED_EXCEPTIONS_PATH = path.join(__dirname, '..', '..', 'config', 'ollama-reviewed-exceptions.json');
+const MAX_EXCEPTION_DAYS = 30;
+
+/**
+ * Carica le eccezioni revisionate dal sorgente. Un file assente lascia il gate
+ * invariato; un file presente ma malformato rifiuta il runtime, perché una
+ * policy illeggibile non deve trasformarsi in "nessun controllo".
+ */
+function loadReviewedExceptions(filePath = REVIEWED_EXCEPTIONS_PATH) {
+  let raw;
+  try { raw = fs.readFileSync(filePath, 'utf8'); }
+  catch (error) { if (error?.code === 'ENOENT') return []; throw runtimeSecurityError('Eccezioni runtime illeggibili.', 'OLLAMA_EXCEPTIONS_INVALID'); }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { throw runtimeSecurityError('Eccezioni runtime non valide.', 'OLLAMA_EXCEPTIONS_INVALID'); }
+  if (parsed?.schemaVersion !== 1 || !Array.isArray(parsed.exceptions)) throw runtimeSecurityError('Schema eccezioni runtime non valido.', 'OLLAMA_EXCEPTIONS_INVALID');
+  return parsed.exceptions.map((entry) => {
+    const reviewed = Date.parse(`${entry?.reviewedAt}T00:00:00Z`);
+    const expires = Date.parse(`${entry?.expiresAt}T23:59:59Z`);
+    const valid = /^[A-Z]+-\d{4}-\d+$/.test(String(entry?.advisory || ''))
+      && entry.severity === 'high'
+      && /^[a-z0-9./-]+$/.test(String(entry.module || ''))
+      && /^v?\d+\.\d+\.\d+/.test(String(entry.moduleVersion || ''))
+      && Array.isArray(entry.vulnerablePackages) && entry.vulnerablePackages.length > 0
+      && entry.vulnerablePackages.every((name) => typeof name === 'string' && name.startsWith(`${entry.module}/`))
+      && /^[a-f0-9]{64}$/.test(String(entry.runtimeSha256 || ''))
+      && Number.isFinite(reviewed) && Number.isFinite(expires) && expires > reviewed
+      && expires - reviewed <= (MAX_EXCEPTION_DAYS + 1) * 86_400_000
+      && String(entry.evidence || '').trim().length >= 40;
+    if (!valid) throw runtimeSecurityError(`Eccezione runtime non valida: ${entry?.advisory || 'sconosciuta'}.`, 'OLLAMA_EXCEPTIONS_INVALID');
+    return Object.freeze({ ...entry, reviewedMs: reviewed, expiresMs: expires });
+  });
+}
+
+const normalizeModuleVersion = (value) => String(value || '').replace(/^v/, '');
+
+/** Eccezioni candidate per un finding: stesso advisory, modulo, versione e binario, non scadute. */
+function applicableExceptions(finding, exceptions, { sha256, now }) {
+  return exceptions.filter((entry) => (entry.advisory === finding.id || (entry.aliases || []).includes(finding.id))
+    && finding.severity.toLowerCase() === 'high'
+    && entry.module === finding.package
+    && normalizeModuleVersion(entry.moduleVersion) === normalizeModuleVersion(finding.version)
+    && entry.runtimeSha256 === sha256
+    && now <= entry.expiresMs);
+}
+
+/** Simboli Go del pacchetto: "pkg." oppure "pkg/" (sottopacchetti) nel binario. */
+function packageLinked(binary, packageName) {
+  return binary.includes(`${packageName}.`) || binary.includes(`${packageName}/`);
 }
 
 function runChecked(runProcess, command, args, options, errorCode, description) {
@@ -111,7 +166,9 @@ function* auditRuntimeSteps(executablePath, {
   usage = 'distribution',
   host = '',
   minimumVersion = DEVELOPMENT_MINIMUM_VERSION,
-  scannerExecutable = process.env.NEXUS_GRYPE_EXECUTABLE || 'grype'
+  scannerExecutable = process.env.NEXUS_GRYPE_EXECUTABLE || 'grype',
+  reviewedExceptions = undefined,
+  now = Date.now()
 } = {}) {
   let executable = path.resolve(String(executablePath || ''));
   if (!fs.existsSync(executable) || !fs.statSync(executable).isFile()) {
@@ -155,9 +212,25 @@ function* auditRuntimeSteps(executablePath, {
     && typeof match?.artifact?.name === 'string' && match.artifact.name.trim())) {
     throw runtimeSecurityError('Risposta Grype incompleta o non valida.', 'OLLAMA_SECURITY_SCAN_FAILED');
   }
-  const blocking = blockingFindings(scan);
+  let blocking = blockingFindings(scan);
   const sha256 = yield { kind: 'sha256', executable, stage: 'identity-final' };
   if (sha256 !== initialHash) throw runtimeSecurityError('Il runtime è cambiato durante la verifica.', 'OLLAMA_RUNTIME_CHANGED');
+  // Un finding High è esonerato solo se un'eccezione revisionata e non scaduta
+  // copre esattamente advisory, modulo, versione e binario, e se nessun
+  // pacchetto vulnerabile dichiarato risulta compilato. Critical non è mai esonerabile.
+  const exceptions = blocking.length ? (reviewedExceptions === undefined ? loadReviewedExceptions() : reviewedExceptions) : [];
+  const waived = [];
+  if (blocking.length && exceptions.length) {
+    const candidates = blocking.map((finding) => ({ finding, entries: applicableExceptions(finding, exceptions, { sha256, now }) }));
+    const needles = [...new Set(candidates.flatMap(({ entries }) => entries.flatMap((entry) => entry.vulnerablePackages)))];
+    const linked = needles.length ? yield { kind: 'symbols', executable, needles, stage: 'reachability' } : {};
+    blocking = blocking.filter((finding, index) => {
+      const entry = candidates[index].entries.find((item) => item.vulnerablePackages.every((name) => linked[name] === false));
+      if (!entry) return true;
+      waived.push(Object.freeze({ ...finding, expiresAt: entry.expiresAt, vulnerablePackages: entry.vulnerablePackages }));
+      return false;
+    });
+  }
   const developmentLoopback = usage === 'development' && isLoopbackHost(host);
   if (blocking.length && !developmentLoopback) {
     throw runtimeSecurityError(
@@ -166,12 +239,26 @@ function* auditRuntimeSteps(executablePath, {
       { executable, version, sha256, signature, findings: blocking.slice(0, 25) }
     );
   }
-  const warnings = blocking.length ? Object.freeze([Object.freeze({
-    code: 'OLLAMA_MODULE_FINDINGS_LOOPBACK_ONLY',
-    message: `${blocking.length} finding High/Critical a granularità modulo: runtime consentito soltanto in sviluppo loopback.`,
-    findings: Object.freeze(blocking.slice(0, 25))
-  })]) : Object.freeze([]);
-  return Object.freeze({ executable, version, minimumVersion, sha256, signature, blockingFindings: blocking.length, warnings });
+  const warnings = Object.freeze([
+    ...(blocking.length ? [Object.freeze({
+      code: 'OLLAMA_MODULE_FINDINGS_LOOPBACK_ONLY',
+      message: `${blocking.length} finding High/Critical a granularità modulo: runtime consentito soltanto in sviluppo loopback.`,
+      findings: Object.freeze(blocking.slice(0, 25))
+    })] : []),
+    ...(waived.length ? [Object.freeze({
+      code: 'OLLAMA_REVIEWED_EXCEPTION',
+      message: `${waived.length} finding High esonerati da eccezione revisionata: pacchetto vulnerabile assente dal binario.`,
+      findings: Object.freeze(waived)
+    })] : [])
+  ]);
+  return Object.freeze({ executable, version, minimumVersion, sha256, signature, blockingFindings: blocking.length, waivedFindings: waived.length, warnings });
+}
+
+// Legge il binario già verificato per hash e restituisce, per ogni pacchetto,
+// se i suoi simboli Go sono presenti. latin1 preserva ogni byte come carattere.
+function linkedPackages(buffer, needles) {
+  const binary = buffer.toString('latin1');
+  return Object.fromEntries(needles.map((name) => [name, packageLinked(binary, name)]));
 }
 
 function auditOllamaRuntime(executablePath, options = {}) {
@@ -179,6 +266,7 @@ function auditOllamaRuntime(executablePath, options = {}) {
   while (!next.done) {
     const op = next.value;
     const result = op.kind === 'sha256' ? crypto.createHash('sha256').update(fs.readFileSync(op.executable)).digest('hex')
+      : op.kind === 'symbols' ? (options.readBinary ? linkedPackages(options.readBinary(op.executable), op.needles) : linkedPackages(fs.readFileSync(op.executable), op.needles))
       : runChecked(options.runProcess || spawnSync, op.command, op.args, op.options, op.errorCode, op.description);
     next = steps.next(result);
   }
@@ -196,9 +284,10 @@ async function auditOllamaRuntimeAsync(executablePath, options = {}) {
     options.signal?.throwIfAborted();
     const op = next.value, started = performance.now();
     const result = op.kind === 'sha256' ? await hashFile(op.executable, options.signal)
+      : op.kind === 'symbols' ? linkedPackages(options.readBinary ? await options.readBinary(op.executable) : await fs.promises.readFile(op.executable, { signal: options.signal }), op.needles)
       : await run(op.command, op.args, op.options);
     options.signal?.throwIfAborted();
-    const checked = op.kind === 'sha256' ? result
+    const checked = op.kind === 'sha256' || op.kind === 'symbols' ? result
       : runChecked(() => result, op.command, op.args, op.options, op.errorCode, op.description);
     try { options.onStage?.({ stage: op.stage, durationMs: Math.round(performance.now() - started) }); } catch { /* Observability cannot admit or reject a runtime. */ }
     next = steps.next(checked);
@@ -212,7 +301,8 @@ function assertOllamaRuntimeSecure(executablePath, options) {
 
 module.exports = {
   DEVELOPMENT_MINIMUM_VERSION, assertOllamaRuntimeSecure, auditOllamaRuntime, auditOllamaRuntimeAsync,
-  blockingFindings, compareVersions, isLoopbackHost, parseOllamaVersion, verifyAuthenticode
+  blockingFindings, compareVersions, isLoopbackHost, parseOllamaVersion, verifyAuthenticode,
+  loadReviewedExceptions, packageLinked, REVIEWED_EXCEPTIONS_PATH
 };
 
 // #endregion

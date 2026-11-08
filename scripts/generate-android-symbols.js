@@ -1,4 +1,4 @@
-/** @module scripts/generate-android-symbols Pinned, offline Material Symbols for Control and desktop/web clients. */
+/** @module scripts/generate-android-symbols Pinned, offline Material Symbols for NexusNXS Control. */
 // #region Manifest and generated contracts
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,7 +6,6 @@ const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const manifestPath = path.join(root, 'config/android-symbols.json');
 const javaPath = path.join(root, 'android/shared-motion/src/main/java/local/nexus/motion/NexusSymbolPaths.java');
-const rendererPath = path.join(root, 'src/renderer/components/NexusSymbolPaths.ts');
 const assets = ['NexusConsole'].map(app => path.join(root, `android/${app}/app/src/main/assets/material-symbols-license.txt`));
 const sha = value => createHash('sha256').update(value).digest('hex');
 
@@ -24,11 +23,7 @@ function render(manifest) {
   validateManifest(manifest);
   const names = Object.keys(manifest.icons), revision = manifest.revision;
   const java = `// Generated from config/android-symbols.json; Google Material Symbols, Apache-2.0.\n// Source revision ${revision}; license bundled in Control and the desktop app.\npackage local.nexus.motion;\n\npublic final class NexusSymbolPaths {\n    private NexusSymbolPaths() {}\n    public static String path(String name) {\n        switch (name) {\n${names.map(name => `            case "${name}": return "${manifest.icons[name].path}";`).join('\n')}\n            default: throw new IllegalArgumentException("Unknown Nexus symbol: " + name);\n        }\n    }\n}\n`;
-  // Keep the initial desktop bundle bounded: emit only its actual controls.
-  const rendererNames = ['ContentCopy', 'Check', 'Restore', 'Download'];
-  const renderer = '/** @module renderer/components/NexusSymbolPaths Generated from config/android-symbols.json; Material Symbols, Apache-2.0. */\n'
-    + `export const symbolPaths = ${JSON.stringify(Object.fromEntries(rendererNames.map(name => [name, manifest.icons[name].path])), null, 2)} as const;\n`;
-  return new Map([[javaPath, java], [rendererPath, renderer]]);
+  return new Map([[javaPath, java]]);
 }
 // #endregion
 

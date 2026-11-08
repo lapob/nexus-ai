@@ -80,14 +80,13 @@ test('su piattaforme non Windows il listener non apre processi', async () => {
   assert.equal(listener.status().available, false);
 });
 
-test('renderer e impostazioni espongono il richiamo soltanto come opt-in visibile', () => {
+test('la UI unica espone il richiamo soltanto come opt-in visibile e lo sospende mentre ascolta o parla', () => {
   const root = path.resolve(__dirname, '..');
-  const preferences = fs.readFileSync(path.join(root, 'src/renderer/systems/InterfacePreferences.ts'), 'utf8');
-  const settings = fs.readFileSync(path.join(root, 'src/renderer/components/SettingsOverlay.tsx'), 'utf8');
-  const app = fs.readFileSync(path.join(root, 'src/renderer/App.tsx'), 'utf8');
-  assert.match(preferences, /wakeWordEnabled:\s*false/);
-  assert.match(settings, /Richiamo “Nexus”/);
-  assert.match(settings, /offline/);
-  assert.match(app, /onWakeWordActivation/);
-  assert.match(app, /wakeWordSuspended:[\s\S]*nexus\.state === 'speaking'/);
+  const presence = fs.readFileSync(path.join(root, 'web/src/desktopPresence.ts'), 'utf8');
+  const control = fs.readFileSync(path.join(root, 'web/src/ControlCenter.tsx'), 'utf8');
+  assert.match(presence, /localStorage\.getItem\(WAKE_WORD_KEY\) === 'on'/, 'spento finché non viene attivato');
+  assert.match(presence, /onWakeWordActivation/);
+  assert.match(presence, /wakeWordSuspended: live \|\| state === 'listening' \|\| state === 'speaking'/);
+  assert.match(control, /Parola di attivazione «Nexus»/);
+  assert.match(control, /Il riconoscimento è locale/);
 });

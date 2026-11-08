@@ -185,7 +185,6 @@ test('verify e release includono diagnostica sicurezza e verifica installer', ()
   assert.match(pkg.scripts.verify, /npm run doctor/);
   assert.match(pkg.scripts.verify, /npm run audit:runtime/);
   assert.match(pkg.scripts['verify:full'], /npm run ai:evaluate:extended/);
-  assert.match(pkg.scripts['verify:full'], /npm run qa:visual/);
   assert.match(pkg.scripts['verify:full'], /npm run audit:tooling/);
   assert.match(pkg.scripts['verify:full'], /npm run sbom/);
   assert.match(pkg.scripts.release, /npm run verify/);

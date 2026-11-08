@@ -28,10 +28,11 @@ umano autorizzato e `voice:evaluate:stt`, come richiesto da AGENTS.md.
 
 ## Verifiche automatiche
 
-`node --test tests/public-voice-session.test.js` controlla concorrenza,
-interruzione, fallback senza AEC e rilascio delle risorse con dispositivi
-simulati. Non misura eco acustico, accuratezza STT o qualità conversazionale.
-Non promuovere il prototipo a predefinito sulla sola base di questi test.
+La voce live della web app unica (`web/src/voice.ts`, ciclo in `web/src/App.tsx`)
+è collaudata nel browser con un microfono sintetico: ascolto, trascrizione,
+risposta, sintesi, interruzione parlando sopra (monitor con cancellazione
+dell'eco) e chiusura pulita. Non misura eco acustico reale, accuratezza STT
+o qualità conversazionale: servono prove umane su dispositivi reali.
 
 La preparazione della sintesi è annullabile al tocco e all'uscita. Le risposte
 audio tardive vengono ignorate, anche se il trasporto restituisce dati dopo

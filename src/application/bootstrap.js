@@ -401,6 +401,7 @@ function bootstrapElectron({ env = process.env } = {}) {
     },
     onReady: async ({ showPrimaryWindow }) => {
       recordSmokeStage('electron-ready');
+      // Stesso URL fidato, UI scelta dalla preferenza: classica o cosmica condivisa con il web.
       registerRendererProtocol(rendererRoot);
       proactiveUnsubscribe = proactiveEvents.subscribe((proactiveEvent) => {
         for (const window of BrowserWindow.getAllWindows()) {

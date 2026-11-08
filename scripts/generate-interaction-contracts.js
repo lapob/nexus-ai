@@ -21,28 +21,7 @@ const constant = (value) => String(value).replace(/[^A-Za-z0-9]+/g, '_').replace
 
 // #endregion
 
-// #region 02 — Generazione TypeScript e Java
-
-const typeScript = `/**
- * @module renderer/types/interaction-states.generated
- * @description Generated from config/nexus-interaction-states.json · ${digest}. Do not edit.
- */
-// #region 01 — Identità e stati
-export const NEXUS_INTERACTION_CONTRACT_ID = ${JSON.stringify(protocol.contractId)} as const;
-export const NEXUS_COSMIC_CONTINUUM_ID = ${JSON.stringify(protocol.presentation.continuum.id)} as const;
-export const NEXUS_INTERACTION_STATES = ${JSON.stringify(protocol.states, null, 2)} as const;
-// #endregion
-
-// #region 02 — Alias e risoluzione
-export const NEXUS_INTERACTION_ALIASES = ${JSON.stringify(protocol.aliases, null, 2)} as const;
-export type NexusInteractionState = keyof typeof NEXUS_INTERACTION_STATES;
-export function resolveNexusInteractionState(value: string): NexusInteractionState {
-  const key = String(value || '').trim().toLowerCase();
-  if (key in NEXUS_INTERACTION_STATES) return key as NexusInteractionState;
-  return (NEXUS_INTERACTION_ALIASES as Record<string, NexusInteractionState>)[key] || 'idle';
-}
-// #endregion
-`;
+// #region 02 — Generazione Java
 
 const javaStateRows = states.map(([name, value]) => `        map.put("${name}", new State("${name}", 0xFF${value.color.slice(1).toUpperCase()}, ${Number(value.energy).toFixed(2)}f, "${value.motion}"));`).join('\n');
 const javaAliasRows = aliases.map(([name, value]) => `        aliases.put("${name}", "${value}");`).join('\n');
@@ -96,7 +75,6 @@ ${javaAliasRows}
 // #region 03 — Scrittura atomica logica e modalità check
 
 const outputs = new Map([
-  [path.join(root, 'src', 'renderer', 'types', 'interaction-states.generated.ts'), typeScript],
   [path.join(root, 'android', 'shared-motion', 'src', 'main', 'java', 'local', 'nexus', 'motion', 'NexusInteractionStates.java'), java]
 ]);
 const design = JSON.parse(fs.readFileSync(path.join(root, 'config', 'nexus-design-tokens.json'), 'utf8'));
@@ -105,8 +83,6 @@ for (const [name, value] of colors) {
   if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(name) || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`Colore non valido: ${name}`);
 }
 const cssName = name => name.replace(/[A-Z]/g, char => `-${char.toLowerCase()}`);
-outputs.set(path.join(root, 'src', 'renderer', 'styles', 'design-tokens.generated.css'),
-  `/** @module renderer/styles/design-tokens.generated\n * Generated from config/nexus-design-tokens.json. Do not edit. */\n:root {\n${colors.map(([name, value]) => `  --nxs-${cssName(name)}: ${value};`).join('\n')}\n}\n`);
 outputs.set(path.join(root, 'android', 'shared-motion', 'src', 'main', 'java', 'local', 'nexus', 'motion', 'NexusColors.java'),
   `/** Generated from config/nexus-design-tokens.json. Do not edit. */\npackage local.nexus.motion;\n\npublic final class NexusColors {\n${colors.map(([name, value]) => `    public static final int ${constant(cssName(name))} = 0xFF${value.slice(1).toUpperCase()};`).join('\n')}\n    private NexusColors() {}\n}\n`);
 let changed = 0;

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "policy": "Ogni eccezione copre un solo advisory High (mai Critical), un solo binario identificato da SHA-256, scade al massimo 30 giorni dopo la revisione e vale solo se all'ammissione nessun pacchetto vulnerabile dichiarato risulta compilato nel binario. Rimuovere l'eccezione appena esiste un runtime ufficiale corretto.",
+  "exceptions": [
+    {
+      "advisory": "GO-2026-6860",
+      "aliases": ["CVE-2026-78661"],
+      "severity": "high",
+      "module": "golang.org/x/net",
+      "moduleVersion": "v0.61.0",
+      "vulnerablePackages": ["golang.org/x/net/html"],
+      "runtimeVersion": "0.40.9",
+      "runtimeSha256": "0957bdaa7b52e163cdc7feb1275653f27c6b32e8ba309e957bdbb83493e97a4b",
+      "reviewedAt": "2026-11-07",
+      "expiresAt": "2026-12-07",
+      "approvedBy": "owner",
+      "evidence": "L'advisory riguarda solo golang.org/x/net/html (Parse, ParseFragment, ParseFragmentWithOptions, ParseWithOptions; allocazioni quadratiche). ollama.exe 0.40.9 compila soltanto x/net dns, http, http2, idna e internal: zero simboli golang.org/x/net/html. Ollama v0.40.15 (2026-11-03) richiede ancora x/net v0.61.0, quindi non esiste un runtime ufficiale corretto."
+    }
+  ]
+}

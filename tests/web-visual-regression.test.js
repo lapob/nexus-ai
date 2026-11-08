@@ -5,8 +5,8 @@ const { validate } = require('../scripts/web-visual-regression');
 function metrics() {
   return { title: 'NexusNXS AI', overflowX: 0, logo: { loaded: true, ratio: 1, width: .03, height: .04 },
     interactiveCount: 5, bodyTextLength: 26, core: { width: 1, height: .7 },
-    publicUi: { ready: true, fontReady: true, assembled: true, heading: 'Chiedi. NexusNXS agisce.',
-      controls: ['core','attachment','keyboard','profileSettings','download'].map(id => ({ id, label: id, visible: true, iconReady: true })) } };
+    publicUi: { ready: true, fontReady: true, assembled: true, heading: 'Chiedi. NexusNXS ragiona.',
+      controls: ['core','attachment','command','send'].map(id => ({ id, label: id, visible: true, iconReady: true })) } };
 }
 
 test('il controllo visivo della UI minimale richiede azioni reali, non testo riempitivo', () => {

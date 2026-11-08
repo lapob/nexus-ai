@@ -97,14 +97,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private boolean dockScrollCandidate, dockScrollActive;
     private float dockTouchX, dockTouchY;
     private String dashboardSection = "Panoramica";
-    private String appFolder = "";
     private final java.util.Map<String, Integer> dashboardPositions = new java.util.HashMap<>();
     private boolean restoringDashboardPosition;
     private ControlBackdropView backdrop;
     private int navigationGeneration;
 
     private String navigationKey() {
-        return "App".equals(dashboardSection) ? "App/" + appFolder : dashboardSection;
+        return dashboardSection;
     }
 
     private void rememberDashboardPosition() {
@@ -128,16 +127,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         SharedPreferences preferences = getPreferences(MODE_PRIVATE);
         String section = preferences.getString("navigation.section", "Panoramica");
         if (java.util.Arrays.asList("Panoramica", "Sistema", "App", "Servizi").contains(section)) dashboardSection = section;
-        String folder = preferences.getString("navigation.folder", "");
-        if (java.util.Arrays.asList("", "Applicazioni", "Giochi").contains(folder)) appFolder = folder;
-        for (String key : new String[]{"Panoramica", "Sistema", "Servizi", "App/", "App/Applicazioni", "App/Giochi"})
+        for (String key : new String[]{"Panoramica", "Sistema", "Servizi", "App"})
             dashboardPositions.put(key, Math.max(0, Math.min(100000, preferences.getInt("navigation.scroll." + key, 0))));
     }
 
     private void persistNavigation() {
         rememberDashboardPosition();
         SharedPreferences.Editor editor = getPreferences(MODE_PRIVATE).edit()
-            .putString("navigation.section", dashboardSection).putString("navigation.folder", appFolder);
+            .putString("navigation.section", dashboardSection).remove("navigation.folder");
         for (java.util.Map.Entry<String, Integer> entry : dashboardPositions.entrySet())
             editor.putInt("navigation.scroll." + entry.getKey(), entry.getValue());
         editor.apply();
@@ -189,7 +186,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private Runnable pendingAuthenticatedAction;
     private TextView recentActions;
     private Boolean nexusAppOpen;
-    private Boolean chatGptAppOpen;
+    private Boolean claudeAppOpen;
     private final Map<String, Boolean> applicationStates = new HashMap<>();
     private final Map<String, Boolean> applicationAvailability = new HashMap<>();
     private final Map<String, Boolean> applicationAdminReady = new HashMap<>();
@@ -393,7 +390,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private void updateBackNavigation() {
         if (backNavigation != null) backNavigation.setEnabled(currentScreen == SCREEN_POWER
-            || (currentScreen == SCREEN_DASHBOARD && (!"Panoramica".equals(dashboardSection) || !appFolder.isEmpty())));
+            || (currentScreen == SCREEN_DASHBOARD && !"Panoramica".equals(dashboardSection)));
     }
 
     private void navigateBack() {
@@ -402,14 +399,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             return;
         }
         if (currentScreen == SCREEN_DASHBOARD) {
-            if ("App".equals(dashboardSection) && !appFolder.isEmpty()) {
-                rememberDashboardPosition();
-                appFolder = "";
-                renderApplicationsPanel(dashboardPanels.get("App"));
-                restoreDashboardPosition();
-                updateBackNavigation();
-                return;
-            }
             if (!"Panoramica".equals(dashboardSection)) {
                 selectDashboardSection("Panoramica");
                 return;
@@ -493,7 +482,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(0, 0, 0, 0);
-        root.setBackgroundColor(BG);
+        root.setBackground(cosmicBackground());
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(18), dp(6), dp(18), dp(18));
@@ -979,69 +968,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         });
     }
 
-    private LinearLayout applicationFolders() {
-        LinearLayout area = new LinearLayout(this); area.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout folders = new LinearLayout(this);
-        LinearLayout entries = new LinearLayout(this); entries.setOrientation(LinearLayout.VERTICAL);
-        Map<String, Button> folderActions = new HashMap<>();
-        boolean stacked = getResources().getConfiguration().fontScale >= 1.3f
-            || getResources().getConfiguration().screenWidthDp < 360;
-        folders.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        for (String name : new String[]{"Applicazioni", "Giochi"}) {
-            Button folder = button(name, false, false);
-            folderActions.put(name, folder);
-            folder.setOnClickListener(v -> {
-                if (name.equals(appFolder)) return;
-                rememberDashboardPosition();
-                appFolder = name;
-                dashboardPositions.put(navigationKey(), 0);
-                for (String key : folderActions.keySet()) updateApplicationFolderButton(folderActions.get(key), key);
-                populateApplicationFolder(entries);
-                restoreDashboardPosition();
-                updateBackNavigation();
-                animateSectionEntry(entries);
-            });
-            folder.setMinHeight(dp(64));
-            updateApplicationFolderButton(folder, name);
-            LinearLayout.LayoutParams folderParams = stacked
-                ? new LinearLayout.LayoutParams(-1, -2) : new LinearLayout.LayoutParams(0, -2, 1);
-            if (folders.getChildCount() > 0) folderParams.setMargins(stacked ? 0 : dp(8), stacked ? dp(8) : 0, 0, 0);
-            folders.addView(folder, folderParams);
-        }
-        area.addView(folders, wrapBlock());
-        area.addView(entries, new LinearLayout.LayoutParams(-1, -2));
-        populateApplicationFolder(entries);
-        return area;
-    }
-
-    private void updateApplicationFolderButton(Button folder, String name) {
-        boolean selected = name.equals(appFolder);
-        decorateButton(folder, selected ? "folder-open" : "folder", ACCENT);
-        folder.setSelected(selected);
-        folder.setTextColor(selected ? TEXT : MUTED);
-        folder.setBackground(rounded(selected ? Color.rgb(7, 35, 36) : SURFACE, 19,
-            selected ? ACCENT : Color.TRANSPARENT));
-    }
-
-    private void populateApplicationFolder(LinearLayout entries) {
-        entries.removeAllViews();
-        if (!appFolder.isEmpty()) {
-            TextView heading = eyebrow(appFolder.toUpperCase(Locale.ROOT)); entries.addView(heading, wrapBlock());
-            if ("Applicazioni".equals(appFolder)) entries.addView(applicationGrid());
-            else {
-                entries.addView(applicationTile("steam", "Steam"), wrapBlock());
-                entries.addView(applicationTile("epic", "Epic Games"), wrapBlock());
-            }
-        }
-    }
-
     private void renderApplicationsPanel(LinearLayout panel) {
         if (panel == null) return;
         panel.removeAllViews();
         TextView heading = eyebrow("LE TUE APP");
         heading.setPadding(0, dp(16), 0, dp(9));
         panel.addView(heading);
-        panel.addView(applicationFolders());
+        panel.addView(applicationGrid());
         panel.addView(foregroundCloseAction(), wrapBlock());
     }
 
@@ -1118,12 +1051,12 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         controlDesktopApp("close-full-app", "Chiudo NexusNXS…", "NexusNXS è già chiuso", "NexusNXS chiuso sul PC");
     }
 
-    private void openChatGpt() {
-        controlDesktopApp("open-chatgpt", "Apro ChatGPT sul PC…", "ChatGPT è già aperto", "ChatGPT aperto sul PC");
+    private void openClaude() {
+        controlDesktopApp("open-claude", "Apro Claude sul PC…", "Claude è già aperto", "Claude aperto sul PC");
     }
 
-    private void closeChatGpt() {
-        controlDesktopApp("close-chatgpt", "Chiudo ChatGPT sul PC…", "ChatGPT è già chiuso", "ChatGPT chiuso sul PC");
+    private void closeClaude() {
+        controlDesktopApp("close-claude", "Chiudo Claude sul PC…", "Claude è già chiuso", "Claude chiuso sul PC");
     }
 
     private void closeForegroundApplication() {
@@ -1257,7 +1190,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         if (!result.optBoolean("available", false)) return false;
         boolean expectedOpen = action.startsWith("open-");
         if (action.endsWith("full-app")) return expectedOpen == "open".equals(result.optString("fullApp"));
-        if (action.endsWith("chatgpt")) return expectedOpen == "open".equals(result.optString("chatGpt"));
+        if (action.endsWith("claude")) return expectedOpen == "open".equals(result.optString("claude"));
         JSONArray applications = result.optJSONArray("applications");
         if (applications == null) return false;
         for (int index = 0; index < applications.length(); index++) {
@@ -1271,7 +1204,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private String applicationIdForAction(String action) {
         if (action.endsWith("full-app")) return "nexusnxs";
-        if (action.endsWith("chatgpt")) return "chatgpt";
+        if (action.endsWith("claude")) return "claude";
         return "";
     }
 
@@ -1298,13 +1231,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private void applyPresenceStatus(JSONObject result) {
         if (!result.optBoolean("available", false)) {
             nexusAppOpen = null;
-            chatGptAppOpen = null;
+            claudeAppOpen = null;
             applicationStates.clear();
             applicationAvailability.clear();
             applicationAdminReady.clear();
         } else {
             nexusAppOpen = stateValue(result.optString("fullApp"));
-            chatGptAppOpen = stateValue(result.optString("chatGpt"));
+            claudeAppOpen = stateValue(result.optString("claude"));
             applicationStates.clear();
             applicationAvailability.clear();
             applicationAdminReady.clear();
@@ -1331,18 +1264,17 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private void updateDesktopControlState(String action) {
         if ("open-full-app".equals(action)) nexusAppOpen = Boolean.TRUE;
         else if ("close-full-app".equals(action)) nexusAppOpen = Boolean.FALSE;
-        else if ("open-chatgpt".equals(action)) chatGptAppOpen = Boolean.TRUE;
-        else if ("close-chatgpt".equals(action)) chatGptAppOpen = Boolean.FALSE;
+        else if ("open-claude".equals(action)) claudeAppOpen = Boolean.TRUE;
+        else if ("close-claude".equals(action)) claudeAppOpen = Boolean.FALSE;
         applyDesktopControlState();
     }
 
     private String applicationGlyph(String id) {
         switch (id) {
             case "nexusnxs": return "nexus";
-            case "chatgpt": return "chat";
+            case "claude": return "chat";
             case "brave": return "browser";
             case "notepad": return "note";
-            case "steam": case "epic": return "game";
             case "terminal": case "supremo": return id;
             default: return "apps";
         }
@@ -1350,19 +1282,17 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private void applyDesktopControlState() {
         updateApplicationTile("nexusnxs", "NexusNXS", nexusAppOpen, true);
-        updateApplicationTile("chatgpt", "ChatGPT", chatGptAppOpen, true);
+        updateApplicationTile("claude", "Claude", claudeAppOpen, true);
         updateApplicationTile("brave", "Brave", applicationStates.get("brave"), applicationAvailability.get("brave"));
         updateApplicationTile("terminal", "Terminale", applicationStates.get("terminal"), applicationAvailability.get("terminal"));
         updateApplicationTile("supremo", "Supremo", applicationStates.get("supremo"), applicationAvailability.get("supremo"));
         updateApplicationTile("notepad", "Note", applicationStates.get("notepad"), applicationAvailability.get("notepad"));
-        updateApplicationTile("steam", "Steam", applicationStates.get("steam"), applicationAvailability.get("steam"));
-        updateApplicationTile("epic", "Epic Games", applicationStates.get("epic"), applicationAvailability.get("epic"));
         setTaggedText("core-pulse-detail", corePulseSummary(lastDashboardSnapshot == null ? null : lastDashboardSnapshot.optJSONObject("nexusService")));
     }
 
     private LinearLayout applicationGrid() {
         String[][] applications = new String[][] {
-            { "nexusnxs", "NexusNXS" }, { "chatgpt", "ChatGPT" },
+            { "nexusnxs", "NexusNXS" }, { "claude", "Claude" },
             { "brave", "Brave" }, { "terminal", "Terminale" },
             { "supremo", "Supremo" }, { "notepad", "Note" }
         };
@@ -1403,14 +1333,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         tile.setContentDescription(label + ", stato in verifica");
         tile.setOnClickListener(v -> {
             if (launchCommandInFlight) return;
-            Boolean open = "nexusnxs".equals(id) ? nexusAppOpen : "chatgpt".equals(id) ? chatGptAppOpen : applicationStates.get(id);
+            Boolean open = "nexusnxs".equals(id) ? nexusAppOpen : "claude".equals(id) ? claudeAppOpen : applicationStates.get(id);
             if ("nexusnxs".equals(id)) { if (Boolean.TRUE.equals(open)) closeNexusNxs(); else openNexusNxs(); return; }
-            if ("chatgpt".equals(id)) { if (Boolean.TRUE.equals(open)) closeChatGpt(); else openChatGpt(); return; }
+            if ("claude".equals(id)) { if (Boolean.TRUE.equals(open)) closeClaude(); else openClaude(); return; }
             controlCatalogApplication(id, label);
         });
         Boolean knownState = "nexusnxs".equals(id) ? nexusAppOpen
-            : "chatgpt".equals(id) ? chatGptAppOpen : applicationStates.get(id);
-        Boolean knownAvailability = "nexusnxs".equals(id) || "chatgpt".equals(id)
+            : "claude".equals(id) ? claudeAppOpen : applicationStates.get(id);
+        Boolean knownAvailability = "nexusnxs".equals(id) || "claude".equals(id)
             ? Boolean.TRUE : applicationAvailability.get(id);
         updateApplicationTile(tile, id, label, knownState, knownAvailability);
         return tile;
@@ -1446,6 +1376,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         GradientDrawable surface = rounded(fill, 19, stroke);
         tile.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(42, 109, 224, 221)), surface, null));
         tile.setTextColor(Boolean.TRUE.equals(open) ? Color.rgb(226, 247, 246) : Color.rgb(190, 211, 211));
+        glow(tile, Boolean.TRUE.equals(open));
         String glyph = applicationGlyph(id);
         Drawable icon = new NexusGlyphDrawable(glyph, Boolean.TRUE.equals(open) ? ACCENT : Color.rgb(151, 190, 191), dp(24));
         tile.setCompoundDrawables(icon, null, null, null);
@@ -1718,7 +1649,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         int open = 0;
         int known = 0;
         if (nexusAppOpen != null) { known++; if (Boolean.TRUE.equals(nexusAppOpen)) open++; }
-        if (chatGptAppOpen != null) { known++; if (Boolean.TRUE.equals(chatGptAppOpen)) open++; }
+        if (claudeAppOpen != null) { known++; if (Boolean.TRUE.equals(claudeAppOpen)) open++; }
         for (Boolean state : applicationStates.values()) {
             if (state == null) continue;
             known++;
@@ -2712,16 +2643,44 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(17), dp(13), dp(17), dp(13));
-        card.setBackground(rounded(SURFACE, 22, Color.argb(32, 91, 105, 106)));
+        card.setBackground(rounded(SURFACE, 22, Color.argb(30, 75, 231, 233)));
         return card;
     }
 
+    /**
+     * Superficie "vetro" condivisa con la web app: luce dall'alto (gradiente
+     * verticale appena più chiaro in cima) e bordo sottile. Stessi token ovunque.
+     */
     private GradientDrawable rounded(int fill, int radius, int stroke) {
-        GradientDrawable shape = new GradientDrawable();
-        shape.setColor(fill);
+        GradientDrawable shape = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{ lighten(fill, 10), fill, fill });
         shape.setCornerRadius(dp(radius));
         if (stroke != Color.TRANSPARENT) shape.setStroke(dp(1), stroke);
         return shape;
+    }
+
+    private static int lighten(int color, int amount) {
+        return Color.argb(Color.alpha(color), Math.min(255, Color.red(color) + amount),
+            Math.min(255, Color.green(color) + amount + 2), Math.min(255, Color.blue(color) + amount + 2));
+    }
+
+    /** Fondale cosmico: alone ciano dall'alto che sfuma nell'inchiostro, come il corpo della web app. */
+    private GradientDrawable cosmicBackground() {
+        GradientDrawable sky = new GradientDrawable();
+        sky.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        sky.setGradientCenter(.5f, 0f);
+        sky.setGradientRadius(Math.max(getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels) * .85f);
+        sky.setColors(new int[]{ Color.rgb(13, 36, 38), Color.rgb(6, 16, 18), BG });
+        return sky;
+    }
+
+    /** Alone ciano per gli elementi attivi (Android 9+): l'ombra prende il colore dell'accento. */
+    private void glow(View view, boolean active) {
+        view.setElevation(active ? dp(10) : 0);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            view.setOutlineAmbientShadowColor(active ? ACCENT : Color.BLACK);
+            view.setOutlineSpotShadowColor(active ? ACCENT : Color.BLACK);
+        }
     }
 
     private LinearLayout.LayoutParams block(int height) {

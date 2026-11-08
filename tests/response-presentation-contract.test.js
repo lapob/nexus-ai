@@ -6,26 +6,21 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '..');
 
-test('desktop rende Markdown semantico anche durante lo streaming', () => {
-  const surface = fs.readFileSync(path.join(root, 'src/renderer/components/ResponseSurface.tsx'), 'utf8');
-  const styles = fs.readFileSync(path.join(root, 'src/renderer/styles/response-surface.css'), 'utf8');
-  assert.match(surface, /streamSafeMarkdown\(response\)/);
-  assert.match(surface, /<MarkdownContent text=\{streamSafeMarkdown\(response\)\} streaming \/>/);
-  assert.match(surface, /kind: 'callout'/);
-  assert.match(surface, /kind: 'table'/);
-  assert.match(surface, /className="answer-context"/);
-  assert.match(surface, /className="answer-stop"/);
-  assert.match(surface, /onClick=\{onStop\}/);
-  assert.match(styles, /\.response-callout/);
-  assert.match(styles, /\.response-table-wrap/);
-  assert.match(styles, /\.code-card-meta/);
-  assert.match(surface, /kind: 'formula'/);
-  assert.match(surface, /start: ordered \? Number\.parseInt\(listItem\[1\], 10\) \|\| 1/);
-  assert.match(surface, /start: block\.start/);
-  assert.match(surface, /className="math-inline"/);
-  assert.match(surface, /className="math-block"/);
-  assert.match(surface, /SUPERSCRIPTS/);
-  assert.match(surface, /token\.startsWith\('\$\$'\)/);
+test('la UI unica (web e desktop) rende Markdown semantico anche durante lo streaming', () => {
+  const markdown = fs.readFileSync(path.join(root, 'web/src/Markdown.tsx'), 'utf8');
+  const app = fs.readFileSync(path.join(root, 'web/src/App.tsx'), 'utf8');
+  const styles = fs.readFileSync(path.join(root, 'web/src/styles.css'), 'utf8');
+  // Lo stesso renderer viene usato mentre i token arrivano e a risposta completa.
+  assert.match(app, /<Markdown text=\{message\.content\} \/>/);
+  assert.doesNotMatch(markdown, /dangerouslySetInnerHTML|\.innerHTML\s*=/);
+  for (const kind of ['code', 'table', 'callout', 'formula', 'list']) assert.match(markdown, new RegExp(`kind: '${kind}'`));
+  assert.match(markdown, /un fence o una formula non ancora chiusi durante lo streaming/);
+  assert.match(markdown, /start: ordered \? Number\.parseInt\(item\[2\], 10\) \|\| 1/);
+  assert.match(markdown, /className="math-inline" role="math"/);
+  assert.match(markdown, /className="math-block" role="math"/);
+  assert.match(markdown, /SUPERSCRIPTS/);
+  assert.match(markdown, /url\.protocol === 'https:'/);
+  for (const selector of ['.callout', '.table-wrap', '.math-block']) assert.ok(styles.includes(selector), selector);
   assert.match(styles, /Cambria Math/);
 });
 
@@ -34,93 +29,6 @@ test('una ricerca live indisponibile termina con una risposta deterministica sen
   assert.match(source, /function publicResearchUnavailableAnswer/);
   assert.match(source, /prepared\.research\.unavailable && prepared\.research\.policy\.level === 'required'/);
   assert.match(source, /Non ti darò un dato potenzialmente superato come se fosse attuale/);
-});
-
-test('NexusNXS AI Web usa lo stesso renderer durante e dopo la generazione', () => {
-  const { enhancePublicAiHtml } = require('../src/remote/public-demo');
-  const base = '<!doctype html><html><head></head><body><div class="exchange" aria-live="polite"><p id="userPrompt" class="prompt-copy"></p><p id="answer" class="answer"></p></div><p class="privacy">Nessun account. La sessione è temporanea e riparte pulita alla visita successiva. · <a href="https://nexusnxs.com/">Scopri NexusNXS</a></p><script>legacy()</script></body></html>';
-  const html = enhancePublicAiHtml({ base, coreStyle: '', coreScript: '' });
-  assert.match(html, /id="answerContext"/);
-  assert.match(html, /class="web-answer-context"/);
-  assert.match(html, /answer\.textContent=rawAnswer/);
-  assert.match(html, /formatAnswer\(rawAnswer,\{streaming:true\}\)/);
-  assert.match(html, /now-lastStreamRender<48/);
-  assert.match(html, /options\.target \|\| answer/);
-  assert.match(html, /options\.announce !== false/);
-  assert.match(html, /formatAnswer\(responseText\)/);
-  assert.match(html, /rawAnswer=recentAnswer\.content;formatAnswer\(recentAnswer\.content\)/);
-  assert.match(html, /className = 'web-code-card'/);
-  assert.match(html, /className = 'web-callout'/);
-  assert.match(html, /className = 'web-table-wrap'/);
-  assert.match(html, /className = block \? 'web-math-block' : 'math-inline'/);
-  assert.match(html, /role', 'math'/);
-  assert.match(html, /const superscripts/);
-  assert.match(html, /list\.start = Number\.parseInt\(bullet\[1\], 10\) \|\| 1/);
-  assert.match(html, /raw\.startsWith\('\$\$'\)/);
-  assert.match(html, /Cambria Math/);
-  assert.match(html, /id="copyResponse"/);
-  assert.match(html, /id="deepenResponse"/);
-  assert.match(html, /id="exportResponse"/);
-  assert.match(html, /download='nexusnxs-risposta\.md'/);
-  assert.match(html, /navigator\.clipboard\.writeText/);
-  assert.match(html, /function followAnswer\(\)/);
-  assert.match(html, /document\.documentElement\.scrollHeight-innerHeight/);
-  assert.match(html, /if\(busy\)followStream=false/);
-  assert.match(html, /\.dock\{position:fixed/);
-  assert.match(html, /data-mode=stop/);
-  assert.match(html, /function stopGeneration\(\)/);
-  assert.match(html, /\/api\/guest\/messages\/cancel/);
-  assert.match(html, /setPhase\('Risposta interrotta'\)/);
-  assert.match(html, /Riprendo la risposta/);
-  assert.match(html, /async function authenticatedFetch\(url,options=\{\}\)/);
-  assert.match(html, /if\(response\.status===401\)\{token='';credential=await session\(\);response=await invoke\(\)\}/);
-  assert.match(html, /await authenticatedFetch\('\/api\/guest\/messages\/stream'/);
-  assert.match(html, /fetchAudio:authenticatedFetch/);
-  assert.match(html, /await fetchAudio\('\/api\/guest\/voice\/synthesize'/);
-  assert.match(html, /await fetchAudio\('\/api\/guest\/voice\/transcribe'/);
-  assert.match(html, /verified!==rawAnswer/);
-  assert.doesNotMatch(html, /async function memoryRead\(/);
-  assert.match(html, /id="sessionHistory"/);
-  assert.match(html, /function renderSessionHistory\(history=turns\)/);
-  assert.match(html, /className='session-turn-content'/);
-  assert.match(html, /formatAnswer\(String\(turn\.content\|\|''\),\{target:content,announce:false\}\)/);
-  assert.match(html, /aria-label',assistant\?'Messaggio di NexusNXS':'Il tuo messaggio'/);
-  assert.match(html, /\.session-turn\[data-role=user\] \.session-turn-content/);
-  assert.match(html, /classList\.add\('request-active','conversation-active','keyboard-open'\)/);
-  assert.match(html, /classList\.add\('conversation-active','keyboard-open'\)/);
-  assert.match(html, /contains\('conversation-active'\)\)\{const collapsed=document\.body\.classList\.toggle\('composer-collapsed'\)/);
-  assert.match(html, /\.conversation-active:not\(\.request-active\) \.dock/);
-  assert.match(html, /\.conversation-active\.composer-collapsed:not\(\.request-active\) \.dock/);
-  assert.match(html, /--nxs-collapse-shift/);
-  assert.match(html, /\.conversation-active\.composer-collapsed:not\(\.request-active\) \.keyboard-toggle,[^{]+\{transform:translate3d\(var\(--nxs-collapse-shift\),0,0\)\}/);
-  assert.match(html, /will-change:transform/);
-  assert.match(html, /nxs-control-reveal/);
-  assert.match(html, /classList\.add\('motion-ready','initial-reveal'\)/);
-  assert.match(html, /function dismissIdleKeyboard\(\)/);
-  assert.match(html, /function syncCoreTypingGuard\(\)/);
-  assert.match(html, /core\.setAttribute\('aria-disabled','true'\)/);
-  assert.match(html, /core\.removeAttribute\('aria-disabled'\)/);
-  assert.match(html, /keyboard-open:not\(\.request-active\):not\(\.conversation-active\) \.core\{pointer-events:auto;cursor:default\}/);
-  assert.match(html, /function guardCoreWhileTyping\(event\)/);
-  assert.match(html, /event\.key==='Escape'/);
-  assert.match(html, /event\.target\.closest\?\.\('\.dock,dialog'\)/);
-  assert.match(html, /--nxs-privacy-height/);
-  assert.match(html, /new ResizeObserver\(\(\)=>syncPrivacyHeight\(\)\)/);
-  assert.match(html, /--nxs-dock-height/);
-  assert.match(html, /privacyNote.offsetHeight/);
-  assert.match(html, /\.privacy::before\{[^}]*background:var\(--nxs-surface\)/);
-  assert.match(html, /classList\.toggle\('status-active',Boolean\(value\)\)/);
-  assert.match(html, /\.status-active \.dock/);
-  assert.match(html, /finally\{busy=false;setSendMode\(false\);if\(requestGeneration===historyGeneration\)leaveRequestLayout\(\)\}/);
-  assert.match(html, /visualViewport/);
-  assert.match(html, /language:\s*preferredLanguage\(\)\s*\|\|\s*capturedLanguage\s*\|\|\s*spokenLanguage\(text\)/);
-  assert.match(html, /NexusNXS può commettere errori/);
-  assert.match(html, /Parla con Nexus/);
-  assert.match(html, /nexusnxs\.core-hint\.v1/);
-  assert.doesNotMatch(html, /answer\.textContent\+=pendingAnswer/);
-  for (const [index, match] of [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].entries()) {
-    assert.doesNotThrow(() => new vm.Script(match[1]), `script Web generato ${index + 1}`);
-  }
 });
 
 test('il prompt impedisce marcatori incompleti e abilita blocchi semantici', () => {

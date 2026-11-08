@@ -69,7 +69,7 @@ function fixture({ publicPort = 0 } = {}) {
     available: true,
     nucleusVisible: false,
     fullAppOpen: false,
-    chatGptOpen: false,
+    claudeOpen: false,
     applications: [{ id: 'notepad', label: 'Note', icon: 'note', available: true, open: false, canClose: true }],
     foregroundApplicationId: '',
     selectedDisplayId: 'display-primary',
@@ -93,8 +93,8 @@ function fixture({ publicPort = 0 } = {}) {
       if (command.action === 'hide-nucleus') state.nucleusVisible = false;
       if (command.action === 'open-full-app') state.fullAppOpen = true;
       if (command.action === 'close-full-app') state.fullAppOpen = false;
-      if (command.action === 'open-chatgpt') state.chatGptOpen = true;
-      if (command.action === 'close-chatgpt') state.chatGptOpen = false;
+      if (command.action === 'open-claude') state.claudeOpen = true;
+      if (command.action === 'close-claude') state.claudeOpen = false;
       if (command.action === 'open-application') state.applications[0].open = true;
       if (command.action === 'close-application') { state.applications[0].open = false; state.foregroundApplicationId = ''; }
       if (command.action === 'select-display') state.selectedDisplayId = command.displayId;
@@ -162,8 +162,8 @@ test('stato e capability non espongono dettagli monitor e ogni mutazione usa pla
       { action: 'hide-nucleus' },
       { action: 'open-full-app' },
       { action: 'close-full-app' },
-      { action: 'open-chatgpt' },
-      { action: 'close-chatgpt' },
+      { action: 'open-claude' },
+      { action: 'close-claude' },
       { action: 'open-application', applicationId: 'notepad' },
       { action: 'close-application', applicationId: 'notepad' },
       { action: 'select-display', displayId: 'display-secondary' }
@@ -209,11 +209,11 @@ test('stato e capability non espongono dettagli monitor e ogni mutazione usa pla
     assert.equal(noChange.changed, false);
     assert.equal(noChange.proposal, null);
 
-    const chatGptNoChange = await (await fetch(`${baseUrl}/api/presence/plan`, {
-      method: 'POST', headers, body: JSON.stringify({ action: 'close-chatgpt' })
+    const claudeNoChange = await (await fetch(`${baseUrl}/api/presence/plan`, {
+      method: 'POST', headers, body: JSON.stringify({ action: 'close-claude' })
     })).json();
-    assert.equal(chatGptNoChange.changed, false);
-    assert.equal(chatGptNoChange.proposal, null);
+    assert.equal(claudeNoChange.changed, false);
+    assert.equal(claudeNoChange.proposal, null);
 
     const unknownDisplay = await fetch(`${baseUrl}/api/presence/plan`, {
       method: 'POST', headers, body: JSON.stringify({ action: 'select-display', displayId: 'display-missing' })
@@ -287,16 +287,19 @@ test('il public ingress restituisce 404 per stato, piano ed esecuzione presence'
 });
 
 
-test('il contratto conserva i launcher giochi e rifiuta identificatori eseguibili', () => {
+test('il contratto accetta solo app del catalogo: niente giochi né identificatori eseguibili', () => {
   const normalized = normalizeDesktopPresenceStatus({available: true, applications: [
+    {id: 'brave', available: true, open: true},
+    {id: 'notepad', available: false, open: false},
     {id: 'steam', available: true, open: true},
-    {id: 'epic', available: false, open: false},
     {id: 'cmd.exe', available: true}
   ]});
-  assert.deepEqual(normalized.applications.map(app => app.id), ['steam', 'epic']);
+  assert.deepEqual(normalized.applications.map(app => app.id), ['brave', 'notepad']);
   assert.equal(normalized.applications[0].state, 'open');
-  for (const applicationId of ['steam', 'epic']) {
+  for (const applicationId of ['brave', 'notepad']) {
     assert.equal(normalizePresenceAction({action: 'open-application', applicationId}).applicationId, applicationId);
   }
-  assert.throws(() => normalizePresenceAction({action: 'open-application', applicationId: 'steam;cmd.exe'}));
+  for (const applicationId of ['steam', 'epic', 'brave;cmd.exe']) {
+    assert.throws(() => normalizePresenceAction({action: 'open-application', applicationId}));
+  }
 });

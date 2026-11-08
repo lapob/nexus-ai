@@ -13,6 +13,9 @@ const { validateChatRequest } = require('../ai-provider');
 // dedicato esclusivamente agli embedding.
 const EMBEDDING_MODEL_PATTERN = /embeddinggemma|(^|[-_.:/])(embed|embedding|bge|e5|gte)([-_.:/]|$)|nomic-embed|all-minilm/i;
 const VISION_MODEL_PATTERN = /(^|[-_.:/])(vl|vision)([-_.:/]|$)|llava|bakllava|moondream|minicpm-v/i;
+// Famiglie con template function-calling pubblicati da Ollama. Un modello non
+// elencato resta `tools:false`: l'agente ripiega sulla risposta diretta.
+const TOOL_MODEL_PATTERN = /^(?:qwen3|qwen2\.5|qwq|llama3\.[1-3]|llama4|mistral|mixtral|ministral|magistral|command-r|granite3|granite4|gemma4|gpt-oss|deepseek-v3|hermes3|firefunction|smollm2)(?:[-.:/]|$)/i;
 function inferModelCapabilities(modelName) {
   const normalizedName = String(modelName || '');
   const embeddingOnly = EMBEDDING_MODEL_PATTERN.test(normalizedName);
@@ -20,7 +23,7 @@ function inferModelCapabilities(modelName) {
     chat: !embeddingOnly,
     streaming: !embeddingOnly,
     embeddings: embeddingOnly,
-    tools: false,
+    tools: !embeddingOnly && TOOL_MODEL_PATTERN.test(normalizedName.replace(/^.*\//, '')),
     vision: !embeddingOnly && VISION_MODEL_PATTERN.test(normalizedName),
     thinking: /^qwen3(?::|$)/i.test(normalizedName)
   };
@@ -74,8 +77,43 @@ function thinkingPreference(request) {
   return request.think !== undefined ? request.think : request.mode === 'deep';
 }
 
+// Converte il formato interno ({toolCalls}, {toolName}) nel formato wire di
+// Ollama ({tool_calls}, {tool_name}) senza alterare i messaggi ordinari.
+function toOllamaMessages(messages) {
+  return messages.map((message) => {
+    if (message.toolCalls) {
+      const { toolCalls, ...rest } = message;
+      return { ...rest, tool_calls: toolCalls.map((call) => ({ function: { name: call.name, arguments: call.arguments } })) };
+    }
+    if (message.role === 'tool' && message.toolName) {
+      const { toolName, ...rest } = message;
+      return { ...rest, tool_name: toolName };
+    }
+    return message;
+  });
+}
+
+// Alcune versioni restituiscono gli argomenti come stringa JSON. Una chiamata
+// malformata diventa un errore esplicito, non un'azione con argomenti vuoti.
+function parseOllamaToolCalls(rawCalls, provider) {
+  if (!Array.isArray(rawCalls) || !rawCalls.length) return [];
+  return rawCalls.slice(0, 8).map((call, index) => {
+    const name = String(call?.function?.name || '');
+    let args = call?.function?.arguments ?? {};
+    if (typeof args === 'string') {
+      try { args = args.trim() ? JSON.parse(args) : {}; }
+      catch (cause) { throw new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, `Argomenti non validi per lo strumento ${name || 'sconosciuto'}.`, { provider, cause }); }
+    }
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name) || !args || typeof args !== 'object' || Array.isArray(args)) {
+      throw new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, 'Chiamata strumento del modello non valida.', { provider });
+    }
+    return { id: String(call.id || `call_${index}`).slice(0, 64), name, arguments: args };
+  });
+}
+
 function messagesForThinking(model, request) {
-  return thinkingPreference(request) === false ? quickMessages(model, 'quick', request.messages) : request.messages;
+  const messages = thinkingPreference(request) === false ? quickMessages(model, 'quick', request.messages) : request.messages;
+  return toOllamaMessages(messages);
 }
 function canonicalModelId(value) {
   return String(value || '').trim().toLowerCase().replace(/:latest$/u, '');
@@ -228,7 +266,7 @@ class OllamaProvider {
       return model;
     }
   }
-  getCapabilities() { return { chat: true, streaming: true, embeddings: true, tools: false, vision: false, thinking: true }; }
+  getCapabilities() { return { chat: true, streaming: true, embeddings: true, tools: true, vision: false, thinking: true }; }
 
   // #endregion
 
@@ -248,10 +286,15 @@ class OllamaProvider {
         think: thinkingPreference(valid),
         keep_alive: valid.keepAlive || '15m',
         ...(valid.format ? { format: valid.format } : {}),
+        ...(valid.tools ? { tools: valid.tools } : {}),
         options: {
           ...(valid.temperature !== undefined ? { temperature: valid.temperature } : {}),
           ...(valid.maxTokens ? { num_predict: valid.maxTokens } : {}),
-          ...(valid.numCtx ? { num_ctx: valid.numCtx } : {})
+          ...(valid.numCtx ? { num_ctx: valid.numCtx } : {}),
+          // Solo le valutazioni isolate forzano la CPU per non contendere la
+          // GPU al servizio attivo; la chat ordinaria non imposta questo campo.
+          ...(Number.isInteger(valid.numGpu) && valid.numGpu >= 0 ? { num_gpu: valid.numGpu } : {}),
+          ...(Number.isInteger(valid.seed) ? { seed: valid.seed } : {})
         }
       },
       signal: valid.signal,
@@ -265,10 +308,15 @@ class OllamaProvider {
     }
     const normalizationMode = thinkingPreference(valid) === false ? 'quick' : valid.mode;
     const content = normalizeQwenContent(model, normalizationMode, data.message.content, data.done_reason);
-    if (!content.trim()) {
+    // Le chiamate sono accettate solo se la richiesta dichiarava strumenti:
+    // un modello non può introdurre azioni in una chat ordinaria.
+    const toolCalls = valid.tools ? parseOllamaToolCalls(data.message.tool_calls, this.name) : [];
+    if (!content.trim() && !toolCalls.length) {
       throw new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, 'Il modello ha esaurito la risposta prima del testo finale.', { provider: this.name, retryable: true });
     }
-    return this.normalizeResult(data, valid.requestId, model, content);
+    const result = this.normalizeResult(data, valid.requestId, model, content);
+    if (toolCalls.length) { result.message.toolCalls = toolCalls; result.finishReason = 'tool_calls'; }
+    return result;
   }
   async streamChat(request, handlers = {}) { const valid = validateChatRequest(request); const model = await this.resolveRequestModel(valid.model, valid); let terminal = false; let content = ''; let finalData = null; const emitError = (error) => { if (!terminal) { terminal = true; handlers.onError?.(error.toPublic ? error.toPublic() : error); } }; try { const response = await this.request('/api/chat', { method: 'POST', body: { model, messages: messagesForThinking(model, valid), stream: true, think: thinkingPreference(valid), keep_alive: valid.keepAlive || '15m', options: { ...(valid.temperature !== undefined ? { temperature: valid.temperature } : {}), ...(valid.maxTokens ? { num_predict: valid.maxTokens } : {}), ...(valid.numCtx ? { num_ctx: valid.numCtx } : {}) } }, signal: valid.signal, timeoutMs: Math.max(this.timeoutMs, Number(valid.timeoutMs) || 1000) }); handlers.onStart?.({ requestId: valid.requestId, provider: this.name, model }); const reader = response.body?.getReader(); if (!reader) throw new AIError(AI_ERROR_CODES.PROVIDER_INVALID_RESPONSE, 'Stream Ollama non leggibile.', { provider: this.name }); const decoder = new TextDecoder(); let buffer = ''; while (true) { const { done, value } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done }); const lines = buffer.split('\n'); buffer = done ? '' : lines.pop(); for (const raw of lines.concat(done && buffer.trim() ? [buffer] : [])) { if (!raw.trim()) continue; let chunk; try { chunk = JSON.parse(raw); } catch (cause) { throw new AIError(AI_ERROR_CODES.STREAM_INTERRUPTED, 'Chunk streaming Ollama non valido.', { provider: this.name, cause }); } if (chunk.error) throw new AIError(AI_ERROR_CODES.STREAM_INTERRUPTED, String(chunk.error), { provider: this.name }); const token = String(chunk.message?.content || ''); const thinking = String(chunk.message?.thinking || ''); if (token) { content += token; handlers.onToken?.(token); } if (thinking) handlers.onThinking?.(thinking); if (chunk.done) finalData = chunk; } if (done) break; } if (!finalData) throw new AIError(AI_ERROR_CODES.STREAM_INTERRUPTED, 'Stream Ollama terminato senza evento finale.', { provider: this.name, retryable: true }); const result = this.normalizeResult(finalData, valid.requestId, model, content); terminal = true; handlers.onComplete?.(result); return result; } catch (error) { const normalized = normalizeAIError(error, this.name); if (normalized.code === AI_ERROR_CODES.REQUEST_CANCELLED) { if (!terminal) { terminal = true; handlers.onCancel?.(); } } else emitError(normalized); throw normalized; } }
   // L'AbortController appartiene ad AIRuntime; il provider riceve già il suo

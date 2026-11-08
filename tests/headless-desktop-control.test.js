@@ -38,13 +38,13 @@ test('il Core headless espone solo controlli applicativi espliciti senza Presenc
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     bridgeClient: { status: async () => { throw new Error('offline'); } },
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     now: () => 2_000
   });
   const status = await control.status();
   assert.equal(status.available, true);
   assert.equal(status.fullAppOpen, false);
-  assert.deepEqual(status.allowedActions, ['open-full-app', 'close-full-app', 'open-chatgpt', 'close-chatgpt', 'open-application', 'close-application']);
+  assert.deepEqual(status.allowedActions, ['open-full-app', 'close-full-app', 'open-claude', 'close-claude', 'open-application', 'close-application']);
   assert.deepEqual(status.logicalDisplays, []);
 });
 
@@ -53,7 +53,7 @@ test('espone solo l identificatore allowlist dell applicazione Windows in primo 
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     applicationStatus: async () => [{ id: 'brave', label: 'Brave', icon: 'browser', available: true, open: true, canClose: true }],
     foregroundApplication: async () => ({ id: 'brave', label: 'Brave' }),
     now: () => 2_000
@@ -70,7 +70,7 @@ test('Apri NexusNXS avvia la UI e ne verifica il lock', async () => {
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     launchDesktop: async () => { launches += 1; running = true; },
     now: () => 2_000
   });
@@ -79,20 +79,20 @@ test('Apri NexusNXS avvia la UI e ne verifica il lock', async () => {
   assert.equal(result.fullAppOpen, true);
 });
 
-test('Apri ChatGPT usa il PC e aggiorna immediatamente lo stato', async () => {
+test('Apri Claude usa il PC e aggiorna immediatamente lo stato', async () => {
   let launches = 0;
   let running = false;
   const control = createHeadlessDesktopControl({
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => running,
-    launchChatGpt: async () => { launches += 1; running = true; },
+    claudeState: async () => running,
+    launchClaude: async () => { launches += 1; running = true; },
     now: () => 2_000
   });
-  const result = await control.execute({ action: 'open-chatgpt' });
+  const result = await control.execute({ action: 'open-claude' });
   assert.equal(launches, 1);
-  assert.equal(result.chatGptOpen, true);
+  assert.equal(result.claudeOpen, true);
 });
 
 test('Chiudi NexusNXS richiede lo shutdown autenticato e verifica la scomparsa del lock', async () => {
@@ -102,7 +102,7 @@ test('Chiudi NexusNXS richiede lo shutdown autenticato e verifica la scomparsa d
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     closeDesktop: () => { shutdowns += 1; running = false; return true; },
     now: () => 2_000
   });
@@ -111,39 +111,39 @@ test('Chiudi NexusNXS richiede lo shutdown autenticato e verifica la scomparsa d
   assert.equal(result.fullAppOpen, false);
 });
 
-test('Chiudi ChatGPT usa il terminatore dedicato e aggiorna immediatamente lo stato', async () => {
+test('Chiudi Claude usa il terminatore dedicato e aggiorna immediatamente lo stato', async () => {
   let closes = 0;
   let running = true;
   const control = createHeadlessDesktopControl({
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => running,
-    closeChatGpt: async () => { closes += 1; running = false; },
+    claudeState: async () => running,
+    closeClaude: async () => { closes += 1; running = false; },
     now: () => 2_000
   });
-  const result = await control.execute({ action: 'close-chatgpt' });
+  const result = await control.execute({ action: 'close-claude' });
   assert.equal(closes, 1);
-  assert.equal(result.chatGptOpen, false);
+  assert.equal(result.claudeOpen, false);
 });
 
-test('Chiudi ChatGPT usa il fallback forzato se il processo Store resta residente', async () => {
+test('Chiudi Claude usa il fallback forzato se il processo Store resta residente', async () => {
   const attempts = [];
   let running = true;
   const control = createHeadlessDesktopControl({
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => running,
-    closeChatGpt: async (options = {}) => {
+    claudeState: async () => running,
+    closeClaude: async (options = {}) => {
       attempts.push(options);
       if (options.force === true) running = false;
     },
     now: () => 2_000
   });
-  const result = await control.execute({ action: 'close-chatgpt' });
+  const result = await control.execute({ action: 'close-claude' });
   assert.deepEqual(attempts, [{}, { force: true }]);
-  assert.equal(result.chatGptOpen, false);
+  assert.equal(result.claudeOpen, false);
 });
 
 test('i controlli del nucleo restano chiusi senza Presence', async () => {
@@ -151,7 +151,7 @@ test('i controlli del nucleo restano chiusi senza Presence', async () => {
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     now: () => 2_000
   });
   await assert.rejects(control.execute({ action: 'show-nucleus' }), { code: 'PRESENCE_UNAVAILABLE' });
@@ -163,7 +163,7 @@ test('apre soltanto una applicazione del catalogo e ne verifica lo stato', async
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     applicationStatus: async () => [{ id: 'notepad', label: 'Note', icon: 'note', available: true, open, canClose: true }],
     launchApplication: async (id) => { assert.equal(id, 'notepad'); open = true; },
     now: () => 2_000
@@ -178,7 +178,7 @@ test('attende il processo finale delle app Windows prima di confermare', async (
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     applicationStatus: async () => [{ id: 'terminal', label: 'Terminale', icon: 'terminal', available: true, open: ++checks >= 3, canClose: true }],
     launchApplication: async () => {},
     now: () => 2_000
@@ -194,7 +194,7 @@ test('chiude soltanto una applicazione del catalogo e ne verifica lo stato', asy
     appRoot: 'Z:\\NexusNXS\\.AI',
     sharedDataRoot: 'Z:\\NexusNXS\\.nexus-data',
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false,
+    claudeState: async () => false,
     applicationStatus: async () => [{ id: 'notepad', label: 'Note', icon: 'note', available: true, open, canClose: true }],
     closeApplication: async (id) => { assert.equal(id, 'notepad'); open = false; },
     now: () => 2_000
@@ -213,7 +213,7 @@ test('la Presence manuale mantiene la precedenza sul controllo headless', async 
       execute: async (command) => executed.push(command.action)
     },
     desktopState: () => ({ running: false }),
-    chatGptState: async () => false
+    claudeState: async () => false
   });
   await control.execute({ action: 'show-nucleus' });
   assert.deepEqual(executed, ['show-nucleus']);

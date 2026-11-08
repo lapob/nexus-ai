@@ -81,6 +81,19 @@ function findRuntime() {
   return null;
 }
 
+// Il loader ROCm di Windows non rileva la GPU se il percorso contiene parentesi
+// quadre (come "[AI]"): il runtime partiva solo su CPU, falsando ogni eval.
+// Riusa la junction creata da start-electron.js, solo se punta allo stesso runtime.
+function loaderSafeExecutable(executable) {
+  if (process.platform !== 'win32' || !/[[\]]/.test(executable)) return executable;
+  const alias = path.join(path.parse(projectRoot).root, 'NexusNXS-Runtime', 'ollama.exe');
+  try {
+    if (fs.realpathSync(path.dirname(alias)).toLowerCase() === fs.realpathSync(path.dirname(executable)).toLowerCase()) return alias;
+  } catch { /* Alias assente: resta il percorso originale. */ }
+  message('Avviso: percorso con parentesi quadre; la GPU AMD potrebbe non essere rilevata (avvia prima npm start per creare l’alias).');
+  return executable;
+}
+
 function resolveDevelopmentModelsDirectory() {
   const selected = resolveOllamaLibrary(Object.keys(MODEL_CATALOG), {
     env: process.env,
@@ -216,7 +229,7 @@ async function main() {
   if (!ready) {
     executable ||= preparePortableRuntime();
     message(`Avvio Ollama con i modelli in ${modelsDirectory}...`);
-    startRuntime(executable);
+    startRuntime(loaderSafeExecutable(executable));
     await waitForRuntime();
     ready = true;
   }

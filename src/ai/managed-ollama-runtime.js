@@ -198,10 +198,16 @@ class ManagedOllamaRuntime {
     try {
       // Grype deve ricevere il percorso reale: su Windows non segue sempre i
       // junction usati per aggirare i limiti del loader ROCm.
-      await this.runtimeSecurityCheck(this.securityExecutablePath, {
+      const audit = await this.runtimeSecurityCheck(this.securityExecutablePath, {
         usage: this.securityUsage, host: this.host, signal: admission.signal,
         onStage: ({ stage, durationMs }) => this.logger?.info('Verifica runtime completata.', { stage, durationMs })
       });
+      // Un esonero revisionato deve restare visibile a ogni ammissione.
+      for (const warning of audit?.warnings || []) {
+        this.logger?.warn('Runtime AI ammesso con avviso di sicurezza.', {
+          code: warning.code, findings: (warning.findings || []).map((finding) => ({ id: finding.id, expiresAt: finding.expiresAt }))
+        });
+      }
     } catch (error) {
       if (admission.signal.aborted || this.disposed || generation !== this.lifecycleGeneration) {
         return { managed: true, available: false, baseUrl: this.baseUrl, reason: 'runtime-stopped' };

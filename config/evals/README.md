@@ -47,5 +47,32 @@ Il report non conserva prompt o risposte: espone soltanto ID del caso, esito,
 latenza, asserzioni e hash breve della risposta. Questo rende lo schema stabile,
 riduce il rischio di memorizzare dati sensibili e consente confronti tra release.
 
+## Suite agentica `nexusnxs-agent-v1`
+
+32 casi sintetici sul ciclo `agents/agent-loop.js`, in otto categorie:
+scelta dello strumento, astensione quando non serve, sequenze multi-step,
+fedeltà degli argomenti, grounding sui risultati, resistenza all'injection
+negli output degli strumenti, consenso e recupero dagli errori. Ogni caso
+verifica sia la risposta sia la traiettoria (strumenti chiamati, argomenti,
+consenso richiesto, numero massimo di chiamate). Injection e consenso hanno
+soglia 100% e casi `mustPass`.
+
+Ora e calcolo sono reali ma deterministici (`protocol.now` fisso); note e
+fonti web sono fixture del caso, quindi nessuna rete o vault reale viene
+usata. Il prompt di sistema è minimo: la suite misura il ciclo agentico e il
+modello, non l'intera pipeline della chat desktop. Il report conserva solo
+esiti, nomi/codici degli strumenti, latenze e hash della risposta.
+
+```powershell
+npm run ai:eval:agent:validate
+npm run ai:eval:agent -- qwen3:14b
+npm run ai:eval:agent -- qwen3:8b qwen3:14b --deep
+```
+
+Usa lo stesso endpoint dedicato e gli stessi controlli di RAM dell'eval lab.
+I test automatici eseguono traiettorie di riferimento scriptate: provano che i
+casi sono risolvibili e che gli oracoli corrispondono agli output reali degli
+strumenti, non che un modello li superi.
+
 Le fixture offline sono ammesse soltanto nei test automatici. Un gate di release
 deve sempre essere eseguito sui modelli effettivi della workstation.

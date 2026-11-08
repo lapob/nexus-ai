@@ -5,14 +5,6 @@ const os = require('node:os');
 const path = require('node:path');
 const { ConversationStore } = require('../src/infrastructure/storage/conversation-store');
 
-test('renderer cache stays bounded with many full artifact revisions while the native history remains complete', () => {
-  const { fitConversationBudget } = require('../src/renderer/systems/ConversationHistory.ts');
-  const record = { id: 'oversized', title: 'Document', turns: Array.from({ length: 6 }, () => ({ role: 'assistant', createdAt: 123, content: 'Answer', artifacts: Array.from({ length: 12 }, () => ({ id: 'a', content: 'x'.repeat(48_000), revisions: Array.from({ length: 6 }, (_, index) => ({ id: `v-${index}`, content: 'y'.repeat(48_000), createdAt: 123, sequence: index + 1 })) })) })) };
-  const before = JSON.stringify(record);
-  for (const budget of [4_500_000, 1000, 20]) assert.ok(JSON.stringify(fitConversationBudget([record], budget)).length <= budget);
-  assert.equal(JSON.stringify(record), before);
-});
-
 test('editable artifact copies preserve the AI result, survive reopening and reject stale or deleted targets', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-artifact-versions-'));
   const filePath = path.join(root, 'conversations.sqlite3');

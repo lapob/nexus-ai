@@ -182,10 +182,7 @@ test('i broker elevati sono confinati al solo eseguibile Supremo firmato', () =>
 });
 
 
-test('i launcher giochi usano soltanto eseguibili del catalogo e nessun comando remoto', () => {
+test('i launcher giochi sono rimossi: nessun eseguibile fuori catalogo e nessun comando remoto', () => {
   const env = { ProgramFiles: 'C:\\Programs', 'ProgramFiles(x86)': 'C:\\Programs x86' };
-  assert.equal(resolveExecutable('steam', { env, exists: () => true }), path.win32.join(env['ProgramFiles(x86)'], 'Steam', 'steam.exe'));
-  assert.equal(resolveExecutable('epic', { env, exists: () => true }), path.win32.join(env['ProgramFiles(x86)'], 'Epic Games', 'Launcher', 'Portal', 'Binaries', 'Win64', 'EpicGamesLauncher.exe'));
-  assert.equal(resolveExecutable('steam', { env, exists: () => false }), '');
-  assert.equal(resolveExecutable('steam; shutdown /s', { env, exists: () => true }), '');
+  for (const id of ['steam', 'epic', 'steam; shutdown /s', 'brave; shutdown /s']) assert.equal(resolveExecutable(id, { env, exists: () => true }), '');
 });

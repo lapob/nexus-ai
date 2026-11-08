@@ -37,9 +37,13 @@ const { assertRuntimeAdmission } = require('../ai/managed-ollama-runtime');
 const { SpeechArbiter } = require('../voice/speech-arbiter');
 const { speculativeInferencePolicy } = require('./speculative-inference-policy');
 const { parseAgentPlan } = require('../agents/action-runtime');
+const { agentModelFor, createNativeToolConsent, createTurnTools, runAgentTurn } = require('./agent-chat');
+const { MemoryConsolidator } = require('./memory-consolidation');
+const { isClockQuestion, TIME_SENSITIVE_PATTERN } = require('../research/research-policy');
+const { createNativeActionApproval } = require('../agents/action-tools');
 const { extractAttachment } = require('./attachments');
 const { decryptArchive, encryptArchive } = require('../infrastructure/storage/encrypted-backup');
-const { explicitMemoryInstruction } = require('../infrastructure/storage/personal-memory-store');
+const { explicitMemoryInstruction, memoryQueryText } = require('../infrastructure/storage/personal-memory-store');
 const { configureContinuityTask, continuityTaskStatus, createTrackedExecFileRunner } = require('../infrastructure/windows/continuity-task');
 const { MODEL_PROFILES, adaptiveModelSelection, isUserSelectableModel, modelSuitability, profileModels, provisioningStatus, publicModelName } = require('../ai/model-manifest');
 const { CHANNELS, parseChatRequest, parseRelativeNotePath, parseClipboardText, parseExternalUrl, parseEmbeddingRequest, parseModelName, parseRequestId, parseAgentInstruction, parseAgentPlanningRequest, parseActionTicket, parseWorkflowId, parseWorkflowCreate, parseWorkflowDecision, parseTrainingExample, parseProvisioningProfile } = require('./ipc-contracts');
@@ -101,7 +105,13 @@ function normalizeLocalFileUrl(value) {
   return path.resolve(fileURLToPath(url)).toLowerCase();
 }
 function isTrustedRendererUrl(senderUrl, trustedRendererUrl) { try { return normalizeLocalFileUrl(senderUrl) === normalizeLocalFileUrl(trustedRendererUrl); } catch { return false; } }
-function buildSystemPrompt(sources, personalization = {}, approvedExamples = [], memories = []) {
+function currentDateDirective(now = new Date()) {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const formatted = new Intl.DateTimeFormat('it-IT', { timeZone, dateStyle: 'full', timeStyle: 'short' }).format(now);
+  return `DATA E ORA CORRENTI: ${formatted} (${timeZone}). Usale per domande su oggi, giorni della settimana, scadenze e calcoli di date. Le tue conoscenze generali possono essere precedenti a questa data: per notizie, prezzi o eventi recenti servono fonti aggiornate.`;
+}
+
+function buildSystemPrompt(sources, personalization = {}, approvedExamples = [], memories = [], now = new Date()) {
   const assistantName = String(personalization.assistantName || 'NEXUSNXS').trim().slice(0, 80) || 'NEXUSNXS';
   const userName = String(personalization.userName || '').trim().slice(0, 80);
   const personalContext = [
@@ -127,12 +137,17 @@ function buildSystemPrompt(sources, personalization = {}, approvedExamples = [],
     `Richiesta: ${String(example.prompt || '').slice(0, 4000)}\nRisposta approvata: ${String(example.response || '').slice(0, 8000)}`,
     12_500
   )).join('\n\n');
+  const provenance = (memory) => memory.sourceKind === 'conversation-summary' ? 'riassunto automatico di una conversazione passata'
+    : memory.confidence === 'inferred' ? 'dedotto automaticamente da una conversazione, da verificare'
+      : 'confermato esplicitamente dall\'utente';
   const remembered = memories.map((memory, index) => formatUntrustedData(
     `RICORDO_${index + 1}`,
-    `${memory.content}\nTipo: ${memory.type}; confermato esplicitamente dall'utente; aggiornato: ${new Date(memory.updatedAt).toISOString()}`,
+    `${memory.content}\nTipo: ${memory.type}; ${provenance(memory)}; aggiornato: ${new Date(memory.updatedAt).toISOString()}`,
     4_000
   )).join('\n\n');
   return `Sei ${assistantName}, il collaboratore digitale personale dell'utente: competente, presente, pragmatico e naturale. Non interpreti il ruolo di un assistente vocale a comandi e non rispondi con formule da centralino. ${userName ? `Ti rivolgi a ${userName}. ` : ''}Lavori al suo fianco: comprendi l'obiettivo reale dietro la richiesta, colleghi il contesto della conversazione, anticipi il prossimo problema utile e proponi una decisione concreta quando serve. Mantieni però onestà epistemica: non fingere emozioni, esperienze, accessi o azioni che non possiedi.
+
+${currentDateDirective(now)}
 
 Puoi aiutare con cultura generale, studio, scrittura, programmazione, creatività, organizzazione, scienza, tecnologia e attività quotidiane: la cybersecurity non ha alcuna precedenza sulle altre materie. Rispondi nella lingua dell'utente con tono umano, diretto e proporzionato. Per una domanda semplice rispondi semplicemente. Per lavoro tecnico ragiona sull'intero problema, produci codice completo e utilizzabile, segnala assunzioni e rischi soltanto quando cambiano davvero il risultato. Fai domande solo se manca una scelta indispensabile; altrimenti adotta un'ipotesi ragionevole e dichiarala brevemente. Non ripetere la richiesta, non usare frasi servili, non riempire la risposta di intestazioni e non chiudere sempre con offerte generiche.
 
@@ -151,7 +166,7 @@ ${personalContext || 'Nessuna preferenza personale configurata.'}
 
 MEMORIA PERSONALE VERIFICABILE:
 ${remembered || 'Nessun ricordo pertinente disponibile.'}
-I ricordi sono dichiarazioni esplicite dell'utente, non verità universali. Usali solo se pertinenti, privilegia sempre il messaggio più recente e chiedi conferma prima di usarli per azioni irreversibili. Non inventare ricordi mancanti.
+I ricordi confermati sono dichiarazioni esplicite dell'utente; quelli automatici possono essere imprecisi o superati. Nessuno è una verità universale. Usali solo se pertinenti, privilegia sempre il messaggio più recente e chiedi conferma prima di usarli per azioni irreversibili. Non inventare ricordi mancanti.
 
 ESEMPI DI RISPOSTA APPROVATI DALL'UTENTE:
 ${examples || 'Nessun esempio pertinente disponibile.'}
@@ -327,6 +342,8 @@ function publicSettings(settings) {
     embeddingModel: source.embeddingModel || null,
     autoSelectModel: source.autoSelectModel !== false,
     actionApprovalMode: source.actionApprovalMode || 'dangerous-only',
+    agentMode: source.agentMode === true,
+    memoryMode: source.memoryMode === 'automatic' ? 'automatic' : 'explicit',
     temperature: source.temperature,
     personalization: source.personalization
   };
@@ -632,6 +649,10 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     try { const parsed = JSON.parse(text); return { valid: parsed.valid === true, issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 8).map(String) : [] }; }
     catch { return { valid: true, issues: ['review-unavailable'] }; }
   };
+  // Memoria automatica opt-in: solo client privato, solo dati locali.
+  const memoryConsolidator = memoryStore && distributionMode !== 'public'
+    ? new MemoryConsolidator({ aiRuntime, memoryStore, conversationStore, getSettings, resolveSettings: () => adaptiveSettings(), ensureRuntime, logger })
+    : null;
   const responseCacheNamespace = (settings) => createHash('sha256').update(JSON.stringify({
     policyRevision: 'intelligence-2026-08-22-v2',
     fastModel: settings.fastModel || settings.chatModel || 'none',
@@ -642,11 +663,15 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     personalization: settings.personalization || {},
     temperature: settings.temperature
   })).digest('hex').slice(0, 32);
+  // La chiave della cache non contiene la data: una risposta su «oggi» o su un
+  // fatto recente servita domani sarebbe sbagliata. Queste domande non si memorizzano.
   const canUseResponseCache = ({ question, mode, history, attachmentIds }) => mode === 'fast'
     && attachmentIds.length === 0
     && history.length === 0
     && !readWorkspace().active
-    && !explicitMemoryInstruction(question);
+    && !explicitMemoryInstruction(question)
+    && !isClockQuestion(question)
+    && !TIME_SENSITIVE_PATTERN.test(question);
   const resolveAttachmentContext = (attachmentIds, senderId) => {
     const now = Date.now();
     for (const [id, attachment] of attachmentStore) {
@@ -706,6 +731,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     // L'upsert rende sicuri retry e continuazioni della stessa richiesta.
     applyExplicitMemoryInstruction(question, null);
     let sources = getIndex().search(question, mode === 'deep' ? runtimeConfig.retrieval.deepInitialLimit : runtimeConfig.retrieval.quickLimit); let planningNote = '';
+    let memoryQueryVector = null;
     // Sul profilo Lite il ranking lessicale è immediato e sufficientemente
     // preciso per il turno rapido. Caricare anche l'embedding model può
     // espellere il modello chat dalla RAM e moltiplicare il tempo al primo token.
@@ -720,6 +746,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
           ...missing.map((chunk) => `${chunk.title}\n${chunk.heading}\n${chunk.text}`.slice(0, 12000))
         ], { model: settings.embeddingModel, signal });
         assertActive();
+        memoryQueryVector = embedded.vectors[0] || null;
         if (missing.length) {
           getIndex().setEmbeddings(missing.map((chunk, index) => ({
             relativePath: chunk.relativePath,
@@ -772,7 +799,19 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       ? `${question}\n\n${formatUntrustedData('MATERIALI_ALLEGATI', attachmentContext, 480_000)}`
       : question;
     const approvedExamples = trainingStore.findRelevant(question, { limit: mode === 'deep' ? 3 : 2 });
-    const memories = memoryStore?.findRelevant(question, { limit: mode === 'deep' ? 6 : 4 }) || [];
+    // Memoria automatica: retrieval semantico dei ricordi, con lo stesso vettore
+    // del RAG quando disponibile. Mai su profilo Lite, mai bloccante.
+    if (!memoryQueryVector && memoryStore && settings.memoryMode === 'automatic' && settings.embeddingModel && runtimeTuning.tier !== 'lite' && !publicGuest) {
+      try {
+        await ensureRuntime(settings);
+        memoryQueryVector = (await aiRuntime.embed(memoryQueryText(question), { model: settings.embeddingModel, signal })).vectors?.[0] || null;
+        assertActive();
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        logger.warn('Ricerca semantica dei ricordi non disponibile; uso ranking lessicale.', { error });
+      }
+    }
+    const memories = memoryStore?.findRelevant(question, { limit: mode === 'deep' ? 6 : 4, queryVector: memoryQueryVector, embeddingModel: settings.embeddingModel }) || [];
     const security = analyzeUntrustedContent([
       attachmentContext,
       ...sources.map((source) => source.text),
@@ -880,7 +919,13 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
   });
   ipcMain.handle(CHANNELS.health, async (event) => { assertTrustedSender(event); const settings = getSettings(); await ensureRuntime(settings); return aiRuntime.health(); });
   ipcMain.handle(CHANNELS.historyList, (event) => { assertTrustedSender(event); return conversationStore.list(); });
-  ipcMain.handle(CHANNELS.historySave, (event, record) => { assertTrustedSender(event); return conversationStore.save(record); });
+  ipcMain.handle(CHANNELS.historySave, (event, record) => {
+    assertTrustedSender(event);
+    const saved = conversationStore.save(record);
+    // Consolidamento differito e non bloccante; disattivo se memoryMode è 'explicit'.
+    try { memoryConsolidator?.schedule(saved.id); } catch (error) { logger.warn('Consolidamento memoria non programmato.', { error }); }
+    return saved;
+  });
   ipcMain.handle(CHANNELS.historyReviseArtifact, (event, payload) => { assertTrustedSender(event); return conversationStore.reviseArtifact(payload); });
   ipcMain.handle(CHANNELS.historyRemove, (event, id) => { assertTrustedSender(event); return conversationStore.remove(id); });
   ipcMain.handle(CHANNELS.historyImport, (event, records) => { assertTrustedSender(event); return conversationStore.import(records); });
@@ -1740,6 +1785,60 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
         : inferencePolicy(settings, mode).candidateModel;
       emit(event, { type: 'phase', requestId, phase: { step: 'execute', label: mode === 'deep' ? 'Ragiono e costruisco una soluzione completa' : 'Formulo una risposta chiara' } });
 
+      // Modalità agente (opt-in): ciclo multi-step con strumenti tipizzati.
+      // Un guasto non annullato ripiega sul percorso ordinario qui sotto.
+      let providerTools = false;
+      try { providerTools = aiRuntime.getCapabilities()?.tools === true; } catch { providerTools = false; }
+      const agentModel = agentModelFor({ settings, selectedModel, distributionMode, attachmentCount: attachmentIds.length, providerTools });
+      if (agentModel) {
+        try {
+          inferenceStartedAt = performance.now();
+          const tools = createTurnTools({
+            getIndex, aiRuntime, embeddingModel: settings.embeddingModel, webResearchService, memoryStore, actionRuntime,
+            getApprovalMode: () => getSettings().actionApprovalMode || 'dangerous-only',
+            requestActionApproval: createNativeActionApproval({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) })
+          });
+          const outcome = await runAgentTurn({
+            aiRuntime, logger, requestId, messages: prepared.messages, model: agentModel,
+            // nexusnxs-agent-v1 su qwen3:14b: thinking 93.75% con mediana 87s
+            // contro 96.88% e 16s senza. Nel ciclo agentico resta disattivato.
+            mode: mode === 'deep' ? 'deep' : 'quick', think: false, temperature: settings.temperature, signal: controller.signal,
+            requestOptions: { maxTokens: mode === 'deep' ? runtimeTuning.deepTokens : runtimeTuning.quickTokens, numCtx: runtimeTuning.contextTokens, keepAlive: runtimeTuning.keepAlive, timeoutMs: requestTimeout(mode) },
+            tools,
+            requestConsent: createNativeToolConsent({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) }),
+            onPhase: (label) => emit(event, { type: 'phase', requestId, phase: { step: 'execute', label } })
+          });
+          throwIfRequestAborted(controller.signal);
+          inferenceCompletedAt = performance.now();
+          const citations = [...prepared.publicSources, ...outcome.sources];
+          if (outcome.sources.length) emit(event, { type: 'sources', requestId, sources: citations });
+          const secured = secureModelOutput(outcome.content, prepared.security);
+          if (secured.changed) logger.warn('Output agente oscurato dal confine di sicurezza.', { requestId, issues: secured.issues });
+          const grounded = enforcePublicCitationUrls(secured.text, citations);
+          const answer = (citations.length ? ensurePublicCitation(grounded.text, citations).text : grounded.text).trim();
+          if (answer) {
+            const result = {
+              requestId, model: outcome.model || agentModel, message: { role: 'assistant', content: answer }, finishReason: 'stop',
+              usage: outcome.usage, sources: citations,
+              ...(outcome.artifacts.length ? { artifacts: outcome.artifacts } : {}),
+              agent: { steps: outcome.steps, stopReason: outcome.stopReason, tools: outcome.toolRuns, receipts: outcome.receipts.length }
+            };
+            emit(event, { type: 'start', requestId, metadata: { requestId, mode: 'agent', model: result.model } });
+            firstTokenAt = performance.now();
+            emittedToken = true;
+            emit(event, { type: 'token', requestId, token: answer });
+            terminal = true;
+            emit(event, { type: 'complete', requestId, result });
+            recordPerformance({ success: true, modelClass: agentModel === settings.chatModel ? 'primary' : 'fast' });
+            return result;
+          }
+          logger.warn('Turno agentico senza testo finale; uso il percorso ordinario.', { requestId });
+        } catch (agentError) {
+          if (controller.signal.aborted || normalizeAIError(agentError, 'ollama').code === AI_ERROR_CODES.REQUEST_CANCELLED) throw agentError;
+          logger.warn('Turno agentico non riuscito; uso il percorso ordinario.', { requestId, error: agentError });
+        }
+      }
+
       let thinkingPhasePublished = false;
       const streamWithModel = (model, messages = prepared.messages, publishCompletion = true, providerRequestId = requestId, continuationPublisher = null) => aiRuntime.streamChat({
         requestId: providerRequestId,
@@ -2253,6 +2352,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     remoteGateway.onWorkflowStatus = null;
     remoteGateway.onWorkflowList = null;
     shutdownPromise = Promise.allSettled([
+      memoryConsolidator?.shutdown(),
       uiCommandRunner.shutdown(),
       workflowRuntime.shutdown(),
       actionRuntime.shutdown(),
@@ -2273,6 +2373,6 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     warmupAI
   };
 }
-module.exports = { agentPlanSchema, alignRuntimeEndpoint, buildAgentPlannerPrompt, buildSystemPrompt, cancelTrackedRequest, directApplicationPlan, isTrustedRendererUrl, normalizeLocalFileUrl, publicSettings, publicSourceArtifacts, registerIpcHandlers, remoteActionCapabilities, responseLanguageDirective, startupCapability, throwIfRequestAborted, windowsStartupEnabled };
+module.exports = { agentPlanSchema, alignRuntimeEndpoint, buildAgentPlannerPrompt, buildSystemPrompt, currentDateDirective, cancelTrackedRequest, directApplicationPlan, isTrustedRendererUrl, normalizeLocalFileUrl, publicSettings, publicSourceArtifacts, registerIpcHandlers, remoteActionCapabilities, responseLanguageDirective, startupCapability, throwIfRequestAborted, windowsStartupEnabled };
 
 // #endregion

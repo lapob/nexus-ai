@@ -17,7 +17,7 @@ const {
   presenceLaunchArguments,
   processLockState
 } = require('../src/infrastructure/electron/desktop-launcher');
-const { CHATGPT_WINDOWS_APP_ID, activateFromWakeWord, closeChatGptDesktop, isChatGptDesktopRunning, openChatGptDesktop, presenceCapabilities } = require('../src/application/presence-bootstrap');
+const { CLAUDE_WINDOWS_APP_ID, CLAUDE_DESKTOP_PROCESS_QUERY, activateFromWakeWord, closeClaudeDesktop, isClaudeDesktopRunning, openClaudeDesktop, presenceCapabilities } = require('../src/application/presence-bootstrap');
 const { startupCapability } = require('../src/application/register-ipc');
 const { continuityTaskScript } = require('../src/infrastructure/windows/continuity-task');
 
@@ -191,9 +191,9 @@ test('lo stato lock non espone token e distingue processi vivi', () => {
   assert.deepEqual(processLockState(fake, { processAlive: () => false }), { running: false, pid: null });
 });
 
-test('il comando ChatGPT apre prima l app desktop Windows', async () => {
+test('il comando Claude apre prima l app desktop Windows', async () => {
   const calls = [];
-  const result = await openChatGptDesktop({
+  const result = await openClaudeDesktop({
     platform: 'win32',
     spawnProcess: (file, args, options) => {
       calls.push({ file, args, options });
@@ -206,64 +206,62 @@ test('il comando ChatGPT apre prima l app desktop Windows', async () => {
   });
   assert.equal(result.target, 'desktop-app');
   assert.equal(calls[0].file, 'explorer.exe');
-  assert.deepEqual(calls[0].args, [`shell:AppsFolder\\${CHATGPT_WINDOWS_APP_ID}`]);
+  assert.deepEqual(calls[0].args, [`shell:AppsFolder\\${CLAUDE_WINDOWS_APP_ID}`]);
 });
 
-test('il comando ChatGPT usa il browser del PC solo come fallback', async () => {
+test('il comando Claude usa il browser del PC solo come fallback', async () => {
   const opened = [];
-  const result = await openChatGptDesktop({
+  const result = await openClaudeDesktop({
     platform: 'win32',
     spawnProcess: () => { throw new Error('app non disponibile'); },
     openExternal: async (url) => opened.push(url)
   });
   assert.equal(result.target, 'desktop-browser');
-  assert.deepEqual(opened, ['https://chatgpt.com']);
+  assert.deepEqual(opened, ['https://claude.ai']);
 });
 
-test('la Presence distingue ChatGPT già aperto senza shell o finestre visibili', async () => {
+test('la Presence riconosce soltanto Claude Desktop, mai Claude Code, con una query fissa e nascosta', async () => {
   const calls = [];
-  const running = await isChatGptDesktopRunning({
+  const running = await isClaudeDesktopRunning({
     platform: 'win32',
-    listProcesses: async (file, args, options) => {
-      calls.push({ file, args, options });
-      return { stdout: '"ChatGPT.exe","8120","Console","1","164.000 K"' };
-    }
+    listProcesses: async (file, args, options) => { calls.push({ file, args, options }); return { stdout: '8120\r\n9001\r\n' }; }
   });
   assert.equal(running, true);
-  assert.equal(calls[0].file, 'tasklist.exe');
+  assert.equal(calls[0].file, 'powershell.exe');
+  assert.equal(calls[0].args.at(-1), CLAUDE_DESKTOP_PROCESS_QUERY);
+  assert.match(CLAUDE_DESKTOP_PROCESS_QUERY, /\\WindowsApps\\Claude_\*\\app\\Claude\.exe/);
   assert.equal(calls[0].options.windowsHide, true);
-  assert.equal(await isChatGptDesktopRunning({ platform: 'linux' }), false);
+  assert.equal(await isClaudeDesktopRunning({ platform: 'win32', listProcesses: async () => ({ stdout: '' }) }), false);
+  assert.equal(await isClaudeDesktopRunning({ platform: 'win32', listProcesses: async () => ({ stdout: 'x; rm -rf' }) }), false);
+  assert.equal(await isClaudeDesktopRunning({ platform: 'linux' }), false);
 });
 
-test('la chiusura ChatGPT usa soltanto il nome processo statico e resta nascosta', async () => {
+const desktopProcesses = async () => ({ stdout: '8120\r\n9001' });
+
+test('la chiusura Claude termina soltanto i PID del pacchetto Desktop, mai per nome immagine', async () => {
   const calls = [];
-  const result = await closeChatGptDesktop({
-    platform: 'win32',
-    terminateProcess: async (file, args, options) => {
-      calls.push({ file, args, options });
-      return { stdout: 'SUCCESS' };
-    }
+  const result = await closeClaudeDesktop({
+    platform: 'win32', listProcesses: desktopProcesses,
+    terminateProcess: async (file, args, options) => { calls.push({ file, args, options }); return { stdout: 'SUCCESS' }; }
   });
   assert.equal(result.closed, true);
   assert.equal(calls[0].file, 'taskkill.exe');
-  assert.deepEqual(calls[0].args, ['/IM', 'ChatGPT.exe', '/T']);
+  assert.deepEqual(calls[0].args, ['/PID', '8120', '/PID', '9001', '/T']);
+  assert.ok(!calls[0].args.includes('/IM'));
   assert.equal(calls[0].options.windowsHide, true);
 });
 
-test('la chiusura forzata ChatGPT resta confinata allo stesso nome statico', async () => {
-  const calls = [];
-  await closeChatGptDesktop({
-    platform: 'win32',
-    force: true,
-    terminateProcess: async (file, args) => { calls.push({ file, args }); return { stdout: 'SUCCESS' }; }
-  });
-  assert.deepEqual(calls, [{ file: 'taskkill.exe', args: ['/IM', 'ChatGPT.exe', '/T', '/F'] }]);
+test('senza processi Desktop la chiusura non tocca nulla', async () => {
+  let terminated = false;
+  const result = await closeClaudeDesktop({ platform: 'win32', listProcesses: async () => ({ stdout: '' }), terminateProcess: async () => { terminated = true; } });
+  assert.equal(result.alreadyClosed, true);
+  assert.equal(terminated, false);
 });
 
-test('la chiusura ChatGPT passa automaticamente al fallback se WM_CLOSE viene rifiutato', async () => {
+test('la chiusura Claude passa al fallback forzato sugli stessi PID se WM_CLOSE viene rifiutato', async () => {
   const calls = [];
-  const result = await closeChatGptDesktop({
-    platform: 'win32',
+  const result = await closeClaudeDesktop({
+    platform: 'win32', listProcesses: desktopProcesses,
     terminateProcess: async (file, args) => {
       calls.push({ file, args });
       if (!args.includes('/F')) throw Object.assign(new Error('Access denied'), { stderr: 'Access denied' });
@@ -273,8 +271,8 @@ test('la chiusura ChatGPT passa automaticamente al fallback se WM_CLOSE viene ri
   assert.equal(result.closed, true);
   assert.equal(result.forced, true);
   assert.deepEqual(calls.map((entry) => entry.args), [
-    ['/IM', 'ChatGPT.exe', '/T'],
-    ['/IM', 'ChatGPT.exe', '/T', '/F']
+    ['/PID', '8120', '/PID', '9001', '/T'],
+    ['/PID', '8120', '/PID', '9001', '/T', '/F']
   ]);
 });
 

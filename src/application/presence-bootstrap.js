@@ -22,7 +22,7 @@ const { createDesktopStatusSampler } = require('./desktop-status-sampler');
 const PRESENCE_LOCK = 'system-presence.lock';
 const UI_LOCK = 'desktop-ui.lock';
 const AMBIENT_UI_LOCK = 'ambient-voice-ui.lock';
-const CHATGPT_WINDOWS_APP_ID = 'OpenAI.Codex_2p2nqsd0c76g0!App';
+const CLAUDE_WINDOWS_APP_ID = 'Claude_pzs8sxrjxfjjc!Claude';
 const execFileAsync = promisify(execFile);
 
 // #region 01 — Contratto presenza
@@ -41,7 +41,7 @@ function presenceCapabilities({ platform = process.platform, shortcutRegistered 
   });
 }
 
-async function openChatGptDesktop({
+async function openClaudeDesktop({
   platform = process.platform,
   spawnProcess = spawn,
   openExternal = shell.openExternal
@@ -51,7 +51,7 @@ async function openChatGptDesktop({
       await new Promise((resolve, reject) => {
         const child = spawnProcess(
           'explorer.exe',
-          [`shell:AppsFolder\\${CHATGPT_WINDOWS_APP_ID}`],
+          [`shell:AppsFolder\\${CLAUDE_WINDOWS_APP_ID}`],
           { detached: true, stdio: 'ignore', windowsHide: true }
         );
         child.once('spawn', resolve);
@@ -61,26 +61,37 @@ async function openChatGptDesktop({
       return Object.freeze({ target: 'desktop-app' });
     } catch {}
   }
-  await openExternal('https://chatgpt.com');
+  await openExternal('https://claude.ai');
   return Object.freeze({ target: 'desktop-browser' });
 }
 
-async function isChatGptDesktopRunning({ platform = process.platform, listProcesses = execFileAsync } = {}) {
-  if (platform !== 'win32') return false;
+// Claude Desktop (pacchetto Store) e Claude Code condividono il nome "claude.exe":
+// chiudere per nome terminerebbe anche le sessioni di Claude Code. Si riconoscono
+// quindi soltanto i processi dell'eseguibile del pacchetto, con una query fissa.
+const CLAUDE_DESKTOP_PROCESS_QUERY = "Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | Where-Object { $_.ExecutablePath -like '*\\WindowsApps\\Claude_*\\app\\Claude.exe' } | ForEach-Object { $_.ProcessId }";
+
+async function claudeDesktopProcessIds({ platform = process.platform, listProcesses = execFileAsync } = {}) {
+  if (platform !== 'win32') return [];
   try {
-    const { stdout = '' } = await listProcesses('tasklist.exe', ['/FO', 'CSV', '/NH', '/FI', 'IMAGENAME eq ChatGPT.exe'], {
-      windowsHide: true, timeout: 1_500, encoding: 'utf8'
+    const { stdout = '' } = await listProcesses('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', CLAUDE_DESKTOP_PROCESS_QUERY], {
+      windowsHide: true, timeout: 4_000, encoding: 'utf8'
     });
-    return /"ChatGPT\.exe"/i.test(String(stdout));
-  } catch { return false; }
+    return [...new Set(String(stdout).split(/\s+/).filter((value) => /^[1-9]\d{0,9}$/.test(value)))];
+  } catch { return []; }
 }
 
-async function closeChatGptDesktop({ platform = process.platform, terminateProcess = execFileAsync, force = false } = {}) {
+async function isClaudeDesktopRunning(options = {}) {
+  return (await claudeDesktopProcessIds(options)).length > 0;
+}
+
+async function closeClaudeDesktop({ platform = process.platform, listProcesses = execFileAsync, terminateProcess = execFileAsync, force = false } = {}) {
   if (platform !== 'win32') {
-    throw Object.assign(new Error('Chiusura ChatGPT disponibile solo su Windows.'), { code: 'CHATGPT_CLOSE_UNSUPPORTED' });
+    throw Object.assign(new Error('Chiusura Claude disponibile solo su Windows.'), { code: 'CLAUDE_CLOSE_UNSUPPORTED' });
   }
+  const ids = await claudeDesktopProcessIds({ platform, listProcesses });
+  if (!ids.length) return Object.freeze({ closed: false, alreadyClosed: true });
   try {
-    await terminateProcess('taskkill.exe', ['/IM', 'ChatGPT.exe', '/T', ...(force ? ['/F'] : [])], {
+    await terminateProcess('taskkill.exe', [...ids.flatMap((id) => ['/PID', id]), '/T', ...(force ? ['/F'] : [])], {
       windowsHide: true, timeout: 4_000, encoding: 'utf8'
     });
     return Object.freeze({ closed: true, forced: force });
@@ -91,12 +102,12 @@ async function closeChatGptDesktop({ platform = process.platform, terminateProce
     }
     if (!force) {
       // L'app Microsoft Store può rifiutare WM_CLOSE per uno dei processi
-      // sandbox. Il fallback resta confinato al nome statico e non riceve
-      // argomenti liberi dal client remoto.
-      return closeChatGptDesktop({ platform, terminateProcess, force: true });
+      // sandbox. Il fallback resta confinato ai PID del pacchetto Claude e non
+      // riceve argomenti liberi dal client remoto.
+      return closeClaudeDesktop({ platform, listProcesses, terminateProcess, force: true });
     }
-    throw Object.assign(new Error('ChatGPT non e stato chiuso in modo verificabile.'), {
-      code: 'CHATGPT_CLOSE_FAILED', cause: error
+    throw Object.assign(new Error('Claude non e stato chiuso in modo verificabile.'), {
+      code: 'CLAUDE_CLOSE_FAILED', cause: error
     });
   }
 }
@@ -152,17 +163,17 @@ async function bootstrapPresence({ env = process.env } = {}) {
   let syncQueued = false;
   let shortcutRegistered = false;
   let stopping = false;
-  let chatGptOpen = null;
+  let claudeOpen = null;
   let applications = [];
   const desktopStatus = createDesktopStatusSampler({
-    initial: { chatGptOpen: null, applications: [], foregroundApplicationId: '' },
+    initial: { claudeOpen: null, applications: [], foregroundApplicationId: '' },
     load: async () => {
-      const [chatGptOpen, applications, foreground] = await Promise.all([
-        isChatGptDesktopRunning(), desktopApplicationStatus({ env }), foregroundDesktopApplication({ env })
+      const [claudeOpen, applications, foreground] = await Promise.all([
+        isClaudeDesktopRunning(), desktopApplicationStatus({ env }), foregroundDesktopApplication({ env })
       ]);
-      return { chatGptOpen, applications, foregroundApplicationId: foreground?.id || '' };
+      return { claudeOpen, applications, foregroundApplicationId: foreground?.id || '' };
     },
-    onUpdate: value => { chatGptOpen = value.chatGptOpen; applications = value.applications; },
+    onUpdate: value => { claudeOpen = value.claudeOpen; applications = value.applications; },
     onError: error => logger.debug?.('Desktop status refresh unavailable.', { code: error?.code })
   });
   let backgroundActivity = 'idle';
@@ -309,38 +320,38 @@ async function bootstrapPresence({ env = process.env } = {}) {
         if ((await closeFullUi()).closed) return;
         throw Object.assign(new Error('NexusNXS non si e chiusa in tempo.'), { code: 'PRESENCE_UI_STOP_TIMEOUT' });
       }
-      if (command.action === 'open-chatgpt') {
-        await openChatGptDesktop();
+      if (command.action === 'open-claude') {
+        await openClaudeDesktop();
         const deadline = Date.now() + 4_000;
         do {
-          chatGptOpen = await isChatGptDesktopRunning();
-          if (chatGptOpen) break;
+          claudeOpen = await isClaudeDesktopRunning();
+          if (claudeOpen) break;
           await new Promise((resolve) => setTimeout(resolve, 100));
         } while (Date.now() < deadline);
-        if (!chatGptOpen) throw Object.assign(new Error('ChatGPT non si e aperta in tempo.'), { code: 'CHATGPT_START_TIMEOUT' });
+        if (!claudeOpen) throw Object.assign(new Error('Claude non si e aperta in tempo.'), { code: 'CLAUDE_START_TIMEOUT' });
         return;
       }
-      if (command.action === 'close-chatgpt') {
-        await closeChatGptDesktop();
+      if (command.action === 'close-claude') {
+        await closeClaudeDesktop();
         let deadline = Date.now() + 1_500;
         do {
-          chatGptOpen = await isChatGptDesktopRunning();
-          if (!chatGptOpen) break;
+          claudeOpen = await isClaudeDesktopRunning();
+          if (!claudeOpen) break;
           await new Promise((resolve) => setTimeout(resolve, 100));
         } while (Date.now() < deadline);
         // La versione Store può accettare WM_CLOSE ma mantenere un processo
         // in background. Dopo la finestra ordinata usa il fallback forzato,
-        // sempre confinato al nome statico ChatGPT.exe già autorizzato.
-        if (chatGptOpen) {
-          await closeChatGptDesktop({ force: true });
+        // sempre confinato ai PID dell'eseguibile del pacchetto Claude Desktop.
+        if (claudeOpen) {
+          await closeClaudeDesktop({ force: true });
           deadline = Date.now() + 4_000;
           do {
-            chatGptOpen = await isChatGptDesktopRunning();
-            if (!chatGptOpen) break;
+            claudeOpen = await isClaudeDesktopRunning();
+            if (!claudeOpen) break;
             await new Promise((resolve) => setTimeout(resolve, 100));
           } while (Date.now() < deadline);
         }
-        if (chatGptOpen) throw Object.assign(new Error('ChatGPT non si e chiusa in tempo.'), { code: 'CHATGPT_STOP_TIMEOUT' });
+        if (claudeOpen) throw Object.assign(new Error('Claude non si e chiusa in tempo.'), { code: 'CLAUDE_STOP_TIMEOUT' });
         return;
       }
       if (command.action === 'open-application') {
@@ -364,7 +375,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
         return;
       }
       throw Object.assign(new Error('Azione Presence non consentita.'), { code: 'PRESENCE_ACTION_NOT_ALLOWED' });
-      } finally { desktopStatus.patch({ chatGptOpen, applications }); }
+      } finally { desktopStatus.patch({ claudeOpen, applications }); }
     },
     protectSecret: bridgeSecretProtection.protectSecret
   });
@@ -440,15 +451,16 @@ async function bootstrapPresence({ env = process.env } = {}) {
 }
 
 module.exports = {
-  CHATGPT_WINDOWS_APP_ID,
+  CLAUDE_WINDOWS_APP_ID,
+  CLAUDE_DESKTOP_PROCESS_QUERY,
   AMBIENT_UI_LOCK,
   PRESENCE_LOCK,
   UI_LOCK,
   activateFromWakeWord,
   bootstrapPresence,
-  isChatGptDesktopRunning,
-  openChatGptDesktop,
-  closeChatGptDesktop,
+  isClaudeDesktopRunning,
+  openClaudeDesktop,
+  closeClaudeDesktop,
   presenceCapabilities,
 };
 

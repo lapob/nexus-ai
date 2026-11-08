@@ -16,11 +16,21 @@ const PRIVATE_LITERAL_PATTERN = /(?:\b[A-Z]:\\|\/(?:Users|home)\/|\b(?:api[_ -]?
 const PERSONAL_PLANNING_PATTERN = /\bpriorit[aà](?=\s|[,.!?;:]|$)|\b(?:priorities|to-do|(?:mia|tua|my|your)\s+agenda|(?:mia|tua)\s+giornata|(?:my|your)\s+day)\b/iu;
 const PUBLIC_FACT_PATTERN = /\b(?:meteo|tempo\s+far[aà]|notizie|news|prezz\w*|quotaz\w*|partita|elezion\w*|classifica|version\w*|release|legge|normativ\w*|regolament\w*|presidente|ceo|weather|forecast|price\w*|stock\w*|election\w*|standings|law|regulation\w*|event\w*|scioper\w*|strike\w*|traffico|traffic)\b/iu;
 
+// Data, ora e conteggi di giorni vengono dall'orologio di sistema, non dal web.
+// Prima «che giorno è oggi?» richiedeva la ricerca e, con SearXNG spento,
+// produceva una risposta "non verificabile" senza consultare il modello.
+const CLOCK_QUESTION_PATTERN = /\b(?:che\s+(?:giorno|data|ore|ora)\b|giorno\s+della\s+settimana|data\s+(?:di\s+)?oggi|oggi\s+che\s+giorno|quanti\s+giorni\s+(?:mancano|ci\s+sono|sono\s+passati)|tra\s+quanti\s+giorni|what\s+(?:day|date|time)\b|today['’]?s\s+date|day\s+of\s+the\s+week|how\s+many\s+days\s+(?:until|till|since|left))/iu;
+
+function isClockQuestion(question = '') {
+  const text = String(question || '');
+  return CLOCK_QUESTION_PATTERN.test(text) && !PUBLIC_FACT_PATTERN.test(text) && !EXPLICIT_WEB_PATTERN.test(text);
+}
+
 function researchIntent(question = '') {
   const text = String(question || '').trim();
   return {
     explicit: EXPLICIT_WEB_PATTERN.test(text),
-    timeSensitive: TIME_SENSITIVE_PATTERN.test(text) && !(PERSONAL_PLANNING_PATTERN.test(text) && !PUBLIC_FACT_PATTERN.test(text)),
+    timeSensitive: TIME_SENSITIVE_PATTERN.test(text) && !isClockQuestion(text) && !(PERSONAL_PLANNING_PATTERN.test(text) && !PUBLIC_FACT_PATTERN.test(text)),
     research: RESEARCH_PATTERN.test(text),
     localOperation: LOCAL_OPERATION_PATTERN.test(text),
     containsPrivateLiteral: PRIVATE_LITERAL_PATTERN.test(text)
@@ -52,6 +62,8 @@ function webResearchPolicy({ question, mode = 'fast', hasAttachment = false, wor
 }
 
 module.exports = {
+  CLOCK_QUESTION_PATTERN,
+  isClockQuestion,
   EXPLICIT_WEB_PATTERN,
   PRIVATE_LITERAL_PATTERN,
   TIME_SENSITIVE_PATTERN,

@@ -162,16 +162,16 @@ const METRICS_EXPRESSION = `new Promise((resolve) => {
       core: rect(core),
       interactiveCount: interactive.length,
       publicUi: location.hostname.startsWith('ai.') ? {
-        ready: document.documentElement.dataset.nxsBoot === 'ready',
-        fontReady: document.fonts.check('16px Inter'),
-        heading: document.querySelector('h1')?.textContent.trim() || '',
-        assembled: globalThis.nexusCosmicMetrics?.renderer?.().arrival === 1,
-        controls: ['core', 'attachment', 'keyboard', 'profileSettings', 'download'].map(id => {
-          const element = document.getElementById(id), icon = element?.querySelector('svg');
+        ready: !!document.querySelector('.app .stage .composer'),
+        fontReady: document.fonts.check('16px "Inter Variable"'),
+        heading: document.querySelector('.welcome h2, .topbar .title')?.textContent.trim() || '',
+        assembled: !!document.querySelector('canvas.core')?.dataset.backend,
+        controls: Object.entries({ core: 'canvas.core', attachment: '[aria-label="Allega file"]', command: '[aria-label^="Comandi"]', send: 'button.send' }).map(([id, selector]) => {
+          const element = document.querySelector(selector), icon = element?.querySelector('svg');
           const box = element?.getBoundingClientRect();
-          return { id, label: element?.getAttribute('aria-label')?.trim() || '',
+          return { id, label: id === 'core' ? 'core' : element?.getAttribute('aria-label')?.trim() || '',
             visible: !!box && box.width >= 32 && box.height >= 32 && getComputedStyle(element).visibility !== 'hidden' && getComputedStyle(element).display !== 'none',
-            iconReady: id === 'core' ? !!document.querySelector('#coreCanvas') && globalThis.nexusCosmicMetrics?.renderer?.().draws > 0 : (icon?.getBoundingClientRect().width || 0) >= 16 };
+            iconReady: id === 'core' ? !!element?.dataset.backend : (icon?.getBoundingClientRect().width || 0) >= 16 };
         })
       } : null,
       undersizedTargets: interactive.filter((element) => { const value = element.getBoundingClientRect(); return value.width < 32 || value.height < 32; }).length,
@@ -207,8 +207,8 @@ async function capture(entry) {
     if (entry.id.startsWith('ai-')) await evaluateWhenReady(client, `new Promise((resolve, reject) => {
       const deadline = performance.now() + 30000;
       function check() {
-        if (document.documentElement.dataset.nxsBoot === 'ready' && document.fonts.check('16px Inter')
-          && globalThis.nexusCosmicMetrics?.renderer?.().arrival === 1) return resolve(true);
+        if (document.querySelector('.app .stage .composer') && document.fonts.check('16px "Inter Variable"')
+          && document.querySelector('canvas.core')?.dataset.backend) return resolve(true);
         if (performance.now() >= deadline) return reject(new Error('Interfaccia e Core non pronti per il confronto visivo'));
         setTimeout(check, 50);
       }
@@ -257,7 +257,7 @@ function validate(entry, metrics) {
     if (!metrics.core || metrics.core.width <= 0 || metrics.core.height <= 0) failures.push('Core non visibile');
     const ui = metrics.publicUi;
     if (!ui?.ready || !ui.fontReady || !ui.assembled || !ui.heading) failures.push('interfaccia incompleta');
-    for (const id of ['core', 'attachment', 'keyboard', 'profileSettings', 'download']) {
+    for (const id of ['core', 'attachment', 'command', 'send']) {
       const control = ui?.controls?.find(item => item.id === id);
       if (!control?.label || !control.visible || !control.iconReady) failures.push(`controllo ${id} incompleto`);
     }

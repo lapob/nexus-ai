@@ -57,21 +57,6 @@ test('public viewport gathers the same grains and reduced motion assembles immed
   reduced.renderer.dispose();
 });
 
-test('web microphone level drives the core and resets when capture stops', () => {
-  const web = fs.readFileSync(path.join(__dirname,'../src/remote/public-demo.js'),'utf8');
-  const monitor = JSON.parse(web.match(/const voiceMonitor = (".*");/)[1]);
-  let sample, value=128, now=0;
-  const runtime={};
-  const analyser={ getByteTimeDomainData: values=>values.fill(value), disconnect(){} };
-  const sandbox={runtime, performance:{now:()=>now}, requestAnimationFrame:fn=>{sample=fn;return 1},cancelAnimationFrame(){},Uint8Array,
-    AudioContext: class {createMediaStreamSource(){return {connect(){},disconnect(){}}}createAnalyser(){return analyser}close(){return Promise.resolve()}}};
-  vm.runInNewContext('let voiceMonitor=null;'+monitor+';monitorVoice({}, {state:"recording",stop(){}});',sandbox);
-  sample(); assert.equal(runtime.voiceEnergy,0);
-  value=150; now=600; sample(); assert.ok(runtime.voiceEnergy>.5);
-  vm.runInNewContext('stopVoiceMonitor()',sandbox); assert.equal(runtime.voiceEnergy,0);
-  assert.match(web,/getEnergy: \(\) => Number\(globalThis\.nexusAiState\?\.voiceEnergy \|\| 0\)/);
-});
-
 test('all real interaction states preserve phase and use bounded finite geometry', () => {
   let energy = NaN;
   const f = fixture({ getEnergy: () => energy });
@@ -151,21 +136,9 @@ test('slow ambient motion does not delay voice feedback or simple core clicks', 
   f.renderer.dispose();
 });
 
-test('Presence and all desktop visualizers retain their decorative motion rates', () => {
-  const animation = fs.readFileSync(path.join(__dirname, '../src/renderer/systems/AnimationController.ts'), 'utf8');
-  for (const [name, value] of [['ambientScale', '.55'], ['returnOmega', '1.1']]) {
-    assert.ok(source.includes(`${name}: ${value}`));
-    assert.ok(animation.includes(`${name}: ${value}`));
-  }
+test('Presence retains its decorative motion rates', () => {
+  for (const [name, value] of [['ambientScale', '.55'], ['returnOmega', '1.1']]) assert.ok(source.includes(`${name}: ${value}`));
   assert.ok(source.includes('pointerRelease: .8'));
-  assert.ok(animation.includes('release: .8'));
-  for (const name of ['ParticleEngine', 'SaturnVisualizer', 'NexusCore']) {
-    const visualizer = fs.readFileSync(path.join(__dirname, `../src/renderer/scene/${name}.tsx`), 'utf8');
-    assert.match(visualizer, /clock\.elapsedTime \* VISUALIZER_MOTION\.ambientScale/);
-    assert.match(visualizer, /VISUALIZER_POINTER_DAMPING\.release/);
-  }
-  const inspection = fs.readFileSync(path.join(__dirname, '../src/renderer/scene/VisualizerInspection.tsx'), 'utf8');
-  assert.match(inspection, /dragging \? 9 : VISUALIZER_MOTION\.returnOmega/);
 });
 
 test('quality sheds glow before particles and recovers with hysteresis', () => {
