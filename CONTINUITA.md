@@ -1,4 +1,16 @@
-## Preview 0.3.35 — 8 November 2026 (IN PROGRESS)
+## Preview 0.3.35 — 8 November 2026 (PUBLISHED)
+
+Done: `release:public:preview` PASS (tests 1168/0 fail, AI eval gate, voice,
+smoke, shutdown, soak 250 heap +0.11 MB, verify:installer, SBOM 331), bundle
+verified (5 artifacts), pushed main 0d0dd74, GitHub v0.3.35-preview.1 (7
+assets verified). Site: synced 0.3.35 + AI shell (8755812), e2e hover test
+made robust (29a4ad5), `release:prepare`/`promote` PASS (version d6565fba).
+ai.nexusnxs.com and private ingress serve the mobile welcome fix; service
+restarted, readyz ready, model qwen3:14b. Smoke flake fixed (0d0dd74: adaptive
+wait for the Control Center, 6/6 pass). First smoke attempt failed 3/4 on the
+fixed 400 ms wait.
+Pending (owner decisions): download of a smaller 27B quant to fit 16 GB VRAM;
+GPU pause for gemma4 consent diagnosis; Qwen3-TTS voice download.
 
 Contents since 0.3.34: owner limits/attachments (cd8874a), deep model on
 "Approfondito" + auto-selection fix (3228859), mobile welcome layout fix
