@@ -9,7 +9,8 @@ const { neutralizeToolOutput } = require('./tool-output-guard');
 // #region 01 — Guida di sistema e confini del contesto
 
 const MAX_MESSAGES = 32;
-const MAX_MESSAGE_CHARS = 12_000;
+// Le istruzioni di sistema non vanno mai troncate: il tetto segue quello del provider.
+const MAX_MESSAGE_CHARS = 120_000;
 
 // Regole derivate dagli errori misurati con nexusnxs-agent-v1 su qwen3:14b:
 // ogni riga corrisponde a un comportamento osservato, non a uno stile.

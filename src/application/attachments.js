@@ -16,7 +16,9 @@ const TEXT_EXTENSIONS = new Set([
   '.py', '.pyi', '.java', '.kt', '.kts', '.c', '.h', '.cpp', '.hpp', '.cs', '.go', '.rs',
   '.php', '.rb', '.swift', '.sh', '.bash', '.zsh', '.ps1', '.psm1', '.bat', '.cmd',
   '.sql', '.graphql', '.gql', '.lua', '.r', '.dart', '.vue', '.svelte', '.astro',
-  '.gitignore', '.gitattributes', '.editorconfig', '.dockerfile'
+  '.gitignore', '.gitattributes', '.editorconfig', '.dockerfile',
+  '.log', '.csv', '.tsv', '.tex', '.srt', '.vtt', '.rst', '.adoc', '.properties', '.env.example',
+  '.gradle', '.cmake', '.mk', '.proto', '.sol', '.zig', '.nim', '.ex', '.exs', '.erl', '.hs', '.ml', '.fs', '.scala', '.clj', '.jl', '.m', '.pl'
 ]);
 
 function isTextCandidate(filePath) {
@@ -69,6 +71,39 @@ function extractAttachment(targetPath) {
   };
 }
 
-module.exports = { extractAttachment, isTextCandidate, MAX_FILE_BYTES, MAX_TOTAL_BYTES };
+// #endregion
+
+// #region 03 — Allegati del proprietario (desktop): file completi, anche PDF
+
+/** Tetto tecnico, non di prodotto: oltre 1 GiB un singolo file non sta in memoria in modo sicuro. */
+const OWNER_MAX_BYTES = 1024 * 1024 * 1024;
+
+/**
+ * Versione per il proprietario sul proprio PC: nessun limite di dimensione utile,
+ * testo letto per intero e PDF estratti in un worker isolato. Il contesto passato
+ * al modello viene poi adattato alla domanda (application/attachment-context).
+ */
+async function extractAttachmentAsync(targetPath, { extractPdf = require('../remote/pdf-extraction').extractPdfText } = {}) {
+  const resolved = await fs.promises.realpath(targetPath);
+  const stat = await fs.promises.stat(resolved);
+  if (!stat.isFile()) throw new Error('È possibile allegare soltanto file.');
+  const name = path.basename(resolved);
+  const base = { name, kind: 'file', fileCount: 1, size: stat.size };
+  const skipped = (reason) => ({ ...base, content: `ALLEGATO FILE: ${name}\n\nFILE: ${name}\nContenuto non incluso (${reason}).` });
+  if (SENSITIVE_NAME.test(name)) return skipped('sensibile');
+  if (stat.size > OWNER_MAX_BYTES) return skipped('oltre 1 GiB, troppo grande per la memoria');
+  if (path.extname(name).toLowerCase() === '.pdf') {
+    try {
+      const { text } = await extractPdf(await fs.promises.readFile(resolved), { profile: 'owner' });
+      return { ...base, content: `ALLEGATO FILE: ${name}\n\nFILE: ${name} (PDF)\n${String(text).trim()}` };
+    } catch { return skipped('PDF non leggibile o protetto'); }
+  }
+  if (!isTextCandidate(resolved)) return skipped('non testuale');
+  const buffer = await fs.promises.readFile(resolved);
+  if (buffer.includes(0)) return skipped('binario');
+  return { ...base, content: `ALLEGATO FILE: ${name}\n\nFILE: ${name}\n${buffer.toString('utf8').replace(/\u0000/g, '').trim()}` };
+}
+
+module.exports = { extractAttachment, extractAttachmentAsync, isTextCandidate, MAX_FILE_BYTES, MAX_TOTAL_BYTES, OWNER_MAX_BYTES };
 
 // #endregion

@@ -41,7 +41,8 @@ const { agentModelFor, createNativeToolConsent, createTurnTools, runAgentTurn } 
 const { MemoryConsolidator } = require('./memory-consolidation');
 const { isClockQuestion, TIME_SENSITIVE_PATTERN } = require('../research/research-policy');
 const { createNativeActionApproval } = require('../agents/action-tools');
-const { extractAttachment } = require('./attachments');
+const { extractAttachmentAsync } = require('./attachments');
+const { fitAttachmentContext } = require('./attachment-context');
 const { decryptArchive, encryptArchive } = require('../infrastructure/storage/encrypted-backup');
 const { explicitMemoryInstruction, memoryQueryText } = require('../infrastructure/storage/personal-memory-store');
 const { configureContinuityTask, continuityTaskStatus, createTrackedExecFileRunner } = require('../infrastructure/windows/continuity-task');
@@ -795,8 +796,11 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       : 'SPAZIO DI LAVORO: nessuna cartella selezionata. Se la richiesta richiede file locali, chiedi di scegliere una cartella di lavoro.';
     const projectDirective = projectContextDirective(workspace);
     const qualityDirective = responseQualityDirective(question, { deep: mode === 'deep' });
-    const userContent = attachmentContext
-      ? `${question}\n\n${formatUntrustedData('MATERIALI_ALLEGATI', attachmentContext, 480_000)}`
+    // Spazio per gli allegati: circa metà del contesto del modello (≈3 caratteri per token).
+    const attachmentBudget = Math.max(8_000, Math.floor(runtimeTuning.contextTokens * 3 * 0.5) - question.length);
+    const fittedAttachments = attachmentContext ? fitAttachmentContext(attachmentContext, question, attachmentBudget) : '';
+    const userContent = fittedAttachments
+      ? `${question}\n\n${formatUntrustedData('MATERIALI_ALLEGATI', fittedAttachments, attachmentBudget + 4_000)}`
       : question;
     const approvedExamples = trainingStore.findRelevant(question, { limit: mode === 'deep' ? 3 : 2 });
     // Memoria automatica: retrieval semantico dei ricordi, con lo stesso vettore
@@ -1168,11 +1172,12 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       : await dialog.showOpenDialog(options);
     if (selection.canceled) return [];
     const selected = [];
-    for (const selectedPath of selection.filePaths.slice(0, 8)) {
+    // Proprietario sul proprio PC: nessun limite di numero o dimensione. Il testo
+    // resta intero; al momento della domanda entra nel contesto per intero o con
+    // i passaggi più pertinenti (fitAttachmentContext), mai tagliato alla cieca.
+    for (const selectedPath of selection.filePaths) {
       try {
-        const extracted = extractAttachment(selectedPath);
-        const attachmentBudget = runtimeTuning.tier === 'lite' ? 12_000 : runtimeTuning.tier === 'balanced' ? 48_000 : 160_000;
-        extracted.content = extracted.content.slice(0, attachmentBudget);
+        const extracted = await extractAttachmentAsync(selectedPath);
         const id = randomUUID();
         attachmentStore.set(id, { ...extracted, senderId: event.sender.id, expiresAt: Date.now() + 30 * 60_000 });
         selected.push({ id, name: extracted.name, kind: extracted.kind, fileCount: extracted.fileCount, size: extracted.size });

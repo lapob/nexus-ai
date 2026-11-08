@@ -128,12 +128,12 @@ function parseExternalUrl(value) {
 
 function parseChatRequest(payload = {}) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new NexusError('Richiesta chat non valida.', { code: 'IPC_INPUT_INVALID' });
-  const question = asText(payload.question, { name: 'La domanda', max: 12000, required: true, requiredMessage: 'La domanda è obbligatoria.' });
+  const question = asText(payload.question, { name: 'La domanda', max: 48000, required: true, requiredMessage: 'La domanda è obbligatoria.' });
   const mode = selectReasoningMode(question, payload.mode === 'deep' ? 'deep' : 'fast');
   const history = Array.isArray(payload.history)
     ? payload.history.slice(-16).filter((item) => item && ['user', 'assistant'].includes(item.role)).map((item) => ({
       role: item.role,
-      content: asText(item.content, { name: 'Il messaggio', max: 12000 })
+      content: asText(item.content, { name: 'Il messaggio', max: 48000 })
     }))
     : [];
   const attachmentIds = Array.isArray(payload.attachmentIds)

@@ -1,4 +1,39 @@
-## Preview 0.3.34 — 8 November 2026 (BLOCKED at verify → check:knowledge)
+## Owner limits removed, Preview 0.3.34 published, boot conflict fixed — 8 November 2026
+
+- **Preview 0.3.34 published**: full `verify` passed (incl. AI eval gate,
+  voice, smoke, shutdown, soak 250, runtime audit 0). Build needed
+  `NEXUS_SERVICE_URL=https://ai.nexusnxs.com` and the project grype
+  (`.toolchains` on PATH). Tooling advisory GHSA-g3hv-75wg-m249 fixed by a
+  range-scoped override `minimatch@>=7.0.0 <11.0.1 → 11.0.5` (a7a5c84; audit 0).
+  Installer built from 7f9ffc5 (packaged files verified equal to HEAD),
+  pushed `main`, `publish-github-preview` → v0.3.34-preview.1, 7 assets
+  verified on GitHub. Site download synced to 0.3.34.
+- **Outage after the PC reboot (14:33)**: legacy logon tasks "NexusNXS
+  Connectivity"/"NexusNXS Presence" pointed at `release\win-unpacked` (re-
+  registered automatically by the packaged app launched during release
+  verification); that Core took the server lock without AI, so ai.nexusnxs.com
+  returned 503. Recovered with a graceful stop + service start (ready, 200).
+  Code fix 7f9ffc5: automatic registration yields to the "NexusNXS Server"
+  task and refuses build folders. The two stale tasks still exist (enabled):
+  deleting/disabling them was refused by the session permission policy, so
+  the owner must disable them.
+- **Owner limits** (desktop): no file count/size cap (1 GiB technical ceiling
+  per file), PDFs supported with an owner profile (all pages, big heap, 15 min),
+  more text formats (.log, .csv…); large attachments are fitted to the model
+  context by selecting the head and the passages relevant to the question
+  (`application/attachment-context.js`) instead of failing — any message over
+  12,000 chars was previously rejected by the provider. Desktop composer 48k
+  chars. Public anonymous guests keep their protective limits.
+- Home entity now has its own layout slot (c0c476f): no overlap with title or
+  buttons on phone/laptop/desktop (measured and screenshotted).
+- Checks: suite 1164 — 1162 PASS, 2 SKIP, 0 FAIL; attachment tests 5/5;
+  source checks, publication safety, electron smoke PASS (one smoke failure in
+  6 runs right after heavy builds; 5 later runs PASS).
+- In progress: download of gemma4:26b-a4b-it-qat, gpt-oss:20b,
+  qwen3.8:27b-q4_K_M (owner-approved) through the service Ollama; service
+  restart deferred until it completes, then model comparison.
+
+## Preview 0.3.34 — 8 November 2026 (superseded: knowledge gate resolved by retiring 34 removed-tool profiles)
 
 `release:public:preview` stopped at `audit-knowledge-governance --strict`: 41
 PRIVATE tool profiles (05_Risorse/Strumenti locali) past `review_after`

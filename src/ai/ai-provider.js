@@ -65,6 +65,10 @@ function validateToolCalls(calls) {
   });
 }
 
+// Tetto di sicurezza per singolo messaggio: lo spazio reale è il contesto del modello,
+// gestito a monte (storico compattato, allegati adattati alla domanda).
+const MAX_MESSAGE_CHARS = 1_000_000;
+
 function validateChatRequest(request) {
   if (!request || typeof request !== 'object' || !/^[A-Za-z0-9:_-]{1,128}$/.test(String(request.requestId || ''))) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'requestId AI non valido.');
   if (!Array.isArray(request.messages) || request.messages.length < 1 || request.messages.length > 32) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'La chat deve contenere da 1 a 32 messaggi.');
@@ -74,7 +78,7 @@ function validateChatRequest(request) {
     // Un turno assistant che contiene soltanto chiamate strumento può avere
     // testo vuoto; tutti gli altri messaggi restano obbligatoriamente non vuoti.
     const toolCalls = message?.role === 'assistant' && message.toolCalls !== undefined ? validateToolCalls(message.toolCalls) : null;
-    if (!roles.has(message?.role) || (!content.trim() && !toolCalls) || content.length > 12000) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'Messaggio AI non valido.');
+    if (!roles.has(message?.role) || (!content.trim() && !toolCalls) || content.length > MAX_MESSAGE_CHARS) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'Messaggio AI non valido.');
     const images = Array.isArray(message?.images) ? message.images.slice(0, 2).map((image) => {
       const encoded = String(image || '');
       if (!encoded || encoded.length > 2_050_000 || !/^[A-Za-z0-9+/]+=*$/.test(encoded)) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'Immagine AI non valida.');

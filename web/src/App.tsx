@@ -531,17 +531,17 @@ export function App() {
                 <button type="button" className="icon-button small" aria-label={`Rimuovi ${item.name}`} onClick={() => removePending(item.id)}><Icon name="close" /></button>
               </li>
             ))}</ul>}
-            <textarea ref={inputRef} value={draft} rows={1} maxLength={12_000}
+            <textarea ref={inputRef} value={draft} rows={1} maxLength={platform.kind === 'desktop' ? 48_000 : 12_000}
               placeholder={recording ? 'Ti ascolto… parla, mi fermo quando fai una pausa' : transcribing ? 'Trascrivo…' : 'Scrivi a NexusNXS…'} aria-label="Messaggio"
               onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} autoFocus readOnly={Boolean(recording) || transcribing}
               onPaste={(event) => { const files = [...event.clipboardData.files]; if (files.length && caps.attachments && platform.acceptsDroppedFiles) { event.preventDefault(); void addFiles(files); } }} />
             <div className="composer-bar">
               {caps.attachments && <>
                 <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(event) => { void addFiles([...(event.target.files ?? [])]); event.target.value = ''; }} />
-                <button type="button" className="icon-button small" aria-label="Allega file" disabled={generating || pending.length >= 2} onClick={async () => {
+                <button type="button" className="icon-button small" aria-label="Allega file" disabled={generating || (!platform.pickAttachments && pending.length >= 2)} onClick={async () => {
                   // Desktop: selettore nativo, il main process estrae il contenuto. Web: input del browser.
                   if (!platform.pickAttachments) { fileRef.current?.click(); return; }
-                  try { const picked = await platform.pickAttachments(); setPending((current) => [...current, ...picked].slice(0, 2)); }
+                  try { const picked = await platform.pickAttachments(); setPending((current) => [...current, ...picked]); }
                   catch { notify('Allegato non leggibile.'); }
                 }}><Icon name="paperclip" /></button>
               </>}
