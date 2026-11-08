@@ -23,12 +23,20 @@
   resumed on the service runtime (port 18032). Comparison not run yet: the
   isolation gate needs ~18 GiB free RAM for CPU-only eval while the service
   holds the GPU (11.7 GiB free); a GPU eval needs the service paused (owner's call).
-- **IN PROGRESS (8 Nov ~21:00)**: owner approved pausing the service for a GPU eval.
-  Steps: wait for the qwen3.8 pull → `manage-headless-server-task.ps1 -Action stop`
-  → `ensure-ollama-runtime.js --runtime-only` (11435) → `run-agent-eval.js` on
-  qwen3:14b, gemma4:26b-a4b-it-qat, gpt-oss:20b, qwen3.8:27b-q4_K_M →
-  stop the eval runtime by the PID owning 11435 → `-Action start` → verify readyz
-  32145/32147 and public. If interrupted: restart the service FIRST.
+- **GPU agent eval done (8 Nov, service paused on owner's approval, then
+  restarted: readyz ready 32145/32147/public; eval runtime stopped by 11435 PID)**.
+  Suite nexusnxs-agent-v1, 39 cases, GPU, quick mode
+  (report `qa-artifacts/agent-eval-2026-11-08-gpu.json`):
+  - qwen3:14b 38/39 = 97.4%, gate PASS, median 1.6s, p95 3.4s; 53.9 tok/s, 9.8 GB all VRAM.
+  - qwen3.8:27b-q4_K_M 39/39 = 100%, gate PASS, median 11.6s, p95 54.6s;
+    9.8 tok/s (16.5 GB, only 13.8 in VRAM: spills to CPU).
+  - gemma4:26b-a4b-it-qat 37/39 = 94.9%, gate FAIL (both consent must-pass:
+    no consent request), median 1.9s; 61.3 tok/s, 14.1 GB.
+  - gpt-oss:20b 34/39 = 87.2%, gate FAIL (grounding 50%, err-web-01, grd-vuoto-04).
+  Decision: no promotion. qwen3:14b stays main/agent model. Candidate for an
+  explicit "deep" slot: qwen3.8:27b (quality, too slow for voice). gemma4 worth
+  re-testing after investigating the consent flow. Synthetic suite, not a
+  general quality claim.
 - **Owner limits** (desktop): no file count/size cap (1 GiB technical ceiling
   per file), PDFs supported with an owner profile (all pages, big heap, 15 min),
   more text formats (.log, .csv…); large attachments are fitted to the model
