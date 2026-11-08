@@ -23,6 +23,12 @@
   resumed on the service runtime (port 18032). Comparison not run yet: the
   isolation gate needs ~18 GiB free RAM for CPU-only eval while the service
   holds the GPU (11.7 GiB free); a GPU eval needs the service paused (owner's call).
+- **IN PROGRESS (8 Nov ~21:00)**: owner approved pausing the service for a GPU eval.
+  Steps: wait for the qwen3.8 pull → `manage-headless-server-task.ps1 -Action stop`
+  → `ensure-ollama-runtime.js --runtime-only` (11435) → `run-agent-eval.js` on
+  qwen3:14b, gemma4:26b-a4b-it-qat, gpt-oss:20b, qwen3.8:27b-q4_K_M →
+  stop the eval runtime by the PID owning 11435 → `-Action start` → verify readyz
+  32145/32147 and public. If interrupted: restart the service FIRST.
 - **Owner limits** (desktop): no file count/size cap (1 GiB technical ceiling
   per file), PDFs supported with an owner profile (all pages, big heap, 15 min),
   more text formats (.log, .csv…); large attachments are fitted to the model
