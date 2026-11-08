@@ -1,4 +1,17 @@
-## Preview 0.3.34 — 8 November 2026 (IN PROGRESS)
+## Preview 0.3.34 — 8 November 2026 (BLOCKED at verify → check:knowledge)
+
+`release:public:preview` stopped at `audit-knowledge-governance --strict`: 41
+PRIVATE tool profiles (05_Risorse/Strumenti locali) past `review_after`
+(public knowledge: 0 stale; private notes are not shipped). Actions taken:
+backup zip of the folder (session scratchpad); official `knowledge:inventory`
+re-run → 6 Sviluppo products re-verified, 41 → 34 stale. The remaining 34
+belong to tools whose folder (`[HACKING]`, and 7-Zip/Mullvad/Tor/qBittorrent
+under Sviluppo) is not present on any drive. Updating those profiles to "not
+detected on 2026-11-08" failed with a persistent EPERM on `7-Zip.md`
+(no file changed in that run); not forced. Nothing built, pushed or published
+for 0.3.34; version bump committed (0541540). Next: owner decides how to
+review those 34 profiles (or reconnects the tools volume), then rerun the
+pipeline.
 
 Operation (owner asked to "execute everything", including GitHub): version
 0.3.34 → `npm run release:public:preview` (verify, unsigned Preview build:win,
