@@ -108,12 +108,15 @@
 
   .core-layer { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 1; transition: opacity .6s var(--ease-emphasized), transform .6s var(--ease-emphasized); }
   .core-layer .core { width: min(80vmin, 760px); aspect-ratio: 1; }
-  .core-layer.hero { transform: translateY(-17vh) scale(.82); }
+  /* Home: l'entità si allinea al proprio spazio (.core-slot) misurato in JS, a ogni dimensione e scorrimento. */
+  .core-layer.hero { transform: translate(var(--hero-x, 0px), var(--hero-y, -17vh)) scale(var(--hero-scale, .82)); }
+  .core-slot { flex: none; width: clamp(150px, 34vh, 300px); aspect-ratio: 1; }
   .welcome h2, .welcome p { text-shadow: 0 2px 24px var(--ink); }
   .core-layer.ambient { opacity: .22; transform: scale(1.25); }
-  /* Finestre basse (portatili, finestre affiancate): l'entità sale e si riduce per non coprire il titolo. */
+  @media (max-width: 599px) { .core-slot { width: clamp(140px, 28vh, 230px); } }
+  /* Finestre basse (portatili, finestre affiancate): testo più compatto e meno suggerimenti. */
   @media (max-height: 760px) {
-    .core-layer.hero { transform: translateY(-27vh) scale(.6); }
+    .core-slot { width: clamp(110px, 26vh, 200px); }
     .welcome { gap: 10px; padding-bottom: 3vh; }
     .welcome h2 { font-size: clamp(1.8rem, 4.4vw, 2.8rem); }
     .suggestions .chip:nth-child(n + 3) { display: none; }
@@ -137,7 +140,7 @@
   .live-cta kbd { font: 500 .72rem 'JetBrains Mono Variable', ui-monospace, monospace; padding: 2px 6px; border-radius: 6px; background: color-mix(in oklch, var(--ink) 18%, transparent); }
   @media (max-width: 599px) { .live-cta kbd { display: none; } .live-state { font-size: .84rem; } }
 
-  .welcome { position: relative; min-height: 100%; display: grid; align-content: end; justify-items: center; text-align: center; padding-bottom: 6vh; gap: 14px; }
+  .welcome { position: relative; min-height: 100%; display: grid; align-content: center; justify-items: center; text-align: center; padding: 2vh 0 6vh; gap: 14px; }
   .welcome h2 { margin: 0; font-size: clamp(2rem, 5.2vw, 3.6rem); font-weight: 600; letter-spacing: -.035em; line-height: 1.04; text-wrap: balance; }
   /* Longhand espliciti: la scorciatoia `background` veniva fusa dal minificatore e annullava il clip. */
   .welcome h2 .accent { background-image: linear-gradient(100deg, var(--cyan), oklch(85% .12 165)); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }

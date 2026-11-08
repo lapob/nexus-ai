@@ -3,7 +3,7 @@
  * @description Shell della nuova web app NexusNXS AI: conversazioni locali, streaming con fasi, nucleo WebGPU, palette comandi e preferenze.
  */
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'framer-motion';
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Capabilities, Preferences } from './api';
 import { ControlCenter } from './ControlCenter';
 import { useDesktopPresence } from './desktopPresence';
@@ -83,6 +83,8 @@ export function App() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const coreLayerRef = useRef<HTMLDivElement>(null);
+  const coreSlotRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [caps, setCaps] = useState<Capabilities>({ voiceInput: false, voiceOutput: false, attachments: true });
   const [pending, setPending] = useState<Pending[]>([]);
@@ -353,6 +355,33 @@ export function App() {
 
   const empty = !conversation || conversation.messages.length === 0;
 
+  // L'entità della home si posa sul suo spazio nel layout: niente sovrapposizioni
+  // con titolo e pulsanti, a qualsiasi dimensione e anche scorrendo.
+  useLayoutEffect(() => {
+    const layer = coreLayerRef.current;
+    const slot = coreSlotRef.current;
+    const stage = layer?.parentElement;
+    if (!layer || !stage) return;
+    const place = () => {
+      if (!slot?.isConnected) { for (const name of ['--hero-x', '--hero-y', '--hero-scale']) layer.style.removeProperty(name); return; }
+      const area = stage.getBoundingClientRect();
+      const target = slot.getBoundingClientRect();
+      // La sfera occupa circa il 60% del canvas, largo min(80vmin, 760px).
+      const sphere = Math.min(Math.min(window.innerWidth, window.innerHeight) * 0.8, 760) * 0.6;
+      layer.style.setProperty('--hero-x', `${Math.round(target.left + target.width / 2 - (area.left + area.width / 2))}px`);
+      layer.style.setProperty('--hero-y', `${Math.round(target.top + target.height / 2 - (area.top + area.height / 2))}px`);
+      layer.style.setProperty('--hero-scale', (target.width / sphere).toFixed(3));
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(stage);
+    if (slot) observer.observe(slot);
+    const scroller = scrollRef.current;
+    scroller?.addEventListener('scroll', place, { passive: true });
+    window.addEventListener('resize', place);
+    return () => { observer.disconnect(); scroller?.removeEventListener('scroll', place); window.removeEventListener('resize', place); };
+  }, [empty, live]);
+
   return (
     <LazyMotion features={domAnimation} strict><MotionConfig reducedMotion="user">
       <div className="app" data-sidebar={sidebarOpen ? 'open' : 'closed'} data-collapsed={sidebarHidden} data-live={live}>
@@ -389,7 +418,7 @@ export function App() {
             <button type="button" className="icon-button" aria-label="Comandi (Ctrl+K)" onClick={() => setPaletteOpen(true)}><Icon name="command" /></button>
           </header>
 
-          <div className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /></div>
+          <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /></div>
           {dragging && <div className="dropzone" aria-hidden="true"><span className="glass"><Icon name="paperclip" />Rilascia per allegare (max 2 file, 1,5 MB)</span></div>}
 
           <div className="scroll" ref={scrollRef} onScroll={(event) => {
@@ -400,6 +429,7 @@ export function App() {
           }}>
             {empty ? (
               <section className="welcome" aria-label="Inizia">
+                <div ref={coreSlotRef} className="core-slot" aria-hidden="true" />
                 <m.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}>
                   Chiedi. <span className="accent">NexusNXS</span> ragiona.
                 </m.h2>
