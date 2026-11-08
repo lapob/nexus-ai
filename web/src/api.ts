@@ -5,6 +5,7 @@
 
 export type ChatMode = 'fast' | 'deep';
 export interface Turn { role: 'user' | 'assistant'; content: string }
+/** `url` vuoto: fonte locale (nota della knowledge sul PC), mostrata senza link. */
 export interface Source { title?: string; url: string; snippet?: string }
 export interface Preferences { responseStyle: 'concise' | 'natural' | 'detailed'; tone: 'neutral' | 'warm' | 'direct'; responseLanguage: 'auto' | 'it' | 'en' | 'es' | 'fr' | 'de' }
 
@@ -146,6 +147,12 @@ function normalizeSources(value: unknown): Source[] {
 
 export async function cancelMessage(clientMessageId: string): Promise<void> {
   await authorized('/api/guest/messages/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientMessageId }) }).catch(() => undefined);
+}
+
+/** Voto anonimo della risposta: solo il segno, mai il testo (non è consenso all'addestramento). */
+export async function rateMessage(clientMessageId: string, rating: 1 | -1): Promise<void> {
+  const response = await authorized('/api/guest/rating', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientMessageId, rating }) });
+  if (!response.ok) throw new Error('Valutazione non registrata.');
 }
 
 /** Cancella sul server le risposte conservate per la ripresa (le chat restano solo locali). */

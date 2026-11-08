@@ -306,24 +306,16 @@ test('workflow history discards a result when access is revoked during its read'
   } finally {release?.({items:[],truncated:false});await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('il client remoto conserva la bozza e riprova dopo un cambio rete', () => {
-  const source = fs.readFileSync(require.resolve('../src/remote/remote-session-gateway'), 'utf8');
-  assert.match(source, /nexus\.remote\.draft/);
-  assert.match(source, /scheduleReconnect/);
-  assert.match(source, /addEventListener\('online'/);
-  assert.match(source, /nexus\.remote\.active/);
-  assert.match(source, /renderSyncedConversation/);
-  assert.match(source, /setInterval\(renderSyncedConversation,900\)/);
-  assert.match(source, /turn-arrive/);
-  assert.match(source, /#back:before/);
-});
-
-test('il client remoto riceve attività push autenticata con fallback di rete', () => {
-  const source = fs.readFileSync(require.resolve('../src/remote/remote-session-gateway'), 'utf8');
-  assert.match(source, /\/api\/events/);
-  assert.match(source, /text\/event-stream/);
-  assert.match(source, /Authorization:'Bearer '\+token/);
-  assert.match(source, /nexusPushRetry=setTimeout/);
+test('la modalità associata usa le conversazioni del PC con token locale, rotazione e fasi reali', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '../web/src/paired.ts'), 'utf8');
+  assert.match(source, /meta\[name="nxs-ingress"\]/);
+  assert.match(source, /'\/api\/pair'/);
+  assert.match(source, /'\/api\/session\/rotate'/);
+  assert.match(source, /\/api\/activity\?conversation=/);
+  assert.match(source, /\/api\/conversations\/\$\{encodeURIComponent\(conversationId\)\}\/messages/);
+  assert.match(source, /Authorization: `Bearer \$\{token\}`/);
+  assert.match(source, /response\.status === 401/, 'un token revocato riporta alla schermata di associazione');
+  assert.doesNotMatch(source, /console|\/api\/actions|\/api\/system/, 'la modalità associata non tocca la Console operativa');
 });
 
 test('la modalità pubblica isola dati privati ma usa in sicurezza gli allegati forniti', () => {
@@ -1478,15 +1470,12 @@ test('pairing monouso, autenticazione e continuazione conversazione funzionano e
     assert.equal(frames.filter((frame) => frame.type === 'token').map((frame) => frame.token).join(''), 'Risposta remota');
     assert.equal(frames.at(-1).type, 'complete');
     assert.equal(requestedModels.at(-1), 'nexus-balanced');
-    assert.match(client, /<script nonce="[^"]+">/);
-    assert.match(client, /<style nonce="[^"]+">/);
+    // L'ingresso privato serve la stessa app unica, dichiarata come "private" (modalità associata), senza microfono.
+    assert.match(client, /<meta name="nxs-ingress" content="private">/);
+    assert.match(client, /<title>NexusNXS AI<\/title>/);
     assert.doesNotMatch(client, /style="[^"]+"/);
-    assert.match(client, /Stessa conversazione/);
-    assert.match(client, /NexusNXS sta comprendendo la richiesta/);
-    assert.match(client, /Risposta approfondita/);
-    assert.match(client, /position:sticky;z-index:8;top:/);
-    assert.ok(client.indexOf('id="activity"') < client.indexOf('class="hero"'));
-    assert.match(client, /grid-template-columns:minmax\(0,1fr\)/);
+    for (const tag of client.match(/<(?:script|style)(?=[\s>])[^>]*>/g) || []) assert.match(tag, /nonce="[^"]+"/);
+    assert.match(clientResponse.headers.get('permissions-policy'), /microphone=\(\)/);
     const links = await (await fetch(`${baseUrl}/.well-known/assetlinks.json`)).json();
     assert.deepEqual(links.map((item) => item.target.package_name), ['local.nexus.remote', 'local.nexus.console']);
     assert.equal((await fetch(`${baseUrl}/api/console/bootstrap`, { method: 'POST' })).status, 404);
@@ -1704,7 +1693,9 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     assert.match(publicHtml, /<title>NexusNXS AI<\/title>/);
     assert.match(publicHtml, /rel="manifest" href="\/manifest\.webmanifest"/);
     assert.match(publicHtml, /rel="icon" href="\/nexus-icon\.png"/);
-    assert.doesNotMatch(publicHtml, /NexusNXS agisce|coreCanvas|<nav|codice di collegamento|\/api\/pair/i);
+    assert.doesNotMatch(publicHtml, /NexusNXS agisce|coreCanvas|<nav/i);
+    // Stesso bundle, ma la modalità associata si attiva solo con il segnale dell'ingresso privato.
+    assert.doesNotMatch(publicHtml, /<meta name="nxs-ingress"/);
     for (const tag of publicHtml.match(/<(?:script|style)(?=[\s>])[^>]*>/g) || []) assert.ok(tag.includes(`nonce="${nonce}"`), tag);
     const publicScripts = [...publicHtml.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
     assert.ok(publicScripts.length > 0);

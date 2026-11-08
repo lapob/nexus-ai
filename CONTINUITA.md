@@ -1,3 +1,24 @@
+## Agent trail, ratings, microphone choice, paired mode — 8 November 2026
+
+- WebGPU: already active in the real desktop app (GPU off only in smoke
+  tests); checked with `NEXUS_SMOKE_ALLOW_GPU=1` → backend `webgpu`.
+- Agent trail under each answer: visible steps (phase history, never hidden
+  reasoning) and numbered sources (https links; local notes as titles).
+  Native consent dialogs for sensitive tools are unchanged.
+- 👍/👎 ratings: web via `/api/guest/rating` (sign only), desktop via
+  `rateResponse`; assistant messages keep their `requestId`.
+- Microphone choice in Preferences (localStorage, `deviceId: ideal`), used by
+  dictation, live voice and barge-in.
+- Paired mode: the private ingress now serves the same app with
+  `<meta name="nxs-ingress" content="private">` and `microphone=()`;
+  `web/src/paired.ts` pairs with the code (also from `#pair=`), rotates the
+  token daily, lists/continues the PC's conversations and shows the PC's real
+  phases. `CLIENT_HTML`/`CLIENT_ACTIVITY_BRIDGE` (old paired client, incl. a
+  dead `NexusAndroid.scanQr` button) removed; `/console` unchanged.
+- Checks: suite 1158 — 1156 PASS, 2 SKIP, 0 FAIL; gateway 82/82; all source
+  checks, publication safety (871 files) and electron smoke PASS. Service
+  restarted (ready 85 s); private ingress shows the pairing screen.
+
 ## Classic desktop UI removed, Control Center, cleanup — 8 November 2026 (PUBLISHED, COMMITTED)
 
 Service restarted (ready 14 s, public `/` serves the new bundle, readyz 200

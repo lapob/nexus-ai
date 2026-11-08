@@ -7,7 +7,8 @@ import type { ChatMode, Preferences, Source } from './api';
 
 /** Degli allegati si conservano solo nome, tipo e dimensione: i contenuti non vengono salvati. */
 export interface AttachmentMeta { name: string; mime: string; size: number }
-export interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: number; sources?: Source[]; error?: boolean; interrupted?: boolean; attachments?: AttachmentMeta[]; voice?: boolean }
+/** `steps`: passaggi visibili dell'agente (mai ragionamento interno), `sources`: fonti citate. */
+export interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: number; sources?: Source[]; steps?: string[]; error?: boolean; interrupted?: boolean; attachments?: AttachmentMeta[]; voice?: boolean; rating?: 'up' | 'down'; requestId?: string }
 export interface Conversation { id: string; title: string; createdAt: number; updatedAt: number; messages: Message[] }
 export interface State {
   conversations: Conversation[];

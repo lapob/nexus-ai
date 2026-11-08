@@ -8,6 +8,31 @@ const MAX_SECONDS = 11.5;
 const SILENCE_MS = 1_200;
 const SPEECH_RMS = 0.02;
 
+const MICROPHONE_KEY = 'nxs.microphone';
+
+/** Microfono scelto nelle preferenze (vuoto = predefinito di sistema). */
+export function preferredMicrophone(): string {
+  try { return localStorage.getItem(MICROPHONE_KEY) || ''; } catch { return ''; }
+}
+
+export function setPreferredMicrophone(deviceId: string) {
+  try { if (deviceId) localStorage.setItem(MICROPHONE_KEY, deviceId); else localStorage.removeItem(MICROPHONE_KEY); } catch { /* archiviazione non disponibile */ }
+}
+
+/** Ingressi audio disponibili; i nomi compaiono dopo il primo permesso al microfono. */
+export async function listMicrophones(): Promise<Array<{ id: string; label: string }>> {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((device) => device.kind === 'audioinput' && device.deviceId && device.deviceId !== 'default')
+      .map((device, index) => ({ id: device.deviceId, label: device.label || `Microfono ${index + 1}` }));
+  } catch { return []; }
+}
+
+function microphoneConstraints(): MediaStreamConstraints {
+  const deviceId = preferredMicrophone();
+  // "ideal": se il microfono scelto è stato scollegato si ripiega sul predefinito invece di fallire.
+  return { audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true, ...(deviceId ? { deviceId: { ideal: deviceId } } : {}) } };
+}
 export interface Recording { stop: () => void; cancel: () => void; done: Promise<Blob> }
 
 /** Codifica campioni float [-1,1] in WAV PCM 16 bit mono: il formato richiesto dal gateway. */
@@ -47,7 +72,7 @@ async function toWav16k(recorded: Blob): Promise<Blob> {
  * parlato o al limite di durata; `onLevel` riceve il livello 0..1 per l'interfaccia.
  */
 export async function startRecording(onLevel: (level: number) => void): Promise<Recording> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints());
   const recorder = new MediaRecorder(stream);
   const chunks: Blob[] = [];
   const context = new AudioContext();
@@ -110,7 +135,7 @@ const BARGE_MS = 320;
  * e chiama `onSpeech` quando l'utente parla sopra con decisione. Restituisce lo stop.
  */
 export async function listenForBargeIn(onSpeech: () => void): Promise<() => void> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints());
   const context = new AudioContext();
   const analyser = context.createAnalyser();
   analyser.fftSize = 1024;

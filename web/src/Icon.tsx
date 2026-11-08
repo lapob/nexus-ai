@@ -25,7 +25,9 @@ const PATHS = {
   image: 'M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M9 9h0',
   sidebar: 'M4 5h16v14H4zM9 5v14',
   down: 'M12 5v14M5 12l7 7 7-7',
-  wave: 'M3 12h2M7 8v8M11 5v14M15 8v8M19 10v4M21 12h0'
+  wave: 'M3 12h2M7 8v8M11 5v14M15 8v8M19 10v4M21 12h0',
+  thumbUp: 'M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7',
+  thumbDown: 'M7 13V4H4v9zM7 13l4 7a2 2 0 0 0 3-2l-1-4h5a2 2 0 0 0 2-2.3l-1.2-6A2 2 0 0 0 16.8 4H7'
 } as const;
 
 export type IconName = keyof typeof PATHS;

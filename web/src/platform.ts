@@ -6,14 +6,17 @@ import * as api from './api';
 import type { Capabilities, ChatMode, Preferences, StreamEvent, Turn } from './api';
 import type { Pending } from './attachments';
 import type { Conversation } from './store';
+import { isPairedIngress, pairedPlatform } from './paired';
 
 export interface SendRequest {
   text: string; history: Turn[]; mode: ChatMode; clientMessageId: string; preferences: Preferences;
+  /** Conversazione locale di destinazione (usata dalla modalità associata). */
+  conversationId?: string;
   signal: AbortSignal; onEvent: (event: StreamEvent) => void; attachments: Pending[];
 }
 
 export interface Platform {
-  kind: 'web' | 'desktop';
+  kind: 'web' | 'desktop' | 'paired';
   capabilities(): Promise<Capabilities>;
   status(): Promise<'ready' | 'preparing' | 'offline'>;
   send(request: SendRequest): Promise<void>;
@@ -28,6 +31,8 @@ export interface Platform {
   saveConversation(conversation: Conversation): void;
   removeConversation(id: string): void;
   forgetRemote(): Promise<void>;
+  /** Voto della risposta identificata dall'id della richiesta. */
+  rate(requestId: string, rating: 'up' | 'down'): Promise<void>;
 }
 
 // #region Web
@@ -45,7 +50,8 @@ const webPlatform: Platform = {
   loadConversations: async () => null,
   saveConversation: () => {},
   removeConversation: () => {},
-  forgetRemote: api.forgetServerMemory
+  forgetRemote: api.forgetServerMemory,
+  rate: (requestId, rating) => api.rateMessage(requestId, rating === 'up' ? 1 : -1)
 };
 
 // #endregion
@@ -54,6 +60,16 @@ const webPlatform: Platform = {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Bridge = Record<string, (...args: any[]) => any>;
+
+/** Fonti del desktop: link solo https; le note locali restano titoli senza percorso. */
+function desktopSources(items: Array<{ title?: unknown; url?: unknown; heading?: unknown }>) {
+  return items.slice(0, 12).flatMap((item) => {
+    const title = String(item?.title || item?.heading || '').slice(0, 200);
+    let url = '';
+    try { const parsed = new URL(String(item?.url || '')); if (parsed.protocol === 'https:') url = parsed.href; } catch { /* nota locale */ }
+    return title || url ? [{ title: title || undefined, url }] : [];
+  });
+}
 
 function desktopPlatform(bridge: Bridge): Platform {
   const requests = new Map<string, string>();
@@ -90,6 +106,7 @@ function desktopPlatform(bridge: Bridge): Platform {
         if (event.type === 'token' && typeof event.token === 'string') { content += event.token; request.onEvent({ type: 'token', token: event.token, cursor: content.length }); }
         else if (event.type === 'replace' && typeof event.token === 'string') { content = event.token; request.onEvent({ type: 'replace', text: content }); }
         else if (event.type === 'phase' && event.phase?.label) request.onEvent({ type: 'phase', label: String(event.phase.label).slice(0, 160) });
+        else if (event.type === 'sources' && Array.isArray(event.sources)) request.onEvent({ type: 'sources', sources: desktopSources(event.sources) });
         else if (event.type === 'complete') { request.onEvent({ type: 'complete', message: String(event.result?.message?.content || content), sources: [] }); finish(); }
         else if (event.type === 'error') { request.onEvent({ type: 'error', error: String(event.error?.message || event.error || 'Risposta non completata.') }); finish(); }
         else if (event.type === 'cancel') finish(Object.assign(new Error('Richiesta annullata.'), { name: 'AbortError' }));
@@ -142,7 +159,8 @@ function desktopPlatform(bridge: Bridge): Platform {
       saveTimers.set(conversation.id, window.setTimeout(() => { saveTimers.delete(conversation.id); void bridge.saveConversationHistory(toRecord(conversation)); }, 600));
     },
     removeConversation: (id) => { void bridge.removeConversationHistory(id); },
-    forgetRemote: async () => {}
+    forgetRemote: async () => {},
+    rate: async (requestId, rating) => { await bridge.rateResponse({ requestId, rating, target: 'current' }); }
   };
 }
 
@@ -151,4 +169,4 @@ function desktopPlatform(bridge: Bridge): Platform {
 const bridge = (window as unknown as { nexus?: Bridge }).nexus;
 /** Ponte IPC del desktop, null sul web: lo usano i pannelli del Centro di controllo. */
 export const desktopBridge: Bridge | null = bridge && typeof bridge.streamChat === 'function' ? bridge : null;
-export const platform: Platform = desktopBridge ? desktopPlatform(desktopBridge) : webPlatform;
+export const platform: Platform = desktopBridge ? desktopPlatform(desktopBridge) : isPairedIngress() ? pairedPlatform() : webPlatform;

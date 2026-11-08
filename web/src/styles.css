@@ -183,6 +183,22 @@
   .markdown .math-inline { font-family: 'Cambria Math', 'STIX Two Math', serif; }
   .markdown li.task { list-style: none; margin-left: -1.2em; display: flex; gap: 8px; align-items: baseline; }
   .markdown li.task input { accent-color: var(--cyan); }
+  .agent-trail { display: grid; gap: 8px; margin: 2px 0 6px; font-size: .84rem; }
+  .agent-trail summary { cursor: pointer; width: max-content; color: var(--mist); list-style: none; padding: 4px 10px; border-radius: 99px; border: 1px solid color-mix(in oklch, var(--hairline) 35%, transparent); }
+  .agent-trail summary::-webkit-details-marker { display: none; }
+  .agent-trail ol { list-style: none; margin: 8px 0 0; padding: 0 0 0 4px; display: grid; gap: 4px; color: var(--mist); }
+  .agent-trail ol li { display: flex; gap: 8px; align-items: center; }
+  .agent-trail ol li::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: listen .8s var(--ease-standard) infinite alternate; }
+  .agent-trail ol li[data-done='true']::before { background: var(--success); box-shadow: none; animation: none; }
+  .sources { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .sources a, .sources li > span { display: inline-flex; align-items: center; gap: 7px; max-width: 280px; padding: 5px 10px 5px 5px; border-radius: 10px; color: var(--ice); text-decoration: none; background: color-mix(in oklch, var(--surface) 70%, transparent); border: 1px solid var(--glass-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sources a:hover { border-color: color-mix(in oklch, var(--cyan) 45%, transparent); }
+  .sources .index { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; font-size: .72rem; color: var(--ink); background: var(--cyan); }
+  .sources small { color: var(--mist); font-size: .74rem; }
+  .answer-actions .icon-button[data-active='true'] { color: var(--cyan); }
+  .pair-error { margin: 4px 0 0; color: var(--attention); font-size: .88rem; }
+  .pair-submit { justify-self: stretch; justify-content: center; border: 0; }
+  .pair-submit:disabled { opacity: .5; }
   .user-turn { position: relative; }
   .edit-turn { justify-self: end; opacity: 0; transition: opacity .17s; }
   .user-turn:hover .edit-turn, .edit-turn:focus-visible { opacity: 1; }
@@ -225,6 +241,7 @@
   .sheet header { display: flex; justify-content: space-between; align-items: center; }
   .sheet h2 { margin: 0; font-size: 1.1rem; }
   .sheet label { font-size: .82rem; color: var(--mist); margin-top: 6px; }
+  .sheet > .field { width: 100%; min-height: 42px; padding: 9px 12px; border-radius: 12px; color: var(--ice); background: color-mix(in oklch, var(--ink) 55%, transparent); border: 1px solid color-mix(in oklch, var(--hairline) 40%, transparent); font: inherit; }
   .segmented { display: flex; flex-wrap: wrap; gap: 6px; }
   /* Centro di controllo (desktop): stesse superfici vetro, schede orizzontali scorrevoli. */
   .sheet.control { width: min(680px, 100%); max-height: min(86dvh, 820px); grid-template-rows: auto auto minmax(0, 1fr); margin-block: auto; }

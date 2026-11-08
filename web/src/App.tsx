@@ -8,12 +8,13 @@ import type { Capabilities, Preferences } from './api';
 import { ControlCenter } from './ControlCenter';
 import { useDesktopPresence } from './desktopPresence';
 import { desktopBridge, platform } from './platform';
+import { pairDevice, pairedToken } from './paired';
 import brandIcon from './assets/nexus-mark-ui.png';
 import { ACCEPT, formatSize, prepareFiles, type Pending } from './attachments';
 import { Core, type CoreState } from './Core';
 import { Markdown } from './Markdown';
 import { Icon } from './Icon';
-import { createPlayer, isNoiseTranscript, listenForBargeIn, speakableText, startRecording, type Recording } from './voice';
+import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { activeConversation, appendMessage, clearAll, deleteConversation, getState, newConversation, setState, uid, updateConversation, useStore, type Message } from './store';
 
 const SUGGESTIONS = [
@@ -95,11 +96,19 @@ export function App() {
   useEffect(() => { void platform.capabilities().then(setCaps); }, []);
 
   // Desktop: la cronologia su disco è la fonte di verità (alimenta anche la memoria automatica).
+  // Modalità associata: le conversazioni sono quelle del PC, dopo l'associazione con il codice.
+  const [paired, setPaired] = useState(() => platform.kind !== 'paired' || Boolean(pairedToken()));
   useEffect(() => {
+    if (!paired) return;
     void platform.loadConversations().then((loaded) => {
       if (loaded) setState((state) => ({ ...state, conversations: loaded.sort((a, b) => b.updatedAt - a.updatedAt), activeId: loaded.some((item) => item.id === state.activeId) ? state.activeId : null }));
-    }).catch(() => notify('Cronologia locale non disponibile.'));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch(() => notify(platform.kind === 'paired' ? 'Conversazioni del PC non raggiungibili.' : 'Cronologia locale non disponibile.'));
+  }, [paired]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const expired = () => setPaired(false);
+    window.addEventListener('nxs-paired-expired', expired);
+    return () => window.removeEventListener('nxs-paired-expired', expired);
+  }, []);
   useEffect(() => { if (conversation && !generating && conversation.messages.length) platform.saveConversation(conversation); }, [conversation, generating]);
 
   const coreState: CoreState = recording ? 'listening'
@@ -157,7 +166,8 @@ export function App() {
     const history = (activeConversation()?.messages ?? []).filter((message) => !message.error).map(({ role, content }) => ({ role, content }));
     appendMessage(conversationId, { id: uid(), role: 'user', content: text, createdAt: Date.now(), voice,
       ...(attachments.length ? { attachments: attachments.map(({ name, mime, size }) => ({ name, mime, size })) } : {}) });
-    const assistant: Message = { id: uid(), role: 'assistant', content: '', createdAt: Date.now() };
+    const requestId = uid();
+    const assistant: Message = { id: uid(), role: 'assistant', content: '', createdAt: Date.now(), requestId };
     appendMessage(conversationId, assistant);
     setDraft('');
     for (const item of attachments) if (item.preview) URL.revokeObjectURL(item.preview);
@@ -166,7 +176,7 @@ export function App() {
     stickToBottom.current = true;
     const abort = new AbortController();
     controller.current = abort;
-    pendingId.current = uid();
+    pendingId.current = requestId;
     setState((state) => ({ ...state, generating: true, phase: 'Mi collego…' }), { durable: false });
     const patch = (update: (message: Message) => Message, durable = false) => updateConversation(conversationId, (item) => ({
       ...item, messages: item.messages.map((message) => message.id === assistant.id ? update(message) : message)
@@ -176,15 +186,22 @@ export function App() {
     const paint = () => { raf = 0; const snapshot = buffered; patch((message) => ({ ...message, content: snapshot })); };
     try {
       await platform.send({
-        text, history, mode: getState().mode, clientMessageId: pendingId.current, preferences: getState().preferences, signal: abort.signal, attachments,
+        text, history, mode: getState().mode, clientMessageId: pendingId.current, preferences: getState().preferences, signal: abort.signal, attachments, conversationId,
         onEvent: (event) => {
           if (event.type === 'token' || event.type === 'replace') {
             buffered = event.type === 'token' ? buffered + event.token : event.text;
             // Un repaint per frame anche con centinaia di token al secondo.
             if (!raf) raf = requestAnimationFrame(paint);
             if (getState().phase) setState((state) => ({ ...state, phase: '' }), { durable: false });
-          } else if (event.type === 'phase') setState((state) => ({ ...state, phase: event.label }), { durable: false });
-          else if (event.type === 'complete') { cancelAnimationFrame(raf); finalText = event.message || buffered; patch((message) => ({ ...message, content: finalText }), true); }
+          } else if (event.type === 'phase') {
+            setState((state) => ({ ...state, phase: event.label }), { durable: false });
+            // Cronologia visibile dei passaggi (strumenti, ricerche, verifiche), senza duplicati consecutivi.
+            patch((message) => message.steps?.at(-1) === event.label ? message : { ...message, steps: [...(message.steps ?? []), event.label].slice(-12) });
+          } else if (event.type === 'sources') patch((message) => ({ ...message, sources: event.sources }));
+          else if (event.type === 'complete') {
+            cancelAnimationFrame(raf); finalText = event.message || buffered;
+            patch((message) => ({ ...message, content: finalText, ...(event.sources.length ? { sources: event.sources } : {}) }), true);
+          }
           else if (event.type === 'error') { cancelAnimationFrame(raf); patch((message) => ({ ...message, content: buffered || event.error, error: !buffered, interrupted: Boolean(buffered) }), true); }
         }
       });
@@ -426,8 +443,18 @@ export function App() {
                       ) : (
                         <div className="answer">
                           {message.content ? <Markdown text={message.content} /> : <Thinking label={phase} />}
+                          <AgentTrail steps={message.steps} sources={message.sources} live={generating && message.id === conversation!.messages.at(-1)?.id} />
                           {message.interrupted && <p className="note">Risposta interrotta.</p>}
                           {message.content && !generating && <AnswerActions text={message.content}
+                            rating={message.rating} onRate={message.requestId && !message.error ? async (rating) => {
+                              const previous = message.rating;
+                              updateConversation(conversation!.id, (item) => ({ ...item, messages: item.messages.map((entry) => entry.id === message.id ? { ...entry, rating } : entry) }));
+                              try { await platform.rate(message.requestId!, rating); }
+                              catch {
+                                updateConversation(conversation!.id, (item) => ({ ...item, messages: item.messages.map((entry) => entry.id === message.id ? { ...entry, rating: previous } : entry) }));
+                                notify('Valutazione non registrata: la risposta non è più disponibile.');
+                              }
+                            } : undefined}
                             speaking={speakingId === message.id} canSpeak={caps.voiceOutput && !message.error}
                             onSpeak={() => speakingId === message.id ? stopSpeaking() : void speak(message.id, message.content)} onRetry={() => {
                             const index = conversation!.messages.findIndex((item) => item.id === message.id);
@@ -521,6 +548,7 @@ export function App() {
           ]} />}
           {settingsOpen && <Settings preferences={preferences} onClose={() => setSettingsOpen(false)} onCleared={() => notify('Dati locali e risposte di ripresa cancellati.')} />}
           {controlOpen && desktopBridge && <ControlCenter onClose={() => setControlOpen(false)} notify={notify} />}
+          {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Collegato al tuo PC.'); }} />}
         </AnimatePresence>
 
         <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{toast}</m.div>}</AnimatePresence>
@@ -533,10 +561,44 @@ function Thinking({ label }: { label: string }) {
   return <p className="thinking" role="status"><span className="dots" aria-hidden="true"><i /><i /><i /></span>{label || 'Sto pensando…'}</p>;
 }
 
-function AnswerActions({ text, onRetry, onSpeak, speaking, canSpeak }: { text: string; onRetry: () => void; onSpeak: () => void; speaking: boolean; canSpeak: boolean }) {
+/**
+ * Cosa ha fatto l'agente per rispondere: passaggi visibili (strumenti, ricerche,
+ * verifiche) e fonti. Durante la risposta resta aperto; dopo si richiude.
+ */
+function AgentTrail({ steps = [], sources = [], live }: { steps?: string[]; sources?: Array<{ title?: string; url: string }>; live: boolean }) {
+  if (!steps.length && !sources.length) return null;
+  const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  return (
+    <div className="agent-trail">
+      {steps.length > 1 && (
+        <details open={live}>
+          <summary>{live ? 'Al lavoro' : `${steps.length} passaggi`}</summary>
+          <ol>{steps.map((step, index) => <li key={`${index}-${step}`} data-done={!live || index < steps.length - 1}>{step}</li>)}</ol>
+        </details>
+      )}
+      {sources.length > 0 && (
+        <ul className="sources" aria-label="Fonti">
+          {sources.map((source, index) => (
+            <li key={`${index}-${source.url || source.title}`}>
+              {source.url
+                ? <a href={source.url} target="_blank" rel="noopener noreferrer" title={source.title || source.url}><span className="index">{index + 1}</span>{source.title || host(source.url)}<small>{host(source.url)}</small></a>
+                : <span title="Nota locale"><span className="index">{index + 1}</span>{source.title}<small>nota locale</small></span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AnswerActions({ text, onRetry, onSpeak, speaking, canSpeak, rating, onRate }: { text: string; onRetry: () => void; onSpeak: () => void; speaking: boolean; canSpeak: boolean; rating?: 'up' | 'down'; onRate?: (rating: 'up' | 'down') => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="answer-actions" data-speaking={speaking}>
+      {onRate && <>
+        <button type="button" className="icon-button small" aria-label="Risposta utile" aria-pressed={rating === 'up'} data-active={rating === 'up'} onClick={() => onRate('up')}><Icon name="thumbUp" /></button>
+        <button type="button" className="icon-button small" aria-label="Risposta non utile" aria-pressed={rating === 'down'} data-active={rating === 'down'} onClick={() => onRate('down')}><Icon name="thumbDown" /></button>
+      </>}
       {canSpeak && <button type="button" className="icon-button small" aria-label={speaking ? 'Interrompi lettura' : 'Leggi ad alta voce'} aria-pressed={speaking} onClick={onSpeak}><Icon name={speaking ? 'stop' : 'speaker'} /></button>}
       <button type="button" className="icon-button small" aria-label={copied ? 'Copiato' : 'Copia risposta'} onClick={async () => {
         try { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch { /* clipboard negata */ }
@@ -601,6 +663,60 @@ function CommandPalette({ actions, onClose }: { actions: Action[]; onClose: () =
   );
 }
 
+/**
+ * Associazione di questo dispositivo al PC (ingresso privato). Il link del QR
+ * porta già il codice (#pair=…&device=…): in quel caso l'associazione parte da sola.
+ */
+function PairingScreen({ onPaired }: { onPaired: () => void }) {
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  const [code, setCode] = useState(fragment.get('pair') || '');
+  const [name, setName] = useState(fragment.get('device') || 'Telefono');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const pair = useCallback(async (value: string, device: string) => {
+    setBusy(true); setError('');
+    try {
+      await pairDevice(value, device);
+      history.replaceState(null, '', window.location.pathname);
+      onPaired();
+    } catch (failure) { setError(String((failure as Error)?.message || 'Associazione non riuscita.')); }
+    finally { setBusy(false); }
+  }, [onPaired]);
+  useEffect(() => { if (fragment.get('pair')) void pair(fragment.get('pair')!, fragment.get('device') || 'Telefono'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="overlay" role="presentation">
+      <m.form className="sheet glass" role="dialog" aria-modal="true" aria-labelledby="pair-title" onSubmit={(event) => { event.preventDefault(); void pair(code, name); }}
+        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+        <header><h2 id="pair-title">Collega questo dispositivo al PC</h2></header>
+        <p className="muted">Inserisci il codice mostrato sul PC in Centro di controllo → Telefono. Il collegamento è privato e revocabile.</p>
+        <label htmlFor="pair-code">Codice</label>
+        <input id="pair-code" className="field" inputMode="numeric" autoComplete="one-time-code" maxLength={12} value={code} onChange={(event) => setCode(event.target.value)} required />
+        <label htmlFor="pair-name">Nome del dispositivo</label>
+        <input id="pair-name" className="field" maxLength={80} value={name} onChange={(event) => setName(event.target.value)} />
+        {error && <p className="pair-error" role="alert">{error}</p>}
+        <button type="submit" className="live-cta pair-submit" disabled={busy || !code.trim()}>{busy ? 'Collego…' : 'Collega'}</button>
+      </m.form>
+    </div>
+  );
+}
+
+/** Scelta del microfono per dettatura e voce live; resta solo su questo dispositivo. */
+function MicrophonePicker() {
+  const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([]);
+  const [selected, setSelected] = useState(preferredMicrophone);
+  useEffect(() => { void listMicrophones().then(setDevices); }, []);
+  if (devices.length < 2) return null;
+  return (
+    <>
+      <label htmlFor="microphone">Microfono</label>
+      <select id="microphone" className="field" value={selected} onChange={(event) => { setPreferredMicrophone(event.target.value); setSelected(event.target.value); }}>
+        <option value="">Predefinito di sistema</option>
+        {devices.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)}
+      </select>
+    </>
+  );
+}
+
 function Settings({ preferences, onClose, onCleared }: { preferences: Preferences; onClose: () => void; onCleared: () => void }) {
   const set = (patch: Partial<Preferences>) => setState((state) => ({ ...state, preferences: { ...state.preferences, ...patch } }));
   const option = <K extends keyof Preferences>(key: K, values: Array<[Preferences[K], string]>) => (
@@ -622,6 +738,7 @@ function Settings({ preferences, onClose, onCleared }: { preferences: Preference
         {option('tone', [['neutral', 'Equilibrato'], ['warm', 'Caloroso'], ['direct', 'Diretto']])}
         <label>Lingua</label>
         {option('responseLanguage', [['auto', 'Auto'], ['it', 'IT'], ['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['de', 'DE']])}
+        <MicrophonePicker />
         <p className="muted">Le preferenze accompagnano le richieste; nome e dati personali non vengono inviati.</p>
         <button type="button" className="danger" onClick={async () => {
           if (!window.confirm('Cancellare tutte le conversazioni salvate su questo dispositivo?')) return;
