@@ -132,10 +132,15 @@ async function inspectBridge(target) {
           if (composerInput && setter) { setter.call(composerInput, draft); composerInput.dispatchEvent(new Event('input', { bubbles: true })); await wait(60); }
           const composerKeepsDraft = composer?.querySelector('textarea')?.value === draft;
           [...document.querySelectorAll('.sidebar-foot button')].find((button) => /Centro di controllo/.test(button.textContent))?.click();
+          // Il pannello entra con un'animazione: si attende che compaia e si fermi (max 3 s), non un tempo fisso.
+          const controlStarted = performance.now();
+          for (let attempt = 0; attempt < 120 && !document.querySelector('.sheet.control'); attempt += 1) await wait(25);
+          const controlAppearedMs = Math.round(performance.now() - controlStarted);
           await wait(400);
           const control = document.querySelector('.sheet.control');
           const controlFits = fits(control) && document.querySelectorAll('.sheet.control [role=tab]').length >= 6;
-          const controlGeometry = control ? (({ left, top, right, bottom }) => ({ left, top, right, bottom, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }))(control.getBoundingClientRect()) : null;
+          const controlGeometry = control ? (({ left, top, right, bottom }) => ({ left, top, right, bottom, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }))(control.getBoundingClientRect())
+            : { missing: true, controlAppearedMs, footButtons: [...document.querySelectorAll('.sidebar-foot button')].map((button) => button.textContent.trim()), sheets: [...document.querySelectorAll('.sheet, [role=dialog]')].map((element) => element.className || element.getAttribute('role')) };
           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
           return {
             bridgeComplete,
