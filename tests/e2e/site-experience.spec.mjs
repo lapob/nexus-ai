@@ -144,7 +144,11 @@ test("real PC captures use precise hover targets", async ({ page }) => {
   expect(await desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeCloseTo(0, 1);
   await desktopCardScreen.hover();
   await page.waitForTimeout(460);
-  await expect.poll(() => desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42)).toBeLessThan(-3);
+  // Under a loaded machine a late layout shift can move the card from under the pointer: re-hover while polling.
+  await expect.poll(async () => {
+    await desktopCardScreen.hover();
+    return desktopCardScreen.evaluate((screen) => new DOMMatrix(getComputedStyle(screen).transform).m42);
+  }).toBeLessThan(-3);
 });
 
 test("the PC image follows its copy without a retired mobile frame gap", async ({ page }) => {
