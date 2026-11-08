@@ -1,3 +1,18 @@
+## Preview 0.3.35 — 8 November 2026 (IN PROGRESS)
+
+Contents since 0.3.34: owner limits/attachments (cd8874a), deep model on
+"Approfondito" + auto-selection fix (3228859), mobile welcome layout fix
+(b00a3aa). Deep-model speed: num_ctx 4096–16384 makes no difference (~10 tok/s,
+13.7 GB in VRAM): the q4_K_M weights alone exceed free VRAM, KV-cache tuning
+cannot fix it; only a smaller quant (download, owner's call) can. gemma4
+consent failures: no tool call at all (not an unconfirmed action); diagnosis
+needs a GPU pause, batched with the smaller-quant test.
+Operation: bump 0.3.35 → `release:public:preview` (NEXUS_SERVICE_URL, .toolchains
+and git on PATH) → refresh manifest/verify bundle/prepare founder preview →
+push `main` → `publish-github-preview` → `.SITE` sync + release. Expected:
+verify PASS, assets digests verified, site download 0.3.35. Then restart the
+service so ai.nexusnxs.com serves the new web-dist.
+
 ## Owner limits removed, Preview 0.3.34 published, boot conflict fixed — 8 November 2026
 
 - **Preview 0.3.34 published**: full `verify` passed (incl. AI eval gate,
