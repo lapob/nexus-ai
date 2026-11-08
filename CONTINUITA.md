@@ -16,7 +16,13 @@
   Code fix 7f9ffc5: automatic registration yields to the "NexusNXS Server"
   task and refuses build folders. The two stale tasks were disabled (not deleted)
   on the owner's explicit go-ahead; Server (boot) and Desktop Bridge (logon)
-  remain the only active startup path.
+  remain the only active startup path. Verified on the 8 Nov 20:48 boot: only
+  Server and Desktop Bridge ran, readyz ready on 32145/32147 and public; the
+  service runs from source, so cd8874a (attachments/limits) is loaded.
+- **Models**: gemma4:26b-a4b-it-qat and gpt-oss:20b downloaded; qwen3.8:27b-q4_K_M
+  resumed on the service runtime (port 18032). Comparison not run yet: the
+  isolation gate needs ~18 GiB free RAM for CPU-only eval while the service
+  holds the GPU (11.7 GiB free); a GPU eval needs the service paused (owner's call).
 - **Owner limits** (desktop): no file count/size cap (1 GiB technical ceiling
   per file), PDFs supported with an owner profile (all pages, big heap, 15 min),
   more text formats (.log, .csv…); large attachments are fitted to the model
