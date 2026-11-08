@@ -8,6 +8,9 @@ const { promisify } = require('node:util');
 const execFileAsync = promisify(execFile);
 const TASK_NAME = 'NexusNXS Connectivity';
 const PRESENCE_TASK_NAME = 'NexusNXS Presence';
+const SERVER_TASK_NAME = 'NexusNXS Server';
+/** Cartelle prodotte da electron-builder: mai un bersaglio di avvio automatico. */
+const BUILD_OUTPUT = /[\\/](?:release|dist)[\\/](?:win|linux|mac)[\w-]*-unpacked[\\/]/i;
 
 // #region Processi CLI posseduti dalla UI
 
@@ -107,9 +110,15 @@ function createTrackedExecFileRunner({ launch = execFile, terminate = terminateO
 function continuityTaskScript(executable, enabled, userDataRoot = '', automatic = false) {
   const encodedExecutable = Buffer.from(String(executable || ''), 'utf8').toString('base64');
   const encodedUserData = Buffer.from(String(userDataRoot || ''), 'utf8').toString('base64');
+  // La registrazione automatica non deve mai entrare in conflitto con il server
+  // headless della workstation (task "NexusNXS Server", che possiede già l'avvio)
+  // né puntare a una cartella di build: una build rigenerata sostituirebbe
+  // l'eseguibile sotto un'attività di sistema e al login partirebbe un secondo Core.
   const preference = automatic
     ? `if((Get-ItemProperty -LiteralPath 'HKCU:\\Software\\NexusNXS' -Name StartupEnabled -ErrorAction SilentlyContinue).StartupEnabled -eq 0){'disabled';exit 0};`
+      + `if(Get-ScheduledTask -TaskName '${SERVER_TASK_NAME}' -ErrorAction SilentlyContinue){'server-managed';exit 0};`
     : `New-Item -Path 'HKCU:\\Software\\NexusNXS' -Force | Out-Null;New-ItemProperty -LiteralPath 'HKCU:\\Software\\NexusNXS' -Name StartupEnabled -Value ${enabled ? 1 : 0} -PropertyType DWord -Force | Out-Null;`;
+  if (enabled && BUILD_OUTPUT.test(String(executable || ''))) return `${preference}'build-output';exit 0`;
   if (!enabled) return preference + [TASK_NAME, PRESENCE_TASK_NAME]
     .map((name) => `Unregister-ScheduledTask -TaskName '${name}' -Confirm:$false -ErrorAction SilentlyContinue`)
     .join(';');

@@ -26,6 +26,20 @@ test('il watchdog parte al login e riavvia NexusNXS senza duplicare processi', (
   assert.doesNotMatch(script, /RunLevel Highest|User SYSTEM/);
 });
 
+test('la registrazione automatica cede al server headless e non punta mai a una cartella di build', () => {
+  const automatic = continuityTaskScript('C:\\Program Files\\NexusNXS\\NexusNXS.exe', true, '', true);
+  // Sulla workstation l'avvio appartiene al task "NexusNXS Server": niente secondo Core al login.
+  assert.ok(automatic.indexOf("Get-ScheduledTask -TaskName 'NexusNXS Server'") < automatic.indexOf('Register-ScheduledTask'));
+  assert.match(automatic, /'server-managed';exit 0/);
+  for (const executable of ['Z:\\[AI]\\NexusNXS\\.AI\\release\\win-unpacked\\NexusNXS.exe', 'C:/src/app/dist/win-unpacked/NexusNXS.exe']) {
+    const script = continuityTaskScript(executable, true, '', true);
+    assert.doesNotMatch(script, /Register-ScheduledTask/, executable);
+    assert.match(script, /'build-output';exit 0/);
+  }
+  // Una scelta esplicita di disattivazione resta sempre applicabile, anche da una build.
+  assert.match(continuityTaskScript('Z:\\x\\release\\win-unpacked\\NexusNXS.exe', false), /Unregister-ScheduledTask/);
+});
+
 test('la disattivazione rimuove soltanto il watchdog NexusNXS', () => {
   const script = continuityTaskScript('ignored', false);
   assert.match(script, /Unregister-ScheduledTask/);
