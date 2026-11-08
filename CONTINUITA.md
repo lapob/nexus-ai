@@ -14,9 +14,9 @@
   verification); that Core took the server lock without AI, so ai.nexusnxs.com
   returned 503. Recovered with a graceful stop + service start (ready, 200).
   Code fix 7f9ffc5: automatic registration yields to the "NexusNXS Server"
-  task and refuses build folders. The two stale tasks still exist (enabled):
-  deleting/disabling them was refused by the session permission policy, so
-  the owner must disable them.
+  task and refuses build folders. The two stale tasks were disabled (not deleted)
+  on the owner's explicit go-ahead; Server (boot) and Desktop Bridge (logon)
+  remain the only active startup path.
 - **Owner limits** (desktop): no file count/size cap (1 GiB technical ceiling
   per file), PDFs supported with an owner profile (all pages, big heap, 15 min),
   more text formats (.log, .csv…); large attachments are fitted to the model
