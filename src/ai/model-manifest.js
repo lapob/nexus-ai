@@ -61,7 +61,9 @@ const MODEL_PROFILES = Object.freeze({
 
 // Opzionale e mai scaricato in automatico: usato solo dal pulsante
 // "Approfondito" quando è già installato (vedi application/deep-model).
-const DEEP_MODEL = 'qwen3.8:27b-q4_K_M';
+// Eval 9/11/2026: UD-Q3_K_XL (unsloth, 13.1 GB) entra tutto in 16 GB di VRAM,
+// 33 token/s contro 10 della q4_K_M; agente 38/39, suite generale 98%.
+const DEEP_MODEL = 'qwen3.8:27b-ud-q3_K_XL';
 
 const TIER_ORDER = Object.freeze({ lite: 0, balanced: 1, performance: 2, ultra: 3 });
 

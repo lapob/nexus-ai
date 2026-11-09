@@ -25,9 +25,14 @@ test('se non è installato si resta sul percorso ordinario, senza download', asy
   assert.equal(await resolveDeepModel({ requestedMode: 'deep' }, async () => { throw new Error('runtime giù'); }), null);
 });
 
-test('budget del turno adatto a ~10 token/s e niente thinking', () => {
+test('budget del turno adatto a ~33 token/s più il caricamento a freddo, niente thinking', () => {
   assert.equal(DEEP_MODEL_REQUEST.think, false);
-  assert.ok(DEEP_MODEL_REQUEST.timeoutMs >= DEEP_MODEL_REQUEST.maxTokens / 10 * 1000 * 1.5);
+  assert.ok(DEEP_MODEL_REQUEST.timeoutMs >= (DEEP_MODEL_REQUEST.maxTokens / 33 * 1000 + 60_000) * 1.5);
+});
+
+test('il modello profondo è la variante che entra in 16 GB di VRAM', () => {
+  assert.equal(DEEP_MODEL, 'qwen3.8:27b-ud-q3_K_XL');
+  assert.equal(explicitDeepModel({ requestedMode: 'deep', installedModels: [{ id: 'qwen3.8:27b-ud-q3_K_XL' }] }), 'qwen3.8:27b-ud-q3_K_XL', 'nome con maiuscole di Ollama');
 });
 
 test('un modello di prova installato non diventa il principale in automatico', () => {

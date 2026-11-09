@@ -2,15 +2,16 @@
  * @module application/deep-model
  * @description Modello "Approfondito" scelto esplicitamente dal proprietario.
  *
- * Eval agente GPU dell'8/11/2026 (39 casi): qwen3.8:27b 100% ma ~10 token/s
- * perché non entra interamente in 16 GB di VRAM; qwen3:14b 97.4% a ~54 token/s.
- * Il 27B serve quindi solo quando l'utente preme "Approfondito": mai per
+ * Eval GPU (39 casi agente, 100 casi generali): qwen3.8:27b UD-Q3_K_XL entra
+ * interamente in 16 GB di VRAM (~33 token/s, agente 38/39, generale 98%);
+ * qwen3:14b resta il modello di ogni giorno (~54 token/s, 38/39, 99%).
+ * Il 27B serve solo quando l'utente preme "Approfondito": mai per
  * l'escalation automatica (allegati, domande lunghe), mai per ospiti pubblici.
  */
 const { DEEP_MODEL, canonicalModelId } = require('../ai/model-manifest');
 
-/** Budget del turno: a ~10 token/s 4K token richiedono ~7 minuti. */
-const DEEP_MODEL_REQUEST = Object.freeze({ maxTokens: 4096, timeoutMs: 900_000, think: false });
+/** Budget del turno: a ~33 token/s 8K token richiedono ~4 minuti; il caricamento a freddo ~45 s. */
+const DEEP_MODEL_REQUEST = Object.freeze({ maxTokens: 8192, timeoutMs: 900_000, think: false });
 
 function explicitDeepModel({ requestedMode, publicGuest = false, distributionMode = '', installedModels = [], preferred = DEEP_MODEL } = {}) {
   if (requestedMode !== 'deep' || publicGuest || distributionMode === 'public' || !preferred) return null;

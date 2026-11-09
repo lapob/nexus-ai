@@ -9,8 +9,23 @@ ai.nexusnxs.com and private ingress serve the mobile welcome fix; service
 restarted, readyz ready, model qwen3:14b. Smoke flake fixed (0d0dd74: adaptive
 wait for the Control Center, 6/6 pass). First smoke attempt failed 3/4 on the
 fixed 400 ms wait.
-Pending (owner decisions): download of a smaller 27B quant to fit 16 GB VRAM;
-GPU pause for gemma4 consent diagnosis; Qwen3-TTS voice download.
+Pending (owner decisions): Qwen3-TTS voice download.
+- **Deep model switched to the 16 GB-fitting quant (9 Nov, owner approved)**:
+  Ollama has no official 27B quant below q4_K_M, so pulled the community GGUF
+  `hf.co/unsloth/Qwen3.8-27B-GGUF:UD-Q3_K_XL` (13.1 GB; download interrupted
+  by the 9 Nov 19:31 reboot at 60%, resumed) and copied it to
+  `qwen3.8:27b-ud-q3_K_XL`. GPU eval with the service paused, then restarted:
+  12.9 GB all in VRAM at ctx 16384, ~33 tok/s (q4_K_M: ~10); agent 38/39 gate
+  PASS (only miss: read "48759 per 317" as division), median 3.1 s; general
+  extended suite 98/100 (prompt-injection, privacy-workstation).
+  qwen3:14b: agent 38/39, general 99/100. gemma4: consent failures were it
+  asking confirmation in words instead of calling the tool; new AGENT_GUIDANCE
+  line fixed it (agent 39/39, median 1.7 s) but general suite 80/100 —
+  structured JSON 2/22 — so NOT promoted. DEEP_MODEL now the Q3 quant,
+  maxTokens 8192. Live smoke via service runtime: correct answer, cold first
+  token 47.6 s (was 168 s). Reports: qa-artifacts/agent-eval-2026-11-09-*.json,
+  local-model-evaluation-2026-11-09.json. q4_K_M (18 GB) still installed; not
+  deleted without the owner's OK. Tests 1169 pass, `npm run check` PASS.
 
 Contents since 0.3.34: owner limits/attachments (cd8874a), deep model on
 "Approfondito" + auto-selection fix (3228859), mobile welcome layout fix
