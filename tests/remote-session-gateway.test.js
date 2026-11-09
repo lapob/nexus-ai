@@ -306,12 +306,13 @@ test('workflow history discards a result when access is revoked during its read'
   } finally {release?.({items:[],truncated:false});await gateway.stop();fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('la modalità associata usa le conversazioni del PC con token locale, rotazione e fasi reali', () => {
+test('la modalità associata usa le conversazioni del PC con token locale, rotazione e streaming reale', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../web/src/paired.ts'), 'utf8');
   assert.match(source, /meta\[name="nxs-ingress"\]/);
   assert.match(source, /'\/api\/pair'/);
   assert.match(source, /'\/api\/session\/rotate'/);
-  assert.match(source, /\/api\/activity\?conversation=/);
+  assert.match(source, /Accept: 'application\/x-ndjson, application\/json'/, 'chiede lo stream NDJSON e accetta il JSON dei PC meno recenti');
+  assert.doesNotMatch(source, /setInterval/, 'niente polling: fasi e token arrivano nello stream');
   assert.match(source, /\/api\/conversations\/\$\{encodeURIComponent\(conversationId\)\}\/messages/);
   assert.match(source, /Authorization: `Bearer \$\{token\}`/);
   assert.match(source, /response\.status === 401/, 'un token revocato riporta alla schermata di associazione');
@@ -1578,6 +1579,19 @@ test('pairing monouso, autenticazione e continuazione conversazione funzionano e
     assert.equal(result.turns.at(-1).content, 'Risposta remota');
     const duplicate = await (await fetch(`${baseUrl}/api/conversations/chat-1/messages`, { method: 'POST', headers, body: JSON.stringify({ text: 'Continuiamo', clientMessageId }) })).json();
     assert.equal(duplicate.turns.filter((turn) => turn.content === 'Continuiamo').length, 1);
+    // Telefono associato: con Accept NDJSON la risposta arriva token per token, poi l'evento finale con la conversazione.
+    const deviceStream = await fetch(`${baseUrl}/api/conversations/chat-1/messages`, { method: 'POST', headers: { ...headers, Accept: 'application/x-ndjson, application/json' },
+      body: JSON.stringify({ text: 'In streaming', clientMessageId: '019fa53a-63c1-79b1-bf97-08fdf3bb5ca0' }) });
+    assert.match(deviceStream.headers.get('content-type'), /application\/x-ndjson/);
+    assert.equal(deviceStream.headers.get('x-content-type-options'), 'nosniff');
+    const deviceFrames = (await deviceStream.text()).trim().split('\n').map((line) => JSON.parse(line));
+    assert.equal(deviceFrames[0].type, 'phase');
+    assert.deepEqual(deviceFrames.filter((frame) => frame.type === 'token').map((frame) => [frame.token, frame.cursor]), [['Risposta ', 9], ['remota', 15]]);
+    assert.equal(deviceFrames.at(-1).type, 'complete');
+    assert.equal(deviceFrames.at(-1).message, 'Risposta remota');
+    assert.equal(deviceFrames.at(-1).conversation.turns.at(-2).content, 'In streaming');
+    // Senza credenziali il flusso non parte: resta un 401 JSON vero.
+    assert.equal((await fetch(`${baseUrl}/api/conversations/chat-1/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }, body: JSON.stringify({ text: 'x' }) })).status, 401);
     const activity = await (await fetch(`${baseUrl}/api/activity?conversation=chat-1`, { headers })).json();
     assert.equal(activity.text, 'Risposta pronta');
     assert.equal(activity.phase, 'done');

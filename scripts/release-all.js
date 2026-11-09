@@ -128,7 +128,7 @@ if (includePrivate) {
   const privateApk = path.join(privateRoot, 'NexusNXS-Control.apk');
   fs.copyFileSync(source, privateApk);
   const manifest = releaseManifest({
-    product: 'NexusNXS PC Control', version: androidVersion('NexusConsole'), channel: 'owner',
+    product: 'NexusNXS Control', version: androidVersion('NexusConsole'), channel: 'owner',
     visibility: 'private-owner', releaseClass: production ? 'production' : 'preview',
     signatureRequired: production,
     artifacts: [artifactRecord(root, privateApk, {

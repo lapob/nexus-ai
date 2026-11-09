@@ -3091,7 +3091,24 @@ class RemoteSessionGateway {
           const conversation = Number.isSafeInteger(afterTurnIndex) && afterTurnIndex >= 0 && afterTurnIndex < record.turns.length
             ? { ...record, turns: record.turns.slice(0, afterTurnIndex + 1), updatedAt: Date.now(), incomplete: false }
             : record;
-          const report = (message, phase = 'work') => this.reportActivity(record.id, message, phase);
+          // Streaming NDJSON opzionale (Accept: application/x-ndjson): stesso formato dello
+          // stream pubblico (token/phase/complete/error/heartbeat); senza l'header resta il JSON.
+          const streaming = String(request.headers.accept || '').split(',').map((value) => value.trim()).includes('application/x-ndjson');
+          // Le intestazioni partono solo dopo la prima autorizzazione: un token revocato resta un 401 vero.
+          let streamCursor = 0, heartbeat = null, live = false;
+          const frame = (event) => {
+            if (!streaming || !live || response.destroyed || response.writableEnded) return;
+            if (!response.headersSent) response.writeHead(200, {
+              'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store, no-transform',
+              'Content-Security-Policy': "default-src 'none'", 'Cross-Origin-Resource-Policy': 'same-origin',
+              'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY'
+            });
+            response.write(`${JSON.stringify(event)}\n`);
+          };
+          const report = (message, phase = 'work') => {
+            this.reportActivity(record.id, message, phase);
+            frame({ type: 'phase', activity: { text: String(message || '').slice(0, 160), phase } });
+          };
           report('Comprendo la richiesta e preparo il contesto…');
           try {
             const { signal } = this.deviceRequestContexts.get(request).controller;
@@ -3101,7 +3118,18 @@ class RemoteSessionGateway {
               this.assertRequestAuthorized(request);
             };
             assertAuthorized();
-            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, publicIngress, report, signal, assertAuthorized, attachments });
+            if (streaming) {
+              live = true;
+              frame({ type: 'phase', activity: { text: 'Comprendo la richiesta e preparo il contesto…', phase: 'work' } });
+              heartbeat = setInterval(() => frame({ type: 'heartbeat' }), this.streamHeartbeatMs); heartbeat.unref?.();
+            }
+            const onToken = streaming ? (token) => {
+              const value = String(token || '');
+              if (!value || signal.aborted) return;
+              streamCursor += value.length;
+              frame({ type: 'token', token: value, cursor: streamCursor });
+            } : undefined;
+            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, publicIngress, report, signal, assertAuthorized, attachments, ...(onToken ? { onToken } : {}) });
             assertAuthorized();
             if (messageKey) {
               this.completedRemoteMessages.set(messageKey, Date.now());
@@ -3112,10 +3140,20 @@ class RemoteSessionGateway {
             }
             report('Risposta pronta', 'done');
             this.broadcast({ type: 'conversation', conversationId: record.id, updatedAt: updated.updatedAt });
-            return this.json(response, 200, updated);
+            if (!streaming) return this.json(response, 200, updated);
+            const answer = [...(updated.turns || [])].reverse().find((turn) => turn.role === 'assistant')?.content || '';
+            frame({ type: 'complete', message: answer, conversation: updated, cursor: answer.length });
+            if (!response.writableEnded) response.end();
+            return;
           } catch (error) {
             report('Non sono riuscito a completare la risposta', 'error');
-            throw error;
+            if (!streaming || !response.headersSent) throw error;
+            const aborted = error?.name === 'AbortError' || error?.code === 'ABORT_ERR';
+            frame({ type: 'error', error: aborted ? 'Richiesta annullata.' : 'La risposta non è stata completata.', cursor: streamCursor, resumable: false });
+            if (!response.writableEnded) response.end();
+            return;
+          } finally {
+            if (heartbeat) clearInterval(heartbeat);
           }
         }
       }

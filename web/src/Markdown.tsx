@@ -3,6 +3,8 @@
  * @description Markdown sicuro per lo streaming (web e desktop): solo elementi React (niente innerHTML), link solo https, codice copiabile, tabelle, callout, formule, liste numerate e checklist.
  */
 import { memo, useState, type ReactNode } from 'react';
+import { Icon } from './Icon';
+import { openPanel, worthPanel } from './panelStore';
 
 // #region 01 — Blocchi
 
@@ -159,11 +161,12 @@ function CodeBlock({ language, text, open }: { language: string; text: string; o
     <figure className="code">
       <figcaption>
         <span>{language}</span>
+        {!open && worthPanel(language, text) && <button type="button" className="open-panel" aria-label="Apri nel pannello laterale" title="Apri nel pannello" onClick={() => openPanel({ language, text })}><Icon name="panel" size={16} /></button>}
         <button type="button" disabled={open} aria-label={copied ? 'Copiato' : 'Copia codice'} onClick={async () => {
           try { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch { /* clipboard negata */ }
         }}>{copied ? 'Copiato' : 'Copia'}</button>
       </figcaption>
-      <pre><code>{text}</code></pre>
+      <pre tabIndex={0} aria-label={`Codice ${language}`}><code>{text}</code></pre>
     </figure>
   );
 }

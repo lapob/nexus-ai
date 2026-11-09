@@ -78,6 +78,59 @@ async function serverId(localId: string): Promise<string> {
   return created.id;
 }
 
+/** Il PC del proprietario legge il progetto intero: istruzioni e tutti i file (tetto dei progetti + margine). */
+const OWNER_PROJECT_BUDGET = 610_000;
+
+const utf8Base64 = (text: string) => {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  return btoa(binary);
+};
+
+const lastAnswer =(record: Partial<ServerConversation>) => [...(record.turns || [])].reverse().find((turn) => turn.role === 'assistant')?.content || '';
+
+/**
+ * Legge lo stream NDJSON del PC: token man mano che il modello scrive, fasi reali, evento finale.
+ * Se la connessione cade senza evento finale, lo segnala: il messaggio resta sul PC e ricompare nella cronologia.
+ */
+export async function consumeStream(body: ReadableStream<BufferSource>, onEvent: (event: StreamEvent) => void): Promise<void> {
+  const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '', text = '', terminal = false;
+  const handle = (line: string) => {
+    if (!line.trim()) return;
+    let event: Record<string, unknown>;
+    try { event = JSON.parse(line); } catch { return; }
+    if (event.type === 'token' && typeof event.token === 'string') {
+      text += event.token;
+      onEvent({ type: 'token', token: event.token, cursor: Number(event.cursor) || text.length });
+    } else if (event.type === 'phase') {
+      const activity = event.activity as { text?: unknown; phase?: unknown } | undefined;
+      if (typeof activity?.text === 'string' && activity.text && activity.phase !== 'done' && activity.phase !== 'error') onEvent({ type: 'phase', label: activity.text.slice(0, 160) });
+    } else if (event.type === 'complete') {
+      terminal = true;
+      const conversation = event.conversation as Partial<ServerConversation> | undefined;
+      const message = typeof event.message === 'string' && event.message ? event.message : (conversation ? lastAnswer(conversation) : '') || text;
+      onEvent({ type: 'complete', message, sources: [] });
+    } else if (event.type === 'error') {
+      terminal = true;
+      onEvent({ type: 'error', error: typeof event.error === 'string' ? event.error : 'La risposta non è stata completata.' });
+    }
+  };
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      lines.forEach(handle);
+    }
+    handle(buffer);
+  } finally { reader.releaseLock(); }
+  if (!terminal) onEvent({ type: 'error', error: 'Connessione con il PC interrotta. La risposta comparirà nella cronologia.' });
+}
+
 // #endregion
 
 // #region 03 — Piattaforma
@@ -95,26 +148,28 @@ export function pairedPlatform(): Platform {
     },
     send: async (sendRequest: SendRequest) => {
       const conversationId = await serverId(sendRequest.conversationId || sendRequest.clientMessageId);
-      // La risposta privata non è in streaming: si mostrano le fasi reali del PC finché arriva.
-      let lastPhase = '';
-      const poll = window.setInterval(async () => {
-        try {
-          const activity = await request<{ text?: string; phase?: string }>(`/api/activity?conversation=${encodeURIComponent(conversationId)}`);
-          if (activity.text && activity.phase !== 'idle' && activity.phase !== 'done' && activity.text !== lastPhase) {
-            lastPhase = activity.text;
-            sendRequest.onEvent({ type: 'phase', label: activity.text.slice(0, 160) } as StreamEvent);
-          }
-        } catch { /* la risposta finale resta la fonte di verità */ }
-      }, 700);
-      try {
-        const updated = await request<ServerConversation>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
-          method: 'POST', signal: sendRequest.signal,
-          body: JSON.stringify({ text: sendRequest.text, mode: sendRequest.mode, clientMessageId: sendRequest.clientMessageId,
-            ...(sendRequest.attachments.length ? { attachments: sendRequest.attachments.map(({ name, mime, data }) => ({ name, mime, data })) } : {}) })
-        });
-        const answer = [...updated.turns].reverse().find((turn) => turn.role === 'assistant')?.content || '';
-        sendRequest.onEvent({ type: 'complete', message: answer, sources: [] });
-      } finally { window.clearInterval(poll); }
+      const token = pairedToken();
+      // Il PC legge gli allegati di testo per intero e non li salva nei turni: lì viaggia il contesto del progetto.
+      const attachments = [
+        ...(sendRequest.project ? [{ name: `Progetto ${sendRequest.project.name}.md`.replace(/[\\/:*?"<>|]+/g, ' '), mime: 'text/markdown', data: utf8Base64(sendRequest.project.context(OWNER_PROJECT_BUDGET)) }] : []),
+        ...sendRequest.attachments.map(({ name, mime, data }) => ({ name, mime, data }))
+      ];
+      const response = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
+        method: 'POST', signal: sendRequest.signal, credentials: 'omit',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ text: sendRequest.text, mode: sendRequest.mode, clientMessageId: sendRequest.clientMessageId,
+          ...(attachments.length ? { attachments } : {}) })
+      });
+      if (response.status === 401) { write(TOKEN_KEY, ''); window.dispatchEvent(new Event('nxs-paired-expired')); }
+      const streamed = response.ok && response.body && (response.headers.get('content-type') || '').includes('application/x-ndjson');
+      if (!streamed) {
+        // PC meno recente o messaggio già completato (deduplicato): risposta JSON intera.
+        const body = await response.json().catch(() => ({})) as ServerConversation & { error?: string };
+        if (!response.ok) throw Object.assign(new Error(body?.error || 'Richiesta non riuscita.'), { status: response.status });
+        sendRequest.onEvent({ type: 'complete', message: lastAnswer(body), sources: [] });
+        return;
+      }
+      await consumeStream(response.body!, sendRequest.onEvent);
     },
     cancel: async () => {},
     transcribe: async () => { throw new Error('Voce non disponibile in modalità associata.'); },

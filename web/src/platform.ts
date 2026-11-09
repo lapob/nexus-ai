@@ -8,10 +8,15 @@ import type { Pending } from './attachments';
 import type { Conversation } from './store';
 import { isPairedIngress, pairedPlatform } from './paired';
 
+/** Progetto visto dai trasporti: nome e contesto costruito entro il budget di ciascun canale. */
+export interface ProjectRef { name: string; context: (budget: number) => string }
+
 export interface SendRequest {
   text: string; history: Turn[]; mode: ChatMode; clientMessageId: string; preferences: Preferences;
   /** Conversazione locale di destinazione (usata dalla modalità associata). */
   conversationId?: string;
+  /** Progetto della conversazione: istruzioni e file entrano come contesto, adattati al trasporto. */
+  project?: ProjectRef | null;
   signal: AbortSignal; onEvent: (event: StreamEvent) => void; attachments: Pending[];
 }
 
@@ -37,11 +42,18 @@ export interface Platform {
 
 // #region Web
 
+/** Il contesto del progetto apre la cronologia come scambio iniziale: resta anche nelle chat lunghe. */
+export function withProject(history: Turn[], project: ProjectRef | null | undefined, budget: number, keep: number): Turn[] {
+  if (!project) return history.slice(-keep);
+  return [{ role: 'user', content: project.context(budget) }, { role: 'assistant', content: 'Va bene: seguo istruzioni e file del progetto.' }, ...history.slice(-(keep - 2))];
+}
+
 const webPlatform: Platform = {
   kind: 'web',
   capabilities: api.capabilities,
   status: api.serviceStatus,
-  send: (request) => api.streamMessage({ ...request, conversationPreferences: request.preferences, attachments: request.attachments }),
+  // Ospite pubblico: ogni turno della cronologia arriva al gateway fino a 4.000 caratteri.
+  send: (request) => api.streamMessage({ ...request, history: withProject(request.history, request.project, 3_900, 24), conversationPreferences: request.preferences, attachments: request.attachments }),
   cancel: api.cancelMessage,
   transcribe: (wav) => api.transcribe(wav),
   synthesize: (text, options) => api.synthesize(text, options),
@@ -114,7 +126,7 @@ function desktopPlatform(bridge: Bridge): Platform {
       request.signal.addEventListener('abort', () => { void bridge.cancel(requestId); }, { once: true });
       Promise.resolve(bridge.streamChat({
         question: request.text, mode: request.mode, requestId,
-        history: request.history.slice(-16),
+        history: withProject(request.history, request.project, 46_000, 16),
         attachmentIds: request.attachments.map((item) => item.id)
       })).catch((error: Error) => finish(error));
     }),

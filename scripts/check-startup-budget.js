@@ -18,10 +18,17 @@ const source = entry ? fs.readFileSync(path.join(dist, entry.name), 'utf8') : ''
 
 // #region 02 — Regole
 const LIMIT = 400 * 1024;
+// Pannelli aperti di rado (es. Centro di controllo) possono stare in chunk pigri: non entrano
+// nell'avvio purché l'HTML carichi un solo script, senza modulepreload, e restino piccoli.
+const LAZY_LIMIT = 80 * 1024;
 const failures = [];
 if (!entry || entry.bytes > LIMIT) failures.push(`bundle oltre ${LIMIT / 1024} KiB (${entry?.bytes || 0} byte)`);
-if (scripts.length !== 1) failures.push(`attesi un solo bundle JS, trovati ${scripts.length}`);
-if (/three\.module|WebGLRenderer|@react-three/.test(source)) failures.push('una libreria 3D è rientrata nel bundle');
+const htmlScripts = html.match(/<script\b[^>]*\bsrc=/gi) || [];
+if (htmlScripts.length !== 1) failures.push(`l'avvio deve caricare un solo script, trovati ${htmlScripts.length}`);
+if (/modulepreload/i.test(html)) failures.push('chunk pigri precaricati nell HTML');
+for (const chunk of scripts.filter((file) => file !== entry)) if (chunk.bytes > LAZY_LIMIT) failures.push(`chunk pigro ${chunk.name} oltre ${LAZY_LIMIT / 1024} KiB`);
+const allSource = scripts.map((file) => fs.readFileSync(path.join(dist, file.name), 'utf8')).join('\n');
+if (/three\.module|WebGLRenderer|@react-three/.test(allSource)) failures.push('una libreria 3D è rientrata nel bundle');
 if (!/navigator\.gpu|requestAdapter/.test(source) || !/getContext\(['"`]2d/.test(source)) failures.push('nucleo WebGPU o fallback Canvas mancanti');
 if (/<(?:script|link)[^>]+(?:src|href)=["']https?:/i.test(html)) failures.push('l HTML carica risorse da origini esterne');
 if (failures.length) {

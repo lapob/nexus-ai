@@ -3,9 +3,8 @@
  * @description Shell della nuova web app NexusNXS AI: conversazioni locali, streaming con fasi, nucleo WebGPU, palette comandi e preferenze.
  */
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'framer-motion';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Capabilities, Preferences } from './api';
-import { ControlCenter } from './ControlCenter';
 import { useDesktopPresence } from './desktopPresence';
 import { desktopBridge, platform } from './platform';
 import { pairDevice, pairedToken } from './paired';
@@ -16,13 +15,25 @@ import { Markdown } from './Markdown';
 import { Icon, type IconName } from './Icon';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
-import { activeConversation, appendMessage, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
+import { activeConversation, appendMessage, assignProject, createProject, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, openProject, projectContext, projectFor, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
+import { ProjectNav, ProjectSheet } from './Projects';
+import { Panel } from './Panel';
+import { closePanel, openPanel, usePanel } from './panelStore';
+
+// Centro di controllo solo desktop (protocollo nexus://, script-src 'self'): caricato alla prima apertura, fuori dal bundle iniziale.
+const ControlCenter = lazy(() => import('./ControlCenter').then((module) => ({ default: module.ControlCenter })));
 
 /** Rinomina e, dove la cronologia vive altrove (desktop), salva subito anche le conversazioni non attive. */
 function rename(id: string, title: string) {
   renameConversation(id, title);
   const updated = getState().conversations.find((item) => item.id === id);
   if (updated?.messages.length) platform.saveConversation(updated);
+}
+
+/** Il progetto della conversazione per i trasporti: il contesto si costruisce al budget di ciascun canale. */
+function projectRef(conversationId: string) {
+  const project = projectFor(conversationId);
+  return project ? { name: project.name, context: (budget: number) => projectContext(project, budget) } : null;
 }
 
 const timeLabel = (at: number) => new Date(at).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -88,6 +99,13 @@ export function App() {
   const [controlOpen, setControlOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const pinned = useStore((state) => state.pinned);
+  const projects = useStore((state) => state.projects);
+  const projectView = useStore((state) => state.projectView);
+  const currentProject = useStore((state) => projectFor(state.activeId, state));
+  const viewedProject = projects.find((item) => item.id === projectView) ?? null;
+  const [projectSheet, setProjectSheet] = useState<string | null>(null);
+  const closeProjectSheet = useCallback(() => setProjectSheet(null), []);
+  const panelDoc = usePanel();
   // Home dinamica: categoria scelta e rotazione dei suggerimenti (nuova a ogni conversazione o con «Altre idee»).
   const [category, setCategory] = useState<string | null>(null);
   const [roll, setRoll] = useState(0);
@@ -209,7 +227,7 @@ export function App() {
     const paint = () => { raf = 0; const snapshot = buffered; patch((message) => ({ ...message, content: snapshot })); };
     try {
       await platform.send({
-        text, history, mode: getState().mode, clientMessageId: pendingId.current, preferences: getState().preferences, signal: abort.signal, attachments, conversationId,
+        text, history, mode: getState().mode, clientMessageId: pendingId.current, preferences: getState().preferences, signal: abort.signal, attachments, conversationId, project: projectRef(conversationId),
         onEvent: (event) => {
           if (event.type === 'token' || event.type === 'replace') {
             buffered = event.type === 'token' ? buffered + event.token : event.text;
@@ -361,7 +379,8 @@ export function App() {
       else if (event.key === 'Escape') {
         if (event.defaultPrevented) return;
         if (liveRef.current && !paletteOpen && !settingsOpen) endLive();
-        else if (paletteOpen || settingsOpen || sidebarOpen || controlOpen || shortcutsOpen) { setPaletteOpen(false); setSettingsOpen(false); setSidebarOpen(false); setControlOpen(false); setShortcutsOpen(false); }
+        else if (paletteOpen || settingsOpen || sidebarOpen || controlOpen || shortcutsOpen || projectSheet) { setPaletteOpen(false); setSettingsOpen(false); setSidebarOpen(false); setControlOpen(false); setShortcutsOpen(false); setProjectSheet(null); }
+        else if (panelDoc) closePanel();
         else if (recording) recording.cancel();
         else if (getState().generating) stop();
         else stopSpeaking();
@@ -369,7 +388,7 @@ export function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [controlOpen, endLive, paletteOpen, recording, settingsOpen, shortcutsOpen, sidebarOpen, startLive, startNew, stop, stopSpeaking, toggleSidebar]);
+  }, [controlOpen, endLive, paletteOpen, panelDoc, projectSheet, recording, settingsOpen, shortcutsOpen, sidebarOpen, startLive, startNew, stop, stopSpeaking, toggleSidebar]);
 
   const jumpToBottom = useCallback(() => {
     const element = scrollRef.current;
@@ -427,7 +446,7 @@ export function App() {
 
   return (
     <LazyMotion features={domAnimation} strict><MotionConfig reducedMotion="user">
-      <div className="app" data-sidebar={sidebarOpen ? 'open' : 'closed'} data-collapsed={sidebarHidden} data-live={live}>
+      <div className="app" data-sidebar={sidebarOpen ? 'open' : 'closed'} data-collapsed={sidebarHidden} data-live={live} data-panel={Boolean(panelDoc)}>
         <aside className="sidebar glass" aria-label="Conversazioni" aria-hidden={sidebarHidden && !sidebarOpen ? true : undefined} inert={sidebarHidden && !sidebarOpen ? true : undefined}>
           <div className="sidebar-head">
             <span className="brand"><img src={brandIcon} alt="" width="22" height="22" />NexusNXS</span>
@@ -436,7 +455,8 @@ export function App() {
             </span>
           </div>
           <button type="button" className="new-chat" aria-label="Nuova conversazione" onClick={startNew} disabled={generating}><Icon name="plus" size={18} /><span>Nuova conversazione</span><kbd className="only-wide">Ctrl+Maiusc+O</kbd></button>
-          <ConversationList onPick={(id) => transition(() => { setState((state) => ({ ...state, activeId: id })); setSidebarOpen(false); })} disabled={generating} />
+          <ProjectNav onEdit={setProjectSheet} disabled={generating} />
+          <ConversationList onEditProject={setProjectSheet} onPick={(id) => transition(() => { setState((state) => ({ ...state, activeId: id })); setSidebarOpen(false); })} disabled={generating} />
           <div className="sidebar-foot">
             <button type="button" className="icon-button" aria-label="Preferenze" title="Preferenze" onClick={() => setSettingsOpen(true)}><Icon name="sliders" /></button>
             {desktopBridge && <button type="button" className="icon-button" aria-label="Centro di controllo" title="Centro di controllo: modelli, telefono, memoria, sistema" onClick={() => setControlOpen(true)}><Icon name="classic" /></button>}
@@ -457,7 +477,8 @@ export function App() {
             </>}
             {conversation && !empty
               ? <TitleEditor key={conversation.id} conversation={conversation} disabled={generating} />
-              : <h1 className="title">NexusNXS AI</h1>}
+              : <h1 className="title">{viewedProject ? viewedProject.name : 'NexusNXS AI'}</h1>}
+            {currentProject && !empty && <button type="button" className="project-chip only-wide" title="Istruzioni e file del progetto" onClick={() => setProjectSheet(currentProject.id)}><Icon name="folder" size={15} /><span>{currentProject.name}</span></button>}
             {conversation && !empty && <span className="title-actions only-wide">
               <button type="button" className="icon-button small" aria-label={pinned.includes(conversation.id) ? 'Rimuovi dalle fissate' : 'Fissa conversazione'} title={pinned.includes(conversation.id) ? 'Rimuovi dalle fissate' : 'Fissa in cima'}
                 aria-pressed={pinned.includes(conversation.id)} data-active={pinned.includes(conversation.id)} onClick={() => togglePin(conversation.id)}><Icon name="pin" size={18} /></button>
@@ -481,6 +502,7 @@ export function App() {
             {empty ? (
               <section className="welcome" aria-label="Inizia">
                 <div ref={coreSlotRef} className="core-slot" aria-hidden="true" />
+                {viewedProject && <m.p className="project-eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Icon name="folder" size={15} />{viewedProject.name}{viewedProject.files.length ? ` · ${viewedProject.files.length} file` : ''}{viewedProject.instructions.trim() ? ' · istruzioni attive' : ''}</m.p>}
                 <m.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}>
                   {hello} <span className="accent">Cosa creiamo?</span>
                 </m.h2>
@@ -527,6 +549,7 @@ export function App() {
                             {!generating && message.id === conversation!.messages.at(-1)?.id && <button type="button" className="inline-action" onClick={() => void send('Continua esattamente da dove ti sei fermato, senza ripetere.')}><Icon name="forward" size={16} />Continua</button>}
                           </p>}
                           {message.content && !generating && <AnswerActions text={message.content} at={message.createdAt} onBranch={message.error ? undefined : () => branch(message.id)}
+                            onOpen={!message.error && message.content.length > 1_200 ? () => openPanel({ language: 'markdown', text: message.content }) : undefined}
                             rating={message.rating} onRate={message.requestId && !message.error ? async (rating) => {
                               const previous = message.rating;
                               updateConversation(conversation!.id, (item) => ({ ...item, messages: item.messages.map((entry) => entry.id === message.id ? { ...entry, rating } : entry) }));
@@ -626,10 +649,18 @@ export function App() {
           )}
         </main>
 
+        <AnimatePresence>{panelDoc && <Panel key="panel" />}</AnimatePresence>
+
         <AnimatePresence>
           {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} actions={[
             { id: 'new', label: 'Nuova conversazione', hint: 'Ctrl+Maiusc+O', icon: 'plus', run: startNew },
             ...(caps.voiceInput && caps.voiceOutput ? [{ id: 'live', label: live ? 'Termina voce live' : 'Avvia voce live', hint: 'Ctrl+Maiusc+L', icon: 'wave' as const, run: () => { if (live) endLive(); else void startLive(); } }] : []),
+            { id: 'project-new', label: 'Nuovo progetto', icon: 'folderPlus', run: () => setProjectSheet(createProject()) },
+            ...(conversation?.messages.length ? [
+              ...projects.filter((item) => item.id !== currentProject?.id).slice(0, 8).map((item) => ({ id: `move-${item.id}`, label: `Sposta nel progetto «${item.name}»`, icon: 'folder' as const, run: () => { assignProject(conversation.id, item.id); notify(`Spostata in «${item.name}»: da ora usa istruzioni e file del progetto.`); } })),
+              ...(currentProject ? [{ id: 'move-out', label: `Togli dal progetto «${currentProject.name}»`, icon: 'folder' as const, run: () => assignProject(conversation.id, null) }] : [])
+            ] : []),
+            ...projects.slice(0, 8).map((item) => ({ id: `open-${item.id}`, label: `Apri progetto «${item.name}»`, hint: 'Progetto', icon: 'folder' as const, run: () => transition(() => openProject(item.id)) })),
             { id: 'mode', label: mode === 'fast' ? 'Passa a modalità Approfondita' : 'Passa a modalità Rapida', icon: mode === 'fast' ? 'sparkles' : 'bolt', run: toggleMode },
             ...(conversation?.messages.length ? [
               { id: 'pin', label: pinned.includes(conversation.id) ? 'Rimuovi dalle fissate' : 'Fissa conversazione', icon: 'pin' as const, run: () => togglePin(conversation.id) },
@@ -642,9 +673,10 @@ export function App() {
             ...(desktopBridge ? [{ id: 'control', label: 'Centro di controllo (modelli, telefono, memoria, sistema)', icon: 'classic' as const, run: () => setControlOpen(true) }] : []),
             ...conversations.slice(0, 12).map((item) => ({ id: `c-${item.id}`, label: item.title, hint: 'Apri', icon: (pinned.includes(item.id) ? 'pin' : 'clock') as IconName, run: () => transition(() => setState((state) => ({ ...state, activeId: item.id }))) }))
           ]} />}
+          {projectSheet && <ProjectSheet key={projectSheet} projectId={projectSheet} onClose={closeProjectSheet} notify={notify} />}
           {shortcutsOpen && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
           {settingsOpen && <Settings preferences={preferences} onClose={() => setSettingsOpen(false)} onCleared={() => notify('Dati locali e risposte di ripresa cancellati.')} />}
-          {controlOpen && desktopBridge && <ControlCenter onClose={() => setControlOpen(false)} notify={notify} />}
+          {controlOpen && desktopBridge && <Suspense key="control" fallback={null}><ControlCenter onClose={() => setControlOpen(false)} notify={notify} /></Suspense>}
           {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Collegato al tuo PC.'); }} />}
         </AnimatePresence>
 
@@ -746,7 +778,7 @@ function TitleEditor({ conversation, disabled }: { conversation: Conversation; d
     onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); save(); } else if (event.key === 'Escape') { event.preventDefault(); setEditing(false); } }} />;
 }
 
-function AnswerActions({ text, at, onBranch, onRetry, onSpeak, speaking, canSpeak, rating, onRate }: { text: string; at: number; onBranch?: () => void; onRetry: () => void; onSpeak: () => void; speaking: boolean; canSpeak: boolean; rating?: 'up' | 'down'; onRate?: (rating: 'up' | 'down') => void }) {
+function AnswerActions({ text, at, onBranch, onOpen, onRetry, onSpeak, speaking, canSpeak, rating, onRate }: { text: string; at: number; onBranch?: () => void; onOpen?: () => void; onRetry: () => void; onSpeak: () => void; speaking: boolean; canSpeak: boolean; rating?: 'up' | 'down'; onRate?: (rating: 'up' | 'down') => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="answer-actions" data-speaking={speaking}>
@@ -760,15 +792,22 @@ function AnswerActions({ text, at, onBranch, onRetry, onSpeak, speaking, canSpea
         try { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch { /* clipboard negata */ }
       }}><Icon name={copied ? 'check' : 'copy'} /></button>
       <button type="button" className="icon-button small" aria-label="Rigenera risposta" title="Rigenera" onClick={onRetry}><Icon name="retry" /></button>
+      {onOpen && <button type="button" className="icon-button small" aria-label="Apri come documento nel pannello" title="Apri come documento" onClick={onOpen}><Icon name="panel" /></button>}
       {onBranch && <button type="button" className="icon-button small" aria-label="Dirama da qui" title="Dirama da qui: nuova conversazione fino a questa risposta" onClick={onBranch}><Icon name="branch" /></button>}
     </div>
   );
 }
 
-function ConversationList({ onPick, disabled }: { onPick: (id: string) => void; disabled: boolean }) {
-  const conversations = useStore((state) => state.conversations);
+function ConversationList({ onPick, onEditProject, disabled }: { onPick: (id: string) => void; onEditProject: (id: string) => void; disabled: boolean }) {
+  const allConversations = useStore((state) => state.conversations);
   const pinned = useStore((state) => state.pinned);
   const activeId = useStore((state) => state.activeId);
+  const projectView = useStore((state) => state.projectView);
+  const projectOf = useStore((state) => state.projectOf);
+  const projects = useStore((state) => state.projects);
+  const project = projects.find((item) => item.id === projectView) ?? null;
+  // Dentro un progetto si vedono solo le sue chat; fuori, tutte.
+  const conversations = useMemo(() => projectView ? allConversations.filter((item) => projectOf[item.id] === projectView) : allConversations, [allConversations, projectOf, projectView]);
   const [query, setQuery] = useState('');
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -780,9 +819,16 @@ function ConversationList({ onPick, disabled }: { onPick: (id: string) => void; 
   const groups = useMemo(() => groupConversations(visible, pinned), [visible, pinned]);
   return (
     <>
-      <label className="search"><Icon name="search" size={18} /><input type="search" placeholder="Cerca nelle conversazioni" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Cerca nelle conversazioni" /></label>
+      {project && (
+        <div className="project-banner">
+          <button type="button" className="icon-button small" aria-label="Tutte le conversazioni" title="Tutte le conversazioni" onClick={() => transition(() => openProject(null))}><Icon name="back" size={17} /></button>
+          <span title={project.name}><Icon name="folder" size={16} />{project.name}</span>
+          <button type="button" className="icon-button small" aria-label={`Istruzioni e file di ${project.name}`} title="Istruzioni e file" onClick={() => onEditProject(project.id)}><Icon name="sliders" size={16} /></button>
+        </div>
+      )}
+      <label className="search"><Icon name="search" size={18} /><input type="search" placeholder={project ? 'Cerca nel progetto' : 'Cerca nelle conversazioni'} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Cerca nelle conversazioni" /></label>
       <nav className="conversation-list" aria-label="Cronologia">
-        {visible.length === 0 && <p className="muted empty-list">{query ? 'Nessun risultato.' : 'Le tue conversazioni appariranno qui.'}</p>}
+        {visible.length === 0 && <p className="muted empty-list">{query ? 'Nessun risultato.' : project ? 'Le chat nuove aperte qui useranno istruzioni e file del progetto.' : 'Le tue conversazioni appariranno qui.'}</p>}
         {groups.map((group) => (
           <section key={group.label} className="conversation-group" aria-label={group.label}>
             <h3>{group.label === 'Fissate' && <Icon name="pin" size={13} />}{group.label}</h3>

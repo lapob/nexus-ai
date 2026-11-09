@@ -40,6 +40,38 @@
   13 routes verified; live capture confirms the PC showcase fix.
 - Next: release 0.3.36 (installer with the new UI) needs the owner's go.
 
+### Block 2 — streaming on the phone, Projects, side panel, permanent UI checks
+
+- **Streaming to the paired phone**: the device message route answers NDJSON
+  (`Accept: application/x-ndjson`) with phase/token/heartbeat/complete/error,
+  the same format as the public stream; headers leave only after the first
+  authorization (revoked token stays a real 401); without the header it is the
+  old JSON. `paired.ts` consumes it (`consumeStream`), no more 700 ms polling.
+- **Projects** (Claude-style, local only): `store.ts` projects/projectOf/
+  projectView (sanitised on load, limits 24 projects, 20 text files, 600K
+  chars); new chats and forks inherit the project; deleting a project keeps its
+  chats. Context = instructions + files within each channel's budget: web
+  guest 3.9K (history opener), desktop 46K (history opener, 16 turns), phone
+  full as a text attachment (never saved into PC turns). UI `Projects.tsx`:
+  sidebar section, project banner/filter, header chip, home eyebrow, sheet
+  (name, instructions, drag-and-drop files, two-step delete), palette actions.
+- **Side panel** (`Panel.tsx`, `panelStore.ts`): open long code blocks / long
+  answers; line numbers, wrap, copy, download, icon-only preview/code switch;
+  safe previews only (Markdown, SVG as <img>, CSV table). Executable HTML
+  preview NOT done: web/desktop CSPs forbid frames — needs a sandboxed origin on
+  gateway + Electron + Cloudflare edge and its own security review.
+- **Startup budget**: entry bundle 377 KB (Control Center lazy, desktop only);
+  rule now "one startup script, no modulepreload, lazy chunks ≤ 80 KB".
+- **Checks**: `tests/web-store-projects.test.js`, `tests/web-paired-stream.test.js`,
+  gateway device-stream assertions; `npm run check:ui` (17 real Chrome
+  scenarios over web-dist: errors, overflow, targets ≥ 32 px, axe serious/
+  critical, reduced motion) → 17/17. Code blocks now keyboard-focusable (axe).
+- Naming: Android app is NexusNXS Control only (release manifest fixed); no
+  Android AI app exists in the repo.
+- Cleanup candidates awaiting the owner's OK (not deleted): qa-artifacts/blobs
+  (6.6 GB interrupted model download, 25 Oct), release/ installers 0.3.25–0.3.34
+  (~1.07 GB), old APK 1.20.3, the two *-broken-sep30 junctions (links only).
+
 ## Preview 0.3.35 — 8 November 2026 (PUBLISHED)
 
 Done: `release:public:preview` PASS (tests 1168/0 fail, AI eval gate, voice,
