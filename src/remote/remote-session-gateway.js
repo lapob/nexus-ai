@@ -43,6 +43,9 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_PORT = 32145;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
+/** Solo dispositivi associati del proprietario: allegati in base64 senza limite di numero (tetto tecnico di memoria). */
+const MAX_DEVICE_MESSAGE_BYTES = 256 * 1024 * 1024;
+const MAX_DEVICE_TEXT_CHARS = 48_000;
 const MAX_PRIVATE_VOICE_BYTES = 512 * 1024;
 const PRIVATE_VOICE_SAMPLE_RATE = 16_000;
 const PRIVATE_VOICE_MAX_SECONDS = 12;
@@ -205,6 +208,49 @@ async function guestAttachments(value, { signal } = {}) {
     else throw new Error('Formato allegato non supportato.');
   }
   return { context: contexts.join('\n\n'), images };
+}
+
+const SENSITIVE_ATTACHMENT_NAME = /^(?:\.env(?:\..*)?|id_(?:rsa|dsa|ecdsa|ed25519)|.*\.(?:pem|pfx|p12|key|kdbx))$/i;
+/** Il provider accetta al massimo 2 immagini da ~1,5 MB per messaggio: le altre vengono dichiarate, non scartate in silenzio. */
+const MAX_DEVICE_IMAGES = 2;
+
+/**
+ * Allegati dal telefono associato del proprietario: nessun limite di numero o
+ * di dimensione per file oltre al corpo della richiesta; testo e PDF letti per
+ * intero (profilo PDF "owner"). Il contesto viene poi adattato alla domanda.
+ */
+async function deviceAttachments(value, { signal, extractPdf = extractPdfText } = {}) {
+  if (!Array.isArray(value)) return { context: '', images: [] };
+  const contexts = []; const images = [];
+  for (const item of value) {
+    const name = path.basename(String(item?.name || 'allegato')).replace(/[\r\n]/g, ' ').slice(0, 120);
+    const mime = String(item?.mime || 'application/octet-stream').toLowerCase().slice(0, 80);
+    const encoded = String(item?.data || '');
+    if (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(mime) || !encoded || !/^[A-Za-z0-9+/]+=*$/.test(encoded)) throw new Error('Allegato non valido.');
+    if (SENSITIVE_ATTACHMENT_NAME.test(name)) { contexts.push(`FILE: ${name}\nContenuto non incluso (file sensibile).`); continue; }
+    if (mime.startsWith('image/')) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) throw new Error('Formato immagine non supportato.');
+      if (images.length < MAX_DEVICE_IMAGES && encoded.length <= 2_050_000) { images.push(encoded); contexts.push(`IMMAGINE: ${name}`); }
+      else contexts.push(`IMMAGINE: ${name}\nNon inclusa: il modello visivo legge al massimo ${MAX_DEVICE_IMAGES} immagini fino a ~1,5 MB per messaggio.`);
+      continue;
+    }
+    const bytes = Buffer.from(encoded, 'base64');
+    if (!bytes.length) throw new Error('Allegato vuoto.');
+    if (mime.startsWith('text/') || ['application/json', 'application/xml'].includes(mime)) {
+      contexts.push(`FILE: ${name}\n${bytes.toString('utf8').replace(/\u0000/g, '').trim()}`);
+      continue;
+    }
+    if (mime === 'application/pdf') {
+      try {
+        const extracted = await extractPdf(bytes, { profile: 'owner', signal });
+        const text = String(extracted?.text || '').replace(/\u0000/g, '').trim();
+        contexts.push(text ? `PDF: ${name}\n${text}` : `PDF: ${name}\nTesto non estraibile; il documento potrebbe contenere soltanto immagini.`);
+      } catch { contexts.push(`PDF: ${name}\nContenuto non incluso (PDF non leggibile o protetto).`); }
+      continue;
+    }
+    throw new Error('Formato allegato non supportato.');
+  }
+  return { context: contexts.join('\n\n========\n\n'), images };
 }
 
 function cpuUtilization() {
@@ -1648,7 +1694,7 @@ class RemoteSessionGateway {
     response.end(JSON.stringify(payload));
   }
 
-  async body(request) {
+  async body(request, maximumBytes = MAX_BODY_BYTES) {
     this.assertServing();
     this.assertRequestAuthorized(request);
     const chunks = [];
@@ -1657,7 +1703,7 @@ class RemoteSessionGateway {
       this.assertServing();
       this.assertRequestAuthorized(request);
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) throw new Error('Richiesta troppo grande.');
+      if (size > maximumBytes) throw requestFailure('Richiesta troppo grande.', 'REQUEST_TOO_LARGE', 413);
       chunks.push(chunk);
     }
     this.assertServing();
@@ -3027,10 +3073,14 @@ class RemoteSessionGateway {
         if (request.method === 'GET' && !url.pathname.endsWith('/messages')) return this.json(response, 200, record);
         if (request.method === 'POST' && url.pathname.endsWith('/messages')) {
           if (!this.onMessage) return this.json(response, 503, { error: 'Il motore conversazionale non è pronto.' });
-          const body = await this.body(request);
+          // Dispositivo associato e autenticato: corpo ampio per gli allegati del proprietario.
+          const body = await this.body(request, MAX_DEVICE_MESSAGE_BYTES);
           this.assertServing();
           const text = String(body.text || '').trim();
-          if (!text || text.length > 12_000) return this.json(response, 400, { error: 'Messaggio non valido.' });
+          if (!text || text.length > MAX_DEVICE_TEXT_CHARS) return this.json(response, 400, { error: 'Messaggio non valido.' });
+          let attachments;
+          try { attachments = await deviceAttachments(body.attachments, { signal: this.deviceRequestContexts.get(request)?.controller?.signal }); }
+          catch (error) { return this.json(response, 400, { error: error.message || 'Allegato non valido.' }); }
           const clientMessageId = String(body.clientMessageId || '');
           const messageKey = clientMessageId && /^[a-f0-9-]{20,80}$/i.test(clientMessageId) ? `${device.id}:${clientMessageId}` : '';
           if (messageKey && this.completedRemoteMessages.has(messageKey)) {
@@ -3051,7 +3101,7 @@ class RemoteSessionGateway {
               this.assertRequestAuthorized(request);
             };
             assertAuthorized();
-            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, publicIngress, report, signal, assertAuthorized });
+            const updated = await this.onMessage({ conversation, text, mode: body.mode === 'deep' ? 'deep' : 'fast', device: { id: device.id, name: device.name }, publicIngress, report, signal, assertAuthorized, attachments });
             assertAuthorized();
             if (messageKey) {
               this.completedRemoteMessages.set(messageKey, Date.now());
@@ -3084,4 +3134,4 @@ class RemoteSessionGateway {
 
 // #endregion
 
-module.exports = { PUBLIC_AI_HTML, PUBLIC_AI_BUILT, PUBLIC_AI_MANIFEST, PUBLIC_AI_SERVICE_WORKER, RemoteSessionGateway, systemSnapshot, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, normalizeSyncedPreferences, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed, parseDeviceIdentityEnrollment, verifyDevicePublicKeySignature, privateVoiceWaveInfo, DEFAULT_PORT };
+module.exports = { PUBLIC_AI_HTML, PUBLIC_AI_BUILT, PUBLIC_AI_MANIFEST, PUBLIC_AI_SERVICE_WORKER, RemoteSessionGateway, systemSnapshot, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, normalizeSyncedPreferences, guestAttachments, deviceAttachments, authenticatedRouteLimit, slidingWindowAllowed, parseDeviceIdentityEnrollment, verifyDevicePublicKeySignature, privateVoiceWaveInfo, DEFAULT_PORT };

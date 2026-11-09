@@ -6,46 +6,81 @@ import { useEffect, useRef } from 'react';
 
 export type CoreState = 'idle' | 'listening' | 'thinking' | 'responding' | 'speaking' | 'error';
 
-const PARTICLES = 6_000;
+// Tre popolazioni: guscio sferico, due anelli orbitali "HUD" a segmenti, nucleo interno.
+const SPHERE = 5_200;
+const RING = 900;
+const INNER = 500;
+const PARTICLES = SPHERE + RING * 2 + INNER;
 const FALLBACK_PARTICLES = 1_600;
 const ENERGY: Record<CoreState, number> = { idle: 0.15, listening: 0.4, thinking: 0.6, responding: 1, speaking: 0.85, error: 0.35 };
 
 // Ogni istanza è un quad; la posizione nasce da un hash dell'indice (distribuzione
-// di Fibonacci sulla sfera) e da onde dipendenti da tempo ed energia.
+// di Fibonacci sulla sfera, oppure orbite inclinate) e da onde dipendenti da tempo ed energia.
 const SHADER = /* wgsl */ `
 struct Uniforms { time: f32, energy: f32, aspect: f32, scale: f32, tint: vec4f };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
-struct Out { @builtin(position) position: vec4f, @location(0) local: vec2f, @location(1) glow: f32 };
+struct Out { @builtin(position) position: vec4f, @location(0) local: vec2f, @location(1) glow: f32, @location(2) white: f32 };
 
 fn hash(n: f32) -> f32 { return fract(sin(n * 12.9898) * 43758.5453); }
+fn rotY(p: vec3f, a: f32) -> vec3f { let c = cos(a); let s = sin(a); return vec3f(c * p.x + s * p.z, p.y, -s * p.x + c * p.z); }
+fn rotX(p: vec3f, a: f32) -> vec3f { let c = cos(a); let s = sin(a); return vec3f(p.x, c * p.y - s * p.z, s * p.y + c * p.z); }
+fn rotZ(p: vec3f, a: f32) -> vec3f { let c = cos(a); let s = sin(a); return vec3f(c * p.x - s * p.y, s * p.x + c * p.y, p.z); }
 
 @vertex
 fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32) -> Out {
-  let count = f32(${PARTICLES});
   let i = f32(instance);
-  let golden = 2.39996323;
-  let y = 1.0 - (i / (count - 1.0)) * 2.0;
-  let ring = sqrt(max(0.0, 1.0 - y * y));
-  let theta = golden * i;
-  var p = vec3f(cos(theta) * ring, y, sin(theta) * ring);
   let seed = hash(i);
-  let wave = sin(u.time * (0.6 + u.energy * 1.4) + seed * 6.2831 + y * 4.0);
-  let radius = 0.62 + 0.05 * wave * (0.4 + u.energy) + 0.12 * (seed - 0.5) * u.energy;
-  p = p * radius;
-  let angle = u.time * (0.08 + 0.22 * u.energy);
-  let c = cos(angle); let s = sin(angle);
-  p = vec3f(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
-  let tilt = 0.35; let ct = cos(tilt); let st = sin(tilt);
-  p = vec3f(p.x, ct * p.y - st * p.z, st * p.y + ct * p.z);
+  var p: vec3f;
+  var bright = 1.0;
+  var white = 0.0;
+  var sizeBoost = 1.0;
+  if (instance < ${SPHERE}u) {
+    let count = f32(${SPHERE});
+    let y = 1.0 - (i / (count - 1.0)) * 2.0;
+    let ring = sqrt(max(0.0, 1.0 - y * y));
+    let theta = 2.39996323 * i;
+    let wave = sin(u.time * (0.6 + u.energy * 1.4) + seed * 6.2831 + y * 4.0);
+    let radius = 0.62 + 0.05 * wave * (0.4 + u.energy) + 0.12 * (seed - 0.5) * u.energy;
+    p = rotY(vec3f(cos(theta) * ring, y, sin(theta) * ring) * radius, u.time * (0.08 + 0.22 * u.energy));
+  } else if (instance < ${SPHERE + RING * 2}u) {
+    // Anelli orbitali: piani inclinati opposti, segmenti luminosi che scorrono come dati.
+    let k = i - f32(${SPHERE});
+    let second = k >= f32(${RING});
+    let j = select(k, k - f32(${RING}), second);
+    let a = j / f32(${RING}) * 6.2831853;
+    let dir = select(1.0, -1.0, second);
+    let spin = u.time * dir * (0.12 + 0.35 * u.energy);
+    let radius = select(0.88, 0.97, second) + 0.012 * (seed - 0.5);
+    p = vec3f(cos(a + spin) * radius, 0.006 * (seed - 0.5), sin(a + spin) * radius);
+    p = rotX(p, select(0.22, -0.3, second));
+    p = rotZ(p, select(0.38, -0.5, second));
+    let dash = fract(a * select(9.0, 14.0, second) / 6.2831853 - u.time * 0.15 * dir);
+    bright = select(0.25, 1.7, dash < select(0.55, 0.35, second)) * (0.6 + 0.4 * u.energy);
+    white = 0.4;
+    sizeBoost = 1.1;
+  } else {
+    // Nucleo interno: luce densa e più bianca che pulsa con l'energia.
+    let k = i - f32(${SPHERE + RING * 2});
+    let y = 1.0 - (k / f32(${INNER - 1})) * 2.0;
+    let ring = sqrt(max(0.0, 1.0 - y * y));
+    let theta = 2.39996323 * k;
+    let pulse = 1.0 + 0.18 * sin(u.time * (1.2 + 2.4 * u.energy) + seed * 3.0) * (0.3 + u.energy);
+    p = rotY(vec3f(cos(theta) * ring, y, sin(theta) * ring) * (0.14 + 0.1 * seed) * pulse, -u.time * 0.4);
+    white = 0.7;
+    bright = 0.8 + 0.6 * u.energy;
+    sizeBoost = 1.3;
+  }
+  p = rotX(p, 0.35);
   let depth = 1.0 / (2.2 - p.z);
   let corners = array<vec2f, 4>(vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0), vec2f(1.0, 1.0));
   let corner = corners[vertex];
-  let size = (0.0035 + 0.006 * hash(i + 7.0)) * (1.0 + u.energy * 0.6) * u.scale;
+  let size = (0.0035 + 0.006 * hash(i + 7.0)) * (1.0 + u.energy * 0.6) * u.scale * sizeBoost;
   var out: Out;
   out.position = vec4f(vec2f(p.x * depth / u.aspect, p.y * depth) * 1.9 * u.scale + corner * vec2f(size / u.aspect, size), 0.0, 1.0);
   out.local = corner;
-  out.glow = (0.35 + 0.65 * (p.z * 0.5 + 0.5)) * (0.55 + 0.45 * u.energy);
+  out.glow = (0.35 + 0.65 * (p.z * 0.5 + 0.5)) * (0.55 + 0.45 * u.energy) * bright;
+  out.white = white;
   return out;
 }
 
@@ -54,7 +89,8 @@ fn fs(input: Out) -> @location(0) vec4f {
   let d = dot(input.local, input.local);
   if (d > 1.0) { discard; }
   let falloff = exp(-d * 3.2);
-  return vec4f(u.tint.rgb * falloff * input.glow, falloff * input.glow);
+  let color = mix(u.tint.rgb, vec3f(0.92, 1.0, 1.0), input.white);
+  return vec4f(color * falloff * input.glow, falloff * input.glow);
 }
 `;
 
@@ -135,6 +171,20 @@ function canvasRenderer(canvas: HTMLCanvasElement, tint: [number, number, number
         context.globalAlpha = Math.min(1, (0.35 + 0.65 * front) * (0.6 + 0.4 * energy));
         context.fillRect(width / 2 + x * radius * wave * depth * 1.7 - size / 2, height / 2 + y * radius * wave * depth * 1.7 - size / 2, size, size);
       }
+      // Anelli orbitali a segmenti, come nel percorso WebGPU.
+      context.strokeStyle = color;
+      context.lineWidth = Math.max(1, (window.devicePixelRatio || 1) * 1.2);
+      for (const [index, [scale, tilt, dash]] of ([[1.42, 0.42, 9], [1.56, -0.55, 14]] as const).entries()) {
+        const direction = index ? -1 : 1;
+        const circumference = Math.PI * 2 * radius * scale;
+        context.globalAlpha = 0.35 + 0.35 * energy;
+        context.setLineDash([circumference / dash * 0.5, circumference / dash * 0.5]);
+        context.lineDashOffset = -direction * time * 40 * (0.3 + energy);
+        context.beginPath();
+        context.ellipse(width / 2, height / 2, radius * scale, radius * scale * 0.34, tilt, 0, Math.PI * 2);
+        context.stroke();
+      }
+      context.setLineDash([]);
       context.globalAlpha = 1;
     },
     destroy: () => {}

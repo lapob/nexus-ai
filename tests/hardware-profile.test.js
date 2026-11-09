@@ -47,9 +47,10 @@ test('adatta contesto, output e permanenza del modello al computer', () => {
 
   assert.deepEqual(
     [lite.contextTokens, balanced.contextTokens, performance.contextTokens],
-    [1536, 4096, 16384]
+    [1536, 4096, 32768]
   );
-  assert.equal(maximum.contextTokens, 17408);
+  assert.equal(maximum.contextTokens, 32768);
+  assert.equal(runtimeTuning({ totalMemoryBytes: 32 * GIB, cpuThreads: 16, gpuMemoryBytes: 14 * GIB }).contextTokens, 16384, 'sotto 15 GB di VRAM resta 16K');
   assert.ok(lite.quickTokens < balanced.quickTokens);
   assert.equal(efficient.performanceLevel, 2);
   assert.ok(lite.contextTokens < efficient.contextTokens);

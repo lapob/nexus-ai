@@ -82,7 +82,8 @@ async function serverId(localId: string): Promise<string> {
 
 // #region 03 — Piattaforma
 
-const NO_VOICE: Capabilities = { voiceInput: false, voiceOutput: false, attachments: false };
+/** Allegati attivi: il PC li legge per intero (profilo proprietario). La voce resta sul PC. */
+const NO_VOICE: Capabilities = { voiceInput: false, voiceOutput: false, attachments: true };
 
 export function pairedPlatform(): Platform {
   void rotateIfDue();
@@ -108,7 +109,8 @@ export function pairedPlatform(): Platform {
       try {
         const updated = await request<ServerConversation>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
           method: 'POST', signal: sendRequest.signal,
-          body: JSON.stringify({ text: sendRequest.text, mode: sendRequest.mode, clientMessageId: sendRequest.clientMessageId })
+          body: JSON.stringify({ text: sendRequest.text, mode: sendRequest.mode, clientMessageId: sendRequest.clientMessageId,
+            ...(sendRequest.attachments.length ? { attachments: sendRequest.attachments.map(({ name, mime, data }) => ({ name, mime, data })) } : {}) })
         });
         const answer = [...updated.turns].reverse().find((turn) => turn.role === 'assistant')?.content || '';
         sendRequest.onEvent({ type: 'complete', message: answer, sources: [] });
@@ -118,7 +120,7 @@ export function pairedPlatform(): Platform {
     transcribe: async () => { throw new Error('Voce non disponibile in modalità associata.'); },
     synthesize: async () => { throw new Error('Voce non disponibile in modalità associata.'); },
     pickAttachments: null,
-    acceptsDroppedFiles: false,
+    acceptsDroppedFiles: true,
     loadConversations: async () => {
       if (!pairedToken()) return [];
       const rows = await request<Array<{ id: string }>>('/api/conversations');

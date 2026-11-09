@@ -1,3 +1,34 @@
+## In progress — 9 November 2026: 32K context, phone attachments, Jarvis UI (owner approved)
+
+- **Context 32K** (`hardware-profile.js`): performance ≥5 and GPU ≥15 GiB →
+  minimum 32768 (14B at 32K: 13.4 GB all in VRAM, ~39 tok/s; 27B ~33 tok/s on
+  short prompts). Test updated (14 GB VRAM → 16384).
+- **Attachments from the paired phone**: `paired.ts` sends attachments (owner
+  limits, photos downscaled ≤1.4 MB in `attachments.ts`), gateway
+  `deviceAttachments` (no count limit, sensitive names skipped, 2 images to the
+  model, others declared, PDFs owner profile), device body limit 256 MB, text
+  48K. Guests keep 2 files/1.5 MB. `remoteChat` skips the instant reply with
+  attachments. Tests: `tests/device-attachments.test.js`.
+- **Jarvis UI**: Core shader with orbital "HUD" rings and inner core (WebGPU +
+  Canvas fallback), CSS HUD rings coloured by state, starfield background;
+  new linear icon set; Claude-style organisation: "Nuova conversazione" button,
+  history grouped (Fissate/Oggi/Ieri/7/30 giorni/Meno recenti) with pin, inline
+  rename and two-step delete; header rename/pin/export; dynamic home (greeting
+  by hour, 5 categories, shuffle, prompts that need text go to the composer);
+  "/" quick commands (10) in the composer and palette; inline edit of any user
+  message (truncates only on send), copy, "Continua" on interrupted answers,
+  "Dirama da qui" (fork), timestamps, shortcuts sheet (Ctrl+/), palette icons.
+  Tests: `tests/web-prompts.test.js`. Playwright/Chrome captures (8 scenarios:
+  desktop, short, mobile, slash, thread, palette, shortcuts): 0 console errors,
+  0 horizontal overflow. In-app browser pane screenshots are unreliable while
+  the pane is hidden (rAF paused).
+- **Site** (`.SITE/app/narrative.css`): removed the hard-edged teal panel behind
+  the PC showcase and the `mix-blend-mode: screen` that let background particles
+  show through the app screenshot (owner's photo).
+- Checks so far: typecheck PASS, `npm test` 1175 pass / 0 fail.
+  Next: `npm run check`, commit+push, service restart (readyz 32145/32147),
+  site capture refresh + deploy, release 0.3.36.
+
 ## Preview 0.3.35 — 8 November 2026 (PUBLISHED)
 
 Done: `release:public:preview` PASS (tests 1168/0 fail, AI eval gate, voice,

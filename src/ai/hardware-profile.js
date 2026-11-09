@@ -64,8 +64,12 @@ function runtimeTuning(hardware = {}) {
   // piccolo margine, mentre RAM e thread determinano contesto e output senza
   // legare il runtime a categorie commerciali o modelli specifici.
   const baseContext = profile.performanceLevel === 1 ? 1536 : 2048;
-  const minimumContext = profile.performanceLevel >= 5 ? 16384
-    : profile.performanceLevel >= 4 ? 8192 : baseContext;
+  // Misurato 9/11/2026 su 16 GB di VRAM: qwen3:14b con 32K di contesto pieno
+  // resta tutto in VRAM (13.4 GB) a ~39 token/s; il contesto doppio fa
+  // entrare il doppio di un allegato grande senza estratti.
+  const minimumContext = profile.performanceLevel >= 5 && gpuGiB >= 15 ? 32768
+    : profile.performanceLevel >= 5 ? 16384
+      : profile.performanceLevel >= 4 ? 8192 : baseContext;
   const maximumContext = profile.performanceLevel >= 5 ? 32768
     : profile.performanceLevel >= 4 ? 16384 : 12288;
   const contextTokens = clamp(minimumContext, maximumContext, stepped(

@@ -2018,7 +2018,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     const remoteStartedAt = performance.now();
     report('Comprendo la richiesta e preparo il contesto…');
     const parsed = parseChatRequest({ question: text, mode, history: conversation.turns });
-    const instantReply = parsed.mode !== 'deep' && normalizeConversationPreferences(conversationPreferences, ephemeral ? {} : getSettings().personalization).responseLanguage === 'auto'
+    const hasRemoteAttachments = Boolean(attachments?.context || attachments?.images?.length);
+    const instantReply = !hasRemoteAttachments && parsed.mode !== 'deep' && normalizeConversationPreferences(conversationPreferences, ephemeral ? {} : getSettings().personalization).responseLanguage === 'auto'
       ? strictToolRoutingReply(parsed.question) || deterministicUtilityReply(parsed.question) || deterministicSecurityReply(parsed.question) || deterministicArithmeticReply(parsed.question, parsed.history) || deterministicCodeOutputReply(parsed.question) || instantConversationalReply(parsed.question)
       : null;
     if (instantReply) {
