@@ -66,6 +66,12 @@
   gateway device-stream assertions; `npm run check:ui` (17 real Chrome
   scenarios over web-dist: errors, overflow, targets ≥ 32 px, axe serious/
   critical, reduced motion) → 17/17. Code blocks now keyboard-focusable (axe).
+- **Live phone check** (ADB wireless, SM-S931B, Control 1.21.0): the app was
+  OFFLINE because the phone's Tailscale was disconnected; reconnected, PC
+  connected. Supremo: tap → opened (process up in ~1 s); second tap → "Supremo
+  chiusa sul PC", process gone in ~1 s. Owner's report closed. Restart/power
+  buttons never touched.
+- Commit c3e3f77 pushed; service restarted, readyz 32145/32147 ready.
 - Naming: Android app is NexusNXS Control only (release manifest fixed); no
   Android AI app exists in the repo.
 - Cleanup candidates awaiting the owner's OK (not deleted): qa-artifacts/blobs
