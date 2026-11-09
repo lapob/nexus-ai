@@ -85,6 +85,7 @@ const scenarios = [
   { name: 'home-desktop', viewport: desktop, expect: ['.welcome h2', '.suggestions .chip'] },
   { name: 'home-short', viewport: { width: 1024, height: 640 }, expect: ['.welcome h2'] },
   { name: 'home-mobile', viewport: mobile, mobile: true, expect: ['.welcome h2'] },
+  { name: 'home-landscape', viewport: { width: 844, height: 390 }, reducedMotion: 'reduce', expect: ['.welcome h2'] },
   { name: 'slash-menu', viewport: desktop, run: async (page) => { await page.click('textarea[aria-label="Messaggio"]'); await page.keyboard.type('/r'); }, expect: ['.slash-menu li'] },
   { name: 'thread', viewport: desktop, state: thread, run: async (page) => { await page.hover('.message.user >> nth=0'); }, expect: ['.thread .message.assistant', '.inline-action'] },
   { name: 'thread-mobile', viewport: mobile, mobile: true, state: thread, expect: ['.thread'] },

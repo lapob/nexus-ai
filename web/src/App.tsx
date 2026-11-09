@@ -827,7 +827,8 @@ function ConversationList({ onPick, onEditProject, disabled }: { onPick: (id: st
         </div>
       )}
       <label className="search"><Icon name="search" size={18} /><input type="search" placeholder={project ? 'Cerca nel progetto' : 'Cerca nelle conversazioni'} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Cerca nelle conversazioni" /></label>
-      <nav className="conversation-list" aria-label="Cronologia">
+      {/* Su schermi bassi la lista scorre: deve restare raggiungibile da tastiera anche se vuota. */}
+      <nav className="conversation-list" aria-label="Cronologia" tabIndex={0}>
         {visible.length === 0 && <p className="muted empty-list">{query ? 'Nessun risultato.' : project ? 'Le chat nuove aperte qui useranno istruzioni e file del progetto.' : 'Le tue conversazioni appariranno qui.'}</p>}
         {groups.map((group) => (
           <section key={group.label} className="conversation-group" aria-label={group.label}>

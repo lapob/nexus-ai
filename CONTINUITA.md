@@ -1,3 +1,13 @@
+## In progress — 9 November 2026: site sync + Preview 0.3.36 (owner: "completa tutto")
+
+Operation: web-dist rebuilt (single inlined bundle; ControlCenter chunk only in
+renderer-dist) → `.SITE` `sync-ai-shell` → commit → `release:prepare` →
+`release:promote` → push `website`. Then bump 0.3.36 → `release:public:preview`
+→ verify bundle → push `main` → `publish-github-preview` → site download sync.
+Expected: all gates PASS, ai.nexusnxs.com serves Projects/panel UI, v0.3.36
+assets verified. Then HTML sandbox preview and model actions (Qwen3-TTS,
+vision model, removal of qwen3.8:27b-q4_K_M after checking it is unused).
+
 ## In progress — 9 November 2026: 32K context, phone attachments, Jarvis UI (owner approved)
 
 - **Context 32K** (`hardware-profile.js`): performance ≥5 and GPU ≥15 GiB →
