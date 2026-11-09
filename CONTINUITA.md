@@ -74,9 +74,13 @@
 - Commit c3e3f77 pushed; service restarted, readyz 32145/32147 ready.
 - Naming: Android app is NexusNXS Control only (release manifest fixed); no
   Android AI app exists in the repo.
-- Cleanup candidates awaiting the owner's OK (not deleted): qa-artifacts/blobs
-  (6.6 GB interrupted model download, 25 Oct), release/ installers 0.3.25–0.3.34
-  (~1.07 GB), old APK 1.20.3, the two *-broken-sep30 junctions (links only).
+- **Cleanup done with the owner's OK (9 Nov)**: deleted qa-artifacts/blobs
+  (6.6 GB interrupted model download, 18 sha256 partial files, untouched since
+  25 Oct), release/ installers + blockmaps 0.3.25–0.3.34 (1069 MB; 0.3.35 kept),
+  APK NexusNXS Control 1.20.3 (1.21.0 kept); removed the junctions
+  vendor-broken-sep30 and node_modules-broken-sep30 with rmdir (links only:
+  vendor 4 and node_modules 235 entries unchanged, readyz 200). No source
+  references them.
 
 ## Preview 0.3.35 — 8 November 2026 (PUBLISHED)
 
