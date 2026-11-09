@@ -18,9 +18,32 @@ body { background: radial-gradient(ellipse at 50% 45%, #020607 18%, #09171d 100%
 html { scroll-padding-top: 96px; }
 [id] { scroll-margin-top: 96px; }
 .inner-page :is(p,.service-list small,.legal-nav a) { color: #a6bfc1; }
-.trust-seal { background: transparent !important; clip-path: none; border: 1px solid #80d8d52b; border-radius: 50%; box-shadow: inset 0 0 70px #59cbc80b; }
-.trust-seal::before, .trust-seal::after { display: none; }
-.trust-seal > span, .trust-seal small { color: #a6cbcd; }
+/* Trust seal: a quiet orbital emblem on the shared field. Every child sets its own
+   light colour (the legacy cyan-disc rule painted them near-black). */
+.trust-seal { background: radial-gradient(circle at 50% 42%, #5fd8d214 0, #5fd8d205 38%, transparent 66%) !important; clip-path: none; border: 1px solid #80d8d524; border-radius: 50%; box-shadow: inset 0 0 80px #59cbc80d, 0 0 120px #3fb8b40a; color: #dff3f2; overflow: visible; filter: none; text-align: center; }
+.trust-seal::before, .trust-seal::after { content: ""; display: block; position: absolute; z-index: 0; pointer-events: none; border-radius: 50%; }
+.trust-seal::before { inset: -1px; padding: 1px; background: conic-gradient(from 0deg, transparent 0 62%, #8fe9e3 74%, transparent 86%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); opacity: .75; }
+.trust-seal::after { inset: 13%; border: 1px dashed #80d8d51f; background: none; transform: none; }
+.trust-seal svg { width: 34px; height: 34px; color: #9cefe9; stroke-width: 1.4; filter: drop-shadow(0 0 14px #5fd8d299); }
+.trust-seal strong { color: #eef8f7; letter-spacing: .14em; line-height: 1.35; text-shadow: 0 0 24px #5fd8d240; }
+.trust-seal > span, .trust-seal small { color: #9fc4c5; letter-spacing: .16em; }
+/* Legibility pass (pixel-measured audit): small labels reach WCAG AA on the field,
+   and the section label never touches the display heading below it. */
+.release-list dt { font-size: 10.5px; letter-spacing: .14em; color: #b4d0d1; }
+.platform-chip { color: #8fe6e3; font-size: max(10px, 1em); }
+.data-flow .section-label { margin-bottom: clamp(14px, 1.6vw, 22px); }
+.data-flow h2 { margin-top: 0; padding-top: .08em; }
+.trust-seal .seal-pillars { width: auto; line-height: 1.9; text-wrap: nowrap; }
+@keyframes nxs-seal-orbit { to { transform: rotate(1turn); } }
+@keyframes nxs-seal-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .trust-seal::before { animation: nxs-seal-orbit 14s linear infinite; }
+  .trust-seal::after { animation: nxs-seal-orbit 60s linear infinite reverse; }
+  .trust-seal svg { animation: nxs-seal-glow 5s ease-in-out infinite; }
+  .trust-seal::before, .trust-seal::after, .trust-seal svg { animation-play-state: paused; }
+  .trust-seal.nxs-ambient-active::before, .trust-seal.nxs-ambient-active::after, .trust-seal.nxs-ambient-active svg { animation-play-state: running; }
+}
+@media (prefers-reduced-motion: reduce) { .trust-seal::before, .trust-seal::after, .trust-seal svg { animation: none !important; } }
 @media(max-width:959px) {
   .nxs-floating-brand::before, .nxs-menu-toggle::before { content:''; position:absolute; inset:-14px; z-index:-1; pointer-events:none; border-radius:50%; background:radial-gradient(#020607e6 38%,#02060700 74%); }
   .nxs-floating-brand, .nxs-menu-toggle { isolation:isolate; }
