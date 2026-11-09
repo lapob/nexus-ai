@@ -490,9 +490,9 @@ export function App() {
                     <Icon name="wave" />Parla con l’entità<kbd>Ctrl+Maiusc+L</kbd>
                   </m.button>
                 )}
-                <div className="categories" role="tablist" aria-label="Categorie di suggerimenti">
+                <div className="categories" role="group" aria-label="Categorie di suggerimenti">
                   {CATEGORIES.map((item) => (
-                    <button key={item.id} type="button" role="tab" className="category" aria-selected={category === item.id} data-active={category === item.id}
+                    <button key={item.id} type="button" className="category" aria-pressed={category === item.id} data-active={category === item.id}
                       onClick={() => setCategory((current) => current === item.id ? null : item.id)}><Icon name={item.icon} size={17} />{item.label}</button>
                   ))}
                   <button type="button" className="category shuffle" aria-label="Altre idee" title="Altre idee" onClick={() => setRoll((value) => value + 1)}><Icon name="shuffle" size={17} /></button>
