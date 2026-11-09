@@ -43,7 +43,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
   test(`single AI app renders under the edge CSP at ${viewport.width}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: viewport.width === 844 ? 'reduce' : 'no-preference' });
     const errors = await open(page, viewport);
-    await expect(page.getByRole('heading', { name: /NexusNXS ragiona/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Cosa creiamo\?/ })).toBeVisible();
     await expect(page.getByRole('status').first()).toContainText(/Offline|In preparazione|Connessione/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     // No classic shell and no visible scrollbars in the conversation area.
