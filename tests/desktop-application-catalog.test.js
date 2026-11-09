@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   closeDesktopApplication,
+  closeSupremoPrivileged,
   desktopApplicationStatus,
   openDesktopApplication,
   openSupremoPrivileged,
@@ -105,13 +106,50 @@ test('Supremo usa il client installato e non arresta helper o servizio', async (
   const calls = [];
   await closeDesktopApplication('supremo', {
     platform: 'win32',
-    supremoWindow: async () => ({ found: true, visible: true }),
+    listProcesses: async () => ({ stdout: '"Supremo.exe","300","Console","1","15.000 K"' }),
     supremoClose: async () => { calls.push(['broker', ['close']]); },
     terminateProcess: async (file, args) => calls.push([file, args])
   });
   assert.deepEqual(calls, [['broker', ['close']]]);
   assert.equal(JSON.stringify(calls).includes('SupremoService'), false);
   assert.equal(JSON.stringify(calls).includes('SupremoHelper'), false);
+});
+
+test('Supremo si chiude al secondo tocco anche senza finestra visibile (area di notifica)', async () => {
+  let running = true;
+  const listProcesses = async (file, args) => {
+    assert.equal(file, 'tasklist.exe');
+    assert.deepEqual(args.slice(0, 2), ['/FI', 'IMAGENAME eq Supremo.exe']);
+    return { stdout: running ? '"Supremo.exe","300","Console","1","15.000 K"' : 'INFO: No tasks are running which match the specified criteria.' };
+  };
+  const brokerCalls = [];
+  const result = await closeDesktopApplication('supremo', {
+    platform: 'win32', listProcesses,
+    supremoClose: (options) => closeSupremoPrivileged({ ...options, wait: async () => {},
+      execute: async (file, args) => { brokerCalls.push(args); running = false; } })
+  });
+  assert.deepEqual(result, { id: 'supremo', closed: true, alreadyClosed: false });
+  assert.deepEqual(brokerCalls, [['/Run', '/TN', 'NexusNXS Close Supremo']]);
+
+  // Già chiuso: nessun broker, nessun taskkill.
+  const idle = await closeDesktopApplication('supremo', { platform: 'win32', listProcesses,
+    supremoClose: async () => { throw new Error('non deve chiudere'); }, terminateProcess: async () => { throw new Error('non deve chiudere'); } });
+  assert.equal(idle.alreadyClosed, true);
+});
+
+test('Supremo senza broker elevato: chiusura confinata a Supremo.exe, ordinata e poi forzata', async () => {
+  const calls = [];
+  await closeDesktopApplication('supremo', {
+    platform: 'win32',
+    listProcesses: async () => ({ stdout: '"Supremo.exe","300","Console","1","15.000 K"' }),
+    supremoClose: async () => { throw Object.assign(new Error('task missing'), { code: 'DESKTOP_APP_ELEVATION_REQUIRED' }); },
+    terminateProcess: async (file, args) => { calls.push([file, args]); if (!args.includes('/F')) throw new Error('refused'); }
+  });
+  assert.deepEqual(calls, [['taskkill.exe', ['/IM', 'Supremo.exe', '/T']], ['taskkill.exe', ['/IM', 'Supremo.exe', '/T', '/F']]]);
+});
+
+test('una chiusura non confermata dal processo resta un errore esplicito', async () => {
+  await assert.rejects(closeSupremoPrivileged({ execute: async () => {}, isRunning: async () => true, wait: async () => {} }), { code: 'DESKTOP_APP_CLOSE_UNCONFIRMED' });
 });
 
 test('Supremo usa il broker elevato statico e non accetta un falso stato visibile', async () => {

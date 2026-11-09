@@ -129,12 +129,23 @@ async function supremoPrivilegeReady({ env = process.env, execute = execFileAsyn
   }
 }
 
-async function closeSupremoPrivileged({ env = process.env, execute = execFileAsync, supremoWindow = controlSupremoWindow } = {}) {
+/**
+ * Supremo.exe è in esecuzione? Si guarda il processo, non la finestra: ridotto
+ * nell'area di notifica non ha una finestra principale ma resta aperto.
+ */
+async function supremoProcessRunning({ listProcesses = execFileAsync } = {}) {
+  const { stdout = '' } = await listProcesses('tasklist.exe', ['/FI', 'IMAGENAME eq Supremo.exe', '/FO', 'CSV', '/NH'], {
+    windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 64 * 1024
+  });
+  return parseTaskList(stdout).has('supremo.exe');
+}
+
+async function closeSupremoPrivileged({ env = process.env, execute = execFileAsync, isRunning = () => supremoProcessRunning(), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
   await runSupremoPrivilegedTask(SUPREMO_CLOSE_TASK, { env, execute });
+  // Conferma sul processo: una finestra nascosta non significa chiuso.
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    const state = await supremoWindow('status', { env });
-    if (!state.found) {
+    await wait(150);
+    if (!(await isRunning().catch(() => true))) {
       supremoRequestedVisible = false;
       return Object.freeze({ found: true, closed: true });
     }
@@ -257,14 +268,28 @@ async function openDesktopApplication(id, { platform = process.platform, env = p
   return Object.freeze({ id: application.id, launched: true });
 }
 
-async function closeDesktopApplication(id, { platform = process.platform, terminateProcess = execFileAsync, supremoWindow = controlSupremoWindow, supremoClose = closeSupremoPrivileged } = {}) {
+async function closeDesktopApplication(id, { platform = process.platform, env = process.env, terminateProcess = execFileAsync, listProcesses = execFileAsync, supremoClose = closeSupremoPrivileged } = {}) {
   const application = APPLICATION_BY_ID.get(String(id || ''));
   if (!application) throw Object.assign(new Error('Applicazione non consentita.'), { code: 'DESKTOP_APP_NOT_ALLOWED' });
   if (platform !== 'win32') throw Object.assign(new Error('Applicazione disponibile solo su Windows.'), { code: 'DESKTOP_APP_UNSUPPORTED' });
   if (application.id === 'supremo') {
-    const state = await supremoWindow('status');
-    if (!state.found) return Object.freeze({ id: application.id, closed: false, alreadyClosed: true });
-    await supremoClose({ supremoWindow });
+    // Prima la finestra visibile decideva tutto: con Supremo nell'area di
+    // notifica (o appena avviato, senza finestra principale) il secondo tocco
+    // dalla Console rispondeva "già chiusa" e non chiudeva nulla.
+    const isRunning = () => supremoProcessRunning({ listProcesses });
+    if (!(await isRunning().catch(() => true))) {
+      supremoRequestedVisible = false;
+      return Object.freeze({ id: application.id, closed: false, alreadyClosed: true });
+    }
+    try {
+      await supremoClose({ env, isRunning });
+    } catch (error) {
+      if (error?.code !== 'DESKTOP_APP_ELEVATION_REQUIRED') throw error;
+      // Senza broker elevato: chiusura ordinata, poi forzata, sempre e solo di Supremo.exe.
+      try { await terminateProcess('taskkill.exe', ['/IM', 'Supremo.exe', '/T'], { windowsHide: true, timeout: 4_000, encoding: 'utf8' }); }
+      catch { await terminateProcess('taskkill.exe', ['/IM', 'Supremo.exe', '/T', '/F'], { windowsHide: true, timeout: 5_000, encoding: 'utf8' }); }
+      supremoRequestedVisible = false;
+    }
     return Object.freeze({ id: application.id, closed: true, alreadyClosed: false });
   }
   let matched = false;
@@ -307,5 +332,6 @@ module.exports = {
   parseTaskList,
   resolveExecutable,
   supremoPrivilegeReady,
+  supremoProcessRunning,
   visibleWindowProcessNames
 };
