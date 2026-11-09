@@ -11,7 +11,7 @@ export const CATEGORIES: Category[] = [
     'Scrivi un’email cortese per spostare una riunione a giovedì',
     'Migliora questo testo rendendolo più chiaro e scorrevole: ',
     'Scrivi un post LinkedIn per annunciare un nuovo progetto',
-    'Crea tre titoli accattivanti per un articolo su ',
+    'Crea tre titoli accattivanti per un articolo su questo tema: ',
     'Scrivi un messaggio di auguri originale per un collega',
     'Riscrivi questo paragrafo con un tono più professionale: '
   ] },

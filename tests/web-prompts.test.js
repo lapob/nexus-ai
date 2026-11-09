@@ -26,6 +26,10 @@ test('suggerimenti dinamici: niente doppioni, categorie diverse, saluto per fasc
   assert.equal(greeting(new Date(2026, 0, 1, 15)), 'Buon pomeriggio.');
   assert.equal(greeting(new Date(2026, 0, 1, 21)), 'Buonasera.');
   assert.equal(greeting(new Date(2026, 0, 1, 2)), 'Ancora sveglio?');
+  // Ogni prompt è completo (si invia) oppure finisce con «: » (va nel composer da completare).
+  for (const prompt of CATEGORIES.flatMap((category) => category.prompts)) {
+    assert.ok(needsInput(prompt) || /[\p{L}\p{N}?)]$/u.test(prompt) && !/\s(su|di|per|a|in|con)$/i.test(prompt), `prompt troncato: ${prompt}`);
+  }
   assert.ok(needsInput('Riassumi i punti chiave di questo testo: '));
   assert.ok(!needsInput('Spiegami la relatività'));
 });
