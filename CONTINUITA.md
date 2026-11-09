@@ -20,6 +20,18 @@ the dark field (legacy cyan-disc colour); redesigned as orbital emblem. A
 pixel-measured audit (contrast vs real background, text collisions, overflow;
 8 routes x 4 widths) found and fixed: download labels 8px ~3.2:1, version chip
 4.3:1, "/ DATA FLOW" touching its heading. Result 0 issues. Site download 0.3.36.
+Site promoted (3540f30c, then 83a391ea with the new shell).
+Web app 50242e0 (after 0.3.36, ships in the next installer; already live on
+ai.nexusnxs.com, service restarted): scroll-driven soft edges + blur bands,
+glass tooltips replacing native title, swipe gestures (right opens history
+outside the Android back edge, left closes, right closes the panel; horizontal
+moves preventDefault'd because headless Chrome turned them into Back), idempotent
+"+", adaptive core resolution (device DPR up to 3x, 4K pixel budget, frame-time
+scaling), phone images on qwen3-vl:8b (live: correct description, 45 s cold).
+Checks: npm test 1189 pass/0 fail, `npm run check` PASS (entry 381 KB),
+check:ui 22/22, site e2e 34/34. Not verified: on-device swipe (phone was locked).
+Not started: executable HTML preview sandbox (needs separate origin on gateway,
+Electron and edge + security review); Qwen3-TTS voice.
 
 ## In progress — 9 November 2026: 32K context, phone attachments, Jarvis UI (owner approved)
 
