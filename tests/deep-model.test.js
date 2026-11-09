@@ -35,6 +35,14 @@ test('il modello profondo è la variante che entra in 16 GB di VRAM', () => {
   assert.equal(explicitDeepModel({ requestedMode: 'deep', installedModels: [{ id: 'qwen3.8:27b-ud-q3_K_XL' }] }), 'qwen3.8:27b-ud-q3_K_XL', 'nome con maiuscole di Ollama');
 });
 
+test('le immagini usano il modello visivo più capace installato, senza scaricarne', () => {
+  const { preferredVisionModel } = require('../src/ai/model-manifest');
+  assert.equal(preferredVisionModel([{ id: 'qwen3:14b' }, { id: 'qwen3-vl:4b' }, { id: 'qwen3-vl:8b' }]), 'qwen3-vl:8b');
+  assert.equal(preferredVisionModel([{ id: 'qwen3-vl:4b' }]), 'qwen3-vl:4b');
+  assert.equal(preferredVisionModel(['QWEN3-VL:8B']), 'qwen3-vl:8b', 'nomi normalizzati');
+  assert.equal(preferredVisionModel([]), 'qwen3-vl:4b', 'nessun visivo: il più leggero, come prima');
+});
+
 test('un modello di prova installato non diventa il principale in automatico', () => {
   const { automaticChatCandidates } = require('../src/ai/model-manifest');
   const hardware = { totalMemoryBytes: 32 * 2 ** 30, gpuMemoryBytes: 16 * 2 ** 30, cpuThreads: 16, performanceLevel: 5 };

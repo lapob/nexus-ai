@@ -208,18 +208,36 @@ export function Core({ state, className, level }: { state: CoreState; className?
     let energy = target.current;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     const tint: [number, number, number] = [0.29, 0.9, 0.91];
+    // Risoluzione adattiva: densità reale dello schermo (fino a 3× in WebGPU, 2× in Canvas),
+    // al massimo ~4K di pixel; se i fotogrammi rallentano scende, quando torna fluido risale.
+    let quality = 1;
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const cap = canvas.dataset.backend === 'canvas' ? 2 : 3;
       const { width, height } = canvas.getBoundingClientRect();
+      let ratio = Math.min(window.devicePixelRatio || 1, cap) * quality;
+      const budget = 3840 * 2160;
+      if (width * height * ratio * ratio > budget) ratio = Math.sqrt(budget / Math.max(1, width * height));
       canvas.width = Math.max(1, Math.round(width * ratio));
       canvas.height = Math.max(1, Math.round(height * ratio));
+      canvas.dataset.quality = quality.toFixed(2);
       renderer?.resize(canvas.width, canvas.height);
     };
     const observer = new ResizeObserver(resize);
     const started = performance.now();
     let tick = 0;
+    let last = 0, spent = 0, samples = 0;
+    const adapt = (now: number) => {
+      if (last && now - last < 250) { spent += now - last; samples += 1; } // salta pause e cambi scheda
+      last = now;
+      if (samples < 90) return;
+      const average = spent / samples;
+      spent = 0; samples = 0;
+      const next = average > 24 ? Math.max(0.5, quality * 0.85) : average < 18.5 && quality < 1 ? Math.min(1, quality * 1.12) : quality;
+      if (Math.abs(next - quality) > 0.01) { quality = next; resize(); }
+    };
     const loop = () => {
       if (disposed || !renderer) return;
+      adapt(performance.now());
       energy += (target.current - energy) * 0.04;
       const time = reduced.matches ? 0 : (performance.now() - started) / 1000;
       // A riposo 30 fps bastano al respiro lento del nucleo: metà lavoro GPU e batteria.
@@ -227,7 +245,7 @@ export function Core({ state, className, level }: { state: CoreState; className?
       if (!(energy < 0.2 && tick % 2 === 1 && !reduced.matches)) renderer.frame(time, energy);
       if (!reduced.matches && document.visibilityState === 'visible') frame = requestAnimationFrame(loop);
     };
-    const wake = () => { cancelAnimationFrame(frame); if (document.visibilityState === 'visible') frame = requestAnimationFrame(loop); };
+    const wake = () => { cancelAnimationFrame(frame); last = 0; if (document.visibilityState === 'visible') frame = requestAnimationFrame(loop); };
     (async () => {
       let backend = 'webgpu';
       renderer = await webgpuRenderer(canvas, tint).catch(() => null);

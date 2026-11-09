@@ -74,7 +74,13 @@ test('contesto del progetto: istruzioni prima, file entro il budget, gli esclusi
 test('fissate e rinomina: il titolo cambia senza spostare la chat, vuoto non è ammesso', async () => {
   const store = await load('store.ts');
   const first = store.newConversation();
+  assert.equal(store.newConversation(), first, '"+" ripetuto riapre la stessa chat vuota');
+  const count = store.getState().conversations.length;
+  store.newConversation();
+  assert.equal(store.getState().conversations.length, count, 'nessuna chat vuota accumulata');
+  store.appendMessage(first, { id: 'f1', role: 'user', content: 'Ciao', createdAt: 3 });
   const second = store.newConversation();
+  assert.notEqual(second, first);
   const order = () => store.getState().conversations.map((item) => item.id);
   const before = order();
   store.renameConversation(first, '   Nuovo   titolo  ');

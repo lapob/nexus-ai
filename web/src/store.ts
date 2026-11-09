@@ -96,6 +96,14 @@ export function activeConversation(current = state): Conversation | null {
 }
 
 export function newConversation(): string {
+  // Idempotente: una chat vuota nello stesso contesto (progetto o nessuno) viene riaperta,
+  // così premere più volte "+" non accumula conversazioni vuote.
+  const scope = state.projectView ?? null;
+  const empty = state.conversations.find((item) => !item.messages.length && (state.projectOf[item.id] ?? null) === scope);
+  if (empty) {
+    if (state.activeId !== empty.id) setState((current) => ({ ...current, activeId: empty.id }));
+    return empty.id;
+  }
   const id = uid();
   const now = Date.now();
   // Una chat nuova aperta dentro un progetto ne eredita istruzioni e file.

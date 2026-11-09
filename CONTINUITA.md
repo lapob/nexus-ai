@@ -8,6 +8,19 @@ Expected: all gates PASS, ai.nexusnxs.com serves Projects/panel UI, v0.3.36
 assets verified. Then HTML sandbox preview and model actions (Qwen3-TTS,
 vision model, removal of qwen3.8:27b-q4_K_M after checking it is unused).
 
+Done so far: site AI shell synced and promoted (fix: history list
+keyboard-reachable at 844x390, 0bdb9fb; UI scenarios 18/18); service restarted,
+public UI has Projects/panel. Preview 0.3.36: `release:public:preview` PASS
+(tests 1185/0 fail, soak 250 heap +0.11 MB, SBOM 331), bundle 5 artifacts
+verified, GitHub v0.3.36-preview.1 7 assets verified. qwen3.8:27b-q4_K_M
+deleted (unreferenced, Q3 digest different and intact). Vision: qwen3-vl:8b,
+gemma4 and the 27B Q3 already have vision; no download needed.
+Site fix in progress: trust seal on /security had near-black shield/title on
+the dark field (legacy cyan-disc colour); redesigned as orbital emblem. A
+pixel-measured audit (contrast vs real background, text collisions, overflow;
+8 routes x 4 widths) found and fixed: download labels 8px ~3.2:1, version chip
+4.3:1, "/ DATA FLOW" touching its heading. Result 0 issues. Site download 0.3.36.
+
 ## In progress — 9 November 2026: 32K context, phone attachments, Jarvis UI (owner approved)
 
 - **Context 32K** (`hardware-profile.js`): performance ≥5 and GPU ≥15 GiB →

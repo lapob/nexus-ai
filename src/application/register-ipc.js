@@ -47,7 +47,7 @@ const { fitAttachmentContext } = require('./attachment-context');
 const { decryptArchive, encryptArchive } = require('../infrastructure/storage/encrypted-backup');
 const { explicitMemoryInstruction, memoryQueryText } = require('../infrastructure/storage/personal-memory-store');
 const { configureContinuityTask, continuityTaskStatus, createTrackedExecFileRunner } = require('../infrastructure/windows/continuity-task');
-const { MODEL_PROFILES, adaptiveModelSelection, automaticChatCandidates, isUserSelectableModel, modelSuitability, profileModels, provisioningStatus, publicModelName } = require('../ai/model-manifest');
+const { MODEL_PROFILES, adaptiveModelSelection, automaticChatCandidates, isUserSelectableModel, modelSuitability, preferredVisionModel, profileModels, provisioningStatus, publicModelName } = require('../ai/model-manifest');
 const { CHANNELS, parseChatRequest, parseRelativeNotePath, parseClipboardText, parseExternalUrl, parseEmbeddingRequest, parseModelName, parseRequestId, parseAgentInstruction, parseAgentPlanningRequest, parseActionTicket, parseWorkflowId, parseWorkflowCreate, parseWorkflowDecision, parseTrainingExample, parseProvisioningProfile } = require('./ipc-contracts');
 const { MODEL_WARMUP_TIMEOUT_MS, createAdaptiveSettingsResolver, createWarmupSingleflight, residentModelOptions } = require('./runtime-warmup-policy');
 const { enforcePublicCitationUrls, ensurePublicCitation, researchLanguage, researchQuestion } = require('../research/research-orchestrator');
@@ -2121,7 +2121,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       const deepModel = (explicitModel || attachments.images?.length) ? null
         : await resolveDeepModel({ requestedMode: parsed.mode, publicGuest: ephemeral, distributionMode }, () => aiRuntime.listModels());
       const selectedModel = explicitModel || deepModel || (attachments.images?.length
-        ? 'qwen3-vl:4b'
+        ? preferredVisionModel(await aiRuntime.listModels())
         : shouldPreferFastExecutionModel({
           question: parsed.question,
           attachmentCount: remoteAttachmentCount,

@@ -99,6 +99,44 @@ const scenarios = [
   { name: 'panel-svg', viewport: { width: 1440, height: 860 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=1'); }, expect: ['.panel-svg img'] },
   { name: 'panel-csv', viewport: { width: 1180, height: 760 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=2'); }, expect: ['.panel-table td'] },
   { name: 'panel-mobile', viewport: mobile, mobile: true, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.panel'] },
+  { name: 'tooltip', viewport: desktop, run: async (page) => {
+    await page.hover('button[title="Preferenze"]'); await page.waitForTimeout(650);
+    if (await page.locator('button[title="Preferenze"]').count()) throw new Error('il title nativo resta attivo');
+    if ((await page.locator('.tooltip').textContent()) !== 'Preferenze') throw new Error('tooltip con testo errato');
+  }, expect: ['.tooltip[role="tooltip"]'] },
+  { name: 'new-chat-idempotent', viewport: desktop, state: thread, run: async (page) => {
+    const count = () => page.evaluate(() => JSON.parse(localStorage.getItem('nxs.next.state.v1')).conversations.length);
+    for (let i = 0; i < 4; i += 1) { await page.click('.new-chat'); await page.waitForTimeout(450); }
+    const before = (thread.conversations || []).length;
+    if (await count() !== before + 1) throw new Error(`"+" ripetuto: ${await count()} chat invece di ${before + 1}`);
+  }, expect: ['.welcome h2'] },
+  { name: 'swipe-sidebar', viewport: mobile, mobile: true, state: thread, run: async (page) => {
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = async (from, to) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from, y: 400 }] });
+      for (let step = 1; step <= 6; step += 1) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from + ((to - from) * step) / 6, y: 402 }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForTimeout(500);
+    };
+    await swipe(70, 300);
+    if (!page.url().startsWith(base)) throw new Error(`lo swipe ha fatto navigare il browser (${page.url()})`);
+    if (await page.locator('.app[data-sidebar="open"]').count() !== 1) throw new Error('lo swipe a destra non apre la cronologia');
+    await swipe(300, 60);
+    if (await page.locator('.app[data-sidebar="closed"]').count() !== 1) throw new Error('lo swipe a sinistra non chiude la cronologia');
+  }, expect: ['.thread'] },
+  { name: 'soft-edges', viewport: desktop, state: { ...thread, activeId: 'cl', conversations: [{ id: 'cl', title: 'Lunga', createdAt: now, updatedAt: now,
+    messages: Array.from({ length: 24 }, (_, i) => msg(`l${i}`, i % 2 ? 'assistant' : 'user', `Messaggio ${i}: ${'testo di prova '.repeat(i % 2 ? 18 : 3)}`, now - (30 - i) * 1000)) }, ...thread.conversations] },
+  run: async (page) => {
+    const fades = () => page.$eval('.scroll', (element) => { const style = getComputedStyle(element); return [parseFloat(style.getPropertyValue('--fade-start')), parseFloat(style.getPropertyValue('--fade-end'))]; });
+    await page.$eval('.scroll', (element) => { element.scrollTop = element.scrollHeight / 2 - element.clientHeight / 2; });
+    await page.waitForTimeout(300);
+    const [top, bottom] = await fades();
+    if (!(top > 30 && bottom > 30)) throw new Error(`bordi non sfumati a metà conversazione: ${top}/${bottom}`);
+    await page.$eval('.scroll', (element) => { element.scrollTop = element.scrollHeight; });
+    await page.waitForTimeout(300);
+    const [, end] = await fades();
+    if (end > 2) throw new Error(`in fondo il bordo inferiore resta sfumato: ${end}`);
+  }, expect: ['.thread'] },
   { name: 'reduced-motion', viewport: desktop, reducedMotion: 'reduce', state: thread, expect: ['.thread'] }
 ];
 

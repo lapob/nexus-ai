@@ -65,6 +65,15 @@ const MODEL_PROFILES = Object.freeze({
 // 33 token/s contro 10 della q4_K_M; agente 38/39, suite generale 98%.
 const DEEP_MODEL = 'qwen3.8:27b-ud-q3_K_XL';
 
+// Immagini: il modello visivo più capace già installato (mai scaricato in automatico).
+const VISION_MODELS = Object.freeze(['qwen3-vl:8b', 'qwen3-vl:4b']);
+
+/** @param {Array<string|{id?:string,name?:string}>} installed @returns {string} */
+function preferredVisionModel(installed = []) {
+  const ids = new Set(installed.map(canonicalModelId));
+  return VISION_MODELS.find((id) => ids.has(id)) || VISION_MODELS[VISION_MODELS.length - 1];
+}
+
 const TIER_ORDER = Object.freeze({ lite: 0, balanced: 1, performance: 2, ultra: 3 });
 
 // #endregion
@@ -249,6 +258,7 @@ module.exports = {
   MODEL_PROFILES,
   canonicalModelId,
   DEEP_MODEL,
+  preferredVisionModel,
   developmentProfile,
   modelMemoryBudget,
   modelSet,

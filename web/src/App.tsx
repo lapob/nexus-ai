@@ -15,6 +15,8 @@ import { Markdown } from './Markdown';
 import { Icon, type IconName } from './Icon';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
+import { Tooltips } from './Tooltips';
+import { useSwipeGestures } from './gestures';
 import { activeConversation, appendMessage, assignProject, createProject, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, openProject, projectContext, projectFor, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
 import { ProjectNav, ProjectSheet } from './Projects';
 import { Panel } from './Panel';
@@ -390,6 +392,8 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [controlOpen, endLive, paletteOpen, panelDoc, projectSheet, recording, settingsOpen, shortcutsOpen, sidebarOpen, startLive, startNew, stop, stopSpeaking, toggleSidebar]);
 
+  useSwipeGestures({ sidebarOpen, panelOpen: Boolean(panelDoc) }, { openSidebar: () => setSidebarOpen(true), closeSidebar: () => setSidebarOpen(false), closePanel });
+
   const jumpToBottom = useCallback(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -680,6 +684,7 @@ export function App() {
           {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Collegato al tuo PC.'); }} />}
         </AnimatePresence>
 
+        <Tooltips />
         <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{toast}</m.div>}</AnimatePresence>
       </div>
     </MotionConfig></LazyMotion>
