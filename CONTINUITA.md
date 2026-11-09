@@ -25,9 +25,20 @@
 - **Site** (`.SITE/app/narrative.css`): removed the hard-edged teal panel behind
   the PC showcase and the `mix-blend-mode: screen` that let background particles
   show through the app screenshot (owner's photo).
-- Checks so far: typecheck PASS, `npm test` 1175 pass / 0 fail.
-  Next: `npm run check`, commit+push, service restart (readyz 32145/32147),
-  site capture refresh + deploy, release 0.3.36.
+- **Console → Supremo close** (owner report: second tap did not close it):
+  closing depended on a visible main window, so Supremo in the tray (or just
+  launched) answered "already closed". Now decided and confirmed on the
+  Supremo.exe process; without the elevated broker, taskkill confined to
+  Supremo.exe (ordered, then forced). 4 new tests. Live tap not yet verified
+  on the phone.
+- Commits: 0b68338 (UI/32K/attachments), 56c5c9f (no truncated suggestions),
+  a11y group fix, 7b6f0e9 (Supremo). `npm run check` PASS, `npm test` PASS.
+  Service restarted: readyz 32145/32147 ready, qwen3:14b ctx 32768, 13.4 GB VRAM.
+- **Site deployed**: 2bde122 + 3585f42 (AI e2e expects the new greeting;
+  categories are a button group, axe clean). `release:prepare` PASS (all
+  gates, candidate b64a76c5), `release:promote` PASS → production 92b2b055,
+  13 routes verified; live capture confirms the PC showcase fix.
+- Next: release 0.3.36 (installer with the new UI) needs the owner's go.
 
 ## Preview 0.3.35 — 8 November 2026 (PUBLISHED)
 
