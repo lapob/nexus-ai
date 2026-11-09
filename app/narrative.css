@@ -127,17 +127,20 @@ html { scroll-padding-top: 96px; }
 .narrative-copy > p:not(.section-label), .narrative-app-copy > p:not(.platform) { max-width: 51ch; font-size: clamp(17px, 1.5vw, 21px); line-height: 1.7; color: #a4bbbe; margin-bottom: 24px; }
 .narrative-copy .text-link, .narrative-app-copy .text-link { display: inline-flex; align-items: center; gap: 14px; min-height: 44px; font-size: 14px; color: #b9eff0; }
 .narrative-apps { padding: 0 var(--page-pad); }
-.narrative-apps .app-grid { display: flex; flex-direction: column; max-width: 1280px; margin: auto; gap: clamp(100px, 13vw, 220px); }
+/* Nessun pannello a bordi netti: il campo cosmico scorre libero dietro testo e schermata. */
+.narrative-apps .app-grid { display: flex; flex-direction: column; max-width: 1280px; margin: auto; gap: clamp(100px, 13vw, 220px); background: none; border: 0; }
 .narrative-apps .app-card { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: center; gap: clamp(36px, 6vw, 100px); padding: 0; background: none; border: 0; border-radius: 0; backdrop-filter: none; box-shadow: none; overflow: visible; }
 .narrative-app-copy h2 { margin: 24px 0; }
 .narrative-apps .app-card::before, .narrative-apps .app-card::after { display: none; }
 .narrative-apps .app-card:hover { transform: none; border: 0; background: none; box-shadow: none; }
 .narrative-apps .app-card-visual { border: 0; background: none; margin: 0; height: auto; aspect-ratio: 1090 / 613; overflow: visible; }
 
-.narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; max-width: 680px; transform: none; border: 1px solid #5b696a; border-radius: 12px; overflow: hidden; }
+/* Schermate opache: con la fusione "screen" le particelle di sfondo attraversavano l'immagine e coprivano il titolo dell'app. */
+.narrative-apps .app-card-visual__screen { background: #020405; border: 0; mix-blend-mode: normal; isolation: isolate; }
+.narrative-apps .app-card-visual.desktop .app-card-visual__screen { width: 100%; max-width: 680px; transform: none; border: 1px solid color-mix(in oklch, #4be7e9 26%, #5b696a); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 30px 80px rgb(0 0 0 / .65), 0 0 0 1px rgb(75 231 233 / .05), 0 0 60px rgb(75 231 233 / .12); }
 .narrative-apps .app-card-visual.desktop img { display: block; width: 100%; height: auto; }
-.narrative-apps .app-card-visual__screen { background: transparent; border: 0; box-shadow: none; mix-blend-mode: screen; }
-.narrative-page .device-frame, .narrative-page .product-screen { background: transparent; box-shadow: none; mix-blend-mode: screen; }
+.narrative-page .device-frame, .narrative-page .product-screen { background: #020405; mix-blend-mode: normal; isolation: isolate; }
 .narrative-page .presence-system { margin-block: clamp(120px, 18vw, 250px) clamp(64px, 8vw, 120px); }
 .narrative-page .presence-grid article { background: none; border: 0; border-radius: 0; backdrop-filter: none; padding-inline: 0; }
 .narrative-page .presence-grid article small { color: #92b0b4; font-size: 14px; line-height: 1.5; }
