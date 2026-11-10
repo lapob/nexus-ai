@@ -69,11 +69,13 @@ test('sidebar hides on wide screens, persists, and the command palette opens wit
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('an unavailable service ends the turn with a readable error instead of hanging', async ({ page }) => {
+test('with the PC offline nothing is sent: the draft stays and the composer explains why', async ({ page }) => {
   await open(page, { width: 390, height: 844 });
-  await page.getByRole('textbox', { name: 'Messaggio' }).fill('Ciao');
+  await expect(page.locator('.composer[data-offline="true"]')).toBeVisible();
+  const box = page.getByRole('textbox', { name: 'Messaggio' });
+  await box.fill('Ciao');
   await page.keyboard.press('Enter');
-  await expect(page.locator('.thread .message.user')).toContainText('Ciao');
-  await expect(page.locator('.thread .message.assistant')).toContainText(/non disponibile|non riuscita|Servizio/i);
-  await expect(page.getByRole('button', { name: 'Invia', exact: true })).toBeVisible();
+  await expect(page.locator('.thread .message.user')).toHaveCount(0);
+  await expect(box).toHaveValue('Ciao');
+  await expect(page.getByRole('button', { name: /Invio non disponibile/ })).toBeDisabled();
 });
