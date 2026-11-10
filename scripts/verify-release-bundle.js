@@ -9,6 +9,7 @@ const {
   verifyElectronUpdateManifest,
   verifySignatureEnvelope
 } = require('./release-manifest');
+const { PREVIEW_KEY_ID, PREVIEW_PUBLIC_KEY } = require('./preview-update-key');
 
 const root = path.resolve(__dirname, '..');
 const manifestArgument = process.argv.find((argument) => argument.startsWith('--manifest='));
@@ -23,9 +24,11 @@ if (updateArtifact) verifyElectronUpdateManifest(root, path.resolve(root, update
 if (manifest.integrity?.manifestSignature === 'ed25519') {
   const signaturePath = manifestPath.replace(/\.json$/i, '.sig.json');
   if (!fs.existsSync(signaturePath)) throw new Error('Firma distinta mancante.');
+  // Preview: chiave pubblica incorporata nel repository; Stable: chiave fornita dall'ambiente di rilascio.
+  const preview = manifest.channel === 'preview' && !process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY;
   verifySignatureEnvelope(payload, JSON.parse(fs.readFileSync(signaturePath, 'utf8')), {
-    publicKey: process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY,
-    keyId: process.env.NEXUS_RELEASE_MANIFEST_KEY_ID
+    publicKey: preview ? PREVIEW_PUBLIC_KEY : process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY,
+    keyId: preview ? PREVIEW_KEY_ID : process.env.NEXUS_RELEASE_MANIFEST_KEY_ID
   });
 }
 
