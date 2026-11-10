@@ -56,8 +56,8 @@ alla repository. `NEXUS_DISABLE_UPDATES=1` disabilita il controllo in emergenza
 senza modificare l'installer.
 
 Le build pubbliche accettano `NEXUS_RELEASE_CHANNEL=preview|beta|stable`.
-`Preview` si aggiorna da sola quando `config/preview-update-key.pub.pem` è presente:
-l'app incorpora quella chiave pubblica e il feed `https://nexusnxs.com/updates/preview`;
+`Preview` si aggiorna da sola (chiave pubblica in `scripts/preview-update-key.js`,
+esclusa con `NEXUS_DISABLE_PREVIEW_UPDATES=1`): l'app incorpora la chiave e il feed `https://nexusnxs.com/updates/preview`;
 la pipeline firma la distinta (`rollout: preview-auto`, Ed25519) con la chiave privata
 locale in `%APPDATA%/NexusNXS-release` (o `NEXUS_PREVIEW_UPDATE_KEY`), mai nel repository.
 Senza chiave privata la release Preview fallisce chiusa. Il sito serve distinta, firma e
