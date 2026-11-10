@@ -1,4 +1,20 @@
-## In progress — 10 November 2026: release Preview 0.3.37 + site promote
+## Preview 0.3.37 — 11 November 2026 (PUBLISHED)
+
+Done: release:public:preview PASS (installer + SBOM 331, manifest signed
+nxs-preview-1, rollout preview-auto); verify-bundle now uses the embedded
+Preview public key (d2457fb; tampered manifest rejected); main pushed;
+GitHub v0.3.37-preview.1 with 9 assets verified (manifest + .sig included);
+service restarted (readyz ready). Site b6dbf8a/6c92cc7 promoted
+(cbaf7740…): unit 45/45, e2e 35/35. Live: /updates/preview manifest/sig/
+latest.yml 200 and signature verified against the embedded key, installer
+302 to GitHub, unknown names 404, /sandbox/v1 200 with no-network CSP, ai
+shell frame-src limited to nexusnxs.com/sandbox/. Not yet verified live: an
+installed 0.3.37 picking up the next update automatically (needs 0.3.38),
+quick bar and desktop sandbox in the packaged app, phone swipe test (phone
+locked). Installs ≤0.3.36 must install 0.3.37 by hand once. Next: Qwen3-TTS
+and phone notifications in separate sessions.
+
+### Plan as recorded before the release
 
 Added after the section below: Ctrl+Maiusc+Spazio quick bar (Presence,
 one-shot quick-prompt.json ≤60 s, 0o600) and HTML preview in a sandbox
