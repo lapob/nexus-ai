@@ -58,7 +58,7 @@ function releaseManifest({ product, version, channel, visibility, releaseClass, 
       manifestSignature: signatureRequired ? 'ed25519' : 'optional-preview'
     },
     updatePolicy: {
-      rollout: channel === 'stable' ? 'staged' : channel === 'beta' ? 'beta-ring' : 'manual-preview',
+      rollout: channel === 'stable' ? 'staged' : channel === 'beta' ? 'beta-ring' : signatureRequired ? 'preview-auto' : 'manual-preview',
       initialPercentage: channel === 'stable' ? 10 : 100,
       paused: false,
       rollback: 'signed-forward-fix',

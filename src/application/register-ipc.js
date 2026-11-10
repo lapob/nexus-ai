@@ -731,7 +731,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     }
     // Le sole frasi esplicite "ricorda/dimentica" modificano la memoria.
     // L'upsert rende sicuri retry e continuazioni della stessa richiesta.
-    applyExplicitMemoryInstruction(question, null);
+    const memoryUpdate = applyExplicitMemoryInstruction(question, null);
     let sources = getIndex().search(question, mode === 'deep' ? runtimeConfig.retrieval.deepInitialLimit : runtimeConfig.retrieval.quickLimit); let planningNote = '';
     let memoryQueryVector = null;
     // Sul profilo Lite il ranking lessicale è immediato e sufficientemente
@@ -830,6 +830,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       publicSources: research.citations,
       research,
       security,
+      memoryUpdate,
       messages: [{ role: 'system', content: `${buildSystemPrompt(sources, settings.personalization, approvedExamples, memories)}${planningNote}${researchDirective ? `\n\n${researchDirective}` : ''}\n\n${workspaceDirective}${projectDirective ? `\n${projectDirective}` : ''}\n\n${qualityDirective}\n\n${dialogueDirective}` }, ...conversationHistory, { role: 'system', content: responseLanguageDirective(question, settings.personalization?.responseLanguage) }, { role: 'user', content: userContent }]
     };
   };
@@ -838,12 +839,13 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     const instruction = explicitMemoryInstruction(question);
     if (!instruction || !memoryStore) return null;
     if (instruction.action === 'update') {
-      return { action: 'remember', count: memoryStore.updateById(instruction.id, instruction.content) };
+      const count = memoryStore.updateById(instruction.id, instruction.content);
+      return { action: 'update', count, id: Number(instruction.id) || null, content: String(instruction.content || '').slice(0, 240) };
     }
     if (instruction.action === 'remember') {
       const memory = memoryStore.remember({ content: instruction.content, type: instruction.type, sourceId: requestId });
       logger.info('Ricordo esplicito salvato.', { requestId, type: memory.type });
-      return { action: 'remember', count: 1 };
+      return { action: 'remember', count: 1, id: memory.id, content: String(memory.content || '').slice(0, 240) };
     }
     const count = memoryStore.forgetMatching(instruction.content);
     logger.info('Richiesta esplicita di oblio applicata.', { requestId, count });
@@ -1770,6 +1772,8 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: attachmentIds.length ? 'Leggo i file e organizzo il contesto' : 'Organizzo la conversazione e il contesto' } });
       const prepared = await prepare({ question, mode, history, settings, signal: controller.signal, attachmentContext });
       preparedAt = performance.now();
+      // Avviso «Memoria aggiornata» nella chat: solo id e testo breve del ricordo, mai il resto della memoria.
+      if (prepared.memoryUpdate?.count > 0) emit(event, { type: 'memory', requestId, memory: prepared.memoryUpdate });
       const bufferModelOutput = prepared.security.promptInjection || prepared.security.sensitiveLiterals.length > 0 || prepared.publicSources.length > 0 || hasStrictOutputConstraint(question);
       if (prepared.research?.searched) {
         emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: prepared.research.unavailable ? publicResearchUnavailablePhase(prepared.research) : `Confronto ${prepared.publicSources.length} fonti pubbliche` } });
@@ -1804,6 +1808,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
           inferenceStartedAt = performance.now();
           const tools = createTurnTools({
             getIndex, aiRuntime, embeddingModel: settings.embeddingModel, webResearchService, memoryStore, actionRuntime,
+            onMemory: (memory) => emit(event, { type: 'memory', requestId, memory: { ...memory, count: 1, content: String(memory.content || '').slice(0, 240) } }),
             getApprovalMode: () => getSettings().actionApprovalMode || 'dangerous-only',
             requestActionApproval: createNativeActionApproval({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) })
           });

@@ -49,7 +49,7 @@ function toolPhaseLabel(name) {
  * Crea un registro per un singolo turno. Le fonti web restituite agli
  * strumenti vengono raccolte per consentire le citazioni nella risposta.
  */
-function createTurnTools({ getIndex, aiRuntime, embeddingModel = null, webResearchService = null, memoryStore = null, actionRuntime = null, getApprovalMode = () => 'always', requestActionApproval = null, now } = {}) {
+function createTurnTools({ getIndex, aiRuntime, embeddingModel = null, webResearchService = null, memoryStore = null, actionRuntime = null, getApprovalMode = () => 'always', requestActionApproval = null, onMemory = null, now } = {}) {
   const sources = [];
   const seen = new Set();
   const webResearch = webResearchService && typeof webResearchService.search === 'function' ? {
@@ -69,7 +69,7 @@ function createTurnTools({ getIndex, aiRuntime, embeddingModel = null, webResear
   try { knowledgeIndex = typeof getIndex === 'function' ? getIndex() : null; } catch { knowledgeIndex = null; }
   const embed = embeddingModel && aiRuntime ? (input, { signal } = {}) => aiRuntime.embed(input, { model: embeddingModel, signal }) : null;
   const registry = registerCoreTools(new TypedToolRegistry({ audience: 'private' }), { knowledgeIndex, embed, webResearch, ...(now ? { now } : {}) });
-  if (memoryStore) registerMemoryTools(registry, { memoryStore, embed, embeddingModel });
+  if (memoryStore) registerMemoryTools(registry, { memoryStore, embed, embeddingModel, onMemory });
   // Azioni del PC e integrazioni: solo tramite ActionRuntime, con ticket e ricevute.
   const actions = actionRuntime ? registerActionTools(registry, { actionRuntime, getApprovalMode, requestApproval: requestActionApproval }) : { artifacts: [], receipts: [] };
   return { registry, sources, artifacts: actions.artifacts, receipts: actions.receipts };
@@ -82,7 +82,7 @@ const PROVENANCE = Object.freeze({
 });
 
 /** Memoria per l'agente: ricerca libera, scrittura solo con consenso. */
-function registerMemoryTools(registry, { memoryStore, embed, embeddingModel }) {
+function registerMemoryTools(registry, { memoryStore, embed, embeddingModel, onMemory = null }) {
   registry.register({
     name: 'recall-memory',
     description: 'Cerca nei ricordi personali dell’utente e nei riassunti delle conversazioni passate (preferenze, progetti, cosa avete già discusso). Usalo quando l’utente fa riferimento a qualcosa detto in precedenza.',
@@ -106,6 +106,7 @@ function registerMemoryTools(registry, { memoryStore, embed, embeddingModel }) {
     parameters: { type: 'object', required: ['content'], properties: { content: { type: 'string', minLength: 3, maxLength: 500 } } },
     invoke: ({ content }) => {
       const memory = memoryStore.remember({ content, sourceId: 'agent-tool' });
+      try { onMemory?.({ action: 'remember', id: memory.id, content: memory.content }); } catch { /* l'avviso non blocca il salvataggio */ }
       return { saved: true, id: memory.id, type: memory.type };
     }
   });

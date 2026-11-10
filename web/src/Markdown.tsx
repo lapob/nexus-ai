@@ -2,7 +2,7 @@
  * @module web/Markdown
  * @description Markdown sicuro per lo streaming (web e desktop): solo elementi React (niente innerHTML), link solo https, codice copiabile, tabelle, callout, formule, liste numerate e checklist.
  */
-import { memo, useState, type ReactNode } from 'react';
+import { createContext, memo, useContext, useState, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import { openPanel, worthPanel } from './panelStore';
 
@@ -103,6 +103,26 @@ export function parseBlocks(source: string): Block[] {
 
 // #region 02 — Inline
 
+/** Fonti della risposta: i riferimenti [1], [2,3] nel testo diventano citazioni cliccabili. */
+export interface CitationSource { title?: string; url: string }
+const Citations = createContext<CitationSource[]>([]);
+
+function Cite({ numbers, raw }: { numbers: number[]; raw: string }) {
+  const sources = useContext(Citations);
+  const found = numbers.map((number) => ({ number, source: sources[number - 1] })).filter((item) => item.source);
+  if (!found.length) return <>{raw}</>;
+  return (
+    <span className="cites">
+      {found.map(({ number, source }) => {
+        const label = source!.title || (() => { try { return new URL(source!.url).hostname.replace(/^www\./, ''); } catch { return 'Fonte'; } })();
+        return source!.url
+          ? <a key={number} className="cite" href={source!.url} target="_blank" rel="noopener noreferrer" title={label} aria-label={`Fonte ${number}: ${label}`}>{number}</a>
+          : <span key={number} className="cite" title={label} aria-label={`Fonte ${number}: ${label}`}>{number}</span>;
+      })}
+    </span>
+  );
+}
+
 function safeHref(value: string): string | null {
   try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; } catch { return null; }
 }
@@ -125,7 +145,7 @@ export function readableMath(source: string): string {
 /** Inline: `codice`, **grassetto**, *corsivo*, $formula$, [testo](https://…) e URL nudi https. */
 export function renderInline(text: string, keyPrefix = 'i'): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\$[^$\n]{1,200}\$)|(\[[^\]\n]{1,200}\]\((https:\/\/[^)\s]+)\))|(https:\/\/[^\s<>()\]]+)/g;
+  const pattern = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\$[^$\n]{1,200}\$)|(\[[^\]\n]{1,200}\]\((https:\/\/[^)\s]+)\))|(https:\/\/[^\s<>()\]]+)|(\[(\d{1,2}(?:\s*,\s*\d{1,2}){0,4})\](?!\())/g;
   let last = 0;
   let match: RegExpExecArray | null;
   let index = 0;
@@ -144,6 +164,8 @@ export function renderInline(text: string, keyPrefix = 'i'): ReactNode[] {
     } else if (match[7]) {
       const href = safeHref(token.replace(/[.,;:!?]+$/, ''));
       nodes.push(href ? <a key={key} href={href} target="_blank" rel="noopener noreferrer">{new URL(href).hostname}</a> : token);
+    } else if (match[8]) {
+      nodes.push(<Cite key={key} raw={token} numbers={match[9].split(',').map((value) => Number.parseInt(value, 10)).filter((value) => value > 0)} />);
     }
     last = match.index + token.length;
   }
@@ -171,9 +193,9 @@ function CodeBlock({ language, text, open }: { language: string; text: string; o
   );
 }
 
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+export const Markdown = memo(function Markdown({ text, sources = [] }: { text: string; sources?: CitationSource[] }) {
   return (
-    <div className="markdown">
+    <Citations.Provider value={sources}><div className="markdown">
       {parseBlocks(text).map((block, index) => {
         const key = `b${index}`;
         switch (block.kind) {
@@ -210,7 +232,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
           default: return <p key={key}>{renderInline(block.text, key)}</p>;
         }
       })}
-    </div>
+    </div></Citations.Provider>
   );
 });
 

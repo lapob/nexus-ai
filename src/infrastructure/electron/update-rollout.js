@@ -25,6 +25,10 @@ function evaluateUpdateRollout(manifest, { rolloutSeed = '' } = {}) {
   if (policy.paused === true) {
     return Object.freeze({ eligible: false, reason: 'paused', percentage, bucket: null });
   }
+  // Preview firmata: aggiornamento automatico per tutti appena pubblicata.
+  if (channel === 'preview' && policy.rollout === 'preview-auto') {
+    return Object.freeze({ eligible: true, reason: 'all', percentage: 100, bucket: null });
+  }
   if (channel === 'preview' || policy.rollout === 'manual-preview') {
     return Object.freeze({ eligible: false, reason: 'manual-preview', percentage, bucket: null });
   }

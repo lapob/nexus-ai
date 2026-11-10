@@ -58,7 +58,7 @@
   .sidebar-rail { display: none; }
   /* Barra chiusa su desktop: colonna di icone (stile Claude), non un vuoto. */
   .app[data-collapsed='true'] { grid-template-columns: 64px minmax(0, 1fr); }
-  .app[data-collapsed='true'] .sidebar { padding: 14px 10px; }
+  .app[data-collapsed='true'] .sidebar { padding: 14px 10px; overflow: visible; }
   .app[data-collapsed='true'] .sidebar-full { display: none; }
   .app[data-collapsed='true'] .sidebar-rail { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-height: 0; animation: rail-in .3s var(--ease-emphasized) both; }
   /* Scorrimento libero ma senza barre visibili: la freccia "Torna in fondo" sostituisce la scrollbar. */
@@ -72,7 +72,8 @@
   .stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; overflow: clip; min-height: 0; isolation: isolate; }
   .topbar { display: flex; align-items: center; gap: 12px; padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); z-index: 5; }
   .title { flex: 1; min-width: 0; margin: 0; font-size: .95rem; font-weight: 550; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; view-transition-name: conversation-title; }
-  .scroll { overflow-y: auto; overscroll-behavior: contain; padding: 8px 16px 24px; z-index: 2; }
+  /* overflow-anchor: mentre la risposta cresce, la parte che si sta leggendo resta ferma. */
+  .scroll { overflow-y: auto; overscroll-behavior: contain; overflow-anchor: auto; padding: 8px 16px 24px; z-index: 2; }
   .composer { width: min(var(--content), calc(100% - 32px)); margin: 0 auto max(16px, env(safe-area-inset-bottom)); border-radius: 22px; padding: 10px 10px 8px 16px; z-index: 6; container-type: inline-size; }
   .scrim { display: none; }
   .only-compact { display: none; }
@@ -170,7 +171,9 @@
   .live-end .icon, .live-actions .icon { width: 16px; height: 16px; }
   .live-cta { justify-self: center; display: inline-flex; align-items: center; gap: 10px; margin-top: 6px; height: 46px; padding: 0 20px; border-radius: 99px; color: var(--ink); background: linear-gradient(100deg, var(--cyan), oklch(85% .12 165)); font-weight: 600; box-shadow: 0 0 32px color-mix(in oklch, var(--cyan) 35%, transparent); transition: box-shadow .2s, translate .2s; }
   .live-cta:hover { box-shadow: 0 0 48px color-mix(in oklch, var(--cyan) 55%, transparent); translate: 0 -1px; }
-  .live-cta kbd { font: 500 .72rem 'JetBrains Mono Variable', ui-monospace, monospace; padding: 2px 6px; border-radius: 6px; background: color-mix(in oklch, var(--ink) 18%, transparent); }
+  /* Sul pulsante chiaro la scorciatoia eredita il colore inchiostro: il grigio generico dei kbd era illeggibile. */
+  .live-cta kbd { font: 600 .72rem 'JetBrains Mono Variable', ui-monospace, monospace; line-height: 1.5; padding: 2px 7px; border-radius: 7px; color: color-mix(in oklch, var(--ink) 82%, transparent);
+    border: 1px solid color-mix(in oklch, var(--ink) 22%, transparent); background: color-mix(in oklch, var(--ink) 10%, transparent); white-space: nowrap; }
   @media (max-width: 599px) { .live-cta kbd { display: none; } .live-state { font-size: .84rem; } }
 
   /* `safe center`: se il benvenuto supera lo schermo (telefono) parte dall'alto invece di uscire sopra, dove non si scorre. */
@@ -203,7 +206,10 @@
   .markdown > :first-child { margin-top: 0; }
   .markdown > :last-child { margin-bottom: 0; }
   .markdown p, .markdown ul, .markdown ol, .markdown blockquote { margin: 0 0 .85em; }
-  .markdown h2, .markdown h3, .markdown h4 { margin: 1.3em 0 .5em; letter-spacing: -.015em; line-height: 1.25; }
+  .markdown h2, .markdown h3, .markdown h4 { margin: 1.3em 0 .5em; font-weight: 640; letter-spacing: -.01em; line-height: 1.3; text-wrap: balance; color: var(--ice); }
+  /* "### **Titolo**" dai modelli: il grassetto dentro un titolo diventava 900 (bolder) e il testo sembrava compresso. */
+  .markdown :is(h1, h2, h3, h4, h5, h6) :is(strong, b) { font-weight: inherit; }
+  .markdown strong { font-weight: 640; }
   .markdown h2 { font-size: 1.3rem; } .markdown h3 { font-size: 1.12rem; } .markdown h4 { font-size: 1rem; }
   .markdown ul, .markdown ol { padding-left: 1.3em; }
   .markdown li + li { margin-top: .3em; }
@@ -227,9 +233,35 @@
   .markdown li.task { list-style: none; margin-left: -1.2em; display: flex; gap: 8px; align-items: baseline; }
   .markdown li.task input { accent-color: var(--cyan); }
   .agent-trail { display: grid; gap: 8px; margin: 2px 0 6px; font-size: .84rem; }
-  .agent-trail summary { cursor: pointer; width: max-content; color: var(--mist); list-style: none; padding: 4px 10px; border-radius: 99px; border: 1px solid color-mix(in oklch, var(--hairline) 35%, transparent); }
-  .agent-trail summary::-webkit-details-marker { display: none; }
-  .agent-trail ol { list-style: none; margin: 8px 0 0; padding: 0 0 0 4px; display: grid; gap: 4px; color: var(--mist); }
+  .agent-trail:empty { display: none; }
+  /* Avviso "Memoria aggiornata": pillola in vetro con testo del ricordo e azioni, entra con una molla leggera. */
+  .memory-chip { display: flex; align-items: center; gap: 8px; justify-self: start; max-width: 100%; margin: 4px 0 2px; padding: 4px 4px 4px 12px; border-radius: 14px; font-size: .84rem; color: var(--mist);
+    background: color-mix(in oklch, var(--cyan) 7%, var(--surface)); border: 1px solid color-mix(in oklch, var(--cyan) 22%, transparent); animation: memory-in .42s var(--ease-emphasized) both; }
+  .memory-chip > .icon { flex: none; color: var(--cyan); }
+  .memory-chip[data-undone='true'] { background: color-mix(in oklch, var(--surface) 70%, transparent); border-color: color-mix(in oklch, var(--hairline) 35%, transparent); }
+  .memory-chip[data-undone='true'] > .icon { color: var(--mist); }
+  .memory-text { display: flex; gap: 6px; min-width: 0; align-items: baseline; }
+  .memory-text strong { flex: none; font-weight: 600; color: var(--ice); }
+  .memory-text span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .memory-action { flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 10px; border-radius: 10px; color: var(--mist); font-size: .8rem; transition: background .15s, color .15s; }
+  .memory-action:hover, .memory-action:focus-visible { background: color-mix(in oklch, var(--cyan) 12%, transparent); color: var(--ice); }
+  @media (max-width: 599px) { .memory-action span { display: none; } .memory-action { width: 32px; padding: 0; justify-content: center; } }
+  @keyframes memory-in { from { opacity: 0; translate: 0 6px; scale: .97; } }
+  .trail-toggle { display: inline-flex; align-items: center; gap: 8px; justify-self: start; max-width: 100%; min-height: 32px; padding: 4px 12px 4px 10px; border-radius: 99px; color: var(--mist);
+    border: 1px solid color-mix(in oklch, var(--hairline) 35%, transparent); background: color-mix(in oklch, var(--surface) 55%, transparent); transition: color .18s, background .18s, border-color .18s; }
+  .trail-toggle:hover, .trail-toggle:focus-visible { color: var(--ice); border-color: color-mix(in oklch, var(--cyan) 30%, transparent); }
+  .trail-toggle > span:not(.trail-chevron) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-trail[data-live='true'] .trail-toggle > .icon { color: var(--cyan); animation: listen 1s var(--ease-standard) infinite alternate; }
+  .trail-chevron { display: grid; transition: rotate .28s var(--ease-emphasized); }
+  .trail-toggle[aria-expanded='true'] .trail-chevron { rotate: 180deg; }
+  /* Luce che scorre sul testo della fase corrente (come "Thinking" negli assistenti migliori). */
+  .shimmer { background: linear-gradient(100deg, var(--mist) 35%, var(--ice) 50%, var(--mist) 65%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.8s linear infinite; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+  /* Apertura morbida: righe di griglia 0fr → 1fr, nessun salto di altezza. */
+  .trail-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .34s var(--ease-emphasized), opacity .24s; }
+  .trail-body[data-open='true'] { grid-template-rows: 1fr; opacity: 1; }
+  .trail-body > ol { min-height: 0; overflow: hidden; }
+  .agent-trail ol { list-style: none; margin: 0; padding: 8px 0 0 14px; display: grid; gap: 5px; color: var(--mist); border-left: 1px solid color-mix(in oklch, var(--hairline) 30%, transparent); margin-left: 17px; }
   .agent-trail ol li { display: flex; gap: 8px; align-items: center; }
   .agent-trail ol li::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: listen .8s var(--ease-standard) infinite alternate; }
   .agent-trail ol li[data-done='true']::before { background: var(--success); box-shadow: none; animation: none; }
@@ -238,6 +270,13 @@
   .sources a:hover { border-color: color-mix(in oklch, var(--cyan) 45%, transparent); }
   .sources .index { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; font-size: .72rem; color: var(--ink); background: var(--cyan); }
   .sources small { color: var(--mist); font-size: .74rem; }
+  /* Citazioni in linea [n]: piccole pastiglie numerate che aprono la fonte (con titolo nel tooltip). */
+  .cites { display: inline-flex; gap: 3px; margin-left: 3px; vertical-align: .12em; }
+  .cite { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; font-size: .68rem; font-weight: 600; line-height: 1; text-decoration: none;
+    color: var(--cyan); background: color-mix(in oklch, var(--cyan) 13%, transparent); border: 1px solid color-mix(in oklch, var(--cyan) 26%, transparent); transition: background .15s, color .15s, translate .15s; }
+  .cite { position: relative; }
+  .cite::after { content: ''; position: absolute; inset: -7px -3px; } /* area di tocco ≥ 32px senza allargare il testo */
+  a.cite:hover, a.cite:focus-visible { color: var(--ink); background: var(--cyan); translate: 0 -1px; }
   .answer-actions .icon-button[data-active='true'] { color: var(--cyan); }
   .pair-error { margin: 4px 0 0; color: var(--attention); font-size: .88rem; }
   .pair-submit { justify-self: stretch; justify-content: center; border: 0; }
@@ -346,6 +385,10 @@
   .dropzone span { display: inline-flex; align-items: center; gap: 10px; padding: 16px 22px; border-radius: 18px; border-style: dashed; border-color: color-mix(in oklch, var(--cyan) 45%, transparent); }
 
   /* In alto sotto l'intestazione: non collide col composer, che cresce col testo e con la tastiera. */
+  .update-pill { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top)); translate: -50% 0; z-index: 59; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 16px; font-size: .88rem; max-width: calc(100% - 32px); color: var(--ice); }
+  .update-pill > .icon { flex: none; color: var(--cyan); }
+  .update-pill > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .update-now { flex: none; min-height: 32px; padding: 0 14px; border-radius: 10px; font-weight: 600; color: var(--ink); background: linear-gradient(100deg, var(--cyan), oklch(85% .12 165)); }
   .toast { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top)); translate: -50% 0; z-index: 60; padding: 12px 16px; border-radius: 14px; font-size: .9rem; max-width: min(520px, calc(100% - 32px)); }
 
   /* ── Organizzazione stile assistente moderno: nuova chat, cronologia a gruppi, azioni discrete ── */
@@ -642,7 +685,8 @@
   .profile-text small { font-size: .76rem; color: var(--mist); }
   .profile-menu { position: absolute; z-index: 50; left: 0; right: 0; bottom: calc(100% + 8px); display: grid; gap: 2px; padding: 6px; border-radius: 14px; transform-origin: 50% 100%;
     box-shadow: 0 24px 60px -18px #000d, 0 0 0 1px color-mix(in oklch, var(--cyan) 10%, transparent); }
-  .profile[data-rail='true'] .profile-menu { right: auto; width: 230px; transform-origin: 0 100%; }
+  /* Nella barra a icone il menu si apre a destra del pulsante, fuori dalla colonna da 64px, senza tagli. */
+  .profile[data-rail='true'] .profile-menu { left: calc(100% + 12px); right: auto; bottom: 0; width: 240px; max-width: calc(100vw - 96px); transform-origin: 0 100%; }
   .profile-menu button { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 9px; font-size: .9rem; color: var(--mist); text-align: left; transition: background .15s, color .15s; }
   .profile-menu button:hover, .profile-menu button:focus-visible { background: color-mix(in oklch, var(--cyan) 9%, transparent); color: var(--ice); }
   .profile-menu kbd { margin-left: auto; font: 500 .7rem 'JetBrains Mono Variable', ui-monospace, monospace; color: color-mix(in oklch, var(--mist) 80%, transparent); }

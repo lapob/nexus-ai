@@ -88,7 +88,8 @@ fn vs(@builtin(vertex_index) vertex: u32, @builtin(instance_index) instance: u32
 fn fs(input: Out) -> @location(0) vec4f {
   let d = dot(input.local, input.local);
   if (d > 1.0) { discard; }
-  let falloff = exp(-d * 3.2);
+  // Punto nitido con bordo antialias più un alone leggero: definito anche in 4K, mai una macchia.
+  let falloff = (1.0 - smoothstep(0.2, 0.55, d)) * 0.85 + exp(-d * 5.0) * 0.35;
   let color = mix(u.tint.rgb, vec3f(0.92, 1.0, 1.0), input.white);
   return vec4f(color * falloff * input.glow, falloff * input.glow);
 }
@@ -211,10 +212,20 @@ export function Core({ state, className, level }: { state: CoreState; className?
     // Risoluzione adattiva: densità reale dello schermo (fino a 3× in WebGPU, 2× in Canvas),
     // al massimo ~4K di pixel; se i fotogrammi rallentano scende, quando torna fluido risale.
     let quality = 1;
+    let throttle = false; // con la GPU impegnata (es. dal modello) si dimezzano i fotogrammi, non la nitidezza
     const resize = () => {
       const cap = canvas.dataset.backend === 'canvas' ? 2 : 3;
-      const { width, height } = canvas.getBoundingClientRect();
-      let ratio = Math.min(window.devicePixelRatio || 1, cap) * quality;
+      // Dimensione di layout × scala CSS effettiva: il ResizeObserver non vede le trasformazioni
+      // (hero 0.82 → ambiente 1.25) e senza questo il bitmap veniva ingrandito e sfocato.
+      const layoutWidth = canvas.clientWidth || 1;
+      const layoutHeight = canvas.clientHeight || 1;
+      const box = canvas.getBoundingClientRect();
+      const scale = Math.max(1, box.width / layoutWidth, box.height / layoutHeight);
+      const width = layoutWidth * scale;
+      const height = layoutHeight * scale;
+      const dpr = window.devicePixelRatio || 1;
+      // Mai sotto la densità nativa (almeno 1 pixel reale per pixel CSS).
+      let ratio = Math.max(Math.min(dpr, cap) * quality, Math.min(dpr, 1.5));
       const budget = 3840 * 2160;
       if (width * height * ratio * ratio > budget) ratio = Math.sqrt(budget / Math.max(1, width * height));
       canvas.width = Math.max(1, Math.round(width * ratio));
@@ -232,7 +243,10 @@ export function Core({ state, className, level }: { state: CoreState; className?
       if (samples < 90) return;
       const average = spent / samples;
       spent = 0; samples = 0;
-      const next = average > 24 ? Math.max(0.5, quality * 0.85) : average < 18.5 && quality < 1 ? Math.min(1, quality * 1.12) : quality;
+      // Prima si riduce il ritmo (30 fps), poi — solo sugli schermi ad altissima densità — la risoluzione.
+      if (average > 24 && !throttle) { throttle = true; return; }
+      if (average < 15 && throttle && quality >= 1) { throttle = false; return; }
+      const next = average > 30 ? Math.max(0.6, quality * 0.9) : average < 18.5 && quality < 1 ? Math.min(1, quality * 1.12) : quality;
       if (Math.abs(next - quality) > 0.01) { quality = next; resize(); }
     };
     const loop = () => {
@@ -242,7 +256,7 @@ export function Core({ state, className, level }: { state: CoreState; className?
       const time = reduced.matches ? 0 : (performance.now() - started) / 1000;
       // A riposo 30 fps bastano al respiro lento del nucleo: metà lavoro GPU e batteria.
       tick += 1;
-      if (!(energy < 0.2 && tick % 2 === 1 && !reduced.matches)) renderer.frame(time, energy);
+      if (!((energy < 0.2 || throttle) && tick % 2 === 1 && !reduced.matches)) renderer.frame(time, energy);
       if (!reduced.matches && document.visibilityState === 'visible') frame = requestAnimationFrame(loop);
     };
     const wake = () => { cancelAnimationFrame(frame); last = 0; if (document.visibilityState === 'visible') frame = requestAnimationFrame(loop); };
@@ -261,7 +275,22 @@ export function Core({ state, className, level }: { state: CoreState; className?
     document.addEventListener('visibilitychange', wake);
     reduced.addEventListener('change', wake);
     canvas.addEventListener('nxs-core-state', redraw);
+    // Fine di una transizione di scala del contenitore: ricalcola il bitmap alla nuova dimensione reale.
+    const layer = canvas.parentElement;
+    const settle = (event: TransitionEvent) => { if (event.propertyName === 'transform' || event.propertyName === 'scale') resize(); };
+    layer?.addEventListener('transitionend', settle);
+    // Zoom del browser o finestra spostata su un monitor diverso: la densità cambia, il bitmap si rifà nitido.
+    let density: MediaQueryList | null = null;
+    const watchDensity = () => {
+      density?.removeEventListener('change', onDensity);
+      density = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      density.addEventListener('change', onDensity);
+    };
+    function onDensity() { resize(); watchDensity(); }
+    watchDensity();
     return () => {
+      density?.removeEventListener('change', onDensity);
+      layer?.removeEventListener('transitionend', settle);
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();

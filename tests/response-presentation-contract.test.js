@@ -11,7 +11,7 @@ test('la UI unica (web e desktop) rende Markdown semantico anche durante lo stre
   const app = fs.readFileSync(path.join(root, 'web/src/App.tsx'), 'utf8');
   const styles = fs.readFileSync(path.join(root, 'web/src/styles.css'), 'utf8');
   // Lo stesso renderer viene usato mentre i token arrivano e a risposta completa.
-  assert.match(app, /<Markdown text=\{message\.content\} \/>/);
+  assert.match(app, /<Markdown text=\{message\.content\} sources=\{message\.sources\} \/>/);
   assert.doesNotMatch(markdown, /dangerouslySetInnerHTML|\.innerHTML\s*=/);
   for (const kind of ['code', 'table', 'callout', 'formula', 'list']) assert.match(markdown, new RegExp(`kind: '${kind}'`));
   assert.match(markdown, /un fence o una formula non ancora chiusi durante lo streaming/);

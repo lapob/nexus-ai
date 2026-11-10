@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { publicKeyDerBase64 } = require('../src/security/release-integrity');
+const { PREVIEW_KEY_ID, PREVIEW_UPDATE_URL, previewPublicKey } = require('./preview-update-key');
 
 const root = path.resolve(__dirname, '..');
 const value = String(process.env.NEXUS_SERVICE_URL || '').trim().replace(/\/+$/, '');
@@ -31,11 +32,15 @@ if (rawUpdatesUrl) {
   updatesUrl = updateOrigin.toString().replace(/\/$/, '');
 }
 if (signedChannel && !updatesUrl) throw new Error('I canali Beta e Stable richiedono NEXUS_UPDATE_URL.');
-if (!signedChannel) updatesUrl = '';
-const manifestKeyId = String(process.env.NEXUS_RELEASE_MANIFEST_KEY_ID || '').trim();
-const manifestPublicKey = process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY
-  ? publicKeyDerBase64(process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY)
-  : '';
+// Preview: aggiornamenti automatici solo con la chiave pubblica di firma presente nel repository.
+const previewKey = signedChannel ? null : previewPublicKey();
+if (!signedChannel) updatesUrl = previewKey ? (updatesUrl || PREVIEW_UPDATE_URL) : '';
+const manifestKeyId = previewKey ? PREVIEW_KEY_ID : String(process.env.NEXUS_RELEASE_MANIFEST_KEY_ID || '').trim();
+const manifestPublicKey = previewKey
+  ? publicKeyDerBase64(previewKey)
+  : process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY
+    ? publicKeyDerBase64(process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY)
+    : '';
 if (signedChannel && (!manifestPublicKey || !/^[A-Za-z0-9._-]{3,80}$/.test(manifestKeyId))) {
   throw new Error('I canali Beta e Stable richiedono chiave pubblica Ed25519 e NEXUS_RELEASE_MANIFEST_KEY_ID.');
 }

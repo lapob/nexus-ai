@@ -85,3 +85,26 @@ test('Preview resta esplicitamente non firmata mentre Beta e Stable richiedono f
   });
   assert.equal(preview.updatePolicy.rollout, 'manual-preview');
 });
+
+test('Preview firmata Ed25519 diventa automatica e non accetta politiche miste', () => {
+  const { validateReleaseManifest } = require('../src/security/release-integrity');
+  const signed = releaseManifest({
+    product: 'NexusNXS', version: '1.0.1', channel: 'preview', visibility: 'public', releaseClass: 'preview', signatureRequired: true,
+    artifacts: [{ name: 'preview.bin', path: 'release/preview.bin', bytes: 1, sha256: 'C'.repeat(64), visibility: 'public' }]
+  });
+  assert.equal(signed.integrity.manifestSignature, 'ed25519');
+  assert.equal(signed.updatePolicy.rollout, 'preview-auto');
+  assert.throws(() => validateReleaseManifest({ ...signed, updatePolicy: { ...signed.updatePolicy, rollout: 'manual-preview' } }), /rollout/i);
+  assert.throws(() => validateReleaseManifest({ ...signed, integrity: { ...signed.integrity, manifestSignature: 'optional-preview' }, updatePolicy: { ...signed.updatePolicy } }), /rollout/i);
+});
+
+test('la chiave pubblica Preview incorporata verifica soltanto firme della chiave privata locale', () => {
+  const crypto = require('node:crypto');
+  const { signatureEnvelope, verifySignatureEnvelope } = require('../src/security/release-integrity');
+  const { previewPublicKey, PREVIEW_KEY_ID } = require('../scripts/preview-update-key');
+  const publicKey = previewPublicKey();
+  assert.ok(publicKey && publicKey.includes('BEGIN PUBLIC KEY'));
+  const intruder = crypto.generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const envelope = signatureEnvelope(Buffer.from('{"a":1}'), { privateKey: intruder, keyId: PREVIEW_KEY_ID });
+  assert.throws(() => verifySignatureEnvelope(Buffer.from('{"a":1}'), envelope, { publicKey, keyId: PREVIEW_KEY_ID }), /Firma della distinta non valida/);
+});

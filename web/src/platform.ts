@@ -119,6 +119,10 @@ function desktopPlatform(bridge: Bridge): Platform {
         else if (event.type === 'replace' && typeof event.token === 'string') { content = event.token; request.onEvent({ type: 'replace', text: content }); }
         else if (event.type === 'phase' && event.phase?.label) request.onEvent({ type: 'phase', label: String(event.phase.label).slice(0, 160) });
         else if (event.type === 'sources' && Array.isArray(event.sources)) request.onEvent({ type: 'sources', sources: desktopSources(event.sources) });
+        else if (event.type === 'memory' && event.memory && ['remember', 'update', 'forget'].includes(event.memory.action)) {
+          const id = Number(event.memory.id);
+          request.onEvent({ type: 'memory', memory: { action: event.memory.action, id: Number.isInteger(id) && id > 0 ? id : null, content: String(event.memory.content || '').slice(0, 240), count: Math.max(0, Number(event.memory.count) || 0) } });
+        }
         else if (event.type === 'complete') { request.onEvent({ type: 'complete', message: String(event.result?.message?.content || content), sources: [] }); finish(); }
         else if (event.type === 'error') { request.onEvent({ type: 'error', error: String(event.error?.message || event.error || 'Risposta non completata.') }); finish(); }
         else if (event.type === 'cancel') finish(Object.assign(new Error('Richiesta annullata.'), { name: 'AbortError' }));

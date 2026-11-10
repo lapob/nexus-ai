@@ -28,8 +28,8 @@ const message = (error: unknown, fallback: string) => String((error as Error)?.m
 
 // #region 02 — Contenitore
 
-export function ControlCenter({ onClose, notify }: { onClose: () => void; notify: (text: string) => void }) {
-  const [tab, setTab] = useState<Tab>('models');
+export function ControlCenter({ onClose, notify, initialTab }: { onClose: () => void; notify: (text: string) => void; initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'models');
   const [settings, setSettings] = useState<Any>(null);
   const reload = useCallback(async () => { setSettings((await bridge().bootstrap())?.settings ?? null); }, []);
   useEffect(() => { void reload().catch(() => notify('Impostazioni non leggibili.')); }, [notify, reload]);

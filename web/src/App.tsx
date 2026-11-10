@@ -5,7 +5,7 @@
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'framer-motion';
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Capabilities, Preferences } from './api';
-import { useDesktopPresence } from './desktopPresence';
+import { useDesktopPresence, useDesktopUpdate } from './desktopPresence';
 import { desktopBridge, platform } from './platform';
 import { pairDevice, pairedToken } from './paired';
 import brandIcon from './assets/nexus-mark-ui.png';
@@ -17,6 +17,7 @@ import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, nee
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { Tooltips } from './Tooltips';
 import { useSwipeGestures } from './gestures';
+import { mergeStep } from './steps';
 import { activeConversation, appendMessage, assignProject, createProject, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, openProject, projectContext, projectFor, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
 import { ProjectNav, ProjectSheet } from './Projects';
 import { Panel } from './Panel';
@@ -137,7 +138,7 @@ export function App() {
   const [showJump, setShowJump] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [controlOpen, setControlOpen] = useState(false);
+  const [controlOpen, setControlOpen] = useState<boolean | 'memory'>(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const pinned = useStore((state) => state.pinned);
   const projects = useStore((state) => state.projects);
@@ -166,6 +167,7 @@ export function App() {
   const coreLayerRef = useRef<HTMLDivElement>(null);
   const coreSlotRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const touchY = useRef(0);
   const [caps, setCaps] = useState<Capabilities>({ voiceInput: false, voiceOutput: false, attachments: true });
   const [pending, setPending] = useState<Pending[]>([]);
   const [recording, setRecording] = useState<Recording | null>(null);
@@ -280,8 +282,9 @@ export function App() {
           } else if (event.type === 'phase') {
             setState((state) => ({ ...state, phase: event.label }), { durable: false });
             // Cronologia visibile dei passaggi (strumenti, ricerche, verifiche), senza duplicati consecutivi.
-            patch((message) => message.steps?.at(-1) === event.label ? message : { ...message, steps: [...(message.steps ?? []), event.label].slice(-12) });
+            patch((message) => ({ ...message, steps: mergeStep(message.steps, event.label) }));
           } else if (event.type === 'sources') patch((message) => ({ ...message, sources: event.sources }));
+          else if (event.type === 'memory') patch((message) => ({ ...message, memory: event.memory }), true);
           else if (event.type === 'complete') {
             cancelAnimationFrame(raf); finalText = event.message || buffered;
             patch((message) => ({ ...message, content: finalText, ...(event.sources.length ? { sources: event.sources } : {}) }), true);
@@ -369,6 +372,7 @@ export function App() {
 
   // Desktop: «Nexus» apre la voce live; la Presence segue lo stato dell'entità; avvisi del PC come toast.
   useDesktopPresence({ state: coreState, live, onWake: () => { void startLive(); }, notify });
+  const update = useDesktopUpdate();
 
   /** Microfono: un tocco avvia, un tocco (o il silenzio) ferma; il testo riconosciuto viene inviato. */
   const toggleMic = useCallback(async () => {
@@ -546,12 +550,21 @@ export function App() {
           <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /><div className="core-hud" aria-hidden="true"><i /><i /><i /></div></div>
           {dragging && <div className="dropzone" aria-hidden="true"><span className="glass"><Icon name="paperclip" />{Number.isFinite(limitsFor(platform.kind).maxCount) ? 'Rilascia per allegare (max 2 file, 1,5 MB)' : 'Rilascia per allegare'}</span></div>}
 
-          <div className="scroll" ref={scrollRef} onScroll={(event) => {
-            const element = event.currentTarget;
-            stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-            const far = element.scrollHeight - element.scrollTop - element.clientHeight > 240;
-            if (far !== showJump) setShowJump(far);
-          }}>
+          <div className="scroll" ref={scrollRef}
+            // Intenzione dell'utente, non posizione: il primo gesto verso l'alto stacca subito lo scorrimento
+            // automatico (prima un piccolo scroll entro 80px veniva riportato giù a ogni token: effetto glitch).
+            onWheel={(event) => { if (event.deltaY < 0) stickToBottom.current = false; }}
+            onTouchStart={(event) => { touchY.current = event.touches[0]?.clientY ?? 0; }}
+            onTouchMove={(event) => { const y = event.touches[0]?.clientY ?? 0; if (y > touchY.current + 4) stickToBottom.current = false; touchY.current = y; }}
+            onKeyDown={(event) => { if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) stickToBottom.current = false; }}
+            onScroll={(event) => {
+              const element = event.currentTarget;
+              const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+              // Si riaggancia solo quando l'utente torna davvero in fondo.
+              if (distance < 12) stickToBottom.current = true;
+              const far = distance > 240;
+              if (far !== showJump) setShowJump(far);
+            }}>
             {empty ? (
               <section className="welcome" aria-label="Inizia">
                 <div ref={coreSlotRef} className="core-slot" aria-hidden="true" />
@@ -596,8 +609,17 @@ export function App() {
                         }} />
                       ) : (
                         <div className="answer">
-                          {message.content ? <Markdown text={message.content} /> : <Thinking label={phase} />}
-                          <AgentTrail steps={message.steps} sources={message.sources} live={generating && message.id === conversation!.messages.at(-1)?.id} />
+                          <AgentTrail steps={message.steps} live={generating && message.id === conversation!.messages.at(-1)?.id} writing={Boolean(message.content)} />
+                          {message.content ? <Markdown text={message.content} sources={message.sources} /> : (message.steps?.length ?? 0) > 1 ? null : <Thinking label={phase} />}
+                          <SourceList sources={message.sources} />
+                          {message.memory && <MemoryChip notice={message.memory} onView={desktopBridge ? () => setControlOpen('memory') : undefined}
+                            onUndo={desktopBridge && message.memory.action === 'remember' && message.memory.id && !message.memory.undone ? async () => {
+                              try {
+                                await desktopBridge!.forgetMemory(message.memory!.id);
+                                updateConversation(conversation!.id, (item) => ({ ...item, messages: item.messages.map((entry) => entry.id === message.id && entry.memory ? { ...entry, memory: { ...entry.memory, undone: true } } : entry) }));
+                                notify('Ricordo annullato');
+                              } catch { notify('Non sono riuscito ad annullare il ricordo.'); }
+                            } : undefined} />}
                           {message.interrupted && <p className="note">Risposta interrotta.
                             {!generating && message.id === conversation!.messages.at(-1)?.id && <button type="button" className="inline-action" onClick={() => void send('Continua esattamente da dove ti sei fermato, senza ripetere.')}><Icon name="forward" size={16} />Continua</button>}
                           </p>}
@@ -729,11 +751,18 @@ export function App() {
           {projectSheet && <ProjectSheet key={projectSheet} projectId={projectSheet} onClose={closeProjectSheet} notify={notify} />}
           {shortcutsOpen && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
           {settingsOpen && <Settings preferences={preferences} onClose={() => setSettingsOpen(false)} onCleared={() => notify('Dati locali e risposte di ripresa cancellati.')} />}
-          {controlOpen && desktopBridge && <Suspense key="control" fallback={null}><ControlCenter onClose={() => setControlOpen(false)} notify={notify} /></Suspense>}
+          {controlOpen && desktopBridge && <Suspense key="control" fallback={null}><ControlCenter initialTab={controlOpen === 'memory' ? 'memory' : undefined} onClose={() => setControlOpen(false)} notify={notify} /></Suspense>}
           {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Collegato al tuo PC.'); }} />}
         </AnimatePresence>
 
         <Tooltips />
+        <AnimatePresence>{update.ready && !toast && (
+          <m.div className="update-pill glass" role="status" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>
+            <Icon name="download" size={16} /><span>NexusNXS {update.ready.version} è pronto</span>
+            <button type="button" className="update-now" onClick={update.install}>Riavvia</button>
+            <button type="button" className="icon-button small" aria-label="Più tardi: si installa alla chiusura" title="Più tardi (si installa alla chiusura)" onClick={update.dismiss}><Icon name="close" size={15} /></button>
+          </m.div>
+        )}</AnimatePresence>
         <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>{toast}</m.div>}</AnimatePresence>
       </div>
     </MotionConfig></LazyMotion>
@@ -748,17 +777,33 @@ function Thinking({ label }: { label: string }) {
  * Cosa ha fatto l'agente per rispondere: passaggi visibili (strumenti, ricerche,
  * verifiche) e fonti. Durante la risposta resta aperto; dopo si richiude.
  */
-function AgentTrail({ steps = [], sources = [], live }: { steps?: string[]; sources?: Array<{ title?: string; url: string }>; live: boolean }) {
-  if (!steps.length && !sources.length) return null;
+/**
+ * Ragionamento visibile, come nei migliori assistenti: una sola riga con la fase corrente in
+ * luce scorrevole mentre lavora; si richiude da sola appena inizia la risposta e resta apribile.
+ */
+function AgentTrail({ steps = [], live, writing }: { steps?: string[]; live: boolean; writing: boolean }) {
+  const [open, setOpen] = useState<boolean | null>(null);
+  if (steps.length < 2) return null;
+  const expanded = open ?? (live && !writing);
+  const current = steps.at(-1) ?? '';
+  return (
+    <div className="agent-trail" data-live={live}>
+      <button type="button" className="trail-toggle" aria-expanded={expanded} onClick={() => setOpen(!expanded)}>
+        <Icon name={live ? 'sparkles' : 'check'} size={15} />
+        <span className={live ? 'shimmer' : undefined}>{live ? current.replace(/…$/u, '') : `Ragionamento · ${steps.length} passaggi`}</span>
+        <span className="trail-chevron"><Icon name="chevron" size={14} /></span>
+      </button>
+      <div className="trail-body" data-open={expanded}>
+        <ol>{steps.map((step, index) => <li key={`${index}-${step}`} data-done={!live || index < steps.length - 1}>{step}</li>)}</ol>
+      </div>
+    </div>
+  );
+}
+
+function SourceList({ sources = [] }: { sources?: Array<{ title?: string; url: string }> }) {
   const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
   return (
     <div className="agent-trail">
-      {steps.length > 1 && (
-        <details open={live}>
-          <summary>{live ? 'Al lavoro' : `${steps.length} passaggi`}</summary>
-          <ol>{steps.map((step, index) => <li key={`${index}-${step}`} data-done={!live || index < steps.length - 1}>{step}</li>)}</ol>
-        </details>
-      )}
       {sources.length > 0 && (
         <ul className="sources" aria-label="Fonti">
           {sources.map((source, index) => (
@@ -1078,6 +1123,20 @@ function ProfileMenu({ status, compactRail = false, onSettings, onControl, onSho
           </m.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+/** Avviso in linea "Memoria aggiornata": cosa è stato ricordato, con Vedi (Centro di controllo) e Annulla. */
+function MemoryChip({ notice, onView, onUndo }: { notice: NonNullable<Message['memory']>; onView?: () => void; onUndo?: () => void | Promise<void> }) {
+  const label = notice.undone ? 'Ricordo annullato'
+    : notice.action === 'forget' ? (notice.count === 1 ? 'Ho dimenticato 1 ricordo' : `Ho dimenticato ${notice.count} ricordi`)
+    : notice.action === 'update' ? 'Memoria aggiornata' : 'Memoria aggiornata';
+  return (
+    <div className="memory-chip" role="status" data-undone={Boolean(notice.undone)}>
+      <Icon name={notice.undone ? 'undo' : 'memory'} size={15} />
+      <span className="memory-text"><strong>{label}</strong>{notice.content && !notice.undone && notice.action !== 'forget' ? <span title={notice.content}>{notice.content}</span> : null}</span>
+      {onView && <button type="button" className="memory-action" onClick={onView} title="Apri la memoria"><Icon name="eye" size={15} /><span>Vedi</span></button>}
+      {onUndo && <button type="button" className="memory-action" onClick={() => void onUndo()} title="Annulla questo ricordo"><Icon name="undo" size={15} /><span>Annulla</span></button>}
     </div>
   );
 }

@@ -145,7 +145,7 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       recurringTimer = setInterval(() => checkTrustedUpdates().catch((error) => {
         logger.warn('Verifica periodica della distinta aggiornamento non riuscita.', { error });
         setState({ status: 'error', progress: 0, lastCheckedAt: Date.now() });
-      }), 6 * 60 * 60 * 1000);
+      }), 30 * 60 * 1000); // ogni 30 minuti: una nuova versione arriva in giornata, scaricata in background
       recurringTimer.unref?.();
     },
     stop() {

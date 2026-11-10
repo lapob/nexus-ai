@@ -15,6 +15,7 @@ export type StreamEvent =
   | { type: 'replace'; text: string }
   | { type: 'phase'; label: string }
   | { type: 'sources'; sources: Source[] }
+  | { type: 'memory'; memory: { action: 'remember' | 'update' | 'forget'; id?: number | null; content?: string; count: number } }
   | { type: 'complete'; message: string; sources: Source[] }
   | { type: 'error'; error: string };
 

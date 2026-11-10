@@ -1,3 +1,23 @@
+## In progress — 10 November 2026: "esegui tutte le modifiche suggerite" (repo stays public)
+
+Done and verified (check:ui 29/29 + matrix 15/15, npm test 1194/0): profile
+menu no longer clipped in the 64 px rail; Ctrl+Maiusc+L kbd legible on the
+cyan button; core canvas sharp (bitmap sized to CSS transform scale, DPR
+floor, throttle frames before resolution, re-size on zoom/monitor change);
+streaming no longer pulls the reader down after a scroll-up (intent-based
+stick); reasoning trail collapses when text starts, steps merged; heading
+bold-in-bold fixed; "Memoria aggiornata" chip (Vedi → Control Center Memoria,
+Annulla → forgetMemory) from explicit memory + agent remember-fact; inline
+citations [n] linked to sources. Preview auto-update: Ed25519 key generated
+outside the repo (%APPDATA%/NexusNXS-release, public key in
+config/preview-update-key.pub.pem), manifest rollout `preview-auto`, feed
+https://nexusnxs.com/updates/preview served by the site worker (metadata
+proxied, binaries 302 to the GitHub release), check every 30 min, "Riavvia"
+pill. Installs older than 0.3.37 must update once by hand. Next: Ctrl+Maiusc+
+Spazio quick bar (Presence), HTML sandbox preview, Qwen3-TTS, phone
+notifications, site screenshots, release 0.3.37 + site promote, then (owner
+authorized) power off the PC at the very end.
+
 ## 10 November 2026 — owner bug report + UI pass (owner: "esegui tutto")
 
 Fixed: readyz 503 {status:offline} was read as "preparing", so the app never

@@ -79,9 +79,11 @@ function validateReleaseManifest(manifest, { expectedChannel = '' } = {}) {
   if (manifest.visibility === 'public') {
     const expectedClass = manifest.channel === 'stable' ? 'production' : manifest.channel;
     if (manifest.releaseClass !== expectedClass) throw new Error('Classe e canale della distinta non corrispondono.');
-    const expectedSignature = manifest.channel === 'preview' ? 'optional-preview' : 'ed25519';
+    // Preview: manuale senza firma, oppure automatica solo con distinta firmata Ed25519 ("preview-auto").
+    const previewAuto = manifest.channel === 'preview' && manifest.integrity?.manifestSignature === 'ed25519';
+    const expectedSignature = manifest.channel === 'preview' && !previewAuto ? 'optional-preview' : 'ed25519';
     if (manifest.integrity?.manifestSignature !== expectedSignature) throw new Error('Politica di firma della distinta non coerente con il canale.');
-    const expectedRollout = manifest.channel === 'stable' ? 'staged' : manifest.channel === 'beta' ? 'beta-ring' : 'manual-preview';
+    const expectedRollout = manifest.channel === 'stable' ? 'staged' : manifest.channel === 'beta' ? 'beta-ring' : previewAuto ? 'preview-auto' : 'manual-preview';
     if (manifest.updatePolicy?.rollout !== expectedRollout
       || !Number.isInteger(manifest.updatePolicy?.initialPercentage)
       || manifest.updatePolicy.initialPercentage < 1 || manifest.updatePolicy.initialPercentage > 100

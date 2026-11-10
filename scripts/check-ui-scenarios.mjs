@@ -39,6 +39,23 @@ const server = http.createServer((request, response) => {
   // API simulate: il servizio risulta pronto, senza voce; nessuna richiesta esce dalla macchina.
   // Icona e manifest li serve il gateway, non web-dist.
   if (['/favicon.ico', '/nexus-icon.png', '/manifest.webmanifest'].includes(pathname)) { response.writeHead(204).end(); return; }
+  if (pathname === '/api/guest/bootstrap') { response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ token: 'scenario-token', expiresAt: Date.now() + 3_600_000 })); return; }
+  // Risposta in streaming lenta (fasi + 120 token in ~4 s) per provare lo scorrimento durante la generazione.
+  if (pathname === '/api/guest/messages/stream') {
+    response.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+    const events = [
+      ...['Comprendo la richiesta…', 'Comprendo la richiesta e preparo il contesto…', 'Raccolgo le informazioni utili…', 'Genero la risposta…'].map((text) => ({ type: 'phase', activity: { text, phase: 'work' } })),
+      ...Array.from({ length: 120 }, (_, i) => ({ type: 'token', token: i % 12 === 11 ? `parola ${i}.\n\n` : `parola ${i} ` })),
+      { type: 'complete' }
+    ];
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index >= events.length || response.destroyed) { clearInterval(timer); response.end(); return; }
+      response.write(`${JSON.stringify(events[index])}\n`); index += 1;
+    }, 35);
+    request.on('close', () => clearInterval(timer));
+    return;
+  }
   if (pathname === '/readyz' || pathname.startsWith('/api/')) { response.writeHead(200, { 'Content-Type': 'application/json' }).end('{}'); return; }
   const target = path.resolve(dist, `.${pathname === '/' ? '/index.html' : pathname}`);
   if (!target.startsWith(dist + path.sep) || !fs.existsSync(target) || !fs.statSync(target).isFile()) { response.writeHead(404).end(); return; }
@@ -140,6 +157,45 @@ const scenarios = [
     if (await page.locator('.profile-menu').count()) throw new Error('Esc non chiude il menu profilo');
     await page.click('.sidebar-foot .profile-button');
   }, expect: ['.profile-menu [role="menuitem"]'] },
+  { name: 'profile-menu-rail', viewport: desktop, state: thread, run: async (page) => {
+    await page.click('[aria-label="Nascondi barra laterale (Ctrl+B)"]'); await page.waitForTimeout(500);
+    await page.click('.sidebar-rail .profile-button'); await page.waitForTimeout(350);
+    // Il menu non deve essere ritagliato dalla colonna da 64px: ogni voce deve essere davvero visibile e cliccabile.
+    const clipped = await page.$$eval('.profile-menu [role="menuitem"]', (items) => items.filter((item) => {
+      const box = item.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.right - 6, box.top + box.height / 2);
+      return box.right > innerWidth || !(hit && item.contains(hit));
+    }).map((item) => item.textContent?.trim()));
+    if (clipped.length) throw new Error(`menu profilo tagliato nella barra a icone: ${clipped.join(', ')}`);
+  }, expect: ['.profile-menu [role="menuitem"]'] },
+  { name: 'reasoning-trail', viewport: desktop, state: { ...thread, activeId: 'rt', conversations: [{ id: 'rt', title: 'Ragionamento', createdAt: now, updatedAt: now, messages: [
+    msg('rt1', 'user', 'Come risparmio energia?', now - 4000),
+    msg('rt3', 'user', 'Ricorda che preferisco risposte brevi', now - 3000),
+    { ...msg('rt4', 'assistant', 'Fatto, lo ricorderò.', now - 2500), memory: { action: 'remember', id: 7, content: 'Preferisce risposte brevi e dirette, con esempi pratici quando servono', count: 1 } },
+    { ...msg('rt2', 'assistant', '### **2. Pannelli solari**\n\n**Descrizione:** produrre energia da fonti rinnovabili [1]. Un impianto domestico copre gran parte dei consumi [1, 2].', now - 2000),
+      sources: [{ title: 'Guida al fotovoltaico', url: 'https://example.org/fotovoltaico' }, { title: 'Consumi domestici', url: 'https://example.com/consumi' }], steps: ['Comprendo la richiesta e preparo il contesto…', 'Raccolgo le informazioni utili…', 'Genero la risposta…'] }] }, ...thread.conversations] },
+  run: async (page) => {
+    if (await page.$eval('.trail-body', (element) => element.dataset.open) !== 'false') throw new Error('ragionamento aperto a risposta finita');
+    await page.click('.trail-toggle'); await page.waitForTimeout(450);
+    if (await page.$eval('.trail-body', (element) => element.dataset.open) !== 'true') throw new Error('il ragionamento non si apre');
+    const weight = await page.$eval('.markdown :is(h2, h3, h4)', (element) => Math.max(...[element, ...element.querySelectorAll('*')].map((node) => Number(getComputedStyle(node).fontWeight))));
+    if (Number(weight) > 700) throw new Error(`titolo in grassetto doppio (${weight})`);
+    const cites = await page.$$eval('.markdown a.cite', (links) => links.map((link) => `${link.textContent}:${link.getAttribute('href')}`));
+    if (cites.join(' ') !== '1:https://example.org/fotovoltaico 1:https://example.org/fotovoltaico 2:https://example.com/consumi') throw new Error(`citazioni in linea errate: ${cites.join(' ')}`);
+  }, expect: ['.trail-toggle[aria-expanded="true"]', '.memory-chip', '.sources'] },
+  { name: 'stream-scroll-up', viewport: desktop, state: { ...thread, activeId: 'ss', conversations: [{ id: 'ss', title: 'Lunga', createdAt: now, updatedAt: now,
+    messages: Array.from({ length: 16 }, (_, i) => msg(`s${i}`, i % 2 ? 'assistant' : 'user', `Messaggio ${i}: ${'testo di prova '.repeat(i % 2 ? 18 : 3)}`, now - (30 - i) * 1000)) }, ...thread.conversations] },
+  run: async (page) => {
+    await page.fill('textarea[aria-label="Messaggio"]', 'Scrivi una risposta lunga');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.trail-toggle'); await page.waitForTimeout(900);
+    // Durante la generazione l'utente risale di poco: non deve essere riportato giù al token successivo.
+    await page.hover('.scroll'); await page.mouse.wheel(0, -60); await page.waitForTimeout(900);
+    const distance = await page.$eval('.scroll', (element) => element.scrollHeight - element.scrollTop - element.clientHeight);
+    if (distance < 40) throw new Error(`scorrimento verso l'alto annullato durante la risposta (distanza ${Math.round(distance)}px)`);
+    if (await page.$eval('.trail-body', (element) => element.dataset.open) !== 'false') throw new Error('il ragionamento resta aperto mentre la risposta viene scritta');
+    await page.waitForFunction(() => !document.querySelector('.composer[data-generating="true"]'), null, { timeout: 15_000 });
+  }, expect: ['.thread .message.user'] },
   { name: 'offline', viewport: desktop, offline: true, run: async (page) => {
     await page.fill('textarea[aria-label="Messaggio"]', 'Ciao');
     if (!(await page.locator('button.send').isDisabled())) throw new Error('invio attivo da offline');
@@ -191,7 +247,8 @@ for (const scenario of scenarios) {
     const metrics = await page.evaluate(() => {
       const visible = (element) => { const box = element.getBoundingClientRect(); const style = getComputedStyle(element); return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && !element.closest('[inert]'); };
       // Il campo di ricerca è dentro un'etichetta alta 40 px: il bersaglio è l'etichetta.
-      const small = [...document.querySelectorAll('button, a[href], [role="option"]')].filter(visible)
+      // Le citazioni [n] stanno dentro una frase: eccezione «inline» di WCAG 2.5.8 (hanno comunque un'area di tocco estesa).
+      const small = [...document.querySelectorAll('button, a[href], [role="option"]')].filter(visible).filter((element) => !element.matches('.cite'))
         .filter((element) => { const box = element.getBoundingClientRect(); return box.width < 32 || box.height < 32; })
         .map((element) => `${element.getAttribute('aria-label') || element.textContent?.trim().slice(0, 24) || element.className}:${Math.round(element.getBoundingClientRect().width)}x${Math.round(element.getBoundingClientRect().height)}`);
       return { overflowX: document.documentElement.scrollWidth - innerWidth, small };

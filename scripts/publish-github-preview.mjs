@@ -3,6 +3,7 @@
  * @description Uses Git Credential Manager in memory. Credentials are never printed or persisted.
  */
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -22,6 +23,11 @@ const assets = [
   { path: resolve(root, 'release', 'nexus-sbom.cdx.json.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'CHECKSUMS.sha256'), type: 'text/plain; charset=utf-8' },
   { path: resolve(root, 'artifacts', 'founder-preview', 'release-manifest.preview.json'), type: 'application/json' },
+  // Feed degli aggiornamenti automatici: distinta firmata Ed25519 e relativa firma (servite da nexusnxs.com/updates/preview).
+  ...['release-manifest.json', 'release-manifest.sig.json']
+    .map((name) => resolve(root, 'release', name))
+    .filter((file) => existsSync(file))
+    .map((file) => ({ path: file, type: 'application/json' })),
 ];
 
 function githubCredential() {

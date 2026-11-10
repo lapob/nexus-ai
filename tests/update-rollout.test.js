@@ -34,3 +34,11 @@ test('preview rimane manuale anche al cento per cento', () => {
   assert.equal(result.eligible, false);
   assert.equal(result.reason, 'manual-preview');
 });
+
+test('preview firmata (preview-auto) si aggiorna subito per tutti; la sola etichetta senza canale preview non basta', () => {
+  assert.deepEqual(evaluateUpdateRollout({ channel: 'preview', updatePolicy: { rollout: 'preview-auto', initialPercentage: 100 } }), {
+    eligible: true, reason: 'all', percentage: 100, bucket: null
+  });
+  assert.equal(evaluateUpdateRollout({ channel: 'preview', updatePolicy: { rollout: 'manual-preview', initialPercentage: 100, paused: true } }).reason, 'paused');
+  assert.equal(evaluateUpdateRollout({ channel: 'preview', updatePolicy: { rollout: 'preview-auto', initialPercentage: 100, paused: true } }).eligible, false);
+});

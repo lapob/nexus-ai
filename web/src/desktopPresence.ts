@@ -2,7 +2,7 @@
  * @module web/desktopPresence
  * @description Integrazioni Jarvis del desktop: stato condiviso con la Presence di sistema, parola di attivazione che apre la voce live e avvisi proattivi del PC.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CoreState } from './Core';
 import { desktopBridge } from './platform';
 
@@ -28,6 +28,28 @@ const PROACTIVE_LABELS: Record<string, (metadata: Record<string, string>) => str
   'update.available': () => 'Aggiornamento disponibile',
   'device.health': () => 'Stato del dispositivo aggiornato'
 };
+
+export interface UpdateState { status: string; version?: string; progress?: number }
+
+/**
+ * Aggiornamenti automatici del desktop: il main process scarica e verifica in background (distinta firmata);
+ * qui si espone solo lo stato "pronto" e il riavvio su richiesta. Se ignorato, si installa alla chiusura.
+ */
+export function useDesktopUpdate(): { ready: UpdateState | null; install: () => void; dismiss: () => void } {
+  const [state, setState] = useState<UpdateState | null>(null);
+  const [dismissed, setDismissed] = useState('');
+  useEffect(() => {
+    if (!desktopBridge?.onUpdateEvent) return;
+    void Promise.resolve(desktopBridge.updateStatus?.()).then((value: UpdateState) => value && setState(value)).catch(() => {});
+    return desktopBridge.onUpdateEvent((value: UpdateState) => setState(value)) as () => void;
+  }, []);
+  const ready = state?.status === 'ready' && state.version !== dismissed ? state : null;
+  return {
+    ready,
+    install: () => { void Promise.resolve(desktopBridge?.installUpdate?.()).catch(() => {}); },
+    dismiss: () => setDismissed(state?.version ?? '')
+  };
+}
 
 /**
  * Collega la UI al desktop. Non fa nulla sul web. `live` e `onWake` arrivano

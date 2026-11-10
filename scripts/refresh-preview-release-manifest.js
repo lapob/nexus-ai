@@ -9,8 +9,10 @@ const {
   releaseManifest,
   verifyArtifactRecords,
   verifyElectronUpdateManifest,
-  writeManifest
+  writeManifest,
+  writeManifestSignature
 } = require('./release-manifest');
+const { previewUpdateSigning } = require('./preview-update-key');
 
 const root = path.resolve(__dirname, '..');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -34,13 +36,14 @@ for (const name of ['nexus-sbom.cdx.json', 'nexus-sbom.cdx.json.sha256']) {
   }]);
 }
 
+const previewSigning = previewUpdateSigning();
 const manifest = releaseManifest({
   product: 'NexusNXS',
   version: packageJson.version,
   channel: 'preview',
   visibility: 'public',
   releaseClass: 'preview',
-  signatureRequired: false,
+  signatureRequired: Boolean(previewSigning),
   artifacts: artifacts.map(([file, metadata]) => artifactRecord(root, file, {
     ...metadata,
     visibility: 'public',
@@ -51,4 +54,7 @@ const manifest = releaseManifest({
 const destination = writeManifest(path.join(releaseRoot, 'release-manifest.json'), manifest);
 verifyArtifactRecords(root, manifest);
 verifyElectronUpdateManifest(root, path.join(releaseRoot, 'latest.yml'), packageJson.version);
+const signaturePath = path.join(releaseRoot, 'release-manifest.sig.json');
+if (previewSigning) writeManifestSignature(destination, signaturePath, previewSigning);
+else fs.rmSync(signaturePath, { force: true });
 process.stdout.write(`Distinta preview aggiornata: ${destination} (${manifest.artifacts.length} artefatti).\n`);

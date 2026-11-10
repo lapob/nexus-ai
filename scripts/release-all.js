@@ -14,6 +14,7 @@ const {
   writeManifest,
   writeManifestSignature
 } = require('./release-manifest');
+const { previewUpdateSigning } = require('./preview-update-key');
 
 // #region Configurazione e build
 
@@ -99,10 +100,12 @@ if (includePublic) {
     [sbom, { platform: 'multi', kind: 'sbom-cyclonedx', componentVersion: packageJson.version }],
     [sbomDigest, { platform: 'multi', kind: 'sbom-digest', componentVersion: packageJson.version }],
   ];
+  // Preview con aggiornamento automatico: distinta firmata con la chiave locale di rilascio.
+  const previewSigning = signedChannel ? null : previewUpdateSigning();
   const manifest = releaseManifest({
     product: 'NexusNXS', version: packageJson.version, channel: releaseChannel,
     visibility: 'public', releaseClass: releaseChannel === 'stable' ? 'production' : releaseChannel === 'beta' ? 'beta' : 'preview',
-    signatureRequired: signedChannel,
+    signatureRequired: signedChannel || Boolean(previewSigning),
     artifacts: publicArtifacts.map(([file, metadata]) => artifactRecord(root, file, { ...metadata, visibility: 'public', distributionSigned: signedChannel })),
   });
   const destination = writeManifest(path.join(releaseRoot, 'release-manifest.json'), manifest);
@@ -115,7 +118,8 @@ if (includePublic) {
       publicKey: process.env.NEXUS_RELEASE_MANIFEST_PUBLIC_KEY,
       keyId: process.env.NEXUS_RELEASE_MANIFEST_KEY_ID
     });
-  } else fs.rmSync(signaturePath, { force: true });
+  } else if (previewSigning) writeManifestSignature(destination, signaturePath, previewSigning);
+  else fs.rmSync(signaturePath, { force: true });
   console.log(`Distinta pubblica pronta: ${destination}`);
 }
 
