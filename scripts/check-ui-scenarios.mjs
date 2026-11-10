@@ -190,9 +190,68 @@ for (const scenario of scenarios) {
     failures.push(scenario.name);
   } finally { await context.close(); }
 }
+// #endregion
+
+// #region 05 — Matrice di risoluzioni: niente tagli durante le animazioni, al passaggio e dopo
+
+// Un elemento è "tagliato" se esce da un antenato che ritaglia (overflow o maschera) lungo un
+// asse in cui quell'antenato non scorre, o dallo schermo. Campionato mentre i riquadri entrano.
+const RESOLUTIONS = [[320, 568], [360, 640], [375, 667], [390, 844], [412, 915], [568, 320], [768, 1024], [844, 390],
+  [1024, 640], [1280, 720], [1366, 768], [1440, 900], [1920, 1080], [2560, 1440], [3840, 2160]];
+const WATCHED = '.chip, .category, .welcome h2, .composer, .topbar .icon-button, .new-chat';
+const clipProbe = (selector) => {
+  const issues = [];
+  for (const element of document.querySelectorAll(selector)) {
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    if (box.width < 1 || style.visibility === 'hidden' || element.closest('[inert],[aria-hidden="true"]')) continue;
+    let scrollsX = false, scrollsY = false;
+    for (let parent = element.parentElement; parent && parent !== document.documentElement; parent = parent.parentElement) {
+      const css = getComputedStyle(parent);
+      const masked = css.maskImage && css.maskImage !== 'none';
+      const clipsX = masked || css.overflowX !== 'visible', clipsY = masked || css.overflowY !== 'visible';
+      if (!clipsX && !clipsY) continue;
+      const area = parent.getBoundingClientRect();
+      const ownX = ['auto', 'scroll'].includes(css.overflowX) && parent.scrollWidth > parent.clientWidth + 1;
+      const ownY = ['auto', 'scroll'].includes(css.overflowY) && parent.scrollHeight > parent.clientHeight + 1;
+      const name = `${parent.tagName.toLowerCase()}.${String(parent.className).split(' ')[0]}`;
+      // Dentro un contenitore che scorre su quell'asse, uscire dai bordi è scorrimento, non un taglio.
+      if (clipsY && !ownY && !scrollsY && (box.top < area.top - 0.5 || box.bottom > area.bottom + 0.5)) issues.push(`taglio verticale da ${name}`);
+      if (clipsX && !ownX && !scrollsX && (box.left < area.left - 0.5 || box.right > area.right + 0.5)) issues.push(`taglio orizzontale da ${name}`);
+      scrollsX ||= ownX; scrollsY ||= ownY;
+    }
+    if (!scrollsX && (box.left < -0.5 || box.right > innerWidth + 0.5)) issues.push('fuori schermo in orizzontale');
+    if (!scrollsY && (box.top < -0.5 || box.bottom > innerHeight + 0.5)) issues.push('fuori schermo in verticale');
+    if (issues.length) return issues.map((issue) => `${element.className.split(' ')[0] || element.tagName}: ${issue}`);
+  }
+  return issues;
+};
+let matrixFailures = 0;
+for (const [width, height] of RESOLUTIONS) {
+  const mobileDevice = width < 600;
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, colorScheme: 'dark', isMobile: mobileDevice, hasTouch: mobileDevice });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  const problems = new Set();
+  try {
+    await page.goto(base, { waitUntil: 'load' });
+    const sample = async (moment) => { for (const issue of await page.evaluate(clipProbe, WATCHED)) problems.add(`${moment}: ${issue}`); };
+    for (const delay of [60, 180, 320, 520, 900, 1600]) { await page.waitForTimeout(delay === 60 ? 60 : 140); await sample(`ingresso ${delay}ms`); }
+    await page.click('.category.shuffle');
+    for (const delay of [80, 220, 420, 800]) { await page.waitForTimeout(120); await sample(`rimescolo ${delay}ms`); }
+    if (!mobileDevice) for (const chip of await page.locator('.chip:visible').all()) { await chip.hover(); await page.waitForTimeout(260); await sample('passaggio'); }
+    for (const error of errors) problems.add(`errore: ${error}`);
+  } catch (error) { problems.add(error.message.split('\n')[0]); }
+  if (problems.size) { matrixFailures += 1; await page.screenshot({ path: path.join(out, `matrix-${width}x${height}.png`) }); }
+  console.log(`${problems.size ? '✖' : '✔'} ${width}×${height}${problems.size ? `\n    ${[...problems].slice(0, 6).join('\n    ')}` : ''}`);
+  await context.close();
+}
+if (matrixFailures) failures.push(`matrice (${matrixFailures})`);
+
 await browser.close();
 server.close();
-console.log(`\n${scenarios.length - failures.length}/${scenarios.length} scenari puliti · catture in ${path.relative(root, out)}${axeSource ? '' : ' · axe non disponibile'}`);
+console.log(`\n${scenarios.length - failures.length}/${scenarios.length} scenari puliti · matrice ${RESOLUTIONS.length - matrixFailures}/${RESOLUTIONS.length} risoluzioni · catture in ${path.relative(root, out)}${axeSource ? '' : ' · axe non disponibile'}`);
 process.exit(failures.length ? 1 : 0);
 
 // #endregion

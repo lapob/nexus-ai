@@ -65,15 +65,38 @@ function transition(update: () => void) {
   else update();
 }
 
+function useMedia(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, [query]);
+  return matches;
+}
+
 function useServiceStatus() {
   const [status, setStatus] = useState<'ready' | 'preparing' | 'offline' | 'unknown'>('unknown');
   useEffect(() => {
     let alive = true;
-    const check = async () => { const next = await platform.status(); if (alive) setStatus(next); };
+    let timer = 0;
+    // Offline si riprova ogni 5 s per sbloccare l'invio appena il PC torna; online ogni 30 s.
+    const check = async () => {
+      window.clearTimeout(timer);
+      const next = navigator.onLine === false ? 'offline' : await platform.status().catch(() => 'offline' as const);
+      if (!alive) return;
+      setStatus(next);
+      timer = window.setTimeout(check, next === 'ready' ? 30_000 : 5_000);
+    };
+    const lost = () => { window.clearTimeout(timer); setStatus('offline'); timer = window.setTimeout(check, 5_000); };
+    const visible = () => { if (document.visibilityState === 'visible') void check(); };
     void check();
-    const timer = window.setInterval(check, 30_000);
     window.addEventListener('online', check);
-    return () => { alive = false; window.clearInterval(timer); window.removeEventListener('online', check); };
+    window.addEventListener('offline', lost);
+    document.addEventListener('visibilitychange', visible);
+    return () => { alive = false; window.clearTimeout(timer); window.removeEventListener('online', check); window.removeEventListener('offline', lost); document.removeEventListener('visibilitychange', visible); };
   }, []);
   return status;
 }
@@ -87,10 +110,16 @@ export function App() {
   const preferences = useStore((state) => state.preferences);
   const conversation = useMemo(() => conversations.find((item) => item.id === activeId) ?? null, [conversations, activeId]);
   const status = useServiceStatus();
+  const offline = status === 'offline';
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
   const [draft, setDraft] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Barra laterale nascondibile su schermi larghi: la scelta resta per le visite successive.
   const [sidebarHidden, setSidebarHidden] = useState(() => { try { return localStorage.getItem('nxs.sidebar') === 'hidden'; } catch { return false; } });
+  const compact = useMedia('(max-width: 839px)');
+  // Fuori vista = fuori dal Tab e dagli screen reader: sul telefono quando è chiusa, su desktop quando è nascosta.
+  const sidebarAway = compact ? !sidebarOpen : sidebarHidden && !sidebarOpen;
   const toggleSidebar = useCallback(() => setSidebarHidden((hidden) => {
     try { localStorage.setItem('nxs.sidebar', hidden ? 'shown' : 'hidden'); } catch { /* archiviazione non disponibile */ }
     return !hidden;
@@ -204,6 +233,8 @@ export function App() {
     const attachments = pending;
     const text = raw.trim() || (attachments.length ? 'Analizza gli allegati.' : '');
     if (!text || getState().generating) return null;
+    // Offline nessun invio: il testo resta nel composer e si invia quando il PC torna raggiungibile.
+    if (offlineRef.current) { notify('Offline: il PC non è raggiungibile. Il messaggio resta qui, riprovo da solo.'); return null; }
     stopSpeaking();
     const conversationId = activeConversation()?.id ?? newConversation();
     const history = (activeConversation()?.messages ?? []).filter((message) => !message.error).map(({ role, content }) => ({ role, content }));
@@ -404,7 +435,10 @@ export function App() {
   // Segue la risposta solo se l'utente è già in fondo: leggere sopra non viene interrotto.
   useEffect(() => {
     const element = scrollRef.current;
-    if (element && stickToBottom.current) element.scrollTop = element.scrollHeight;
+    if (!element) return;
+    // Home senza messaggi: si legge dall'alto (titolo e idee), su schermi bassi non deve sparire sopra.
+    if (!conversation?.messages.length) { element.scrollTop = 0; return; }
+    if (stickToBottom.current) element.scrollTop = element.scrollHeight;
   }, [conversation?.messages]);
 
   const onComposerKey = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -451,7 +485,7 @@ export function App() {
   return (
     <LazyMotion features={domAnimation} strict><MotionConfig reducedMotion="user">
       <div className="app" data-sidebar={sidebarOpen ? 'open' : 'closed'} data-collapsed={sidebarHidden} data-live={live} data-panel={Boolean(panelDoc)}>
-        <aside className="sidebar glass" aria-label="Conversazioni" aria-hidden={sidebarHidden && !sidebarOpen ? true : undefined} inert={sidebarHidden && !sidebarOpen ? true : undefined}>
+        <aside className="sidebar glass" aria-label="Conversazioni" aria-hidden={sidebarAway ? true : undefined} inert={sidebarAway ? true : undefined}>
           <div className="sidebar-head">
             <span className="brand"><img src={brandIcon} alt="" width="22" height="22" />NexusNXS</span>
             <span className="sidebar-actions">
@@ -525,7 +559,7 @@ export function App() {
                 </div>
                 <div className="suggestions" key={`${category ?? 'mix'}-${roll}`}>
                   {suggestions.map((suggestion, index) => (
-                    <m.button key={suggestion.text} type="button" className="chip glass" onClick={() => needsInput(suggestion.text) ? prefill(suggestion.text) : void send(suggestion.text)}
+                    <m.button key={suggestion.text} type="button" className="chip glass" onClick={() => offline || needsInput(suggestion.text) ? prefill(suggestion.text) : void send(suggestion.text)}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 * index + 0.1, duration: 0.36 }}>
                       <Icon name={suggestion.icon} size={17} /><span>{suggestion.text.replace(/:\s$/, '…')}</span>
                     </m.button>
@@ -593,7 +627,7 @@ export function App() {
               </span>
             </m.section>
           ) : (
-          <form className="composer glass" data-recording={Boolean(recording)} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
+          <form className="composer glass" data-recording={Boolean(recording)} data-offline={offline} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
             <AnimatePresence>
               {showJump && !empty && (
                 <m.button key="jump" type="button" className="jump glass" aria-label="Torna in fondo" onClick={jumpToBottom}
@@ -620,7 +654,7 @@ export function App() {
               </li>
             ))}</ul>}
             <textarea ref={inputRef} value={draft} rows={1} maxLength={platform.kind === 'desktop' ? 48_000 : 12_000}
-              placeholder={recording ? 'Ti ascolto… parla, mi fermo quando fai una pausa' : transcribing ? 'Trascrivo…' : 'Scrivi a NexusNXS…   / per i comandi'} aria-label="Messaggio"
+              placeholder={offline ? 'Offline · il PC non è raggiungibile, riprovo da solo…' : recording ? 'Ti ascolto… parla, mi fermo quando fai una pausa' : transcribing ? 'Trascrivo…' : 'Scrivi a NexusNXS…   / per i comandi'} aria-label="Messaggio"
               onChange={(event) => { setDraft(event.target.value); setSlashIndex(0); }} onKeyDown={onComposerKey} autoFocus readOnly={Boolean(recording) || transcribing}
               onPaste={(event) => { const files = [...event.clipboardData.files]; if (files.length && caps.attachments && platform.acceptsDroppedFiles) { event.preventDefault(); void addFiles(files); } }} />
             <div className="composer-bar">
@@ -638,16 +672,16 @@ export function App() {
                 <Icon name={mode === 'deep' ? 'sparkles' : 'bolt'} />{mode === 'deep' ? 'Approfondito' : 'Rapido'}
               </button>
               <span className="hint" aria-hidden="true" />
-              {caps.voiceInput && caps.voiceOutput && !generating && !recording && (
+              {caps.voiceInput && caps.voiceOutput && !generating && !recording && !offline && (
                 <button type="button" className="icon-button small live-toggle" aria-label="Voce live (Ctrl+Maiusc+L)" title="Conversazione vocale continua" onClick={() => void startLive()}><Icon name="wave" /></button>
               )}
               {caps.voiceInput && !generating && (
-                <button type="button" className="mic" data-active={Boolean(recording)} aria-pressed={Boolean(recording)} disabled={transcribing}
+                <button type="button" className="mic" data-active={Boolean(recording)} aria-pressed={Boolean(recording)} disabled={transcribing || (offline && !recording)}
                   aria-label={recording ? 'Termina e invia' : 'Parla con NexusNXS'} onClick={() => void toggleMic()}><Icon name="mic" /></button>
               )}
               {generating
                 ? <button type="button" className="send stop" aria-label="Interrompi" onClick={stop}><Icon name="stop" /></button>
-                : <button type="submit" className="send" aria-label="Invia" disabled={(!draft.trim() && !pending.length) || Boolean(recording) || transcribing}><Icon name="arrow" /></button>}
+                : <button type="submit" className="send" aria-label={offline ? 'Invio non disponibile: offline' : 'Invia'} title={offline ? 'Offline: il PC non è raggiungibile' : undefined} disabled={offline || (!draft.trim() && !pending.length) || Boolean(recording) || transcribing}><Icon name="arrow" /></button>}
             </div>
           </form>
           )}
