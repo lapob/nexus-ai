@@ -1,6 +1,7 @@
 /** Cloudflare Worker entry point for the NexusNXS public site. */
 import handler from "./site-handler";
 import { publicAiShell, publicAiManifest, publicAiServiceWorker } from "./public-ai-shell";
+import publicRelease from "../app/data/public-release.json";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -18,6 +19,81 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+// #region Feed aggiornamenti automatici Preview
+// L'app desktop interroga https://nexusnxs.com/updates/preview/*: distinta firmata Ed25519, firma e latest.yml
+// sono serviti direttamente (il client rifiuta i redirect sulla parte fiduciaria e verifica firma, dimensione e
+// SHA-256); installer e blockmap reindirizzano agli asset GitHub della stessa release, verificati via SHA-512.
+const UPDATE_PREFIX = "/updates/preview/";
+const UPDATE_REPOSITORY = "lapob/nexus-ai";
+const UPDATE_METADATA = new Map([
+  ["release-manifest.json", "application/json; charset=utf-8"],
+  ["release-manifest.sig.json", "application/json; charset=utf-8"],
+  ["latest.yml", "text/yaml; charset=utf-8"],
+]);
+const UPDATE_BINARY = /^NexusNXS-\d+\.\d+\.\d+-Setup\.exe(?:\.blockmap)?$/;
+const MAX_UPDATE_METADATA_BYTES = 512 * 1024;
+
+async function updateFeed(request: Request, url: URL, versionId?: string): Promise<Response> {
+  const name = url.pathname.slice(UPDATE_PREFIX.length);
+  const headers = new Headers({ "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow", "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload" });
+  if (versionId) headers.set("X-NexusNXS-Worker-Version", versionId);
+  const tag = String(publicRelease.tag || "");
+  if ((request.method !== "GET" && request.method !== "HEAD") || !/^v\d+\.\d+\.\d+-preview\.\d+$/.test(tag)
+    || !(UPDATE_METADATA.has(name) || UPDATE_BINARY.test(name))) {
+    headers.set("Cache-Control", "no-store");
+    return new Response(null, { status: 404, headers });
+  }
+  const source = `https://github.com/${UPDATE_REPOSITORY}/releases/download/${encodeURIComponent(tag)}/${name}`;
+  if (UPDATE_BINARY.test(name)) {
+    headers.set("Location", source);
+    headers.set("Cache-Control", "public, max-age=300");
+    return new Response(null, { status: 302, headers });
+  }
+  try {
+    const upstream = await fetch(source, { redirect: "follow", headers: { "User-Agent": "NexusNXS-update-feed" } });
+    const length = Number(upstream.headers.get("content-length") || 0);
+    if (!upstream.ok || length > MAX_UPDATE_METADATA_BYTES) throw new Error("feed");
+    const body = await upstream.arrayBuffer();
+    if (body.byteLength > MAX_UPDATE_METADATA_BYTES) throw new Error("feed");
+    headers.set("Content-Type", UPDATE_METADATA.get(name)!);
+    headers.set("Cache-Control", "public, max-age=300");
+    return new Response(request.method === "HEAD" ? null : body, { status: 200, headers });
+  } catch {
+    headers.set("Cache-Control", "no-store");
+    headers.set("Retry-After", "600");
+    return new Response(null, { status: 503, headers });
+  }
+}
+// #endregion
+
+// #region Ospite dell'anteprima HTML eseguibile (stessa pagina del desktop: src/shared/sandbox-host.js su main)
+// Incorniciato con sandbox="allow-scripts" (origine opaca) dalla web app; la CSP non concede alcuna rete.
+const SANDBOX_PATH = "/sandbox/v1";
+const SANDBOX_HOST_HTML = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Anteprima</title>
+<style>html,body{margin:0;background:#fff;color:#111;font:15px system-ui,sans-serif}</style></head><body><script>
+(function(){var done=false;addEventListener('message',function(event){
+if(done||event.source!==parent||!event.data||event.data.type!=='nexus-sandbox-render'||typeof event.data.html!=='string')return;
+done=true;document.open();document.write(event.data.html);document.close();});
+parent.postMessage({type:'nexus-sandbox-ready'},'*');})();
+</script></body></html>`;
+const SANDBOX_POLICY = ["default-src 'none'", "script-src 'unsafe-inline' 'unsafe-eval'", "style-src 'unsafe-inline'",
+  "img-src data: blob:", "font-src data:", "media-src data: blob:", "connect-src 'none'", "worker-src 'none'",
+  "form-action 'none'", "base-uri 'none'", "object-src 'none'",
+  "frame-ancestors https://ai.nexusnxs.com http://127.0.0.1:* http://localhost:*"].join("; ");
+
+function sandboxHost(request: Request, versionId?: string): Response {
+  const headers = new Headers({
+    "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": SANDBOX_POLICY, "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer", "Cache-Control": "public, max-age=300", "X-Robots-Tag": "noindex, nofollow",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Cross-Origin-Resource-Policy": "cross-origin", "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  });
+  if (versionId) headers.set("X-NexusNXS-Worker-Version", versionId);
+  if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { Allow: "GET, HEAD" } });
+  return new Response(request.method === "HEAD" ? null : SANDBOX_HOST_HTML, { status: 200, headers });
+}
+// #endregion
+
 const CANONICAL_HOSTNAME = "nexusnxs.com";
 const AI_HOSTNAME = "ai.nexusnxs.com";
 const NON_CANONICAL_PRODUCTION_HOSTNAMES = new Set([
@@ -33,7 +109,7 @@ function contentSecurityPolicy(nonce: string): string {
 }
 
 function aiUiContentSecurityPolicy(nonce: string): string {
-  return `default-src 'none'; script-src 'nonce-${nonce}'; script-src-attr 'none'; style-src 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  return `default-src 'none'; script-src 'nonce-${nonce}'; script-src-attr 'none'; style-src 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; frame-src https://nexusnxs.com/sandbox/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
 }
 
 function aiOfflineHtml(nonce: string): string {
@@ -153,6 +229,14 @@ const worker = {
 
     if (url.hostname === AI_HOSTNAME) {
       return proxyAi(request, env, nonce);
+    }
+
+    if (url.hostname === CANONICAL_HOSTNAME && url.pathname === SANDBOX_PATH) {
+      return sandboxHost(request, env.CF_VERSION_METADATA?.id);
+    }
+
+    if (url.hostname === CANONICAL_HOSTNAME && url.pathname.startsWith(UPDATE_PREFIX)) {
+      return updateFeed(request, url, env.CF_VERSION_METADATA?.id);
     }
 
     if (NON_CANONICAL_PRODUCTION_HOSTNAMES.has(url.hostname)) {

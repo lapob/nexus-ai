@@ -69,6 +69,20 @@ test('sidebar hides on wide screens, persists, and the command palette opens wit
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('the desktop update feed only exposes the signed preview files and redirects binaries to the release', async () => {
+  const { default: worker } = await import('../../dist/server/index.js');
+  const call = (path, method = 'GET') => worker.fetch(new Request(`https://nexusnxs.com/updates/preview/${path}`, { method }), {
+    ASSETS: { fetch: async () => new Response('', { status: 404 }) },
+  }, { waitUntil() {}, passThroughOnException() {} });
+  for (const path of ['../secrets', 'config.json', 'NexusNXS-0.3.36-Setup.exe%2F..', 'latest.yml?x=1'.replace('?x=1', '/x')]) {
+    expect((await call(path)).status).toBe(404);
+  }
+  expect((await call('latest.yml', 'POST')).status).toBe(404);
+  const binary = await call('NexusNXS-9.9.9-Setup.exe');
+  expect(binary.status).toBe(302);
+  expect(binary.headers.get('location')).toMatch(/^https:\/\/github\.com\/lapob\/nexus-ai\/releases\/download\/v\d+\.\d+\.\d+-preview\.\d+\/NexusNXS-9\.9\.9-Setup\.exe$/);
+});
+
 test('with the PC offline nothing is sent: the draft stays and the composer explains why', async ({ page }) => {
   await open(page, { width: 390, height: 844 });
   await expect(page.locator('.composer[data-offline="true"]')).toBeVisible();

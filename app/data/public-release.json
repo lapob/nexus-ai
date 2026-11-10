@@ -1,10 +1,10 @@
 {
-  "tag": "v0.3.36-preview.1",
-  "date": "2026-11-09",
+  "tag": "v0.3.37-preview.1",
+  "date": "2026-11-10",
   "windows": {
-    "version": "0.3.36",
-    "bytes": 113231375,
-    "sha256": "361BE060294E4D759F864B52D35581FCFC2D3E0681B282C5B6078EDB1A06CA80",
-    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.36-preview.1/NexusNXS-0.3.36-Setup.exe"
+    "version": "0.3.37",
+    "bytes": 113239546,
+    "sha256": "89D29FDA73A7F38CC6483F373D38D08F4B345B1426BF80FC42EB793F9FE11E4E",
+    "url": "https://github.com/lapob/nexus-ai/releases/download/v0.3.37-preview.1/NexusNXS-0.3.37-Setup.exe"
   }
 }
