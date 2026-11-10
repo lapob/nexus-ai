@@ -1,4 +1,16 @@
-# Preview 0.3.34 download, PC photo frame, entity layout — 8 November 2026 (RELEASE IN PROGRESS)
+# Preview 0.3.37 — 11 November 2026 (RELEASE IN PROGRESS)
+
+- Commit b6dbf8a: download metadata v0.3.37-preview.1 (GitHub assets
+  verified), AI shell synced, new worker routes `/updates/preview/*` (signed
+  manifest/latest.yml proxied ≤512 KB, installer 302 to the GitHub asset,
+  everything else 404/405) and `/sandbox/v1` (HTML preview host, CSP without
+  network, frame-ancestors only the AI app). Desktop photos recaptured from
+  the current UI (2x supersampled, 256 colours, 68/103 KB).
+- Verified: npm test 45/45, e2e 35/35 (new update-feed test included).
+- Operation: release:prepare → release:promote → push website → live check
+  of /updates/preview/release-manifest.json and /sandbox/v1.
+
+# Preview 0.3.34 download, PC photo frame, entity layout — 8 November 2026 (superseded)
 
 - Download metadata synced to v0.3.34-preview.1 (GitHub release verified:
   installer 113212163 bytes, SHA-256 C13F8435…C0C4).
