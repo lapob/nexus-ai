@@ -8,6 +8,16 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const load = () => import(pathToFileURL(path.join(__dirname, '..', 'web', 'src', 'paired.ts')).href);
+
+test('stato del PC: 503 "offline" blocca l’invio, gli altri errori sono avvio', async () => {
+  const { readStatus } = await load();
+  const reply = (status, body) => new Response(body === undefined ? null : JSON.stringify(body), { status });
+  assert.equal(await readStatus(reply(200, {})), 'ready');
+  assert.equal(await readStatus(reply(503, { status: 'offline', retryAfter: 8 })), 'offline');
+  assert.equal(await readStatus(reply(503, { status: 'starting' })), 'preparing');
+  assert.equal(await readStatus(reply(502)), 'offline');
+  assert.equal(await readStatus(new Response('<html>', { status: 503 })), 'preparing', 'corpo non JSON');
+});
 const streamOf = (chunks) => new ReadableStream({ start(controller) { for (const chunk of chunks) controller.enqueue(new TextEncoder().encode(chunk)); controller.close(); } });
 
 test('ricompone token e fasi anche quando una riga è divisa tra due chunk', async () => {

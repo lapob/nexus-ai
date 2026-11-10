@@ -100,9 +100,9 @@ const scenarios = [
   { name: 'panel-csv', viewport: { width: 1180, height: 760 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=2'); }, expect: ['.panel-table td'] },
   { name: 'panel-mobile', viewport: mobile, mobile: true, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.panel'] },
   { name: 'tooltip', viewport: desktop, run: async (page) => {
-    await page.hover('button[title="Preferenze"]'); await page.waitForTimeout(650);
-    if (await page.locator('button[title="Preferenze"]').count()) throw new Error('il title nativo resta attivo');
-    if ((await page.locator('.tooltip').textContent()) !== 'Preferenze') throw new Error('tooltip con testo errato');
+    await page.hover('button[title="Altre idee"]'); await page.waitForTimeout(650);
+    if (await page.locator('button[title="Altre idee"]').count()) throw new Error('il title nativo resta attivo');
+    if ((await page.locator('.tooltip').textContent()) !== 'Altre idee') throw new Error('tooltip con testo errato');
   }, expect: ['.tooltip[role="tooltip"]'] },
   { name: 'new-chat-idempotent', viewport: desktop, state: thread, run: async (page) => {
     const count = () => page.evaluate(() => JSON.parse(localStorage.getItem('nxs.next.state.v1')).conversations.length);
@@ -124,6 +124,28 @@ const scenarios = [
     await swipe(300, 60);
     if (await page.locator('.app[data-sidebar="closed"]').count() !== 1) throw new Error('lo swipe a sinistra non chiude la cronologia');
   }, expect: ['.thread'] },
+  { name: 'sidebar-rail', viewport: desktop, state: thread, run: async (page) => {
+    await page.click('[aria-label="Nascondi barra laterale (Ctrl+B)"]'); await page.waitForTimeout(500);
+    const width = await page.$eval('.sidebar', (element) => Math.round(element.getBoundingClientRect().width));
+    if (width < 56 || width > 72) throw new Error(`colonna icone larga ${width}px`);
+    await page.click('.sidebar-rail [aria-label="Cerca nelle conversazioni"]'); await page.waitForTimeout(600);
+    if (!(await page.evaluate(() => document.activeElement?.matches('.sidebar-full input[type="search"]')))) throw new Error('Cerca dalla colonna non porta alla ricerca');
+  }, expect: ['.sidebar-full .search'] },
+  { name: 'sidebar-rail-closed', viewport: desktop, state: thread, run: async (page) => {
+    await page.click('[aria-label="Nascondi barra laterale (Ctrl+B)"]'); await page.waitForTimeout(500);
+  }, expect: ['.sidebar-rail .rail-new', '.sidebar-rail .avatar'] },
+  { name: 'profile-menu', viewport: desktop, state: thread, run: async (page) => {
+    await page.click('.sidebar-foot .profile-button'); await page.waitForTimeout(300);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+    if (await page.locator('.profile-menu').count()) throw new Error('Esc non chiude il menu profilo');
+    await page.click('.sidebar-foot .profile-button');
+  }, expect: ['.profile-menu [role="menuitem"]'] },
+  { name: 'offline', viewport: desktop, offline: true, run: async (page) => {
+    await page.fill('textarea[aria-label="Messaggio"]', 'Ciao');
+    if (!(await page.locator('button.send').isDisabled())) throw new Error('invio attivo da offline');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    if (await page.locator('.thread .message.user').count()) throw new Error('messaggio inviato da offline');
+  }, expect: ['.composer[data-offline="true"]'] },
   { name: 'soft-edges', viewport: desktop, state: { ...thread, activeId: 'cl', conversations: [{ id: 'cl', title: 'Lunga', createdAt: now, updatedAt: now,
     messages: Array.from({ length: 24 }, (_, i) => msg(`l${i}`, i % 2 ? 'assistant' : 'user', `Messaggio ${i}: ${'testo di prova '.repeat(i % 2 ? 18 : 3)}`, now - (30 - i) * 1000)) }, ...thread.conversations] },
   run: async (page) => {
@@ -153,8 +175,10 @@ for (const scenario of scenarios) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(String(error)));
-  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
-  page.on('response', (response) => { if (response.status() >= 400) errors.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
+  page.on('console', (message) => { if (message.type() === 'error' && !(scenario.offline && /status of 503/.test(message.text()))) errors.push(message.text()); });
+  page.on('response', (response) => { if (response.status() >= 400 && !scenario.offline) errors.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
+  // PC irraggiungibile: readyz e API rispondono come il gateway quando il servizio è spento.
+  if (scenario.offline) await context.route(/\/(readyz|api\/)/, (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"status":"offline","retryAfter":8}' }));
   if (scenario.state) await context.addInitScript((value) => localStorage.setItem('nxs.next.state.v1', JSON.stringify(value)), scenario.state);
   try {
     await page.goto(base, { waitUntil: 'load' });

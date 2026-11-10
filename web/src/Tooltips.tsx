@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 type Tip = { text: string; x: number; y: number; place: 'top' | 'bottom' };
 
+const SPOTLIGHT = '.chip, .category, .new-chat, .project-row, .profile-button, .conversation';
 const DELAY = 420;
 const WARM = 650; // dopo un tooltip, i successivi compaiono subito per questo tempo
 
@@ -49,6 +50,16 @@ export function Tooltips() {
       current = null;
       setTip(null);
     };
+    // Luce che segue il puntatore sulle superfici interattive (vedi .spotlight in styles.css).
+    const glow = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return;
+      const surface = event.target instanceof Element ? event.target.closest<HTMLElement>(SPOTLIGHT) : null;
+      if (!surface) return;
+      const box = surface.getBoundingClientRect();
+      surface.style.setProperty('--mx', `${Math.round(event.clientX - box.left)}px`);
+      surface.style.setProperty('--my', `${Math.round(event.clientY - box.top)}px`);
+    };
+    document.addEventListener('pointermove', glow, { passive: true });
     const over = (event: PointerEvent) => {
       if (event.pointerType === 'touch') return;
       const element = find(event.target);
@@ -68,6 +79,7 @@ export function Tooltips() {
     window.addEventListener('blur', hide);
     return () => {
       window.clearTimeout(timer);
+      document.removeEventListener('pointermove', glow);
       document.removeEventListener('pointerover', over);
       document.removeEventListener('pointerdown', hide);
       document.removeEventListener('focusin', focus);

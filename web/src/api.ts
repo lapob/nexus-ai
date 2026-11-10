@@ -2,6 +2,7 @@
  * @module web/api
  * @description Client del contratto pubblico esistente (/api/guest/*): sessione anonima, streaming NDJSON con ripresa, annullamento e cancellazione.
  */
+import { readStatus } from './paired';
 
 export type ChatMode = 'fast' | 'deep';
 export interface Turn { role: 'user' | 'assistant'; content: string }
@@ -207,7 +208,6 @@ export async function synthesize(text: string, { signal, onSegment, language = '
 
 export async function serviceStatus(): Promise<'ready' | 'preparing' | 'offline'> {
   try {
-    const response = await fetch('/readyz', { cache: 'no-store', credentials: 'omit' });
-    return response.ok ? 'ready' : 'preparing';
+    return await readStatus(await fetch('/readyz', { cache: 'no-store', credentials: 'omit' }));
   } catch { return 'offline'; }
 }

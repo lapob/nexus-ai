@@ -53,9 +53,14 @@
 
 @layer layout {
   .app { display: grid; grid-template-columns: 288px minmax(0, 1fr); height: 100dvh; transition: grid-template-columns .32s var(--ease-emphasized); }
-  .sidebar { display: flex; flex-direction: column; gap: 12px; padding: 16px 12px; border-width: 0 1px 0 0; border-radius: 0; z-index: 30; min-height: 0; min-width: 0; overflow: hidden; transition: opacity .2s var(--ease-standard); }
-  .app[data-collapsed='true'] { grid-template-columns: 0 minmax(0, 1fr); }
-  .app[data-collapsed='true'] .sidebar { opacity: 0; padding-inline: 0; border-width: 0; }
+  .sidebar { display: flex; flex-direction: column; padding: 16px 12px; border-width: 0 1px 0 0; border-radius: 0; z-index: 30; min-height: 0; min-width: 0; overflow: hidden; transition: padding .32s var(--ease-emphasized); }
+  .sidebar-full { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; min-width: 0; animation: sidebar-in .34s var(--ease-emphasized) both; }
+  .sidebar-rail { display: none; }
+  /* Barra chiusa su desktop: colonna di icone (stile Claude), non un vuoto. */
+  .app[data-collapsed='true'] { grid-template-columns: 64px minmax(0, 1fr); }
+  .app[data-collapsed='true'] .sidebar { padding: 14px 10px; }
+  .app[data-collapsed='true'] .sidebar-full { display: none; }
+  .app[data-collapsed='true'] .sidebar-rail { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-height: 0; animation: rail-in .3s var(--ease-emphasized) both; }
   /* Scorrimento libero ma senza barre visibili: la freccia "Torna in fondo" sostituisce la scrollbar. */
   .scroll, .conversation-list, .palette ul, .markdown pre, .sheet { scrollbar-width: none; }
   .scroll::-webkit-scrollbar, .conversation-list::-webkit-scrollbar, .palette ul::-webkit-scrollbar, .markdown pre::-webkit-scrollbar, .sheet::-webkit-scrollbar { display: none; }
@@ -74,7 +79,9 @@
 
   @media (max-width: 839px) {
     .app, .app[data-collapsed='true'] { grid-template-columns: minmax(0, 1fr); }
-    .app[data-collapsed='true'] .sidebar { opacity: 1; padding-inline: 12px; border-width: 0 1px 0 0; }
+    .app[data-collapsed='true'] .sidebar { padding: 16px 12px; }
+    .app .sidebar-rail, .app[data-collapsed='true'] .sidebar-rail { display: none; }
+    .app[data-collapsed='true'] .sidebar-full { display: flex; }
     .only-wide, .icon-button.only-wide { display: none; }
     .sidebar { position: fixed; inset: 0 auto 0 0; width: min(320px, 86vw); translate: -102% 0; transition: translate .26s var(--ease-emphasized); }
     .app[data-sidebar='open'] .sidebar { translate: 0 0; }
@@ -338,7 +345,8 @@
   .dropzone { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: color-mix(in oklch, var(--ink) 50%, transparent); pointer-events: none; }
   .dropzone span { display: inline-flex; align-items: center; gap: 10px; padding: 16px 22px; border-radius: 18px; border-style: dashed; border-color: color-mix(in oklch, var(--cyan) 45%, transparent); }
 
-  .toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom)); translate: -50% 0; z-index: 60; padding: 12px 16px; border-radius: 14px; font-size: .9rem; max-width: min(520px, calc(100% - 32px)); }
+  /* In alto sotto l'intestazione: non collide col composer, che cresce col testo e con la tastiera. */
+  .toast { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top)); translate: -50% 0; z-index: 60; padding: 12px 16px; border-radius: 14px; font-size: .9rem; max-width: min(520px, calc(100% - 32px)); }
 
   /* ── Organizzazione stile assistente moderno: nuova chat, cronologia a gruppi, azioni discrete ── */
   kbd { font: 500 .7rem 'Inter Variable', system-ui, sans-serif; color: var(--mist); padding: 1px 6px; border-radius: 6px; border: 1px solid color-mix(in oklch, var(--hairline) 40%, transparent); background: color-mix(in oklch, var(--ink) 40%, transparent); }
@@ -536,7 +544,7 @@
 
   /* ── Pannello laterale: codice e documenti accanto alla conversazione ── */
   .app[data-panel='true'] { grid-template-columns: 288px minmax(0, 1fr) minmax(380px, 42%); }
-  .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 0 minmax(0, 1fr) minmax(420px, 48%); }
+  .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 64px minmax(0, 1fr) minmax(420px, 48%); }
   .panel { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; height: 100dvh; border-radius: 0; border-width: 0 0 0 1px; z-index: 25;
     background: linear-gradient(var(--surface), var(--surface)), #040809; box-shadow: -30px 0 80px -40px color-mix(in oklch, var(--cyan) 30%, transparent); }
   .panel { container: panel / inline-size; }
@@ -574,7 +582,7 @@
   .code figcaption .open-panel + button { margin-left: 0; }
   @media (max-width: 1099px) {
     .app[data-panel='true'], .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 288px minmax(0, 1fr); }
-    .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 0 minmax(0, 1fr); }
+    .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 64px minmax(0, 1fr); }
     .panel { position: fixed; inset: 0 0 0 auto; width: min(600px, 100vw); z-index: 40; box-shadow: -40px 0 120px -20px #000; }
   }
   @media (max-width: 839px) { .app[data-panel='true'] { grid-template-columns: minmax(0, 1fr); } .panel { border-width: 0; } }
@@ -608,6 +616,64 @@
   .stage::after { bottom: 0; height: clamp(84px, 16dvh, 132px); mask-image: linear-gradient(to top, #000 45%, transparent); }
   .app[data-live='true'] .stage::before, .app[data-live='true'] .stage::after { display: none; }
 
+  /* Colonna di icone (barra chiusa) */
+  .rail-brand img { border-radius: 6px; }
+  .rail-brand .icon { display: none; }
+  .rail-brand:hover img, .rail-brand:focus-visible img { display: none; }
+  .rail-brand:hover .icon, .rail-brand:focus-visible .icon { display: block; }
+  .rail-new { color: var(--cyan); background: color-mix(in oklch, var(--cyan) 10%, transparent); border-radius: 99px; }
+  .rail-new:hover { background: color-mix(in oklch, var(--cyan) 18%, transparent); color: var(--cyan); }
+  .rail-spacer { flex: 1; }
+
+  /* Scheda profilo (stile Claude) con menu */
+  .sidebar-foot { margin-top: auto; padding-top: 8px; border-top: 1px solid color-mix(in oklch, var(--hairline) 18%, transparent); }
+  .profile { position: relative; width: 100%; }
+  .profile[data-rail='true'] { width: auto; }
+  .profile-button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 6px 8px; border-radius: 12px; color: var(--mist); text-align: left; transition: background .17s var(--ease-standard), color .17s; }
+  .profile-button:hover, .profile-button[aria-expanded='true'] { background: color-mix(in oklch, var(--ice) 7%, transparent); color: var(--ice); }
+  .profile[data-rail='true'] .profile-button { width: var(--touch); min-height: var(--touch); padding: 0; justify-content: center; }
+  .avatar { position: relative; flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--ink);
+    background: linear-gradient(135deg, var(--cyan), oklch(85% .12 165)); box-shadow: 0 0 16px color-mix(in oklch, var(--cyan) 28%, transparent); }
+  .avatar::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--surface); background: oklch(80% .15 160); transition: background .3s; }
+  .avatar[data-status='offline']::after { background: oklch(64% .2 25); }
+  .avatar[data-status='preparing']::after, .avatar[data-status='unknown']::after { background: oklch(82% .14 85); }
+  .profile-text { flex: 1; min-width: 0; display: grid; line-height: 1.25; }
+  .profile-text strong { font-size: .88rem; font-weight: 600; color: var(--ice); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .profile-text small { font-size: .76rem; color: var(--mist); }
+  .profile-menu { position: absolute; z-index: 50; left: 0; right: 0; bottom: calc(100% + 8px); display: grid; gap: 2px; padding: 6px; border-radius: 14px; transform-origin: 50% 100%;
+    box-shadow: 0 24px 60px -18px #000d, 0 0 0 1px color-mix(in oklch, var(--cyan) 10%, transparent); }
+  .profile[data-rail='true'] .profile-menu { right: auto; width: 230px; transform-origin: 0 100%; }
+  .profile-menu button { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 9px; font-size: .9rem; color: var(--mist); text-align: left; transition: background .15s, color .15s; }
+  .profile-menu button:hover, .profile-menu button:focus-visible { background: color-mix(in oklch, var(--cyan) 9%, transparent); color: var(--ice); }
+  .profile-menu kbd { margin-left: auto; font: 500 .7rem 'JetBrains Mono Variable', ui-monospace, monospace; color: color-mix(in oklch, var(--mist) 80%, transparent); }
+
+  /* Spotlight: una luce morbida segue il puntatore sulle superfici interattive (--mx/--my da Tooltips.tsx). */
+  .chip, .category, .new-chat, .project-row, .profile-button, .conversation { position: relative; isolation: isolate; }
+  .chip::before, .category::before, .new-chat::before, .project-row::before, .profile-button::before, .conversation::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .25s var(--ease-standard);
+    background: radial-gradient(160px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklch, var(--cyan) 14%, transparent), transparent 70%);
+  }
+  :is(.chip, .category, .new-chat, .project-row, .profile-button, .conversation):hover::before { opacity: 1; }
+  .chip::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; padding: 1px; opacity: 0; transition: opacity .25s;
+    background: radial-gradient(120px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklch, var(--cyan) 70%, transparent), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+  .chip:hover::after { opacity: 1; }
+
+  /* Mentre NexusNXS genera: un'aura luminosa percorre il bordo del composer. */
+  .composer[data-generating='true']::before { content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 1;
+    background: conic-gradient(from var(--aura, 0deg), transparent 0 55%, color-mix(in oklch, var(--cyan) 85%, transparent) 72%, oklch(85% .12 165) 80%, transparent 92%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation: aura 2.6s linear infinite; }
+  .composer[data-generating='true'] { box-shadow: 0 0 40px -12px color-mix(in oklch, var(--cyan) 45%, transparent); transition: box-shadow .4s; }
+  .composer[data-offline='true'] { border-color: color-mix(in oklch, oklch(64% .2 25) 35%, transparent); }
+
+  /* Cronologia: le voci entrano a cascata, l'indicatore della chat attiva scorre in posizione. */
+  .conversation { transition: background .2s var(--ease-standard); }
+  .conversation[data-active='true']::after { content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 3px; border-radius: 3px; background: var(--cyan);
+    box-shadow: 0 0 10px var(--cyan); animation: indicator-in .32s var(--ease-emphasized) both; }
+  @starting-style { .conversation { opacity: 0; translate: -6px 0; } }
+  .conversation { transition: background .2s var(--ease-standard), opacity .3s var(--ease-emphasized), translate .3s var(--ease-emphasized); }
+
   /* Tooltip in vetro: sostituisce il riquadro nativo di title (vedi Tooltips.tsx). */
   .tooltip {
     position: fixed; z-index: 90; pointer-events: none; max-width: min(280px, calc(100vw - 16px));
@@ -624,6 +690,9 @@
 }
 
 /* Lunghezze registrate: le sfumature dei bordi si animano lungo la timeline di scroll. */
+@property --aura { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes aura { to { --aura: 360deg; } }
+@keyframes indicator-in { from { opacity: 0; transform: scaleY(.2); } }
 @property --fade-start { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @property --fade-end { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @keyframes edge-fade {
@@ -635,6 +704,8 @@
 @layer motion {
   @keyframes pulse { from { opacity: .25; scale: .8; } to { opacity: 1; scale: 1; } }
   @keyframes hud-spin { to { rotate: 360deg; } }
+  @keyframes sidebar-in { from { opacity: 0; transform: translateX(-10px); } }
+  @keyframes rail-in { from { opacity: 0; transform: translateX(6px); } }
   @keyframes tip-in { from { opacity: 0; scale: .94; transform: translateY(4px); } }
   @keyframes tip-in-below { from { opacity: 0; scale: .94; transform: translateY(-4px); } }
   @keyframes breathe { from { opacity: .55; scale: .92; } to { opacity: 1; scale: 1.06; } }

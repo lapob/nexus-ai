@@ -124,6 +124,16 @@ export function App() {
     try { localStorage.setItem('nxs.sidebar', hidden ? 'shown' : 'hidden'); } catch { /* archiviazione non disponibile */ }
     return !hidden;
   }), []);
+  // Dalla colonna di icone: apre la barra e porta il focus (o la vista) sull'elemento scelto.
+  const revealSidebar = useCallback((selector: string) => {
+    setSidebarHidden(false);
+    try { localStorage.setItem('nxs.sidebar', 'shown'); } catch { /* archiviazione non disponibile */ }
+    window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>(selector);
+      if (!target) return;
+      if (target.matches('input')) target.focus(); else { target.scrollIntoView({ block: 'nearest' }); target.querySelector<HTMLElement>('button')?.focus(); }
+    }, 340);
+  }, []);
   const [showJump, setShowJump] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -485,7 +495,17 @@ export function App() {
   return (
     <LazyMotion features={domAnimation} strict><MotionConfig reducedMotion="user">
       <div className="app" data-sidebar={sidebarOpen ? 'open' : 'closed'} data-collapsed={sidebarHidden} data-live={live} data-panel={Boolean(panelDoc)}>
-        <aside className="sidebar glass" aria-label="Conversazioni" aria-hidden={sidebarAway ? true : undefined} inert={sidebarAway ? true : undefined}>
+        <aside className="sidebar glass" aria-label="Conversazioni" aria-hidden={compact && sidebarAway ? true : undefined} inert={compact && sidebarAway ? true : undefined}>
+          {/* Desktop con barra chiusa: colonna di icone come in Claude, mai un vuoto. */}
+          <nav className="sidebar-rail" aria-label="Barra compatta" inert={compact || !sidebarHidden ? true : undefined}>
+            <button type="button" className="icon-button rail-brand" aria-label="Mostra barra laterale (Ctrl+B)" title="Mostra barra laterale" onClick={toggleSidebar}><img src={brandIcon} alt="" width="22" height="22" /><Icon name="sidebar" /></button>
+            <button type="button" className="icon-button rail-new" aria-label="Nuova conversazione" title="Nuova conversazione" onClick={startNew} disabled={generating}><Icon name="plus" /></button>
+            <button type="button" className="icon-button" aria-label="Cerca nelle conversazioni" title="Cerca" onClick={() => revealSidebar('.sidebar-full input[type="search"]')}><Icon name="search" /></button>
+            <button type="button" className="icon-button" aria-label="Progetti" title="Progetti" onClick={() => revealSidebar('.sidebar-full .projects')}><Icon name="folder" /></button>
+            <span className="rail-spacer" />
+            <ProfileMenu compactRail status={status} onSettings={() => setSettingsOpen(true)} onControl={desktopBridge ? () => setControlOpen(true) : undefined} onShortcuts={() => setShortcutsOpen(true)} />
+          </nav>
+          <div className="sidebar-full" inert={!compact && sidebarHidden ? true : undefined}>
           <div className="sidebar-head">
             <span className="brand"><img src={brandIcon} alt="" width="22" height="22" />NexusNXS</span>
             <span className="sidebar-actions">
@@ -496,9 +516,8 @@ export function App() {
           <ProjectNav onEdit={setProjectSheet} disabled={generating} />
           <ConversationList onEditProject={setProjectSheet} onPick={(id) => transition(() => { setState((state) => ({ ...state, activeId: id })); setSidebarOpen(false); })} disabled={generating} />
           <div className="sidebar-foot">
-            <button type="button" className="icon-button" aria-label="Preferenze" title="Preferenze" onClick={() => setSettingsOpen(true)}><Icon name="sliders" /></button>
-            {desktopBridge && <button type="button" className="icon-button" aria-label="Centro di controllo" title="Centro di controllo: modelli, telefono, memoria, sistema" onClick={() => setControlOpen(true)}><Icon name="classic" /></button>}
-            <button type="button" className="icon-button only-wide" aria-label="Scorciatoie da tastiera (Ctrl+/)" title="Scorciatoie (Ctrl+/)" onClick={() => setShortcutsOpen(true)}><Icon name="keyboard" /></button>
+            <ProfileMenu status={status} onSettings={() => setSettingsOpen(true)} onControl={desktopBridge ? () => setControlOpen(true) : undefined} onShortcuts={() => setShortcutsOpen(true)} />
+          </div>
           </div>
         </aside>
         <button type="button" className="scrim" aria-label="Chiudi menu" tabIndex={sidebarOpen ? 0 : -1} onClick={() => setSidebarOpen(false)} />
@@ -509,10 +528,6 @@ export function App() {
           onDrop={(event) => { event.preventDefault(); setDragging(false); if (caps.attachments && platform.acceptsDroppedFiles) void addFiles([...event.dataTransfer.files]); }}>
           <header className="topbar">
             <button type="button" className="icon-button only-compact" aria-label="Apri conversazioni" onClick={() => setSidebarOpen(true)}><Icon name="menu" /></button>
-            {sidebarHidden && <>
-              <button type="button" className="icon-button only-wide" aria-label="Mostra barra laterale (Ctrl+B)" onClick={toggleSidebar}><Icon name="sidebar" /></button>
-              <button type="button" className="icon-button only-wide" aria-label="Nuova conversazione" onClick={startNew}><Icon name="plus" /></button>
-            </>}
             {conversation && !empty
               ? <TitleEditor key={conversation.id} conversation={conversation} disabled={generating} />
               : <h1 className="title">{viewedProject ? viewedProject.name : 'NexusNXS AI'}</h1>}
@@ -627,7 +642,7 @@ export function App() {
               </span>
             </m.section>
           ) : (
-          <form className="composer glass" data-recording={Boolean(recording)} data-offline={offline} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
+          <form className="composer glass" data-recording={Boolean(recording)} data-offline={offline} data-generating={generating} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
             <AnimatePresence>
               {showJump && !empty && (
                 <m.button key="jump" type="button" className="jump glass" aria-label="Torna in fondo" onClick={jumpToBottom}
@@ -719,7 +734,7 @@ export function App() {
         </AnimatePresence>
 
         <Tooltips />
-        <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{toast}</m.div>}</AnimatePresence>
+        <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>{toast}</m.div>}</AnimatePresence>
       </div>
     </MotionConfig></LazyMotion>
   );
@@ -1026,5 +1041,42 @@ function Settings({ preferences, onClose, onCleared }: { preferences: Preference
         }}><Icon name="trash" />Cancella dati locali</button>
       </m.section>
     </m.div>
+  );
+}
+
+type ServiceStatus = 'ready' | 'preparing' | 'offline' | 'unknown';
+const STATUS_LABEL: Record<ServiceStatus, string> = { ready: 'Online', preparing: 'In preparazione', offline: 'Offline', unknown: 'Connessione…' };
+
+/** Scheda profilo in fondo alla barra (stile Claude): chi sei, stato del PC e un menu con le impostazioni. */
+function ProfileMenu({ status, compactRail = false, onSettings, onControl, onShortcuts }: { status: ServiceStatus; compactRail?: boolean; onSettings: () => void; onControl?: () => void; onShortcuts: () => void }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const who = platform.kind === 'desktop' ? 'Questo PC' : platform.kind === 'paired' ? 'Collegato al PC' : 'Ospite';
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); } };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', key, true);
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key, true); };
+  }, [open]);
+  const run = (action: () => void) => { setOpen(false); action(); };
+  return (
+    <div className="profile" ref={root} data-rail={compactRail}>
+      <button type="button" className="profile-button" aria-haspopup="menu" aria-expanded={open} aria-label={`${who}, ${STATUS_LABEL[status]}: menu`} onClick={() => setOpen((value) => !value)}>
+        <span className="avatar" data-status={status}><Icon name="user" size={16} /></span>
+        {!compactRail && <span className="profile-text"><strong>{who}</strong><small>{STATUS_LABEL[status]}</small></span>}
+        {!compactRail && <Icon name="more" size={18} />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <m.div className="profile-menu glass" role="menu" initial={{ opacity: 0, y: 6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 4, scale: 0.98 }} transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}>
+            <button type="button" role="menuitem" autoFocus onClick={() => run(onSettings)}><Icon name="sliders" size={18} />Preferenze</button>
+            {onControl && <button type="button" role="menuitem" onClick={() => run(onControl)}><Icon name="classic" size={18} />Centro di controllo</button>}
+            <button type="button" role="menuitem" onClick={() => run(onShortcuts)}><Icon name="keyboard" size={18} />Scorciatoie<kbd>Ctrl+/</kbd></button>
+          </m.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

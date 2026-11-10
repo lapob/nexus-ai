@@ -6,6 +6,14 @@ import type { Capabilities, StreamEvent } from './api';
 import type { Conversation } from './store';
 import type { Platform, SendRequest } from './platform';
 
+/** Interpreta readyz: 200 pronto; un errore che dice offline (PC spento, gateway irraggiungibile) è offline, il resto è avvio. */
+export async function readStatus(response: Response): Promise<'ready' | 'preparing' | 'offline'> {
+  if (response.ok) return 'ready';
+  if (response.status === 502 || response.status === 504) return 'offline';
+  const body = await response.json().catch(() => null) as { status?: unknown } | null;
+  return body?.status === 'offline' ? 'offline' : 'preparing';
+}
+
 // #region 01 — Sessione del dispositivo
 
 const TOKEN_KEY = 'nexus.remote.token';
@@ -144,7 +152,7 @@ export function pairedPlatform(): Platform {
     kind: 'paired',
     capabilities: async () => NO_VOICE,
     status: async () => {
-      try { return (await fetch('/readyz', { cache: 'no-store' })).ok ? 'ready' : 'preparing'; } catch { return 'offline'; }
+      try { return await readStatus(await fetch('/readyz', { cache: 'no-store' })); } catch { return 'offline'; }
     },
     send: async (sendRequest: SendRequest) => {
       const conversationId = await serverId(sendRequest.conversationId || sendRequest.clientMessageId);
