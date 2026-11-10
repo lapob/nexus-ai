@@ -239,7 +239,7 @@ export function App() {
     return current.filter((item) => item.id !== id);
   });
 
-  const send = useCallback(async (raw: string, { voice = false, autoSpeak = true }: { voice?: boolean; autoSpeak?: boolean } = {}): Promise<{ id: string; text: string } | null> => {
+  const send = useCallback(async (raw: string, { voice = false, autoSpeak = true, forceDeep = false }: { voice?: boolean; autoSpeak?: boolean; forceDeep?: boolean } = {}): Promise<{ id: string; text: string } | null> => {
     const attachments = pending;
     const text = raw.trim() || (attachments.length ? 'Analizza gli allegati.' : '');
     if (!text || getState().generating) return null;
@@ -270,7 +270,7 @@ export function App() {
     const paint = () => { raf = 0; const snapshot = buffered; patch((message) => ({ ...message, content: snapshot })); };
     try {
       await platform.send({
-        text, history, mode: getState().mode, clientMessageId: pendingId.current, preferences: getState().preferences, signal: abort.signal, attachments, conversationId, project: projectRef(conversationId),
+        text, history, mode: forceDeep ? 'deep' : getState().mode, clientMessageId: pendingId.current, preferences: getState().preferences, signal: abort.signal, attachments, conversationId, project: projectRef(conversationId),
         onEvent: (event) => {
           if (event.type === 'token' || event.type === 'replace') {
             buffered = event.type === 'token' ? buffered + event.token : event.text;
@@ -613,14 +613,14 @@ export function App() {
                               }
                             } : undefined}
                             speaking={speakingId === message.id} canSpeak={caps.voiceOutput && !message.error}
-                            onSpeak={() => speakingId === message.id ? stopSpeaking() : void speak(message.id, message.content)} onRetry={() => {
+                            onSpeak={() => speakingId === message.id ? stopSpeaking() : void speak(message.id, message.content)} onRetry={(deep) => {
                             const index = conversation!.messages.findIndex((item) => item.id === message.id);
                             const question = conversation!.messages[index - 1];
                             if (question?.role === 'user') {
                               updateConversation(conversation!.id, (item) => ({ ...item, messages: item.messages.slice(0, index - 1) }));
-                              void send(question.content);
+                              void send(question.content, { forceDeep: deep });
                             }
-                          }} />}
+                          }} canDeepen={mode !== 'deep' && !message.error} />}
                         </div>
                       )}
                     </m.li>
@@ -832,7 +832,7 @@ function TitleEditor({ conversation, disabled }: { conversation: Conversation; d
     onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); save(); } else if (event.key === 'Escape') { event.preventDefault(); setEditing(false); } }} />;
 }
 
-function AnswerActions({ text, at, onBranch, onOpen, onRetry, onSpeak, speaking, canSpeak, rating, onRate }: { text: string; at: number; onBranch?: () => void; onOpen?: () => void; onRetry: () => void; onSpeak: () => void; speaking: boolean; canSpeak: boolean; rating?: 'up' | 'down'; onRate?: (rating: 'up' | 'down') => void }) {
+function AnswerActions({ text, at, onBranch, onOpen, onRetry, onSpeak, speaking, canSpeak, canDeepen, rating, onRate }: { text: string; at: number; onBranch?: () => void; onOpen?: () => void; onRetry: (deep: boolean) => void; onSpeak: () => void; speaking: boolean; canSpeak: boolean; canDeepen?: boolean; rating?: 'up' | 'down'; onRate?: (rating: 'up' | 'down') => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="answer-actions" data-speaking={speaking}>
@@ -845,7 +845,8 @@ function AnswerActions({ text, at, onBranch, onOpen, onRetry, onSpeak, speaking,
       <button type="button" className="icon-button small" aria-label={copied ? 'Copiato' : 'Copia risposta'} onClick={async () => {
         try { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1400); } catch { /* clipboard negata */ }
       }}><Icon name={copied ? 'check' : 'copy'} /></button>
-      <button type="button" className="icon-button small" aria-label="Rigenera risposta" title="Rigenera" onClick={onRetry}><Icon name="retry" /></button>
+      <button type="button" className="icon-button small" aria-label="Rigenera risposta" title="Rigenera" onClick={() => onRetry(false)}><Icon name="retry" /></button>
+      {canDeepen && <button type="button" className="icon-button small deepen" aria-label="Rifai in modo approfondito" title="Rifai in modo approfondito (modello più grande)" onClick={() => onRetry(true)}><Icon name="sparkles" /></button>}
       {onOpen && <button type="button" className="icon-button small" aria-label="Apri come documento nel pannello" title="Apri come documento" onClick={onOpen}><Icon name="panel" /></button>}
       {onBranch && <button type="button" className="icon-button small" aria-label="Dirama da qui" title="Dirama da qui: nuova conversazione fino a questa risposta" onClick={onBranch}><Icon name="branch" /></button>}
     </div>

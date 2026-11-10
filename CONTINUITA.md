@@ -1,3 +1,19 @@
+## 10 November 2026 — owner bug report + UI pass (owner: "esegui tutto")
+
+Fixed: readyz 503 {status:offline} was read as "preparing", so the app never
+went offline and kept sending; now offline blocks send/voice/suggestion sends
+(draft kept, re-check every 5 s). Suggestions were clipped by the row mask
+during lift/glow; home jumped to the bottom and hid the title on short screens;
+closed phone sidebar was focusable off-screen. New: Claude-style sidebar (64 px
+icon rail when collapsed, profile card + menu), spotlight/aura/cascade motion,
+toast at top, "Rifai in modo approfondito" per answer (no automatic 14B→27B
+swap: 30-45 s cold load on 16 GB would surprise). Memory already exists
+(Control Center → Memoria). check:ui 26/26 + resolution matrix 15/15 (320x568
+→ 3840x2160, sampled during entrance/reshuffle/hover). npm test 1190/0,
+check PASS. Operation: commit → push main → service restart → `.SITE` shell
+sync (e2e offline test updated) → release:prepare/promote. Pending owner
+decision: making GitHub lapob/nexus-ai private breaks public downloads.
+
 ## In progress — 9 November 2026: site sync + Preview 0.3.36 (owner: "completa tutto")
 
 Operation: web-dist rebuilt (single inlined bundle; ControlCenter chunk only in
