@@ -1,4 +1,7 @@
-# Preview 0.3.37 — 11 November 2026 (RELEASE IN PROGRESS)
+# Preview 0.3.37 — 11 November 2026 (PUBLISHED: production cbaf7740, website 6c92cc7)
+
+- Live verified: update feed 200/302/404 as designed, manifest signature
+  valid, /sandbox/v1 CSP without network, new photos served (103 KB).
 
 - Commit b6dbf8a: download metadata v0.3.37-preview.1 (GitHub assets
   verified), AI shell synced, new worker routes `/updates/preview/*` (signed
