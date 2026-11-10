@@ -1953,7 +1953,7 @@ class RemoteSessionGateway {
         response.writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store',
-          'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'nonce-${nonce}'; style-src-attr 'none'; font-src 'self'; connect-src 'self'; img-src 'self' blob:; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`,
+          'Content-Security-Policy': `default-src 'none'; script-src 'nonce-${nonce}'; worker-src 'self'; style-src 'nonce-${nonce}'; style-src-attr 'none'; font-src 'self'; connect-src 'self'; img-src 'self' blob:; media-src 'self' blob:; frame-src https://nexusnxs.com/sandbox/; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`,
           'Cross-Origin-Opener-Policy': 'same-origin',
           'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
           'Referrer-Policy': 'no-referrer',

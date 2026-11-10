@@ -18,6 +18,8 @@ const { createLocalPresenceBridgeServer } = require('../remote/local-presence-br
 const { createWakeWordListener } = require('../infrastructure/windows/wake-word-listener');
 const { createLogger } = require('../services/logger');
 const { createDesktopStatusSampler } = require('./desktop-status-sampler');
+const { createQuickBar } = require('../infrastructure/electron/quick-bar');
+const { writeQuickPrompt } = require('./quick-prompt');
 
 const PRESENCE_LOCK = 'system-presence.lock';
 const UI_LOCK = 'desktop-ui.lock';
@@ -162,6 +164,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
   let lockWatcher = null;
   let syncQueued = false;
   let shortcutRegistered = false;
+  let quickBar = null;
   let stopping = false;
   let claudeOpen = null;
   let applications = [];
@@ -234,6 +237,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
     if (stateTimer) clearInterval(stateTimer);
     lockWatcher?.close?.();
     globalShortcut.unregisterAll();
+    quickBar?.dispose();
     try {
       await wakeWordListener?.stop?.();
       await presenceBridge?.stop?.();
@@ -411,7 +415,15 @@ async function bootstrapPresence({ env = process.env } = {}) {
     tray.on('click', activateFullUi);
   };
   if (!bridgeOnly) ensureTray();
-  const openShortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', activateFullUi);
+  // Barra rapida sopra qualsiasi programma: la domanda passa alla UI con un file monouso e la UI la invia.
+  quickBar = createQuickBar({
+    logger,
+    onSubmit: async (text) => {
+      if (!writeQuickPrompt(sharedDataRoot, text)) return;
+      await activateFullUi();
+    }
+  });
+  const openShortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', () => quickBar.toggle());
   const visibilityShortcutRegistered = globalShortcut.register('CommandOrControl+Alt+Space', () => {
     const visible = manager.getSystemPresenceStatus().nucleusVisible;
     manager.setSystemPresenceEnabled(!visible);

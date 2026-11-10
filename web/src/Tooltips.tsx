@@ -31,7 +31,8 @@ export function Tooltips() {
     let timer = 0;
     let current: HTMLElement | null = null;
     let hiddenAt = 0;
-    const find = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[title],[data-tip]') : null);
+    // Gli iframe usano `title` come nome accessibile, non come suggerimento: restano esclusi.
+    const find = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[title]:not(iframe),[data-tip]') : null);
     const show = (element: HTMLElement) => {
       const text = adopt(element);
       if (!text || element === current) return;

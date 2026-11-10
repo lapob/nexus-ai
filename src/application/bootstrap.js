@@ -36,7 +36,7 @@ const { createMainWindow } = require('../infrastructure/electron/create-main-win
 const { createSafeStorageSecretProtection } = require('../infrastructure/electron/safe-storage-secret');
 const { shouldKeepApplicationAlive, startAppLifecycle } = require('../infrastructure/electron/app-lifecycle');
 const { AMBIENT_VOICE_ARGUMENT, WAKE_WORD_ARGUMENT_PREFIX, launchSystemPresence } = require('../infrastructure/electron/desktop-launcher');
-const { RENDERER_ENTRY_URL, registerRendererProtocol } = require('../infrastructure/electron/renderer-protocol');
+const { RENDERER_ENTRY_URL, registerRendererProtocol, registerSandboxProtocol } = require('../infrastructure/electron/renderer-protocol');
 recordModuleStage('electron');
 const { AIProviderRegistry } = require('../ai/ai-provider-registry');
 const { AIRuntime } = require('../ai/ai-runtime');
@@ -81,6 +81,8 @@ const { runtimeWarmupPolicy, warmupRetryDelay } = require('./runtime-warmup-poli
 const { ProactiveEventBus } = require('./proactive-event-bus');
 const { ProactiveSensorHub } = require('./proactive-sensor-hub');
 const { createHeadlessDesktopControl } = require('./headless-desktop-control');
+const { CHANNELS } = require('./ipc-contracts');
+const { takeQuickPrompt } = require('./quick-prompt');
 const { WebResearchService } = require('../research/web-research-service');
 const { ImageGenerationService } = require('../ai/image-generation-service');
 recordModuleStage('complete');
@@ -222,8 +224,17 @@ function bootstrapElectron({ env = process.env } = {}) {
     ambientVoiceShutdownTimer = null;
     return true;
   };
+  // Domanda dalla barra rapida (Presence): letta una volta sola e inviata al renderer appena carico.
+  const deliverQuickPrompt = (window) => {
+    const text = takeQuickPrompt(sharedDataRoot);
+    if (!text) return;
+    const send = () => { if (!window.isDestroyed?.()) window.webContents.send(CHANNELS.quickPrompt, { text }); };
+    if (window.webContents.isLoadingMainFrame?.()) window.webContents.once('did-finish-load', () => setTimeout(send, 400));
+    else send();
+  };
   const deliverWakeWordActivation = ({ window, commandLine = [], initial = false } = {}) => {
     if (!window || window.isDestroyed?.()) return false;
+    try { deliverQuickPrompt(window); } catch (error) { logger.warn('Barra rapida: domanda non consegnata.', { error }); }
     const argument = commandLine.find((value) => String(value || '').startsWith(WAKE_WORD_ARGUMENT_PREFIX));
     if (!argument) {
       if (!initial && ambientVoiceMode) return !promoteAmbientWindow();
@@ -403,6 +414,7 @@ function bootstrapElectron({ env = process.env } = {}) {
       recordSmokeStage('electron-ready');
       // Stesso URL fidato, UI scelta dalla preferenza: classica o cosmica condivisa con il web.
       registerRendererProtocol(rendererRoot);
+      registerSandboxProtocol();
       proactiveUnsubscribe = proactiveEvents.subscribe((proactiveEvent) => {
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed() && window.webContents.getURL() === RENDERER_ENTRY_URL) {

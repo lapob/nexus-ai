@@ -1,15 +1,15 @@
 /**
  * @module web/Panel
- * @description Pannello laterale per codice e documenti delle risposte: anteprima sicura (nessun codice eseguito), righe numerate, copia e download.
+ * @description Pannello laterale per codice e documenti delle risposte: anteprime sicure (HTML eseguito solo in sandbox a origine separata), righe numerate, copia e download.
  */
 import { m } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from './Icon';
 import { Markdown } from './Markdown';
 import { closePanel, fileName, parseDelimited, previewKind, usePanel, type PanelDocument } from './panelStore';
 import { platform } from './platform';
 
-const KIND_ICON: Record<string, IconName> = { markdown: 'book', svg: 'image', csv: 'chart' };
+const KIND_ICON: Record<string, IconName> = { markdown: 'book', svg: 'image', csv: 'chart', html: 'code' };
 
 /** SVG mostrato come immagine: il browser non esegue script né carica risorse esterne in un <img>. */
 function SvgPreview({ text }: { text: string }) {
@@ -20,6 +20,39 @@ function SvgPreview({ text }: { text: string }) {
   }, [text]);
   useEffect(() => () => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); }, [url]);
   return <div className="panel-svg"><img src={url} alt="Anteprima dell’immagine SVG" /></div>;
+}
+
+/**
+ * HTML eseguibile, come gli "artifacts" dei grandi assistenti: iframe `sandbox="allow-scripts"` (origine opaca,
+ * niente storage né accesso a questa pagina) caricato da un'origine separata con CSP senza rete.
+ * Desktop: protocollo nexus-sandbox://, web: nexusnxs.com/sandbox. Il codice arriva solo via postMessage.
+ */
+export const SANDBOX_URL = platform.kind === 'desktop' ? 'nexus-sandbox://run/v1' : 'https://nexusnxs.com/sandbox/v1';
+function HtmlPreview({ text }: { text: string }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [run, setRun] = useState(0);
+  useEffect(() => {
+    setState('loading');
+    const timer = window.setTimeout(() => setState((value) => value === 'loading' ? 'failed' : value), 8_000);
+    const receive = (event: MessageEvent) => {
+      const target = frame.current?.contentWindow;
+      if (!target || event.source !== target || event.data?.type !== 'nexus-sandbox-ready') return;
+      // L'origine dell'iframe è opaca ("null"): '*' consegna solo a quella finestra, verificata sopra.
+      target.postMessage({ type: 'nexus-sandbox-render', html: text }, '*');
+      setState('ready');
+    };
+    window.addEventListener('message', receive);
+    return () => { window.clearTimeout(timer); window.removeEventListener('message', receive); };
+  }, [text, run]);
+  return (
+    <div className="panel-html" data-state={state}>
+      <iframe key={run} ref={frame} title="Anteprima HTML in sandbox" src={SANDBOX_URL}
+        sandbox="allow-scripts allow-modals" referrerPolicy="no-referrer" allow="" loading="eager" />
+      {state !== 'ready' && <p className="panel-html-note" role="status">{state === 'loading' ? 'Preparo l’anteprima isolata…' : 'Anteprima non raggiungibile: serve la connessione (web) o l’app aggiornata.'}</p>}
+      <button type="button" className="icon-button small panel-html-rerun" aria-label="Riesegui" title="Riesegui" onClick={() => setRun((value) => value + 1)}><Icon name="retry" size={16} /></button>
+    </div>
+  );
 }
 
 function CsvPreview({ text }: { text: string }) {
@@ -88,7 +121,8 @@ export function Panel() {
         {showPreview
           ? kind === 'markdown' ? <div className="panel-doc"><Markdown text={document_.text} /></div>
             : kind === 'svg' ? <SvgPreview text={document_.text} />
-              : <CsvPreview text={document_.text} />
+              : kind === 'html' ? <HtmlPreview text={document_.text} />
+                : <CsvPreview text={document_.text} />
           : <CodeView text={document_.text} wrap={wrap} />}
       </div>
     </m.aside>

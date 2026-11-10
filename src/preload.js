@@ -93,7 +93,8 @@ const CHANNELS = Object.freeze({
   updateInstall: 'nexus:update-install',
   updateEvent: 'nexus:update-event',
   proactiveEvent: 'nexus:proactive-event',
-  wakeWordActivation: 'nexus:wake-word-activation'
+  wakeWordActivation: 'nexus:wake-word-activation',
+  quickPrompt: 'nexus:quick-prompt'
 });
 
 // #endregion
@@ -186,6 +187,14 @@ contextBridge.exposeInMainWorld('nexus', {
   installUpdate: () => ipcRenderer.invoke(CHANNELS.updateInstall),
   onUpdateEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.updateEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.updateEvent, handler); },
   onProactiveEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.proactiveEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.proactiveEvent, handler); },
+  onQuickPrompt: (listener) => {
+    const handler = (_event, payload) => {
+      const text = String(payload?.text || '').slice(0, 4000).trim();
+      if (text) listener(Object.freeze({ text }));
+    };
+    ipcRenderer.on(CHANNELS.quickPrompt, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.quickPrompt, handler);
+  },
   onWakeWordActivation: (listener) => {
     const handler = (_event, payload) => listener(Object.freeze({
       source: 'local-windows-sapi',

@@ -7,10 +7,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { protocol } = require('electron');
+const { SANDBOX_HOST_HTML, sandboxHostPolicy } = require('../../shared/sandbox-host');
 
 const RENDERER_ORIGIN = 'nexus://app';
 const RENDERER_ENTRY_URL = `${RENDERER_ORIGIN}/index.html`;
-const CONTENT_SECURITY_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const CONTENT_SECURITY_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; connect-src 'none'; media-src 'self' blob:; frame-src nexus-sandbox://run; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const CONTENT_TYPES = Object.freeze({
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -77,6 +78,28 @@ function registerRendererProtocol(rendererRoot) {
   });
 }
 
-module.exports = { CONTENT_SECURITY_POLICY, RENDERER_ENTRY_URL, registerRendererProtocol, resolveRendererAsset };
+/** Ospite dell'anteprima HTML: una sola pagina, incorniciabile solo dal renderer fidato. */
+function registerSandboxProtocol() {
+  protocol.handle('nexus-sandbox', (request) => {
+    let url;
+    try { url = new URL(request.url); } catch { url = null; }
+    if (!url || url.hostname !== 'run' || url.pathname !== '/v1' || url.search || url.username || url.password) {
+      return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }
+    return new Response(SANDBOX_HOST_HTML, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Security-Policy': sandboxHostPolicy(RENDERER_ORIGIN),
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), display-capture=(), usb=(), serial=(), bluetooth=()',
+        'Cache-Control': 'no-store'
+      }
+    });
+  });
+}
+
+module.exports = { CONTENT_SECURITY_POLICY, RENDERER_ENTRY_URL, registerRendererProtocol, registerSandboxProtocol, resolveRendererAsset };
 
 // #endregion

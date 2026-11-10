@@ -100,7 +100,9 @@ test('pannello laterale: anteprime sicure, CSV con virgolette, nomi file puliti'
   assert.equal(previewKind('xml', '<?xml version="1.0"?>\n<svg></svg>'), 'svg');
   assert.equal(previewKind('xml', '<note/>'), null);
   assert.equal(previewKind('markdown', '# Ciao'), 'markdown');
-  assert.equal(previewKind('html', '<script>alert(1)</script>'), null, 'l’HTML non viene eseguito né mostrato in anteprima');
+  // L'HTML va solo nella sandbox a origine opaca e senza rete (vedi html-sandbox.test.js), mai nel DOM dell'app.
+  assert.equal(previewKind('html', '<script>alert(1)</script>'), 'html');
+  assert.equal(previewKind('html', 'solo testo, nessun markup'), null);
   assert.deepEqual(parseDelimited('a,b\n"x, y","il ""capo"""\r\n\n3,4'), [['a', 'b'], ['x, y', 'il "capo"'], ['3', '4']]);
   assert.deepEqual(parseDelimited('n\tv\n1\t2'), [['n', 'v'], ['1', '2']]);
   assert.equal(fileName({ id: '1', language: 'typescript', text: '', title: 'Utility: «date»' }), 'Utility-date.ts');

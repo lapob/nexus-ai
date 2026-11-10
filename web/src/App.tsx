@@ -43,7 +43,7 @@ const timeLabel = (at: number) => new Date(at).toLocaleString('it-IT', { day: 'n
 
 const SHORTCUTS: Array<[string, string]> = [
   ['Ctrl+K', 'Comandi e conversazioni'], ['Ctrl+Maiusc+O', 'Nuova conversazione'], ['Ctrl+B', 'Mostra o nascondi la barra laterale'],
-  ['Ctrl+Maiusc+L', 'Voce live'], ['Ctrl+/', 'Scorciatoie da tastiera'], ['/', 'Comandi rapidi nel messaggio'],
+  ['Ctrl+Maiusc+L', 'Voce live'], ['Ctrl+Maiusc+Spazio', 'Barra rapida da qualsiasi programma (app desktop)'], ['Ctrl+/', 'Scorciatoie da tastiera'], ['/', 'Comandi rapidi nel messaggio'],
   ['Invio', 'Invia'], ['Maiusc+Invio', 'Vai a capo'], ['Esc', 'Chiudi pannelli o interrompi la risposta']
 ];
 
@@ -373,6 +373,17 @@ export function App() {
   // Desktop: «Nexus» apre la voce live; la Presence segue lo stato dell'entità; avvisi del PC come toast.
   useDesktopPresence({ state: coreState, live, onWake: () => { void startLive(); }, notify });
   const update = useDesktopUpdate();
+  // Barra rapida Ctrl+Maiusc+Spazio: la domanda arriva qui e parte in una conversazione nuova
+  // (se una risposta è in corso, resta nel composer per non interromperla).
+  const quickSend = useRef(send); quickSend.current = send;
+  useEffect(() => {
+    if (!desktopBridge?.onQuickPrompt) return;
+    return desktopBridge.onQuickPrompt(({ text }: { text: string }) => {
+      if (getState().generating || offlineRef.current) { setDraft(text); inputRef.current?.focus(); return; }
+      newConversation();
+      void quickSend.current(text);
+    }) as () => void;
+  }, []);
 
   /** Microfono: un tocco avvia, un tocco (o il silenzio) ferma; il testo riconosciuto viene inviato. */
   const toggleMic = useCallback(async () => {

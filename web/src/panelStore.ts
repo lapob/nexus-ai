@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 
 export interface PanelDocument { id: string; language: string; text: string; title: string }
-export type PreviewKind = 'markdown' | 'svg' | 'csv' | null;
+export type PreviewKind = 'markdown' | 'svg' | 'csv' | 'html' | null;
 
 let current: PanelDocument | null = null;
 const listeners = new Set<() => void>();
@@ -39,6 +39,8 @@ export function previewKind(language: string, text: string): PreviewKind {
   if (lang === 'md' || lang === 'markdown') return 'markdown';
   if ((lang === 'svg' || lang === 'xml') && /^\s*(?:<\?xml[^>]*>\s*)?<svg[\s>]/i.test(text)) return 'svg';
   if (lang === 'csv' || lang === 'tsv') return 'csv';
+  // Pagina HTML completa o frammento con markup: eseguita solo nella sandbox a origine separata (Panel.tsx).
+  if ((lang === 'html' || lang === 'htm') && /<(?:!doctype|html|body|div|canvas|svg|script|style|main|section|button)[\s>]/i.test(text)) return 'html';
   return null;
 }
 

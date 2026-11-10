@@ -92,7 +92,8 @@ const CHANNELS = Object.freeze({
   updateInstall: 'nexus:update-install',
   updateEvent: 'nexus:update-event',
   proactiveEvent: 'nexus:proactive-event',
-  wakeWordActivation: 'nexus:wake-word-activation'
+  wakeWordActivation: 'nexus:wake-word-activation',
+  quickPrompt: 'nexus:quick-prompt'
 });
 
 // #endregion

@@ -1,4 +1,21 @@
-## In progress — 10 November 2026: "esegui tutte le modifiche suggerite" (repo stays public)
+## In progress — 10 November 2026: release Preview 0.3.37 + site promote
+
+Added after the section below: Ctrl+Maiusc+Spazio quick bar (Presence,
+one-shot quick-prompt.json ≤60 s, 0o600) and HTML preview in a sandbox
+(iframe allow-scripts only, opaque origin, host page on its own origin:
+nexus-sandbox://run/v1 on desktop, https://nexusnxs.com/sandbox/v1 on web,
+CSP with no network). Site screenshots regenerated from web-dist (2x
+supersampled, 256-colour PNG, 69/105 KB). Verified: npm test 1198/0 (2
+skipped), check PASS (bundle 392955 B), check:ui 30/30 + matrix 15/15.
+Operation: commit → bump 0.3.37 → release:public:preview (manifest signed
+with the preview key) → manifest refresh/verify-bundle/founder preview →
+push main → publish-github-preview → service restart → `.SITE` shell +
+release sync, e2e, promote, push website → live check of /updates/preview
+and /sandbox/v1. Qwen3-TTS and phone notifications: proposed as separate
+sessions (no validated ROCm/Windows path for Qwen3-TTS yet). Owner authorized
+powering off the PC only at the very end.
+
+## 10 November 2026: "esegui tutte le modifiche suggerite" (repo stays public)
 
 Done and verified (check:ui 29/29 + matrix 15/15, npm test 1194/0): profile
 menu no longer clipped in the 64 px rail; Ctrl+Maiusc+L kbd legible on the

@@ -12,6 +12,8 @@ function shouldBlockRendererRequest(value) {
     const url = new URL(raw);
     if (url.protocol === 'nexus:') return url.hostname !== 'app' || Boolean(url.username || url.password);
     if (url.protocol === 'blob:') return !raw.startsWith('blob:nexus://app/');
+    // Unica pagina dell'anteprima HTML in sandbox (vedi shared/sandbox-host).
+    if (url.protocol === 'nexus-sandbox:') return raw !== 'nexus-sandbox://run/v1';
     return url.protocol !== 'data:';
   } catch {
     return true;

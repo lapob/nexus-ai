@@ -83,6 +83,10 @@ app.enableSandbox();
 protocol.registerSchemesAsPrivileged([{
   scheme: 'nexus',
   privileges: { standard: true, secure: true, supportFetchAPI: false, corsEnabled: false, stream: true }
+}, {
+  // Origine separata per l'anteprima HTML eseguibile: mai la stessa del renderer.
+  scheme: 'nexus-sandbox',
+  privileges: { standard: true, secure: true, supportFetchAPI: false, corsEnabled: false, stream: false }
 }]);
 if (process.platform === 'win32') app.setAppUserModelId('local.nexus.ai');
 

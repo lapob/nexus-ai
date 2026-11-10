@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const { SANDBOX_HOST_HTML, sandboxHostPolicy } = (await import(pathToFileURL(path.join(root, 'src', 'shared', 'sandbox-host.js')).href)).default;
 const dist = path.join(root, 'web-dist');
 const out = path.join(root, 'qa-artifacts', 'ui-scenarios');
 
@@ -114,6 +115,19 @@ const scenarios = [
   { name: 'project-sheet', viewport: desktop, state: projects, run: async (page) => { await page.click('[aria-label="Impostazioni di Tesi di laurea"]'); }, expect: ['.project-sheet #project-instructions'] },
   { name: 'panel-code', viewport: { width: 1440, height: 860 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.panel .panel-code .line'] },
   { name: 'panel-svg', viewport: { width: 1440, height: 860 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=1'); }, expect: ['.panel-svg img'] },
+  { name: 'panel-html', viewport: { width: 1440, height: 860 }, sandbox: true, state: { ...thread, activeId: 'h1', conversations: [{ id: 'h1', title: 'Pagina', createdAt: now, updatedAt: now, messages: [
+    msg('h1a', 'user', 'Fammi una pagina', now - 3000),
+    msg('h1b', 'assistant', 'Ecco:\n\n```html\n<!doctype html><html><body><h1 id="t">…</h1><p id="n">…</p><p id="p">…</p><script>\ndocument.getElementById("t").textContent = "Eseguito";\nfetch("https://example.com/").then(() => n.textContent = "rete aperta", () => n.textContent = "rete bloccata");\ntry { p.textContent = parent.document.title ? "madre esposta" : "?"; } catch { p.textContent = "madre protetta"; }\n</script></body></html>\n```', now - 2000)] }, ...thread.conversations] },
+  run: async (page) => {
+    await page.click('.open-panel');
+    await page.waitForSelector('.panel-html[data-state="ready"]', { timeout: 8000 });
+    const frame = page.frameLocator('.panel-html iframe');
+    await frame.locator('#t', { hasText: 'Eseguito' }).waitFor({ timeout: 5000 });
+    await frame.locator('#n', { hasText: /rete/ }).waitFor({ timeout: 5000 });
+    const [network, parentAccess] = [await frame.locator('#n').textContent(), await frame.locator('#p').textContent()];
+    if (network !== 'rete bloccata') throw new Error(`la sandbox ha accesso alla rete (${network})`);
+    if (parentAccess !== 'madre protetta') throw new Error(`la sandbox vede la pagina madre (${parentAccess})`);
+  }, expect: ['.panel-html iframe[sandbox="allow-scripts allow-modals"]'] },
   { name: 'panel-csv', viewport: { width: 1180, height: 760 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=2'); }, expect: ['.panel-table td'] },
   { name: 'panel-mobile', viewport: mobile, mobile: true, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.panel'] },
   { name: 'tooltip', viewport: desktop, run: async (page) => {
@@ -231,11 +245,15 @@ for (const scenario of scenarios) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(String(error)));
-  page.on('console', (message) => { if (message.type() === 'error' && !(scenario.offline && /status of 503/.test(message.text()))) errors.push(message.text()); });
+  // I blocchi della sandbox (rete, storage) sono il comportamento atteso: contano solo gli errori della app.
+  page.on('console', (message) => { if (message.type() === 'error' && !(scenario.offline && /status of 503/.test(message.text())) && !String(message.location()?.url || '').startsWith('https://nexusnxs.com/sandbox/') && !(scenario.sandbox && /connect-src 'none'|Refused to connect because it violates/.test(message.text()))) errors.push(message.text()); });
   page.on('response', (response) => { if (response.status() >= 400 && !scenario.offline) errors.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
   // PC irraggiungibile: readyz e API rispondono come il gateway quando il servizio è spento.
   if (scenario.offline) await context.route(/\/(readyz|api\/)/, (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"status":"offline","retryAfter":8}' }));
-  if (scenario.state) await context.addInitScript((value) => localStorage.setItem('nxs.next.state.v1', JSON.stringify(value)), scenario.state);
+  // Ospite della sandbox servito come in produzione (stessa pagina e CSP di src/shared/sandbox-host.js).
+  await context.route('https://nexusnxs.com/sandbox/v1', (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8',
+    headers: { 'Content-Security-Policy': sandboxHostPolicy('http://127.0.0.1:*') }, body: SANDBOX_HOST_HTML }));
+  if (scenario.state) await context.addInitScript((value) => { if (window === window.top) localStorage.setItem('nxs.next.state.v1', JSON.stringify(value)); }, scenario.state);
   try {
     await page.goto(base, { waitUntil: 'load' });
     await page.waitForSelector('canvas.core[data-backend]', { timeout: 15_000 });
