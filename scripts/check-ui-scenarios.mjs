@@ -233,6 +233,24 @@ const scenarios = [
     if (!(await page.$('.empty-list'))) throw new Error('nessun messaggio «Nessun risultato»');
     await page.fill('.sidebar-full input[type="search"]', 'treni');
   }, expect: ['.search-hit-button .snippet'] },
+  { name: 'focus-contained', viewport: desktop, state: thread,
+  run: async (page) => {
+    await page.focus('.conversation-list .conversation button');
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(260);
+    const ring = await page.evaluate(() => {
+      const element = document.activeElement;
+      const style = getComputedStyle(element);
+      const row = element.closest('.conversation');
+      return { inList: Boolean(element.closest('.conversation-list')), outline: style.outlineStyle, rowRing: row ? getComputedStyle(row).boxShadow : '', radius: row ? getComputedStyle(row).borderRadius : '' };
+    });
+    if (!ring.inList || ring.outline !== 'none' || !/inset/.test(ring.rowRing) || ring.radius === '0px') throw new Error(`anello di focus non integrato nella riga: ${JSON.stringify(ring)}`);
+    // Pulsanti senza raggio dichiarato: l'anello resta comunque arrotondato.
+    const bare = await page.evaluate(() => getComputedStyle(document.createElement('button')).borderRadius);
+    const probe = await page.evaluate(() => { const b = document.createElement('button'); document.body.append(b); const r = getComputedStyle(b).borderRadius; b.remove(); return r; });
+    if (probe === '0px') throw new Error(`pulsante senza raggio: ${bare}/${probe}`);
+  }, expect: ['.conversation-list'] },
   { name: 'custom-select', viewport: { width: 1280, height: 560 }, state: thread,
   run: async (page) => {
     await page.evaluate(() => {

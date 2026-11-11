@@ -23,7 +23,8 @@
   *, *::before, *::after { box-sizing: border-box; }
   html, body, #root { height: 100%; margin: 0; }
   button, input, textarea { font: inherit; color: inherit; }
-  button { cursor: pointer; background: none; border: 0; padding: 0; }
+  /* Raggio di base: l'anello di focus di ogni pulsante è arrotondato anche dove il componente non ne dichiara uno. */
+  button { cursor: pointer; background: none; border: 0; padding: 0; border-radius: 10px; }
   button:disabled { cursor: default; opacity: .45; }
   img, svg, canvas { display: block; }
 }
@@ -41,7 +42,16 @@
       radial-gradient(120% 80% at 50% 0%, oklch(22% .03 200) 0%, var(--ink) 60%) fixed, var(--ink);
     color: var(--ice); -webkit-font-smoothing: antialiased; overflow: hidden;
   }
-  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 10px; }
+  /* Anello di focus: segue il raggio del controllo (nessun salto di forma) ed entra con una breve contrazione. */
+  :focus-visible { outline: 2px solid color-mix(in oklch, var(--cyan) 88%, white); outline-offset: 2px; animation: focus-ring .22s var(--ease-emphasized); }
+  @keyframes focus-ring { from { outline-offset: 6px; outline-color: transparent; } }
+  /* Dentro contenitori che tagliano o scorrono l'anello resta interno al controllo: mai mozzato, mai sporgente. */
+  :is(.sidebar, .conversation-list, .panel, .tabs, .profile-menu, .palette, .slash-menu, .select-panel, .segmented, .sheet, .plan-card, .agent-trail) :focus-visible { outline-offset: -2px; }
+  :is(input, textarea, .field, .select-trigger):focus-visible { animation: none; }
+  /* Righe della cronologia: il focus illumina la riga intera, azioni comprese. */
+  .conversation > button:focus-visible { outline: none; }
+  .conversation:has(> button:focus-visible) { box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--cyan) 80%, transparent); background: color-mix(in oklch, var(--cyan) 7%, transparent); }
+  @media (prefers-reduced-motion: reduce) { :focus-visible { animation: none; } }
   ::selection { background: color-mix(in oklch, var(--cyan) 35%, transparent); }
   .muted { color: var(--mist); font-size: .875rem; }
   .glass {
@@ -366,7 +376,10 @@
   .panel::-webkit-scrollbar { display: none; }
   .panel .field { width: 100%; min-height: 42px; padding: 9px 12px; border-radius: 12px; color: var(--ice); background: color-mix(in oklch, var(--ink) 55%, transparent); border: 1px solid color-mix(in oklch, var(--hairline) 40%, transparent); font: inherit; }
   .panel textarea.field { resize: vertical; }
-  .panel .field:focus-visible { border-color: var(--cyan); }
+  /* Campi: bordo e anello interno, contenuti nel campo anche dentro il pannello che scorre. */
+  :is(.panel, .sheet) .field { transition: border-color .18s var(--ease-standard), box-shadow .2s var(--ease-standard), background .18s; }
+  :is(.panel, .sheet) .field:hover { border-color: color-mix(in oklch, var(--cyan) 30%, transparent); }
+  :is(.panel, .sheet) .field:focus-visible, :is(.panel, .sheet) .field:focus { outline: none; border-color: var(--cyan); box-shadow: inset 0 0 0 1px var(--cyan), 0 0 18px -6px color-mix(in oklch, var(--cyan) 55%, transparent); }
   .panel .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .panel .row .field { flex: 1; min-width: 180px; }
   .panel .card { display: grid; gap: 8px; padding: 14px; border-radius: 16px; border: 1px solid var(--glass-border); background: color-mix(in oklch, var(--surface) 55%, transparent); }
@@ -394,7 +407,7 @@
   .select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; cursor: pointer;
     transition: border-color .18s var(--ease-standard), background .18s, box-shadow .2s var(--ease-standard); }
   .select-trigger:hover { border-color: color-mix(in oklch, var(--cyan) 38%, transparent); }
-  .select-trigger[data-open='true'] { border-color: color-mix(in oklch, var(--cyan) 60%, transparent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--cyan) 14%, transparent); }
+  .select-trigger[data-open='true'] { border-color: var(--cyan); box-shadow: inset 0 0 0 1px var(--cyan), 0 0 18px -6px color-mix(in oklch, var(--cyan) 55%, transparent); }
   .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .select-chevron { display: grid; flex: none; color: var(--mist); transition: rotate .28s var(--ease-emphasized), color .18s; }
   .select-trigger[data-open='true'] .select-chevron { rotate: 180deg; color: var(--cyan); }
