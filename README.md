@@ -154,7 +154,7 @@ It runs only `scripts/start-electron.js --server`, which suppresses every
 desktop UI surface and starts the model runtime and protected gateways. A
 separate owner-session bridge provides private desktop controls after sign-in
 without owning the AI runtime or public gateway. The visible desktop assistant
-and pet remain off until the user runs `npm start`,
+remains off until the user runs `npm start`,
 `npm run nexus:start`, or requests an approved launch from NexusNXS Control.
 
 If automatic startup is unavailable, open PowerShell in this directory and run:

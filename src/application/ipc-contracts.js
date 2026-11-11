@@ -65,8 +65,6 @@ const CHANNELS = Object.freeze({
   actionHistory: 'nexus:action-history',
   actionUndo: 'nexus:action-undo',
   windowCompact: 'nexus:window-compact',
-  companionOverlay: 'nexus:companion-overlay',
-  companionShowMain: 'nexus:companion-show-main',
   presenceSync: 'nexus:presence-sync',
   provisioningStatus: 'nexus:provisioning-status',
   provisioningStart: 'nexus:provisioning-start',

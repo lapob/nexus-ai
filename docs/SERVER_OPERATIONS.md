@@ -94,7 +94,7 @@ the headless Core, model runtime and protected gateways. The desktop interface
 is never started by this workstation task; open it with
 `npm start`, `npm run nexus:start`, or an approved action from NexusNXS Control.
 Boot mode also registers `NexusNXS Desktop Bridge` at owner sign-in. It reuses
-the lightweight authenticated tray/pet process with no AI or gateway ownership.
+the lightweight authenticated tray process with no AI or gateway ownership.
 This routes Control's application actions into the visible owner session;
 Session 0 launches would otherwise appear successful while showing no window.
 Without a live owner bridge, the boot Core exposes no desktop actions and
@@ -409,10 +409,10 @@ the repository. `npm run release:stable:gate` accepts those confirmations only
 as explicit release-environment inputs and still requires the automated checks.
 # Desktop e collegamento locale
 
-Il task Desktop Bridge parte al login senza finestra, pet, tray o ascolto del
+Il task Desktop Bridge parte al login senza finestra, tray o ascolto del
 microfono. Mantiene soltanto il collegamento autenticato ai comandi della
-sessione proprietario. Aprire esplicitamente l'app ripristina il tray e il pet
-secondo la preferenza salvata. Il Core al boot non apre finestre in sessione 0.
+sessione proprietario. Aprire esplicitamente l'app ripristina il tray e la
+barra rapida (Ctrl+Maiusc+Spazio). Il Core al boot non apre finestre in sessione 0.
 
 Il collegamento dell'app usa `--ui` e resta distinto dal servizio. Configurare
 una volta `scripts/refresh-desktop-shortcut.ps1 -Destination <cartella esistente>`:

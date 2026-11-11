@@ -18,6 +18,22 @@ Contents:
 - Windows signing pipeline: Azure Artifact Signing or .pfx, documented in
   docs/WINDOWS-SIGNING.md. Inactive until the owner provides an account or
   certificate.
+- Focus rings contained and animated (scenario focus-contained).
+- DESKTOP PET REMOVED at the owner's request ("leva il pet e qualsiasi cosa
+  derivi da lui"):
+  - Deleted: companion-window.js, system-presence-preload.js, pet-motion.js,
+    nexus-pets.webp, presence-qa.js, verify-presence-menu.js and
+    companion-window.test.js.
+  - The tray loses "Mostra/Scegli pet" and gains "Domanda rapida";
+    Ctrl+Alt+Space removed.
+  - The Presence process now uses presence-settings.js: wake word only, plus
+    remote status. Control no longer receives show/hide-nucleus or
+    select-display; the protocol is unchanged, so Android stays compatible.
+  - Dead code removed: src/remote/public-{artifacts, conversation-preferences,
+    local-memory, web-images}.js, scripts/verify-packaged-presence.js, and an
+    empty "node --check" in precheck.
+  - After removal: npm test 1228/1228 (2 skipped), check PASS, check:ui
+    34/34, smoke PASS.
 
 Checks before the build:
 - npm test: 1236 tests, 1234 pass, 0 fail, 2 skipped.

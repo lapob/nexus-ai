@@ -88,7 +88,7 @@ test('non riusa un requestId finché il trasporto annullato non è terminato', a
 });
 
 
-test('il pet riceve solo stati reali e resta attivo fino alla fine delle richieste concorrenti', async () => {
+test('la presenza riceve solo stati reali e resta attivo fino alla fine delle richieste concorrenti', async () => {
   const pending = new Map();
   const provider = new MockProvider();
   provider.streamChat = (request, handlers) => new Promise((resolve) => {

@@ -27,8 +27,8 @@ test('Core, presenza e UI hanno ruoli non sovrapposti', () => {
   const capability = presenceCapabilities({ platform: 'win32', shortcutRegistered: true });
   assert.deepEqual(capability, {
     mode: 'system-presence', lightweight: true, ownsAiRuntime: false,
-    ownsRemoteGateway: false, multiDisplay: true, opensFullUiOnDemand: true,
-    tray: true, shortcut: 'CommandOrControl+Shift+Space', visibilityShortcut: 'CommandOrControl+Alt+Space'
+    ownsRemoteGateway: false, opensFullUiOnDemand: true,
+    tray: true, shortcut: 'CommandOrControl+Shift+Space'
   });
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: false, appRoot: 'C:\\Nexus' }), ['--ui']);
   assert.deepEqual(interactiveLaunchArguments({ defaultApp: true, appRoot: 'C:\\Nexus' }), ['C:\\Nexus', '--ui']);
@@ -156,8 +156,10 @@ test('la Presence apre la UI on-demand e ne segue la visibilità', () => {
   const source = fs.readFileSync(path.join(root, 'src', 'application', 'bootstrap.js'), 'utf8');
   const presence = fs.readFileSync(path.join(root, 'src', 'application', 'presence-bootstrap.js'), 'utf8');
   assert.doesNotMatch(source, /attachPrimaryWindow/);
-  assert.match(presence, /openPrimaryWindow:\s*activateFullUi/);
-  assert.match(presence, /activateVoice:\s*\(\)\s*=>\s*activateFromWakeWord/);
+  assert.match(presence, /tray\.on\('click', activateFullUi\)/);
+  assert.match(presence, /onWake:\s*\(\)\s*=>\s*activateFromWakeWord/);
+  // Nessuna finestra del pet: il processo Presence usa solo impostazioni e barra rapida.
+  assert.doesNotMatch(presence, /companion-window|selectPet|nucleusVisible/);
   assert.match(presence, /manager\.setApplicationVisible\?\.\(state\.running\)/);
   assert.match(source, /launchSystemPresence\(\{ appRoot, env \}\)/);
 });

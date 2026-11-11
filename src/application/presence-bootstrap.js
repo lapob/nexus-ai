@@ -1,13 +1,13 @@
 /**
  * @module application/presence-bootstrap
- * @description Processo grafico minimo: presenza di sistema, tray e richiamo della UI completa.
+ * @description Processo leggero in background: tray, barra rapida, parola di attivazione, ponte locale per\n * NexusNXS Control e richiamo della UI completa. Non mostra finestre proprie oltre alla barra rapida.
  */
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFile, spawn } = require('node:child_process');
 const { promisify } = require('node:util');
 const { app, globalShortcut, Menu, safeStorage, shell, Tray } = require('electron');
-const { createSystemPresenceManager } = require('../infrastructure/electron/companion-window');
+const { createPresenceSettings } = require('../infrastructure/electron/presence-settings');
 const { configureSessionSecurity, installShutdownBarrier } = require('../infrastructure/electron/app-lifecycle');
 const { launchInteractiveDesktop, processLockState } = require('../infrastructure/electron/desktop-launcher');
 const { ProcessLock, requestProcessShutdown } = require('../infrastructure/electron/process-lock');
@@ -35,11 +35,9 @@ function presenceCapabilities({ platform = process.platform, shortcutRegistered 
     lightweight: true,
     ownsAiRuntime: false,
     ownsRemoteGateway: false,
-    multiDisplay: true,
     opensFullUiOnDemand: true,
     tray: trayVisible,
-    shortcut: shortcutRegistered ? 'CommandOrControl+Shift+Space' : null,
-    visibilityShortcut: shortcutRegistered ? 'CommandOrControl+Alt+Space' : null
+    shortcut: shortcutRegistered ? 'CommandOrControl+Shift+Space' : null
   });
 }
 
@@ -255,21 +253,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
   const bridgeSecretProtection = createSafeStorageSecretProtection(safeStorage);
   registerRendererProtocol(rendererRoot);
   configureSessionSecurity(RENDERER_ENTRY_URL);
-  manager = createSystemPresenceManager({
-    logger,
-    openPrimaryWindow: activateFullUi,
-    closePrimaryWindow: closeFullUi,
-    quitApplication: quitDesktop,
-    activateVoice: () => activateFromWakeWord({
-      manager,
-      createActivationTicket: (kind) => presenceBridge?.createActivationTicket?.(kind),
-      openFullUi,
-      waitForFullUi
-    }),
-    startHidden: bridgeOnly,
-    onStatusChange: status => { if (status.nucleusVisible) ensureTray(); refreshTrayMenu(); },
-    defaultSystemPresence: true
-  });
+  manager = createPresenceSettings({ statePath: path.join(app.getPath('userData'), 'system-presence.json'), logger });
+
   wakeWordListener = createWakeWordListener({
     logger,
     onListeningChange: (active) => manager?.setWakeWordListening?.(active),
@@ -284,7 +269,6 @@ async function bootstrapPresence({ env = process.env } = {}) {
     ...manager.getSystemPresenceConfiguration(),
     wakeWordLocale: app.getLocale?.() || 'en-US'
   });
-  const initialPresence = manager.startSystemPresence?.() || { nucleusVisible: false };
   presenceBridge = createLocalPresenceBridgeServer({
     sharedDataRoot,
     logger,
@@ -300,20 +284,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
     },
     actionExecutor: async (command) => {
       try {
-      if (command.action === 'show-nucleus') {
-        manager.setSystemPresenceEnabled(true);
-        return;
-      }
-      if (command.action === 'hide-nucleus') {
-        manager.setSystemPresenceEnabled(false);
-        return;
-      }
-      if (command.action === 'select-display') {
-        if (!manager.selectSystemPresenceDisplay(command.displayId)) {
-          throw Object.assign(new Error('Display logico non disponibile.'), { code: 'PRESENCE_DISPLAY_UNAVAILABLE' });
-        }
-        return;
-      }
+
       if (command.action === 'open-full-app') {
         const launch = await activateFullUi();
         if (launch.error) throw launch.error;
@@ -396,18 +367,9 @@ async function bootstrapPresence({ env = process.env } = {}) {
     refreshTrayMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
       { label: italian ? 'Apri NexusNXS' : 'Open NexusNXS', click: activateFullUi },
       { label: italian ? 'Riduci al tray' : 'Minimize to tray', click: closeFullUi },
+      { label: italian ? 'Domanda rapida' : 'Quick question', accelerator: 'CommandOrControl+Shift+Space', click: () => quickBar?.toggle() },
       { type: 'separator' },
-      {
-        label: italian ? 'Mostra pet' : 'Show pet',
-        type: 'checkbox',
-        checked: manager.getSystemPresenceStatus().nucleusVisible,
-        click: (item) => { manager.setSystemPresenceEnabled?.(item.checked); refreshTrayMenu(); }
-      },
-      { label: italian ? 'Scegli pet' : 'Choose pet', submenu: ['orb', 'robot', 'fox'].map((pet, index) => ({
-        label: (italian ? ['Orbita', 'Robot', 'Volpe'] : ['Orb', 'Robot', 'Fox'])[index],
-        type: 'radio', checked: manager.getPet() === pet, click: () => { manager.selectPet(pet); refreshTrayMenu(); }
-      })) },
-      { type: 'separator' },
+
       { label: italian ? 'Esci da NexusNXS' : 'Quit NexusNXS', click: quitDesktop }
     ]));
     refreshTrayMenu();
@@ -423,12 +385,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
       await activateFullUi();
     }
   });
-  const openShortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', () => quickBar.toggle());
-  const visibilityShortcutRegistered = globalShortcut.register('CommandOrControl+Alt+Space', () => {
-    const visible = manager.getSystemPresenceStatus().nucleusVisible;
-    manager.setSystemPresenceEnabled(!visible);
-  });
-  shortcutRegistered = openShortcutRegistered && visibilityShortcutRegistered;
+  shortcutRegistered = globalShortcut.register('CommandOrControl+Shift+Space', () => quickBar.toggle());
+
 
   let uiWasRunning = false;
   const syncVisibility = () => {
