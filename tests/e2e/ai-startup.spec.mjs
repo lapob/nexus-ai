@@ -83,6 +83,42 @@ test('the desktop update feed only exposes the signed preview files and redirect
   expect(binary.headers.get('location')).toMatch(/^https:\/\/github\.com\/lapob\/nexus-ai\/releases\/download\/v\d+\.\d+\.\d+-preview\.\d+\/NexusNXS-9\.9\.9-Setup\.exe$/);
 });
 
+test('anonymous update health stops serving the manifest after too many crashes, one vote per source', async () => {
+  const { default: worker } = await import('../../dist/server/index.js');
+  const { default: release } = await import('../../app/data/public-release.json', { with: { type: 'json' } });
+  const version = String(release.tag).replace(/^v/, '').replace(/-preview\.\d+$/, '');
+  const rows = new Map();
+  // D1 minimale in memoria: solo le tre istruzioni usate dal worker.
+  const db = { prepare: (sql) => ({ bind: (...values) => ({
+    run: async () => {
+      if (sql.startsWith('INSERT')) { const key = values.slice(0, 3).join('|'); if (!rows.has(key)) rows.set(key, { version: values[0], event: values[1], day: values[3] }); }
+      if (sql.startsWith('DELETE')) for (const [key, row] of rows) if (row.day < values[0]) rows.delete(key);
+    },
+    all: async () => {
+      const counts = {};
+      for (const row of rows.values()) if (row.version === values[0]) counts[row.event] = (counts[row.event] || 0) + 1;
+      return { results: Object.entries(counts).map(([event, n]) => ({ event, n })) };
+    }
+  }) }) };
+  const env = { ASSETS: { fetch: async () => new Response('', { status: 404 }) }, UPDATE_HEALTH: db };
+  const post = (body, ip = '203.0.113.1', type = 'application/json') => worker.fetch(new Request('https://nexusnxs.com/updates/preview/health', {
+    method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'content-type': type, 'cf-connecting-ip': ip }
+  }), env, { waitUntil() {}, passThroughOnException() {} });
+  expect((await worker.fetch(new Request('https://nexusnxs.com/updates/preview/health'), env, { waitUntil() {}, passThroughOnException() {} })).status).toBe(405);
+  expect((await post({ version: '9.9.9', channel: 'preview', event: 'crash' })).status).toBe(422);
+  expect((await post({ version, channel: 'preview', event: 'other' })).status).toBe(422);
+  expect((await post('x'.repeat(300))).status).toBe(413);
+  expect((await post({ version, channel: 'preview', event: 'crash' }, '1.1.1.1', 'text/plain')).status).toBe(415);
+  for (let i = 0; i < 3; i += 1) expect((await post({ version, channel: 'preview', event: 'crash' }, '198.51.100.7')).status).toBe(204);
+  expect(rows.size).toBe(1);
+  for (let i = 0; i < 5; i += 1) await post({ version, channel: 'preview', event: 'crash' }, `198.51.100.${20 + i}`);
+  await post({ version, channel: 'preview', event: 'healthy' }, '198.51.100.90');
+  const manifest = await worker.fetch(new Request('https://nexusnxs.com/updates/preview/release-manifest.json'), env, { waitUntil() {}, passThroughOnException() {} });
+  expect(manifest.status).toBe(503);
+  expect(manifest.headers.get('x-nexusnxs-rollout')).toBe('halted');
+  expect([...rows.keys()].every((key) => /^[^|]+\|(crash|healthy)\|[0-9a-f]{8}$/.test(key))).toBe(true);
+});
+
 test('with the PC offline nothing is sent: the draft stays and the composer explains why', async ({ page }) => {
   await open(page, { width: 390, height: 844 });
   await expect(page.locator('.composer[data-offline="true"]')).toBeVisible();

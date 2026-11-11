@@ -24,6 +24,13 @@
       "zone_name": "nexusnxs.com"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "UPDATE_HEALTH",
+      "database_name": "nexusnxs-update-health",
+      "database_id": "098fd77b-09e9-47fa-b820-801945aeeb98"
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "html_handling": "none",

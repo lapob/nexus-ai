@@ -12,6 +12,12 @@ interface Env {
     tag: string;
     timestamp: string;
   };
+  UPDATE_HEALTH?: HealthDatabase;
+}
+
+/** Sottoinsieme di D1 usato dal blocco di salute degli aggiornamenti. */
+interface HealthDatabase {
+  prepare(sql: string): { bind(...values: unknown[]): { run(): Promise<unknown>; all<T>(): Promise<{ results: T[] }> } };
 }
 
 interface ExecutionContext {
@@ -33,15 +39,80 @@ const UPDATE_METADATA = new Map([
 const UPDATE_BINARY = /^NexusNXS-\d+\.\d+\.\d+-Setup\.exe(?:\.blockmap)?$/;
 const MAX_UPDATE_METADATA_BYTES = 512 * 1024;
 
-async function updateFeed(request: Request, url: URL, versionId?: string): Promise<Response> {
+// #region Blocco automatico del rollout per salute
+// L'app invia al massimo un segnale "healthy" e uno "crash" per versione, senza identificativi. Qui ogni origine
+// conta una volta sola tramite un hash troncato a 32 bit (non reversibile in modo utile, nessun IP salvato) e le
+// righe scadono dopo 30 giorni. Se i crash superano soglia e quota, la distinta smette di essere servita (503):
+// nessun client nuovo scarica la versione finché una release correttiva non cambia tag.
+const HEALTH_MIN_CRASHES = 5;
+const HEALTH_MAX_CRASH_RATIO = 0.3;
+const HEALTH_RETENTION_DAYS = 30;
+let healthCache: { version: string; at: number; halted: boolean } | null = null;
+
+const releaseVersion = (): string => String(publicRelease.tag || "").replace(/^v/, "").replace(/-preview\.\d+$/, "");
+
+async function healthHalted(env: Env): Promise<boolean> {
+  const version = releaseVersion();
+  if (!env.UPDATE_HEALTH || !version) return false;
+  if (healthCache && healthCache.version === version && Date.now() - healthCache.at < 60_000) return healthCache.halted;
+  try {
+    const { results } = await env.UPDATE_HEALTH.prepare("SELECT event, COUNT(*) AS n FROM health_seen WHERE version = ?1 GROUP BY event").bind(version).all<{ event: string; n: number }>();
+    const crash = Number(results.find((row) => row.event === "crash")?.n || 0);
+    const healthy = Number(results.find((row) => row.event === "healthy")?.n || 0);
+    const halted = crash >= HEALTH_MIN_CRASHES && crash / Math.max(1, crash + healthy) > HEALTH_MAX_CRASH_RATIO;
+    healthCache = { version, at: Date.now(), halted };
+    return halted;
+  } catch {
+    return false; // il database non disponibile non deve fermare gli aggiornamenti correttivi
+  }
+}
+
+async function recordHealth(request: Request, env: Env, headers: Headers): Promise<Response> {
+  headers.set("Cache-Control", "no-store");
+  if (request.method !== "POST") { headers.set("Allow", "POST"); return new Response(null, { status: 405, headers }); }
+  if (!(request.headers.get("content-type") || "").startsWith("application/json")) return new Response(null, { status: 415, headers });
+  const text = await request.text();
+  if (text.length > 256) return new Response(null, { status: 413, headers });
+  let body: { version?: unknown; channel?: unknown; event?: unknown };
+  try { body = JSON.parse(text); } catch { return new Response(null, { status: 400, headers }); }
+  // Solo la versione attualmente distribuita: niente spazzatura né versioni inventate.
+  if (body.channel !== "preview" || body.version !== releaseVersion() || (body.event !== "healthy" && body.event !== "crash")) {
+    return new Response(null, { status: 422, headers });
+  }
+  if (!env.UPDATE_HEALTH) return new Response(null, { status: 204, headers });
+  const source = request.headers.get("cf-connecting-ip") || "unknown";
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`nexusnxs-health-v1\0${body.version}\0${source}`)));
+  const client = Array.from(digest.subarray(0, 4), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const day = new Date().toISOString().slice(0, 10);
+  const expiry = new Date(Date.now() - HEALTH_RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
+  try {
+    await env.UPDATE_HEALTH.prepare("INSERT OR IGNORE INTO health_seen (version, event, client, day) VALUES (?1, ?2, ?3, ?4)").bind(body.version, body.event, client, day).run();
+    if (digest[4] < 8) await env.UPDATE_HEALTH.prepare("DELETE FROM health_seen WHERE day < ?1").bind(expiry).run(); // pulizia occasionale
+  } catch {
+    return new Response(null, { status: 503, headers });
+  }
+  healthCache = null;
+  return new Response(null, { status: 204, headers });
+}
+// #endregion
+
+async function updateFeed(request: Request, url: URL, env: Env, versionId?: string): Promise<Response> {
   const name = url.pathname.slice(UPDATE_PREFIX.length);
   const headers = new Headers({ "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow", "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload" });
   if (versionId) headers.set("X-NexusNXS-Worker-Version", versionId);
+  if (name === "health") return recordHealth(request, env, headers);
   const tag = String(publicRelease.tag || "");
   if ((request.method !== "GET" && request.method !== "HEAD") || !/^v\d+\.\d+\.\d+-preview\.\d+$/.test(tag)
     || !(UPDATE_METADATA.has(name) || UPDATE_BINARY.test(name))) {
     headers.set("Cache-Control", "no-store");
     return new Response(null, { status: 404, headers });
+  }
+  // Rollout fermato dalla salute: la distinta (e quindi l'aggiornamento) non viene più servita.
+  if (name === "release-manifest.json" && await healthHalted(env)) {
+    headers.set("Cache-Control", "no-store");
+    headers.set("Retry-After", "1800");
+    headers.set("X-NexusNXS-Rollout", "halted");
+    return new Response(null, { status: 503, headers });
   }
   const source = `https://github.com/${UPDATE_REPOSITORY}/releases/download/${encodeURIComponent(tag)}/${name}`;
   if (UPDATE_BINARY.test(name)) {
@@ -236,7 +307,7 @@ const worker = {
     }
 
     if (url.hostname === CANONICAL_HOSTNAME && url.pathname.startsWith(UPDATE_PREFIX)) {
-      return updateFeed(request, url, env.CF_VERSION_METADATA?.id);
+      return updateFeed(request, url, env, env.CF_VERSION_METADATA?.id);
     }
 
     if (NON_CANONICAL_PRODUCTION_HOSTNAMES.has(url.hostname)) {
