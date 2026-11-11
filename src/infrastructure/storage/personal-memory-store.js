@@ -267,6 +267,23 @@ class PersonalMemoryStore {
     return matches.length;
   }
 
+  /**
+   * Riepilogo per la revisione settimanale: ricordi attivi nati negli ultimi `days` giorni (più recenti prima)
+   * e, tra questi, quelli dedotti dalle conversazioni che aspettano una conferma dell'utente.
+   */
+  weeklyDigest({ now = Date.now(), days = 7 } = {}) {
+    this.expireStale();
+    const since = now - Math.max(1, Math.min(31, days)) * 86_400_000;
+    const added = this.database.prepare("SELECT * FROM memories WHERE status='active' AND created_at>=? ORDER BY created_at DESC LIMIT 50").all(since).map((row) => this.publicRecord(row));
+    return { since, added, toConfirm: added.filter((record) => record.confidence !== 'user-confirmed'), total: this.stats().active };
+  }
+
+  /** L'utente conferma un ricordo dedotto: diventa affidabile come uno detto esplicitamente. */
+  confirmById(id) {
+    if (!Number.isInteger(id) || id < 1) return 0;
+    return this.database.prepare("UPDATE memories SET confidence='user-confirmed', updated_at=? WHERE id=? AND status='active' AND confidence<>'user-confirmed'").run(Date.now(), id).changes;
+  }
+
   forgetById(id) {
     if (!Number.isInteger(id) || id < 1) return 0;
     return this.database.prepare("UPDATE memories SET status='forgotten', updated_at=? WHERE id=? AND status='active'").run(Date.now(), id).changes;

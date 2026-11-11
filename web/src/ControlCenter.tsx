@@ -4,8 +4,9 @@
  */
 import { m } from 'framer-motion';
 import QRCode from 'qrcode';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon } from './Icon';
+import { Select } from './Select';
 import { setWakeWordEnabled, wakeWordEnabled } from './desktopPresence';
 import { desktopBridge } from './platform';
 
@@ -99,14 +100,16 @@ function Models({ settings, save, notify }: { settings: Any; save: (patch: Any) 
   return (
     <>
       <label htmlFor="model-select">Modello di conversazione</label>
-      <select id="model-select" className="field" value={current} onChange={(event) => void save(event.target.value === 'auto'
-        ? { autoSelectModel: true } : { autoSelectModel: false, chatModel: event.target.value, model: event.target.value })}>
-        <option value="auto">Automatico (consigliato)</option>
-        {models.map((model) => <option key={model.id} value={model.id}>{model.name || model.id}{model.recommended ? ' · consigliato' : ''}</option>)}
-      </select>
+      <Select id="model-select" className="field" value={current} onChange={(value) => void save(value === 'auto'
+        ? { autoSelectModel: true } : { autoSelectModel: false, chatModel: value, model: value })}
+        options={[{ value: 'auto', label: 'Automatico', hint: 'Sceglie il modello migliore per ogni richiesta' },
+          ...models.map((model) => ({ value: String(model.id), label: String(model.name || model.id), hint: model.recommended ? 'Consigliato' : undefined }))]} />
       <Switch label="Modalità agente" hint="Usa strumenti in sequenza (calcolo, note, ricerca, azioni sul PC con consenso)." checked={settings.agentMode === true} onChange={(value) => void save({ agentMode: value })} />
       <label htmlFor="temperature">Creatività · {Number(settings.temperature ?? 0.3).toFixed(1)}</label>
-      <input id="temperature" type="range" min="0" max="1" step="0.1" defaultValue={settings.temperature ?? 0.3} onChange={(event) => void save({ temperature: Number(event.target.value) })} />
+      <input id="temperature" type="range" min="0" max="1" step="0.1" defaultValue={settings.temperature ?? 0.3}
+        style={{ '--value': Number(settings.temperature ?? 0.3) } as CSSProperties}
+        onInput={(event) => event.currentTarget.style.setProperty('--value', event.currentTarget.value)}
+        onChange={(event) => void save({ temperature: Number(event.target.value) })} />
       {provisioning && (
         <div className="card">
           <strong>Motore locale</strong>
@@ -143,9 +146,8 @@ function Profile({ settings, save }: { settings: Any; save: (patch: Any) => Prom
       {field('occupation', 'Di cosa ti occupi')}
       {field('interests', 'Interessi')}
       <label htmlFor="p-style">Stile delle risposte</label>
-      <select id="p-style" className="field" value={draft.responseStyle ?? 'natural'} onChange={(event) => setDraft({ ...draft, responseStyle: event.target.value })}>
-        <option value="concise">Concise</option><option value="natural">Naturali</option><option value="detailed">Dettagliate</option>
-      </select>
+      <Select id="p-style" className="field" value={draft.responseStyle ?? 'natural'} onChange={(value) => setDraft({ ...draft, responseStyle: value })}
+        options={[{ value: 'concise', label: 'Concise', hint: 'Dritte al punto' }, { value: 'natural', label: 'Naturali', hint: 'Equilibrate, come una conversazione' }, { value: 'detailed', label: 'Dettagliate', hint: 'Approfondite, con esempi' }]} />
       <label htmlFor="p-custom">Istruzioni personali</label>
       <textarea id="p-custom" className="field" rows={4} maxLength={2000} value={draft.customInstructions ?? ''} onChange={(event) => setDraft({ ...draft, customInstructions: event.target.value })} />
       <button type="button" className="primary" onClick={() => void save({ personalization: draft })}>Salva profilo</button>
@@ -223,13 +225,41 @@ function Memory({ settings, save, notify }: { settings: Any; save: (patch: Any) 
   const [items, setItems] = useState<Any[] | null>(null);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<{ id: number; content: string } | null>(null);
-  const refresh = useCallback(async () => setItems(await bridge().listMemories()), []);
-  useEffect(() => { void refresh().catch(() => setItems([])); }, [refresh]);
+  const [digest, setDigest] = useState<{ added: Any[]; toConfirm: Any[] } | null>(null);
+  const refresh = useCallback(async () => {
+    setItems(await bridge().listMemories());
+    if (bridge().memoryDigest) setDigest(await bridge().memoryDigest());
+  }, []);
+  useEffect(() => {
+    void refresh().catch(() => setItems([]));
+    // Aprire la memoria vale come revisione settimanale fatta: l'invito non ricompare per 7 giorni.
+    try { localStorage.setItem('nxs.memory.reviewedAt', String(Date.now())); } catch { /* archiviazione non disponibile */ }
+  }, [refresh]);
   const visible = (items ?? []).filter((item) => item.content.toLocaleLowerCase('it').includes(query.toLocaleLowerCase('it')));
   return (
     <>
       <Switch label="Memoria automatica" hint="Ricorda fatti utili dalle conversazioni (mai dati sensibili). Spenta: solo ciò che chiedi di ricordare."
         checked={settings.memoryMode === 'automatic'} onChange={(value) => void save({ memoryMode: value ? 'automatic' : 'explicit' })} />
+      {digest && digest.added.length > 0 && (
+        <section className="digest" aria-label="Riepilogo della settimana">
+          <header>
+            <Icon name="memory" size={16} />
+            <strong>Questa settimana</strong>
+            <small>{digest.added.length === 1 ? '1 ricordo nuovo' : `${digest.added.length} ricordi nuovi`}{digest.toConfirm.length ? ` · ${digest.toConfirm.length} da confermare` : ' · tutti confermati'}</small>
+          </header>
+          {digest.toConfirm.length > 0 && (
+            <ul className="list">{digest.toConfirm.map((item) => (
+              <li key={item.id}>
+                <span><strong>{item.content}</strong><small>Dedotto da una conversazione · {formatDate(item.createdAt)}</small></span>
+                <span className="actions">
+                  <button type="button" className="icon-button small" aria-label="Conferma ricordo" title="È corretto, tienilo" onClick={async () => { await bridge().confirmMemory(item.id); await refresh(); notify('Ricordo confermato.'); }}><Icon name="check" /></button>
+                  <button type="button" className="icon-button small" aria-label="Dimentica ricordo" title="Dimentica" onClick={async () => { await bridge().forgetMemory(item.id); await refresh(); }}><Icon name="trash" /></button>
+                </span>
+              </li>
+            ))}</ul>
+          )}
+        </section>
+      )}
       <Row>
         <input className="field" type="search" placeholder="Cerca nei ricordi…" aria-label="Cerca nei ricordi" value={query} onChange={(event) => setQuery(event.target.value)} />
         <button type="button" className="secondary" onClick={async () => { const result = await bridge().exportMemories(); if (result?.status === 'saved') notify(`Esportati ${result.count} ricordi.`); }}>Esporta</button>
@@ -248,7 +278,7 @@ function Memory({ settings, save, notify }: { settings: Any; save: (patch: Any) 
               </form>
             ) : (
               <>
-                <span><strong>{item.content}</strong><small>{item.sourceKind === 'derived' ? 'Dedotto' : 'Salvato da te'} · {formatDate(item.updatedAt)}</small></span>
+                <span><strong>{item.content}</strong><small>{item.confidence !== 'user-confirmed' ? 'Dedotto' : 'Confermato da te'} · {formatDate(item.updatedAt)}</small></span>
                 <span className="actions">
                   <button type="button" className="icon-button small" aria-label="Modifica ricordo" onClick={() => setEditing({ id: item.id, content: item.content })}><Icon name="sliders" /></button>
                   <button type="button" className="icon-button small" aria-label="Dimentica ricordo" onClick={async () => { await bridge().forgetMemory(item.id); await refresh(); }}><Icon name="trash" /></button>

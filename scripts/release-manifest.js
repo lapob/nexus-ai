@@ -61,6 +61,9 @@ function releaseManifest({ product, version, channel, visibility, releaseClass, 
       rollout: channel === 'stable' ? 'staged' : channel === 'beta' ? 'beta-ring' : signatureRequired ? 'preview-auto' : 'manual-preview',
       initialPercentage: channel === 'stable' ? 10 : 100,
       paused: false,
+      // Fasi nel tempo dalla pubblicazione (generatedAt firmato). Il controllo manuale salta la coorte, mai la pausa.
+      ...(channel === 'stable' ? { stages: [{ afterHours: 0, percentage: 10 }, { afterHours: 24, percentage: 50 }, { afterHours: 72, percentage: 100 }] }
+        : signatureRequired ? { stages: [{ afterHours: 0, percentage: 25 }, { afterHours: 2, percentage: 60 }, { afterHours: 6, percentage: 100 }] } : {}),
       rollback: 'signed-forward-fix',
       preserveUserData: true
     },

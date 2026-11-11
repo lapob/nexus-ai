@@ -68,6 +68,18 @@ function verifySignatureEnvelope(payload, envelope, { publicKey, keyId = '' } = 
   return true;
 }
 
+/** Fasi firmate del rollout: ore crescenti da 0, percentuali crescenti fino a 100 (campo opzionale). */
+function validStages(stages) {
+  if (stages === undefined) return true;
+  if (!Array.isArray(stages) || stages.length < 1 || stages.length > 8) return false;
+  return stages.every((stage, index) => {
+    const previous = stages[index - 1];
+    return stage && Number.isInteger(stage.afterHours) && Number.isInteger(stage.percentage)
+      && stage.afterHours >= 0 && stage.afterHours <= 24 * 30 && stage.percentage >= 1 && stage.percentage <= 100
+      && (index === 0 ? stage.afterHours === 0 : stage.afterHours > previous.afterHours && stage.percentage > previous.percentage);
+  }) && stages[stages.length - 1].percentage === 100;
+}
+
 function validateReleaseManifest(manifest, { expectedChannel = '' } = {}) {
   if (!manifest || manifest.schemaVersion !== 2) throw new Error('Schema distinta release non supportato.');
   if (!['public', 'private-owner'].includes(manifest.visibility)) throw new Error('Visibilità distinta non valida.');
@@ -89,7 +101,8 @@ function validateReleaseManifest(manifest, { expectedChannel = '' } = {}) {
       || manifest.updatePolicy.initialPercentage < 1 || manifest.updatePolicy.initialPercentage > 100
       || (manifest.updatePolicy.paused !== undefined && typeof manifest.updatePolicy.paused !== 'boolean')
       || manifest.updatePolicy?.rollback !== 'signed-forward-fix'
-      || manifest.updatePolicy?.preserveUserData !== true) {
+      || manifest.updatePolicy?.preserveUserData !== true
+      || !validStages(manifest.updatePolicy.stages)) {
       throw new Error('Policy di rollout e recupero non valida.');
     }
   }

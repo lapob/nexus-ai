@@ -83,7 +83,7 @@ const { ProactiveEventBus } = require('./proactive-event-bus');
 const { ProactiveSensorHub } = require('./proactive-sensor-hub');
 const { createHeadlessDesktopControl } = require('./headless-desktop-control');
 const { CHANNELS } = require('./ipc-contracts');
-const { takeQuickPrompt } = require('./quick-prompt');
+const { takeQuickPayload } = require('./quick-prompt');
 const { WebResearchService } = require('../research/web-research-service');
 const { ImageGenerationService } = require('../ai/image-generation-service');
 recordModuleStage('complete');
@@ -141,9 +141,12 @@ function bootstrapElectron({ env = process.env } = {}) {
     // la coorte senza trasmettere hostname, username o identificatori hardware.
     rolloutSeed: sharedDataRoot,
     trustedRendererUrl: RENDERER_ENTRY_URL,
+    healthStatePath: path.join(sharedDataRoot, 'updates', 'health.json'),
     logger
   });
   updateManager.setWindowProvider(() => BrowserWindow.getAllWindows()[0] || null);
+  app.on('render-process-gone', (_event, _contents, details) => updateManager.reportProcessGone?.(details));
+  app.on('child-process-gone', (_event, details) => updateManager.reportProcessGone?.(details));
   const crashReports = new CrashReportStore({
     filePath: path.join(sharedDataRoot, 'logs', 'crash-reports.json'),
     enabled: env.NEXUS_LOCAL_CRASH_REPORTS !== '0'
@@ -228,9 +231,19 @@ function bootstrapElectron({ env = process.env } = {}) {
   };
   // Domanda dalla barra rapida (Presence): letta una volta sola e inviata al renderer appena carico.
   const deliverQuickPrompt = (window) => {
-    const text = takeQuickPrompt(sharedDataRoot);
-    if (!text) return;
-    const send = () => { if (!window.isDestroyed?.()) window.webContents.send(CHANNELS.quickPrompt, { text }); };
+    const payload = takeQuickPayload(sharedDataRoot);
+    if (!payload) return;
+    let waited = 0;
+    const send = () => {
+      if (window.isDestroyed?.()) return;
+      // All'avvio a freddo i gestori IPC arrivano poco dopo la finestra: si attende fino a 5 s per non perdere la cattura.
+      if (payload.image && !ipcServices && waited < 20) { waited += 1; setTimeout(send, 250); return; }
+      // Cattura dello schermo: registrata come allegato immagine di questa finestra (scade in 30 minuti).
+      const attachment = payload.image && ipcServices?.registerImageAttachment
+        ? ipcServices.registerImageAttachment({ senderId: window.webContents.id, name: 'Schermo.jpg', mime: 'image/jpeg', data: payload.image })
+        : null;
+      window.webContents.send(CHANNELS.quickPrompt, { text: payload.text, ...(attachment ? { attachment } : {}) });
+    };
     if (window.webContents.isLoadingMainFrame?.()) window.webContents.once('did-finish-load', () => setTimeout(send, 400));
     else send();
   };

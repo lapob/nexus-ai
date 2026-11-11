@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validAndroidMatrix } = require('./android-matrix-evidence');
+const { windowsSigning } = require('./lib/windows-signing');
 const { validApplicationRecoveryReport } = require('./run-backup-recovery-drill');
 const { validDesktopMotionReport } = require('./check-product-slo');
 
@@ -60,7 +61,7 @@ function buildFounderBetaReport({ projectRoot = root, environment = process.env,
     androidMatrixCheck({ projectRoot, id: 'android-control-device', relativePath: 'qa-artifacts/android-control-matrix/manifest.json', policy, now }),
   ];
   const distribution = [
-    check('windows-signing', Boolean(String(environment.CSC_LINK || '').trim() && String(environment.CSC_KEY_PASSWORD || '').trim()), 'Installer Windows firmato', 'distribution'),
+    check('windows-signing', windowsSigning(environment).ready, 'Installer Windows firmato', 'distribution'),
     check('android-signing', ['NEXUS_ANDROID_KEYSTORE', 'NEXUS_ANDROID_STORE_PASSWORD', 'NEXUS_ANDROID_KEY_ALIAS', 'NEXUS_ANDROID_KEY_PASSWORD'].every((name) => String(environment[name] || '').trim()), 'APK Android firmati con chiave conservata', 'distribution'),
     check('manifest-signing', ['NEXUS_RELEASE_MANIFEST_PRIVATE_KEY', 'NEXUS_RELEASE_MANIFEST_PUBLIC_KEY', 'NEXUS_RELEASE_MANIFEST_KEY_ID'].every((name) => String(environment[name] || '').trim()), 'Distinte di release firmate', 'distribution'),
     check('update-origin', /^https:\/\//i.test(String(environment.NEXUS_UPDATE_URL || '').trim()), 'Origine HTTPS degli aggiornamenti', 'distribution')

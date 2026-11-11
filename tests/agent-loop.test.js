@@ -153,13 +153,13 @@ test('timeout dello strumento diventa un errore osservabile per il modello', asy
 });
 
 test('fitMessages conserva system e turno corrente entro il limite del provider', () => {
-  const history = Array.from({ length: 40 }, (_, index) => ({ role: index % 2 ? 'assistant' : 'user', content: `m${index}` }));
+  const history = Array.from({ length: 80 }, (_, index) => ({ role: index % 2 ? 'assistant' : 'user', content: `m${index}` }));
   const transcript = [{ role: 'system', content: 's' }, ...history, { role: 'user', content: 'ora' }];
   const { messages, turnStart } = fitMessages(transcript, transcript.length - 1);
-  assert.equal(messages.length, 32);
+  assert.equal(messages.length, 64);
   assert.equal(messages[0].content, 's');
   assert.equal(messages.at(-1).content, 'ora');
-  assert.equal(turnStart, 31);
+  assert.equal(turnStart, 63);
 });
 
 test('schema JSON: validazione dei tipi, campi extra e schemi non supportati', () => {

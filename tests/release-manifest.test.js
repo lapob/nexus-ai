@@ -81,7 +81,8 @@ test('Preview resta esplicitamente non firmata mentre Beta e Stable richiedono f
   assert.equal(preview.integrity.manifestSignature, 'optional-preview');
   assert.equal(stable.integrity.manifestSignature, 'ed25519');
   assert.deepEqual(stable.updatePolicy, {
-    rollout: 'staged', initialPercentage: 10, paused: false, rollback: 'signed-forward-fix', preserveUserData: true
+    rollout: 'staged', initialPercentage: 10, paused: false, rollback: 'signed-forward-fix', preserveUserData: true,
+    stages: [{ afterHours: 0, percentage: 10 }, { afterHours: 24, percentage: 50 }, { afterHours: 72, percentage: 100 }]
   });
   assert.equal(preview.updatePolicy.rollout, 'manual-preview');
 });

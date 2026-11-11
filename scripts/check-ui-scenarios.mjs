@@ -197,6 +197,74 @@ const scenarios = [
     const cites = await page.$$eval('.markdown a.cite', (links) => links.map((link) => `${link.textContent}:${link.getAttribute('href')}`));
     if (cites.join(' ') !== '1:https://example.org/fotovoltaico 1:https://example.org/fotovoltaico 2:https://example.com/consumi') throw new Error(`citazioni in linea errate: ${cites.join(' ')}`);
   }, expect: ['.trail-toggle[aria-expanded="true"]', '.memory-chip', '.sources'] },
+  { name: 'agent-plan', viewport: desktop, state: { ...thread, activeId: 'ap', conversations: [{ id: 'ap', title: 'Piano', createdAt: now, updatedAt: now, messages: [
+    msg('ap1', 'user', 'Prepara il viaggio a Lisbona: voli, hotel e itinerario di tre giorni', now - 9000),
+    { ...msg('ap2', 'assistant', 'Ecco il piano completo con voli, hotel e itinerario.', now - 5000), plan: [
+      { title: 'Cerco i voli più convenienti', status: 'done' }, { title: 'Confronto tre hotel in centro', status: 'done' },
+      { title: 'Costruisco l’itinerario di tre giorni', status: 'done' }, { title: 'Riassumo costi e prenotazioni', status: 'skipped' }] },
+    msg('ap3', 'user', 'Ora organizza anche il budget', now - 3000),
+    { ...msg('ap4', 'assistant', 'Il budget totale stimato è di 840 €.', now - 1000), plan: [
+      { title: 'Raccolgo i costi già noti', status: 'done' }, { title: 'Stimo pasti e trasporti', status: 'in_progress' }, { title: 'Preparo la tabella finale', status: 'pending' }] }] }, ...thread.conversations] },
+  run: async (page) => {
+    const cards = await page.$$eval('.plan-card', (items) => items.map((card) => ({ complete: card.dataset.complete, open: card.querySelector('.trail-body')?.dataset.open, label: card.querySelector('.plan-head span')?.textContent })));
+    if (cards.length !== 2) throw new Error(`schede piano attese 2, trovate ${cards.length}`);
+    if (cards[0].complete !== 'true' || cards[0].open !== 'false' || !/completato · 4 passi/.test(cards[0].label)) throw new Error(`piano finito non compatto: ${JSON.stringify(cards[0])}`);
+    if (cards[1].complete !== 'false' || cards[1].open !== 'true' || cards[1].label !== 'Piano · 1/3') throw new Error(`piano in corso non visibile: ${JSON.stringify(cards[1])}`);
+    const progress = await page.$eval('.plan-card[data-complete="false"] [role="progressbar"]', (bar) => bar.getAttribute('aria-valuenow'));
+    if (progress !== '1') throw new Error(`avanzamento errato: ${progress}`);
+    await page.click('.plan-card[data-complete="true"] .plan-head'); await page.waitForTimeout(450);
+    if (await page.$eval('.plan-card[data-complete="true"] .trail-body', (element) => element.dataset.open) !== 'true') throw new Error('il piano completato non si riapre');
+  }, expect: ['.plan-steps li[data-status="in_progress"]', '.plan-steps li[data-status="skipped"]'] },
+  { name: 'smart-search', viewport: desktop, state: { ...thread, activeId: null, conversations: [
+    { id: 'q1', title: 'Viaggio in Portogallo', createdAt: now, updatedAt: now - 1000, messages: [msg('q1a', 'user', 'Organizza tre giorni tra Lisbona e Porto con treni e musei', now - 1000)] },
+    { id: 'q2', title: 'Città da visitare', createdAt: now, updatedAt: now - 2000, messages: [msg('q2a', 'assistant', 'Le città più belle: Siviglia, Lisbona e Valencia, perfette in primavera.', now - 2000)] },
+    { id: 'q3', title: 'Ricetta veloce', createdAt: now, updatedAt: now - 3000, messages: [msg('q3a', 'user', 'Pasta al pomodoro', now - 3000)] }] },
+  run: async (page) => {
+    await page.fill('.sidebar-full input[type="search"]', 'LISBONA');
+    await page.waitForTimeout(350);
+    const hits = await page.$$eval('.search-hit-button', (items) => items.map((item) => ({ title: item.querySelector('.hit-title')?.textContent, snippet: item.querySelector('.snippet')?.textContent })));
+    if (hits.length !== 2 || !hits.every((hit) => /lisbona/i.test(hit.snippet || ''))) throw new Error(`risultati di ricerca errati: ${JSON.stringify(hits)}`);
+    await page.fill('.sidebar-full input[type="search"]', 'citta');
+    await page.waitForTimeout(350);
+    const accent = await page.$$eval('.search-hit-button .hit-title', (items) => items.map((item) => item.textContent));
+    if (accent.length !== 1 || !/Città/.test(accent[0] || '')) throw new Error(`ricerca senza accenti non trova «Città»: ${accent.join(', ')}`);
+    await page.fill('.sidebar-full input[type="search"]', 'zzzz nessuno');
+    await page.waitForTimeout(250);
+    if (!(await page.$('.empty-list'))) throw new Error('nessun messaggio «Nessun risultato»');
+    await page.fill('.sidebar-full input[type="search"]', 'treni');
+  }, expect: ['.search-hit-button .snippet'] },
+  { name: 'custom-select', viewport: { width: 1280, height: 560 }, state: thread,
+  run: async (page) => {
+    await page.evaluate(() => {
+      const fake = [1, 2, 3, 4, 5].map((n) => ({ kind: 'audioinput', deviceId: `mic-${n}`, label: `Microfono studio ${n}`, groupId: 'g' }));
+      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { enumerateDevices: async () => fake } });
+    });
+    await page.keyboard.press('Control+k');
+    await page.keyboard.type('Preferenze di risposta');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('#microphone');
+    if (await page.$('select')) throw new Error('resta un <select> nativo');
+    await page.click('#microphone');
+    await page.waitForSelector('.select-panel li');
+    await page.waitForTimeout(260);
+    const box = await page.$eval('.select-panel', (panel) => { const r = panel.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, w: innerWidth, h: innerHeight, side: panel.dataset.side }; });
+    if (box.top < 0 || box.bottom > box.h || box.left < 0 || box.right > box.w) throw new Error(`pannello fuori schermo: ${JSON.stringify(box)}`);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(220);
+    if (await page.$('.select-panel')) throw new Error('il pannello non si chiude dopo la scelta');
+    const value = await page.$eval('#microphone .select-value', (node) => node.textContent);
+    if (value !== 'Microfono studio 2') throw new Error(`scelta da tastiera errata: ${value}`);
+    if (!(await page.evaluate(() => document.activeElement?.id === 'microphone'))) throw new Error('il fuoco non torna al selettore');
+    await page.keyboard.press('Space');
+    await page.waitForSelector('.select-panel li[aria-selected="true"]');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(220);
+    if (await page.$('.select-panel')) throw new Error('Esc non chiude il pannello');
+    if (!(await page.$('.sheet'))) throw new Error('Esc ha chiuso anche il foglio');
+    await page.click('#microphone');
+  }, expect: ['.select-panel li[aria-selected="true"] .select-check'] },
   { name: 'stream-scroll-up', viewport: desktop, state: { ...thread, activeId: 'ss', conversations: [{ id: 'ss', title: 'Lunga', createdAt: now, updatedAt: now,
     messages: Array.from({ length: 16 }, (_, i) => msg(`s${i}`, i % 2 ? 'assistant' : 'user', `Messaggio ${i}: ${'testo di prova '.repeat(i % 2 ? 18 : 3)}`, now - (30 - i) * 1000)) }, ...thread.conversations] },
   run: async (page) => {

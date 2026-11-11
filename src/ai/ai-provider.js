@@ -71,7 +71,7 @@ const MAX_MESSAGE_CHARS = 1_000_000;
 
 function validateChatRequest(request) {
   if (!request || typeof request !== 'object' || !/^[A-Za-z0-9:_-]{1,128}$/.test(String(request.requestId || ''))) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'requestId AI non valido.');
-  if (!Array.isArray(request.messages) || request.messages.length < 1 || request.messages.length > 32) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'La chat deve contenere da 1 a 32 messaggi.');
+  if (!Array.isArray(request.messages) || request.messages.length < 1 || request.messages.length > 64) throw new AIError(AI_ERROR_CODES.CONFIGURATION_INVALID, 'La chat deve contenere da 1 a 64 messaggi.');
   const roles = new Set(['system', 'user', 'assistant', 'tool']);
   const messages = request.messages.map((message) => {
     const content = String(message?.content ?? '');

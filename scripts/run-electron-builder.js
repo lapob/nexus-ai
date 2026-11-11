@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { verifyElectronRuntime, verifyElectronBuildTarget } = require('./lib/installer-artifacts');
+const { azureSignOptions } = require('./lib/windows-signing');
 
 const root = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -30,6 +31,12 @@ try {
   if (fs.existsSync(releaseConfigPath)) throw error;
 }
 const build = { ...pkg.build, electronVersion, ...(leanPublicClient ? { extraResources: [] } : {}) };
+// Azure Artifact Signing: le opzioni (non segrete) entrano solo nella configurazione generata e temporanea.
+const azure = azureSignOptions(process.env);
+if (azure && requestedArguments.includes('--win')) {
+  build.win = { ...build.win, azureSignOptions: azure, signtoolOptions: undefined };
+  process.stdout.write(`Firma Azure Artifact Signing attiva · editore ${azure.publisherName}\n`);
+}
 fs.mkdirSync(path.dirname(generatedConfigPath), { recursive: true });
 fs.writeFileSync(generatedConfigPath, `${JSON.stringify(build, null, 2)}\n`, 'utf8');
 const builderArguments = ['--config', generatedConfigPath, ...requestedArguments];

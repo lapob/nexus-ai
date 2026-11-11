@@ -694,6 +694,10 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
       return attachment.content;
     }).join('\n\n========\n\n');
   };
+  /** Immagini degli allegati autorizzati (già validati da resolveAttachmentContext), al massimo 2 per messaggio. */
+  const resolveAttachmentImages = (attachmentIds, senderId) => attachmentIds
+    .flatMap((id) => { const attachment = attachmentStore.get(id); return attachment?.senderId === senderId && Array.isArray(attachment.images) ? attachment.images : []; })
+    .slice(0, 2);
   const prepare = async ({ question, mode, history, settings, signal, attachmentContext = '', publicGuest = false, assertAuthorized = null }) => {
     const assertActive = () => { throwIfRequestAborted(signal); assertAuthorized?.(); };
     assertActive();
@@ -1320,6 +1324,32 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     await fs.promises.writeFile(result.filePath, JSON.stringify(exported, null, 2), { encoding: 'utf8', mode: 0o600 });
     return { status: 'saved', count: exported.memories.length, total: exported.totalActive, truncated: exported.truncated };
   });
+  // Ricerca semantica nelle conversazioni locali: vettori calcolati sul PC dal modello di embedding, nulla esce.
+  ipcMain.handle(CHANNELS.embedTexts, async (event, value) => {
+    assertTrustedSender(event);
+    if (!Array.isArray(value) || value.length < 1 || value.length > 16) throw new Error('Testi da indicizzare non validi.');
+    const texts = value.map((text) => String(text ?? '').replace(/\u0000/g, '').trim().slice(0, 2_000));
+    if (texts.some((text) => !text)) throw new Error('Testi da indicizzare non validi.');
+    const settings = getSettings();
+    if (!settings.embeddingModel) return { vectors: [], model: null };
+    try {
+      await ensureRuntime(settings);
+      const result = await aiRuntime.embed(texts, { model: settings.embeddingModel });
+      const vectors = Array.isArray(result?.vectors) ? result.vectors.map((vector) => (Array.isArray(vector) ? vector.map((number) => Math.round(Number(number) * 1e5) / 1e5) : [])) : [];
+      return { vectors: vectors.length === texts.length ? vectors : [], model: settings.embeddingModel };
+    } catch (error) {
+      logger.warn('Embedding per la ricerca non disponibile; resta la ricerca testuale.', { error });
+      return { vectors: [], model: null };
+    }
+  });
+  // Riepilogo settimanale: cosa ho imparato negli ultimi 7 giorni e cosa va confermato.
+  ipcMain.handle(CHANNELS.memoryDigest, (event) => { assertTrustedSender(event); return memoryStore?.weeklyDigest() || { since: Date.now() - 7 * 86_400_000, added: [], toConfirm: [], total: 0 }; });
+  ipcMain.handle(CHANNELS.memoryConfirm, (event, value) => {
+    assertTrustedSender(event);
+    const id = Number(value);
+    if (!Number.isInteger(id) || id < 1) throw new Error('Ricordo non valido.');
+    return { confirmed: memoryStore?.confirmById(id) || 0 };
+  });
   ipcMain.handle(CHANNELS.memoryForget, (event, value) => {
     assertTrustedSender(event);
     const id = Number(value);
@@ -1783,6 +1813,13 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
       emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: attachmentIds.length ? 'Leggo i file e organizzo il contesto' : 'Organizzo la conversazione e il contesto' } });
       const prepared = await prepare({ question, mode, history, settings, signal: controller.signal, attachmentContext });
       preparedAt = performance.now();
+      // Immagini (es. cattura dello schermo): vanno al modello visivo sull'ultimo messaggio dell'utente.
+      const attachmentImages = resolveAttachmentImages(attachmentIds, event.sender.id);
+      if (attachmentImages.length) {
+        const last = prepared.messages.length - 1;
+        prepared.messages = prepared.messages.map((message, index) => index === last && message.role === 'user' ? { ...message, images: attachmentImages } : message);
+        emit(event, { type: 'phase', requestId, phase: { step: 'plan', label: 'Osservo l’immagine allegata' } });
+      }
       // Avviso «Memoria aggiornata» nella chat: solo id e testo breve del ricordo, mai il resto della memoria.
       if (prepared.memoryUpdate?.count > 0) emit(event, { type: 'memory', requestId, memory: prepared.memoryUpdate });
       const bufferModelOutput = prepared.security.promptInjection || prepared.security.sensitiveLiterals.length > 0 || prepared.publicSources.length > 0 || hasStrictOutputConstraint(question);
@@ -1803,8 +1840,8 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
         return result;
       }
       await ensureRuntime(settings);
-      const deepModel = await resolveDeepModel({ requestedMode: parsed.mode, distributionMode }, () => aiRuntime.listModels());
-      selectedModel = deepModel || (shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
+      const deepModel = attachmentImages.length ? null : await resolveDeepModel({ requestedMode: parsed.mode, distributionMode }, () => aiRuntime.listModels());
+      selectedModel = attachmentImages.length ? preferredVisionModel(await aiRuntime.listModels()) : deepModel || (shouldPreferFastExecutionModel({ question, attachmentCount: attachmentIds.length, historyCount: history.length }) && settings.fastModel
         ? settings.fastModel
         : inferencePolicy(settings, mode).candidateModel);
       emit(event, { type: 'phase', requestId, phase: { step: 'execute', label: deepModel ? 'Attivo il modello approfondito: la prima risposta può richiedere un minuto' : mode === 'deep' ? 'Ragiono e costruisco una soluzione completa' : 'Formulo una risposta chiara' } });
@@ -1813,13 +1850,15 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
       // Un guasto non annullato ripiega sul percorso ordinario qui sotto.
       let providerTools = false;
       try { providerTools = aiRuntime.getCapabilities()?.tools === true; } catch { providerTools = false; }
-      const agentModel = agentModelFor({ settings, selectedModel, distributionMode, attachmentCount: attachmentIds.length, providerTools });
+      // Con un'immagine il turno resta sul modello visivo: il ciclo agentico non la vedrebbe.
+      const agentModel = attachmentImages.length ? null : agentModelFor({ settings, selectedModel, distributionMode, attachmentCount: attachmentIds.length, providerTools });
       if (agentModel) {
         try {
           inferenceStartedAt = performance.now();
           const tools = createTurnTools({
             getIndex, aiRuntime, embeddingModel: settings.embeddingModel, webResearchService, memoryStore, actionRuntime,
             onMemory: (memory) => emit(event, { type: 'memory', requestId, memory: { ...memory, count: 1, content: String(memory.content || '').slice(0, 240) } }),
+            onPlan: (plan) => emit(event, { type: 'plan', requestId, plan }),
             getApprovalMode: () => getSettings().actionApprovalMode || 'dangerous-only',
             requestActionApproval: createNativeActionApproval({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) })
           });
@@ -1870,7 +1909,7 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
         model,
         messages,
         mode: mode === 'deep' ? 'deep' : 'quick',
-        ...residencyOptions(settings, mode),
+        ...(attachmentImages.length ? {} : residencyOptions(settings, mode)),
         think: deliberateThinking,
         temperature: settings.temperature,
         maxTokens: mode === 'deep' ? runtimeTuning.deepTokens : runtimeTuning.quickTokens,
@@ -2395,7 +2434,18 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     });
     return shutdownPromise;
   };
+  /** Immagine già in memoria (cattura dello schermo dalla barra rapida) registrata come allegato della finestra. */
+  const registerImageAttachment = ({ senderId, name = 'Immagine.jpg', mime = 'image/jpeg', data = '' }) => {
+    const encoded = String(data || '');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime) || !encoded || encoded.length > 2_050_000 || !/^[A-Za-z0-9+/]+=*$/.test(encoded)) return null;
+    const id = randomUUID();
+    const safeName = path.basename(String(name)).replace(/[\r\n]/g, ' ').slice(0, 120) || 'Immagine.jpg';
+    const size = Math.floor(encoded.length * 3 / 4);
+    attachmentStore.set(id, { name: safeName, kind: 'image', fileCount: 1, size, content: `IMMAGINE ALLEGATA: ${safeName} (cattura dello schermo dell'utente, inclusa come immagine per il modello visivo)`, images: [encoded], senderId, expiresAt: Date.now() + 30 * 60_000 });
+    return { id, name: safeName, mime, size };
+  };
   return {
+    registerImageAttachment,
     remoteChat,
     syncRemoteWake,
     ensureRemoteServeRoute,

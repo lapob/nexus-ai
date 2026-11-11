@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validAndroidMatrix } = require('./android-matrix-evidence');
+const { windowsSigning } = require('./lib/windows-signing');
 const { validApplicationRecoveryReport } = require('./run-backup-recovery-drill');
 
 const root = path.resolve(__dirname, '..');
@@ -35,7 +36,7 @@ function check(id, passed, detail) { return { id, status: passed ? 'pass' : 'blo
 
 function signingChecks() {
   return [
-    check('windows-signing', fileConfigured('CSC_LINK') && configured('CSC_KEY_PASSWORD'), 'Certificato Authenticode e password configurati'),
+    check('windows-signing', windowsSigning(process.env).mode === 'azure' ? windowsSigning(process.env).ready : fileConfigured('CSC_LINK') && configured('CSC_KEY_PASSWORD'), 'Firma Authenticode configurata (certificato .pfx o Azure Artifact Signing)'),
     check('android-signing', fileConfigured('NEXUS_ANDROID_KEYSTORE') && ['NEXUS_ANDROID_STORE_PASSWORD', 'NEXUS_ANDROID_KEY_ALIAS', 'NEXUS_ANDROID_KEY_PASSWORD'].every(configured), 'Keystore Android di produzione configurato'),
     check('manifest-signing', ['NEXUS_RELEASE_MANIFEST_PRIVATE_KEY', 'NEXUS_RELEASE_MANIFEST_PUBLIC_KEY', 'NEXUS_RELEASE_MANIFEST_KEY_ID'].every(configured), 'Coppia Ed25519 e key id configurati'),
     check('update-origin', /^https:\/\//i.test(String(process.env.NEXUS_UPDATE_URL || '').trim()), 'Origine HTTPS degli aggiornamenti configurata')

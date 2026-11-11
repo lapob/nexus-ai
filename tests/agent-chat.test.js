@@ -34,7 +34,7 @@ test('gli strumenti del turno raccolgono soltanto fonti web HTTPS deduplicate', 
       { title: 'Insicuro', url: 'http://example.org/b', snippet: 's' }
     ] }) }
   });
-  assert.deepEqual(tools.registry.list().map((tool) => tool.name), ['current-time', 'calculate', 'date-diff', 'search-knowledge', 'web-search']);
+  assert.deepEqual(tools.registry.list().map((tool) => tool.name), ['current-time', 'calculate', 'date-diff', 'search-knowledge', 'web-search', 'update-plan']);
   await tools.registry.invoke('web-search', { query: 'novità' });
   assert.deepEqual(tools.sources.map((source) => source.url), ['https://example.org/a']);
   assert.equal(tools.sources[0].sourceKind, 'web');
@@ -44,7 +44,7 @@ test('gli strumenti del turno raccolgono soltanto fonti web HTTPS deduplicate', 
 
 test('un indice non disponibile non impedisce gli altri strumenti', () => {
   const tools = createTurnTools({ getIndex: () => { throw new Error('non pronto'); } });
-  assert.deepEqual(tools.registry.list().map((tool) => tool.name), ['current-time', 'calculate', 'date-diff']);
+  assert.deepEqual(tools.registry.list().map((tool) => tool.name), ['current-time', 'calculate', 'date-diff', 'update-plan']);
 });
 
 test('consenso nativo: rifiuto, finestra chiusa e annullamento non autorizzano', async () => {

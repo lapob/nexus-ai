@@ -1,4 +1,44 @@
+## Preview 0.3.38 — 11 November 2026 (RELEASE IN PROGRESS)
+
+Operation: release Preview 0.3.38 (owner: "esegui tutto … al massimo").
+Contents:
+- Agent with a visible plan: update-plan tool and PlanCard, up to 16 steps
+  and 64 messages; agent mode stays opt-in.
+- Rollout in signed stages, with an anonymous health beacon and automatic
+  halt via D1 nexusnxs-update-health. Halt rule: ≥5 crashes and ratio >0.3,
+  then the manifest answers 503.
+- Screen context in the quick bar (Alt+S): JPEG ≤1.45 MB, one-shot file
+  0600, sent to the vision model.
+- Weekly memory review with Confirm / Forget.
+- Search across conversations and project files: tolerant of accents and
+  word endings, semantic on the PC, matched words highlighted.
+- Custom Select component replacing the native <select> elements: portal,
+  flip/clamp, full keyboard support.
+- Styled range slider and checkboxes; opaque sheets.
+- Windows signing pipeline: Azure Artifact Signing or .pfx, documented in
+  docs/WINDOWS-SIGNING.md. Inactive until the owner provides an account or
+  certificate.
+
+Checks before the build:
+- npm test: 1236 tests, 1234 pass, 0 fail, 2 skipped.
+- npm run check: PASS.
+- check:ui: 33/33 scenarios and the 15/15 resolution matrix.
+- Site npm test: 45/45, plus 2/2 update e2e.
+
+Qwen3 files from the TTS session are not in the commit. bootstrap.js was
+committed with only this work's hunks; the opt-in Qwen3 code is present on
+disk.
+
+Flow: release:public:preview, manifest refresh, verify-bundle, push main,
+GitHub, service restart. Site: sync-ai-shell, sync-public-release
+--tag=v0.3.38-preview.1, D1 binding, release:prepare/promote, push website.
+Expected live result: manifest 200 v0.3.38, POST /updates/preview/health
+returns 204, and 0.3.37 updates itself. The PC is NOT restarted.
+
 ## Control notifications — 11 November 2026 (VERIFIED ON PHONE, committed)
+
+Commit fbaeb56 pushed to origin/main (9f39bd8..fbaeb56), notification files
+only; other sessions' work left uncommitted. GitHub CI result not checked yet.
 
 Live result: second restart ready in 50 s. Over wireless ADB on the owner's
 phone (unlocked by the owner, PIN never entered), test events injected into
@@ -61,6 +101,16 @@ qa-artifacts/control-notifications-restart-2.log; then live test driven over
 ADB plus the desktop app. check-source-sections fails only on
 src/infrastructure/electron/update-health.js (not touched by this work).
 
+## Qwen3-TTS evaluation — 11 November 2026 (IN PROGRESS)
+
+Operation: evaluate Qwen3-TTS as optional NexusNXS voice on RX 9070 XT
+(Windows, ROCm). Runtime: vendor/qwen3-tts/.venv (Python 3.12, torch
+2.9.1+rocm7.2.1 copied offline from the existing ComfyUI venv, which is not
+modified; qwen-tts 0.1.1 --no-deps, transformers 4.57.3). Owner approved
+downloading Qwen/Qwen3-TTS-12Hz-0.6B-Base (2.34 GB) and 1.7B-Base (4.23 GB),
+Apache-2.0, into vendor/qwen3-tts/models (gitignored). Expected verification:
+measured A/B report vs Kokoro (first audio, RTF, VRAM, LLM coexistence),
+integration behind an option with automatic Kokoro fallback, npm test green.
 
 ## Preview 0.3.37 — 11 November 2026 (PUBLISHED)
 

@@ -418,8 +418,8 @@ async function bootstrapPresence({ env = process.env } = {}) {
   // Barra rapida sopra qualsiasi programma: la domanda passa alla UI con un file monouso e la UI la invia.
   quickBar = createQuickBar({
     logger,
-    onSubmit: async (text) => {
-      if (!writeQuickPrompt(sharedDataRoot, text)) return;
+    onSubmit: async (text, { image = null } = {}) => {
+      if (!writeQuickPrompt(sharedDataRoot, text, { image })) return;
       await activateFullUi();
     }
   });

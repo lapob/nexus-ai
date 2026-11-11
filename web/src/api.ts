@@ -8,6 +8,8 @@ export type ChatMode = 'fast' | 'deep';
 export interface Turn { role: 'user' | 'assistant'; content: string }
 /** `url` vuoto: fonte locale (nota della knowledge sul PC), mostrata senza link. */
 export interface Source { title?: string; url: string; snippet?: string }
+/** Passo del piano visibile dell'agente. */
+export interface PlanStep { title: string; status: 'pending' | 'in_progress' | 'done' | 'skipped' }
 export interface Preferences { responseStyle: 'concise' | 'natural' | 'detailed'; tone: 'neutral' | 'warm' | 'direct'; responseLanguage: 'auto' | 'it' | 'en' | 'es' | 'fr' | 'de' }
 
 export type StreamEvent =
@@ -16,6 +18,7 @@ export type StreamEvent =
   | { type: 'phase'; label: string }
   | { type: 'sources'; sources: Source[] }
   | { type: 'memory'; memory: { action: 'remember' | 'update' | 'forget'; id?: number | null; content?: string; count: number } }
+  | { type: 'plan'; plan: PlanStep[] }
   | { type: 'complete'; message: string; sources: Source[] }
   | { type: 'error'; error: string };
 

@@ -2,7 +2,8 @@
  * @module infrastructure/electron/update-manager
  * @description Aggiornamenti firmati, silenziosi e confinati al processo principale.
  */
-const { app, ipcMain } = require('electron');
+const { app, ipcMain, net } = require('electron');
+const { createUpdateHealth, isCrashExit } = require('./update-health');
 const { NsisUpdater } = require('electron-updater');
 const { Provider } = require('electron-updater/out/providers/Provider');
 const { CHANNELS } = require('../../application/ipc-contracts');
@@ -54,9 +55,10 @@ class VerifiedReleaseProvider extends Provider {
   }
 }
 
-function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey = '', manifestKeyId = '', rolloutSeed = '', trustedRendererUrl, logger }) {
+function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey = '', manifestKeyId = '', rolloutSeed = '', trustedRendererUrl, logger, healthStatePath = '' }) {
   channel = ['preview', 'beta', 'stable'].includes(channel) ? channel : 'stable';
   let updater = null;
+  let health = null;
   let initialTimer = null;
   let recurringTimer = null;
   let state = { status: 'disabled', version: app.getVersion(), progress: 0, channel, lastCheckedAt: 0 };
@@ -74,7 +76,8 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
   ipcMain.handle(CHANNELS.updateCheck, async (event) => {
     assertTrusted(event);
     if (!updater) return state;
-    await checkTrustedUpdates();
+    // Controllo chiesto dall'utente: salta la coorte del rollout graduale, mai la pausa o il blocco di salute.
+    await checkTrustedUpdates({ seeker: true });
     return state;
   });
   ipcMain.handle(CHANNELS.updateInstall, (event) => {
@@ -91,13 +94,13 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     logger.warn('Aggiornamenti disattivati: identità della distinta firmata non configurata.');
     return { start() {}, stop() {}, setWindowProvider(provider) { windowProvider = provider; }, status: () => state };
   }
-  const checkTrustedUpdates = async () => {
+  const checkTrustedUpdates = async ({ seeker = false } = {}) => {
     setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() });
     const verifiedFeed = await verifyRemoteReleaseFeed({
       updateUrl: cleanUpdateUrl(updateUrl), publicKey: manifestPublicKey,
       keyId: manifestKeyId, channel
     });
-    const rollout = evaluateUpdateRollout(verifiedFeed.manifest, { rolloutSeed });
+    const rollout = evaluateUpdateRollout(verifiedFeed.manifest, { rolloutSeed, seeker });
     if (!rollout.eligible) {
       setState({
         status: rollout.reason === 'paused' ? 'paused' : 'deferred',
@@ -129,14 +132,29 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       setState({ status: 'error', progress: 0, lastCheckedAt: Date.now() });
     });
     state.status = 'current';
+    health = createUpdateHealth({
+      statePath: healthStatePath,
+      version: app.getVersion(),
+      channel,
+      endpoint: `${cleanUpdateUrl(updateUrl)}/health`,
+      enabled: process.env.NEXUS_DISABLE_UPDATE_HEALTH !== '1',
+      logger,
+      send: (url, body) => net.fetch(url, {
+        method: 'POST', body, redirect: 'error', credentials: 'omit', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10_000)
+      })
+    });
   } catch (error) {
     logger.warn('Origine aggiornamenti non valida; aggiornamenti automatici disattivati.', { error });
   }
   return {
     setWindowProvider(provider) { windowProvider = provider; },
     status: () => state,
+    /** Uscita anomala di un processo dell'app (renderer, GPU): segnale di crash per la versione attuale. */
+    reportProcessGone(details) { if (isCrashExit(details)) health?.crash(); },
     start() {
       if (initialTimer || recurringTimer) return;
+      health?.start();
       initialTimer = setTimeout(() => checkTrustedUpdates().catch((error) => {
         logger.warn('Verifica della distinta aggiornamento non riuscita.', { error });
         setState({ status: 'error', progress: 0, lastCheckedAt: Date.now() });
@@ -149,6 +167,7 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       recurringTimer.unref?.();
     },
     stop() {
+      health?.stop();
       clearTimeout(initialTimer);
       clearInterval(recurringTimer);
       initialTimer = null;

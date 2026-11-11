@@ -3,8 +3,9 @@
  * @description Shell della nuova web app NexusNXS AI: conversazioni locali, streaming con fasi, nucleo WebGPU, palette comandi e preferenze.
  */
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'framer-motion';
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import type { Capabilities, Preferences } from './api';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { Capabilities, PlanStep, Preferences } from './api';
+import { highlight, lexicalSearch, semanticSearch, type SearchDoc, type SearchHit } from './search';
 import { useDesktopPresence, useDesktopUpdate } from './desktopPresence';
 import { desktopBridge, platform } from './platform';
 import { pairDevice, pairedToken } from './paired';
@@ -13,6 +14,7 @@ import { ACCEPT, formatSize, limitsFor, prepareFiles, type Pending } from './att
 import { Core, type CoreState } from './Core';
 import { Markdown } from './Markdown';
 import { Icon, type IconName } from './Icon';
+import { Select } from './Select';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { Tooltips } from './Tooltips';
@@ -241,8 +243,8 @@ export function App() {
     return current.filter((item) => item.id !== id);
   });
 
-  const send = useCallback(async (raw: string, { voice = false, autoSpeak = true, forceDeep = false }: { voice?: boolean; autoSpeak?: boolean; forceDeep?: boolean } = {}): Promise<{ id: string; text: string } | null> => {
-    const attachments = pending;
+  const send = useCallback(async (raw: string, { voice = false, autoSpeak = true, forceDeep = false, attach }: { voice?: boolean; autoSpeak?: boolean; forceDeep?: boolean; attach?: Pending[] } = {}): Promise<{ id: string; text: string } | null> => {
+    const attachments = attach ?? pending;
     const text = raw.trim() || (attachments.length ? 'Analizza gli allegati.' : '');
     if (!text || getState().generating) return null;
     // Offline nessun invio: il testo resta nel composer e si invia quando il PC torna raggiungibile.
@@ -256,8 +258,8 @@ export function App() {
     const assistant: Message = { id: uid(), role: 'assistant', content: '', createdAt: Date.now(), requestId };
     appendMessage(conversationId, assistant);
     setDraft('');
-    for (const item of attachments) if (item.preview) URL.revokeObjectURL(item.preview);
-    setPending([]);
+    for (const item of attachments) if (item.preview?.startsWith('blob:')) URL.revokeObjectURL(item.preview);
+    if (!attach) setPending([]);
     let finalText = '';
     stickToBottom.current = true;
     const abort = new AbortController();
@@ -285,6 +287,7 @@ export function App() {
             patch((message) => ({ ...message, steps: mergeStep(message.steps, event.label) }));
           } else if (event.type === 'sources') patch((message) => ({ ...message, sources: event.sources }));
           else if (event.type === 'memory') patch((message) => ({ ...message, memory: event.memory }), true);
+          else if (event.type === 'plan') patch((message) => ({ ...message, plan: event.plan }), true);
           else if (event.type === 'complete') {
             cancelAnimationFrame(raf); finalText = event.message || buffered;
             patch((message) => ({ ...message, content: finalText, ...(event.sources.length ? { sources: event.sources } : {}) }), true);
@@ -373,15 +376,37 @@ export function App() {
   // Desktop: «Nexus» apre la voce live; la Presence segue lo stato dell'entità; avvisi del PC come toast.
   useDesktopPresence({ state: coreState, live, onWake: () => { void startLive(); }, notify });
   const update = useDesktopUpdate();
+  // Revisione settimanale della memoria: un invito discreto se ci sono ricordi dedotti da confermare
+  // e la memoria non è stata aperta negli ultimi 7 giorni («Più tardi» rimanda di un giorno).
+  const [memoryReview, setMemoryReview] = useState(0);
+  useEffect(() => {
+    if (!desktopBridge?.memoryDigest) return;
+    let last = 0;
+    try { last = Number(localStorage.getItem('nxs.memory.reviewedAt')) || 0; } catch { return; }
+    if (Date.now() - last < 7 * 86_400_000) return;
+    const timer = window.setTimeout(() => {
+      Promise.resolve(desktopBridge!.memoryDigest()).then((digest: { toConfirm?: unknown[] }) => setMemoryReview(Array.isArray(digest?.toConfirm) ? digest.toConfirm.length : 0)).catch(() => {});
+    }, 20_000);
+    return () => window.clearTimeout(timer);
+  }, []);
   // Barra rapida Ctrl+Maiusc+Spazio: la domanda arriva qui e parte in una conversazione nuova
   // (se una risposta è in corso, resta nel composer per non interromperla).
   const quickSend = useRef(send); quickSend.current = send;
   useEffect(() => {
     if (!desktopBridge?.onQuickPrompt) return;
-    return desktopBridge.onQuickPrompt(({ text }: { text: string }) => {
-      if (getState().generating || offlineRef.current) { setDraft(text); inputRef.current?.focus(); return; }
+    return desktopBridge.onQuickPrompt(({ text, attachment }: { text: string; attachment?: { id: string; name: string; mime: string; size: number } }) => {
+      // Cattura dello schermo già registrata dal processo principale: qui viaggia solo il suo id.
+      const screen: Pending[] = attachment && typeof attachment.id === 'string'
+        ? [{ id: attachment.id.slice(0, 128), name: String(attachment.name || 'Schermo.jpg').slice(0, 120), mime: 'image/jpeg', size: Math.max(0, Number(attachment.size) || 0), data: '' }]
+        : [];
+      if (getState().generating || offlineRef.current) {
+        setDraft(text);
+        if (screen.length) setPending((current) => [...current, ...screen]);
+        inputRef.current?.focus();
+        return;
+      }
       newConversation();
-      void quickSend.current(text);
+      void quickSend.current(text, screen.length ? { attach: screen } : {});
     }) as () => void;
   }, []);
 
@@ -620,6 +645,7 @@ export function App() {
                         }} />
                       ) : (
                         <div className="answer">
+                          {message.plan?.length ? <PlanCard plan={message.plan} live={generating && message.id === conversation!.messages.at(-1)?.id} /> : null}
                           <AgentTrail steps={message.steps} live={generating && message.id === conversation!.messages.at(-1)?.id} writing={Boolean(message.content)} />
                           {message.content ? <Markdown text={message.content} sources={message.sources} /> : (message.steps?.length ?? 0) > 1 ? null : <Thinking label={phase} />}
                           <SourceList sources={message.sources} />
@@ -774,6 +800,13 @@ export function App() {
             <button type="button" className="icon-button small" aria-label="Più tardi: si installa alla chiusura" title="Più tardi (si installa alla chiusura)" onClick={update.dismiss}><Icon name="close" size={15} /></button>
           </m.div>
         )}</AnimatePresence>
+        <AnimatePresence>{memoryReview > 0 && !update.ready && !toast && !controlOpen && (
+          <m.div className="update-pill glass" role="status" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>
+            <Icon name="memory" size={16} /><span>{memoryReview === 1 ? '1 ricordo della settimana da rivedere' : `${memoryReview} ricordi della settimana da rivedere`}</span>
+            <button type="button" className="update-now" onClick={() => { setMemoryReview(0); setControlOpen('memory'); }}>Rivedi</button>
+            <button type="button" className="icon-button small" aria-label="Più tardi" title="Più tardi" onClick={() => { setMemoryReview(0); try { localStorage.setItem('nxs.memory.reviewedAt', String(Date.now() - 6 * 86_400_000)); } catch { /* ricompare domani */ } }}><Icon name="close" size={15} /></button>
+          </m.div>
+        )}</AnimatePresence>
         <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>{toast}</m.div>}</AnimatePresence>
       </div>
     </MotionConfig></LazyMotion>
@@ -808,6 +841,41 @@ function AgentTrail({ steps = [], live, writing }: { steps?: string[]; live: boo
         <ol>{steps.map((step, index) => <li key={`${index}-${step}`} data-done={!live || index < steps.length - 1}>{step}</li>)}</ol>
       </div>
     </div>
+  );
+}
+
+/**
+ * Piano di lavoro dell'agente, aggiornato dal vivo: barra di avanzamento, passo corrente in luce scorrevole,
+ * spunte che entrano con una molla. A lavoro finito si compatta nell'intestazione e resta apribile.
+ */
+function PlanCard({ plan, live }: { plan: PlanStep[]; live: boolean }) {
+  const [open, setOpen] = useState<boolean | null>(null);
+  const done = plan.filter((step) => step.status === 'done' || step.status === 'skipped').length;
+  const complete = done === plan.length;
+  const expanded = open ?? (live || !complete);
+  const label = complete ? `Piano completato · ${plan.length} passi` : `Piano · ${done}/${plan.length}`;
+  return (
+    <section className="plan-card" data-live={live} data-complete={complete} aria-label="Piano di lavoro">
+      <button type="button" className="plan-head" aria-expanded={expanded} onClick={() => setOpen(!expanded)}>
+        <Icon name={complete ? 'check' : 'sparkles'} size={15} />
+        <span>{label}</span>
+        <span className="plan-progress" role="progressbar" aria-valuemin={0} aria-valuemax={plan.length} aria-valuenow={done} aria-label="Avanzamento del piano">
+          <i style={{ '--plan-progress': `${(done / plan.length) * 100}%` } as CSSProperties} />
+        </span>
+        <span className="trail-chevron"><Icon name="chevron" size={14} /></span>
+      </button>
+      <div className="trail-body" data-open={expanded}>
+        <ol className="plan-steps">
+          {plan.map((step, index) => (
+            <li key={`${index}-${step.title}`} data-status={step.status} style={{ '--i': index } as CSSProperties}>
+              <span className="plan-mark" aria-hidden="true">{step.status === 'done' ? <Icon name="check" size={12} /> : null}</span>
+              <span className={step.status === 'in_progress' && live ? 'shimmer' : undefined}>{step.title}</span>
+              <span className="sr-only">{({ pending: 'da fare', in_progress: 'in corso', done: 'fatto', skipped: 'saltato' } as const)[step.status]}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }
 
@@ -923,11 +991,28 @@ function ConversationList({ onPick, onEditProject, disabled }: { onPick: (id: st
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   useEffect(() => { if (!confirming) return; const timer = window.setTimeout(() => setConfirming(null), 3_000); return () => window.clearTimeout(timer); }, [confirming]);
-  const needle = query.trim().toLocaleLowerCase('it');
-  const visible = needle
-    ? conversations.filter((item) => `${item.title} ${item.messages.map((message) => message.content).join(' ')}`.toLocaleLowerCase('it').includes(needle))
-    : conversations;
-  const groups = useMemo(() => groupConversations(visible, pinned), [visible, pinned]);
+  const needle = query.trim();
+  // Documenti ricercabili: conversazioni e, dentro un progetto, anche i suoi file.
+  const docs = useMemo<SearchDoc[]>(() => [
+    ...conversations.map((item) => ({ id: item.id, title: item.title, text: item.messages.map((message) => message.content).join('\n').slice(0, 40_000), updatedAt: item.updatedAt })),
+    ...(project ? project.files.map((file) => ({ id: `file:${file.id}`, title: file.name, text: file.text.slice(0, 40_000), updatedAt: 0 })) : [])
+  ], [conversations, project]);
+  const lexical = useMemo(() => (needle ? lexicalSearch(needle, docs) : []), [needle, docs]);
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  useEffect(() => {
+    setHits(lexical);
+    if (!needle || needle.length < 3 || !desktopBridge?.embedTexts) return;
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => {
+      const embed = async (texts: string[]) => { const result = await desktopBridge!.embedTexts(texts); return Array.isArray(result?.vectors) ? result.vectors as number[][] : []; };
+      semanticSearch(needle, docs, lexical, embed, abort.signal).then((ranked) => { if (!abort.signal.aborted) setHits(ranked); }).catch(() => {});
+    }, 280);
+    return () => { abort.abort(); window.clearTimeout(timer); };
+  }, [needle, docs, lexical]);
+  const hitById = useMemo(() => new Map(hits.map((hit) => [hit.id, hit])), [hits]);
+  const visible = needle ? hits.map((hit) => conversations.find((item) => item.id === hit.id)).filter((item): item is NonNullable<typeof item> => Boolean(item)) : conversations;
+  const fileHits = needle && project ? hits.filter((hit) => hit.id.startsWith('file:')).map((hit) => ({ hit, file: project.files.find((file) => `file:${file.id}` === hit.id) })).filter((entry) => entry.file) : [];
+  const groups = useMemo(() => (needle ? (visible.length ? [{ label: 'Risultati', items: visible }] : []) : groupConversations(visible, pinned)), [needle, visible, pinned]);
   return (
     <>
       {project && (
@@ -940,7 +1025,17 @@ function ConversationList({ onPick, onEditProject, disabled }: { onPick: (id: st
       <label className="search"><Icon name="search" size={18} /><input type="search" placeholder={project ? 'Cerca nel progetto' : 'Cerca nelle conversazioni'} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Cerca nelle conversazioni" /></label>
       {/* Su schermi bassi la lista scorre: deve restare raggiungibile da tastiera anche se vuota. */}
       <nav className="conversation-list" aria-label="Cronologia" tabIndex={0}>
-        {visible.length === 0 && <p className="muted empty-list">{query ? 'Nessun risultato.' : project ? 'Le chat nuove aperte qui useranno istruzioni e file del progetto.' : 'Le tue conversazioni appariranno qui.'}</p>}
+        {visible.length === 0 && fileHits.length === 0 && <p className="muted empty-list">{query ? 'Nessun risultato.' : project ? 'Le chat nuove aperte qui useranno istruzioni e file del progetto.' : 'Le tue conversazioni appariranno qui.'}</p>}
+        {fileHits.length > 0 && (
+          <section className="conversation-group" aria-label="File del progetto">
+            <h3><Icon name="file" size={13} />File del progetto</h3>
+            {fileHits.map(({ hit, file }) => (
+              <div key={hit.id} className="conversation search-hit">
+                <button type="button" onClick={() => project && onEditProject(project.id)} title={file!.name}><span className="hit-title">{file!.name}</span><small className="snippet"><Marked text={hit.snippet} query={needle} /></small></button>
+              </div>
+            ))}
+          </section>
+        )}
         {groups.map((group) => (
           <section key={group.label} className="conversation-group" aria-label={group.label}>
             <h3>{group.label === 'Fissate' && <Icon name="pin" size={13} />}{group.label}</h3>
@@ -951,7 +1046,11 @@ function ConversationList({ onPick, onEditProject, disabled }: { onPick: (id: st
                     onBlur={(event) => { rename(item.id, event.currentTarget.value); setRenaming(null); }}
                     onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } else if (event.key === 'Escape') { event.preventDefault(); setRenaming(null); } }} />
                 ) : (
-                  <button type="button" disabled={disabled} onClick={() => onPick(item.id)} title={item.title}>{item.title}</button>
+                  needle && hitById.get(item.id)
+                    ? <button type="button" className="search-hit-button" disabled={disabled} onClick={() => onPick(item.id)} title={item.title}>
+                        <span className="hit-title">{item.title}{hitById.get(item.id)!.semantic && <em className="hit-kind">simile</em>}</span><small className="snippet"><Marked text={hitById.get(item.id)!.snippet} query={needle} /></small>
+                      </button>
+                    : <button type="button" disabled={disabled} onClick={() => onPick(item.id)} title={item.title}>{item.title}</button>
                 )}
                 {renaming !== item.id && <span className="row-actions">
                   <button type="button" className="icon-button small" aria-label={pinned.includes(item.id) ? `Rimuovi ${item.title} dalle fissate` : `Fissa ${item.title}`} data-active={pinned.includes(item.id)} onClick={() => togglePin(item.id)}><Icon name="pin" size={16} /></button>
@@ -1051,6 +1150,12 @@ function PairingScreen({ onPaired }: { onPaired: () => void }) {
   );
 }
 
+/** Estratto con le parole trovate evidenziate (stessa tolleranza della ricerca). */
+function Marked({ text, query }: { text: string; query: string }) {
+  const parts = useMemo(() => highlight(text, query), [text, query]);
+  return <>{parts.map((part, index) => (part.match ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>))}</>;
+}
+
 /** Scelta del microfono per dettatura e voce live; resta solo su questo dispositivo. */
 function MicrophonePicker() {
   const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([]);
@@ -1060,10 +1165,8 @@ function MicrophonePicker() {
   return (
     <>
       <label htmlFor="microphone">Microfono</label>
-      <select id="microphone" className="field" value={selected} onChange={(event) => { setPreferredMicrophone(event.target.value); setSelected(event.target.value); }}>
-        <option value="">Predefinito di sistema</option>
-        {devices.map((device) => <option key={device.id} value={device.id}>{device.label}</option>)}
-      </select>
+      <Select id="microphone" className="field" value={selected} onChange={(value) => { setPreferredMicrophone(value); setSelected(value); }}
+        options={[{ value: '', label: 'Predefinito di sistema' }, ...devices.map((device) => ({ value: device.id, label: device.label }))]} />
     </>
   );
 }

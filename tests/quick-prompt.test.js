@@ -1,4 +1,31 @@
 const test = require('node:test');
+const { takeQuickPayload } = require('../src/application/quick-prompt');
+
+test('barra rapida: la cattura dello schermo viaggia una volta sola e solo se valida', () => {
+  const fsx = require('node:fs'); const osx = require('node:os'); const pathx = require('node:path'); const assertx = require('node:assert/strict');
+  const { writeQuickPrompt: write } = require('../src/application/quick-prompt');
+  const root = fsx.mkdtempSync(pathx.join(osx.tmpdir(), 'nxs-quick-image-'));
+  try {
+    const image = Buffer.from('jpeg bytes').toString('base64');
+    assertx.equal(write(root, 'Cosa vedi?', { image }), true);
+    assertx.deepEqual(takeQuickPayload(root), { text: 'Cosa vedi?', image });
+    assertx.equal(takeQuickPayload(root), null, 'monouso');
+    write(root, 'Solo testo', { image: 'non-base64 <script>' });
+    assertx.deepEqual(takeQuickPayload(root), { text: 'Solo testo' });
+    write(root, 'Troppo grande', { image: 'A'.repeat(2_100_000) });
+    assertx.deepEqual(takeQuickPayload(root), { text: 'Troppo grande' });
+  } finally { fsx.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('barra rapida: lo schermo è un gesto esplicito, azzerato a ogni apertura e dopo ogni invio', () => {
+  const assertx = require('node:assert/strict');
+  const source = require('node:fs').readFileSync(require.resolve('../src/infrastructure/electron/quick-bar.js'), 'utf8');
+  assertx.match(source, /aria-pressed="false"/);
+  assertx.match(source, /onShow\(\(\)=>\{const bar=form;setScreen\(false\)/);
+  assertx.match(source, /sync\(\);setScreen\(false\);\}\);/);
+  assertx.match(source, /desktopCapturer\.getSources\(\{ types: \['screen'\]/);
+  assertx.doesNotMatch(source, /writeFile|appendFile/, 'la cattura resta in memoria');
+});
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

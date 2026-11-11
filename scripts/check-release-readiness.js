@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { signatureEnvelope, verifySignatureEnvelope } = require('../src/security/release-integrity');
+const { windowsSigning } = require('./lib/windows-signing');
 
 const root = path.resolve(__dirname, '..');
 const production = process.argv.includes('--production');
@@ -72,7 +73,7 @@ if (production) {
       }
     } catch { failures.push('NEXUS_UPDATE_URL non è un URL valido'); }
   }
-  if (!process.env.CSC_LINK || !process.env.CSC_KEY_PASSWORD) failures.push('certificato di firma Windows non configurato (CSC_LINK / CSC_KEY_PASSWORD)');
+  if (!windowsSigning(process.env).ready) failures.push('firma Windows non configurata (CSC_LINK + CSC_KEY_PASSWORD oppure Azure Artifact Signing)');
   secureOrigin('NEXUS_URL', true);
   const androidSigningVariables = [
     'NEXUS_ANDROID_KEYSTORE', 'NEXUS_ANDROID_STORE_PASSWORD',

@@ -125,7 +125,7 @@ if (!leanPublicPackage && fs.existsSync(unpackedPython)) {
     throw new Error('Versione Python impacchettata non valida.');
   }
 }
-const signed = Boolean(process.env.CSC_LINK || process.env.WIN_CSC_LINK);
+const signed = Boolean(process.env.CSC_LINK || process.env.WIN_CSC_LINK || require('./lib/windows-signing').windowsSigning(process.env).mode === 'azure');
 const installer = path.join(root, 'release', `NexusNXS-${pkg.version}-Setup.exe`);
 const blockmap = `${installer}.blockmap`;
 const updateManifest = path.join(root, 'release', 'latest.yml');

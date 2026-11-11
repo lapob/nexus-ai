@@ -3,14 +3,14 @@
  * @description Conversazioni solo locali (nessun account): stato esterno minimo con useSyncExternalStore e persistenza limitata.
  */
 import { useSyncExternalStore } from 'react';
-import type { ChatMode, Preferences, Source } from './api';
+import type { ChatMode, PlanStep, Preferences, Source } from './api';
 
 /** Degli allegati si conservano solo nome, tipo e dimensione: i contenuti non vengono salvati. */
 export interface AttachmentMeta { name: string; mime: string; size: number }
 /** `steps`: passaggi visibili dell'agente (mai ragionamento interno), `sources`: fonti citate. */
 /** Ricordo salvato, aggiornato o dimenticato durante il turno (avviso con Vedi / Annulla). */
 export interface MemoryNotice { action: 'remember' | 'update' | 'forget'; id?: number | null; content?: string; count: number; undone?: boolean }
-export interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: number; sources?: Source[]; steps?: string[]; memory?: MemoryNotice; error?: boolean; interrupted?: boolean; attachments?: AttachmentMeta[]; voice?: boolean; rating?: 'up' | 'down'; requestId?: string }
+export interface Message { id: string; role: 'user' | 'assistant'; content: string; createdAt: number; sources?: Source[]; steps?: string[]; plan?: PlanStep[]; memory?: MemoryNotice; error?: boolean; interrupted?: boolean; attachments?: AttachmentMeta[]; voice?: boolean; rating?: 'up' | 'down'; requestId?: string }
 export interface Conversation { id: string; title: string; createdAt: number; updatedAt: number; messages: Message[] }
 /** File di un progetto: solo testo estratto, conservato su questo dispositivo. */
 export interface ProjectFile { id: string; name: string; size: number; text: string }

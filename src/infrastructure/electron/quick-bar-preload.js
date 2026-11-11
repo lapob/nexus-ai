@@ -1,11 +1,11 @@
 /**
  * @module infrastructure/electron/quick-bar-preload
- * @description Ponte minimo della barra rapida: solo invio del testo e chiusura, nessun'altra API.
+ * @description Ponte minimo della barra rapida: invio del testo (con la sola scelta «allega lo schermo») e chiusura.
  */
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('nexusQuickBar', Object.freeze({
-  submit: (text) => ipcRenderer.send('nexus:quick-bar-submit', String(text || '').slice(0, 4000)),
+  submit: (text, options = {}) => ipcRenderer.send('nexus:quick-bar-submit', String(text || '').slice(0, 4000), { screen: options?.screen === true }),
   close: () => ipcRenderer.send('nexus:quick-bar-close'),
   onShow: (listener) => {
     if (typeof listener !== 'function') return () => {};

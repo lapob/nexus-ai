@@ -4,6 +4,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { windowsSigning } = require('./lib/windows-signing');
 
 const strict = process.argv.includes('--strict');
 const json = process.argv.includes('--json');
@@ -23,8 +24,9 @@ function localFileStatus(name, { allowInline = false } = {}) {
 
 const groups = {
   windows: {
-    ready: configured('CSC_KEY_PASSWORD') && localFileStatus('CSC_LINK', { allowInline: true }).valid,
-    missing: ['CSC_LINK', 'CSC_KEY_PASSWORD'].filter((name) => !configured(name))
+    mode: windowsSigning(env).mode,
+    ready: windowsSigning(env).mode === 'azure' ? windowsSigning(env).ready : configured('CSC_KEY_PASSWORD') && localFileStatus('CSC_LINK', { allowInline: true }).valid,
+    missing: [...windowsSigning(env).missing, ...windowsSigning(env).invalid]
   },
   android: {
     ready: localFileStatus('NEXUS_ANDROID_KEYSTORE').valid

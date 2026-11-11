@@ -34,7 +34,7 @@ if (production && releaseChannel !== 'stable') throw new Error('--production ric
 const signedChannel = releaseChannel !== 'preview';
 const releaseEnvironment = { ...process.env, NEXUS_RELEASE_CHANNEL: releaseChannel };
 const MANIFEST_SIGNING_SECRETS = ['NEXUS_RELEASE_MANIFEST_PRIVATE_KEY'];
-const WINDOWS_SIGNING_SECRETS = ['CSC_LINK', 'CSC_KEY_PASSWORD'];
+const { WINDOWS_SIGNING_SECRETS } = require('./lib/windows-signing');
 const ANDROID_SIGNING_SECRETS = ['NEXUS_ANDROID_KEYSTORE', 'NEXUS_ANDROID_STORE_PASSWORD', 'NEXUS_ANDROID_KEY_ALIAS', 'NEXUS_ANDROID_KEY_PASSWORD'];
 const RELEASE_SECRET_KEYS = [...MANIFEST_SIGNING_SECRETS, ...WINDOWS_SIGNING_SECRETS, ...ANDROID_SIGNING_SECRETS];
 const scopedEnvironment = (allowedSecrets = []) => {
