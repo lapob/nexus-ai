@@ -38,7 +38,12 @@ returns 204, and 0.3.37 updates itself. The PC is NOT restarted.
 ## Control notifications — 11 November 2026 (VERIFIED ON PHONE, committed)
 
 Commit fbaeb56 pushed to origin/main (9f39bd8..fbaeb56), notification files
-only; other sessions' work left uncommitted. GitHub CI result not checked yet.
+only; other sessions' work left uncommitted. GitHub CI: `npm test` red on both
+OSes, as already on 9f39bd8. Cause reproduced on clean HEAD: the Funnel test in
+remote-session-gateway needs `web-dist` (gitignored) and ci.yml never ran
+`build:web`. Fix: `npm run build:web` before `npm test` in ci.yml; on a clean
+tree the build succeeds and the gateway tests pass 75/75. Logs need GitHub auth:
+the next CI run confirms the fix.
 
 Live result: second restart ready in 50 s. Over wireless ADB on the owner's
 phone (unlocked by the owner, PIN never entered), test events injected into

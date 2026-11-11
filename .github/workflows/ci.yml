@@ -59,6 +59,8 @@ jobs:
       - run: npm ci
       - run: npm audit signatures
       - run: npm run cloud:check
+      # I test del gateway servono la web app pubblica compilata (web-dist, gitignored).
+      - run: npm run build:web
       - run: npm test
       - run: npm run audit:runtime
       - run: npm run audit:tooling
