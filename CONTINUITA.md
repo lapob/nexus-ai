@@ -1,3 +1,67 @@
+## Control notifications — 11 November 2026 (VERIFIED ON PHONE, committed)
+
+Live result: second restart ready in 50 s. Over wireless ADB on the owner's
+phone (unlocked by the owner, PIN never entered), test events injected into
+the real UI→Core relay reached Control in background: "Risposta pronta"
+(3104, nexus_response_ready, importance 3) and "Consenso richiesto" (3105,
+nexus_consent_required, high, after the 20 s grace), both visible 21 s after
+injection; proof qa-artifacts/control-notifications-phone.png. Found on
+Samsung One UI: watch job stayed READY without running (Android 15+ job
+flexibility + "olaf" stops); fixed with setOverrideDeadline and
+PRIORITY_HIGH for the first session; APK rebuilt, SHA256 9753C7BA…BDC5E,
+lint 0 errors. Not verified live: a real desktop generation or real agent
+proposal (synthetic relay events only; real call sites covered by tests),
+tapping the deep link, behaviour after hours in Doze. Full suite
+(node scripts/run-tests.js; npm cannot find node in its shell here):
+1232 tests, 1226 pass, 4 fail, 2 skipped. The android-security-contract
+failure was this work's new JobService; the contract now allows only that
+non-exported BIND_JOB_SERVICE service (5/5 PASS). 3 remaining failures
+(agent-chat x2: extra 'update-plan' tool; agent-loop fitMessages 42 vs 32)
+come from src/agents/agent-loop.js and src/application/agent-chat.js edited
+20:09 by another session, not by this work. Next: commit after review,
+optional "battery unrestricted" advice for Samsung.
+
+Operation: NexusNXS Control 1.22.0 (versionCode 50) gets two opaque server
+events: "risposta pronta" (generation ≥20 s finished while the Control app
+is in background and the desktop window is unfocused) and "consenso
+richiesto" (ActionRuntime proposal still pending after 20 s grace; withdrawn
+when decided, cancelled or expired). No chat/action content leaves the
+server: kind, cursor, expiry and an internal deep link only.
+Server: new src/remote/device-notification-hub.js; gateway route
+GET /api/notifications/events (Console scope, bearer, long-poll ≤55 s,
+token re-checked after wait), push on existing Console/telemetry SSE;
+ActionRuntime.proposalObserver wired in bootstrap; desktop chat/streamChat
+publish via announceResponseReady in register-ipc.
+Android: ConsoleNotifications (channels nexus_consent_required HIGH,
+nexus_response_ready DEFAULT, POST_NOTIFICATIONS + areNotificationsEnabled
+checked, private lockscreen with public version) and NotificationWatchJob
+(JobScheduler, non-persisted: 8 min long-poll right after leaving the app,
+then single polls with backoff 1/2/5/10/15/30 min; stops on 401/403).
+Checks done: tests/device-notification-hub.test.js 10/10; gateway +
+action-runtime + new suite 115/115; build-android-console Preview + lint
+PASS (0 errors, 3 pre-existing warnings), APK SHA256 0388F76A…59D5
+installed on the phone over wireless ADB; channels verified with dumpsys;
+job starts on Home and backs off on the old server's 404.
+Not yet verified: live notifications end-to-end, full npm test / cloud:check.
+Owner approved a service-only restart: npm run server:restart, log
+qa-artifacts/control-notifications-restart.log. It also loads the
+uncommitted Qwen3-TTS bootstrap.js edits (node --check PASS). Expected:
+readyz ready, then live response-ready/consent notifications on the phone.
+No PC reboot. Result: restart EXIT 0, server ready in 118 s (readyz ready
+after 125 s). Phone job now holds the long-poll on the new route (no more
+instant 404).
+Gap found and fixed: with the headless Core running, the desktop UI is a
+separate process with its own (non-serving) hub, so desktop chat and agent
+proposals never reached the phone. New src/remote/device-notification-relay.js:
+the UI writes opaque JSON files (sha256 reference, kind, duration, expiry)
+into sharedDataRoot/device-notifications; the Core validates, applies and
+deletes them (fs.watch + 2 s scan). Tests 12/12, focused suites 117/117,
+hygiene/overlap PASS. Second service-only restart to load it, log
+qa-artifacts/control-notifications-restart-2.log; then live test driven over
+ADB plus the desktop app. check-source-sections fails only on
+src/infrastructure/electron/update-health.js (not touched by this work).
+
+
 ## Preview 0.3.37 — 11 November 2026 (PUBLISHED)
 
 Done: release:public:preview PASS (installer + SBOM 331, manifest signed

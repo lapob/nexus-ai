@@ -21,7 +21,14 @@ test('manifest minimizzano backup, debug e componenti esportati', () => {
     assert.match(manifest, /android:usesCleartextTraffic="false"/);
     assert.doesNotMatch(manifest, /<receiver/);
   }
-  assert.doesNotMatch(consoleManifest(), /<service/);
+  // Unico servizio ammesso: il JobService delle notifiche, non esportato e
+  // invocabile soltanto da JobScheduler (BIND_JOB_SERVICE).
+  const services = consoleManifest().match(/<service\b[^>]*>/g) || [];
+  assert.equal(services.length, 1);
+  assert.match(services[0], /android:name="\.NotificationWatchJob"/);
+  assert.match(services[0], /android:exported="false"/);
+  assert.match(services[0], /android:permission="android\.permission\.BIND_JOB_SERVICE"/);
+  assert.doesNotMatch(consoleManifest(), /FOREGROUND_SERVICE|RECEIVE_BOOT_COMPLETED|WAKE_LOCK/);
   assert.doesNotMatch(consoleManifest(), /android\.permission\.CAMERA|QrScannerActivity|android\.intent\.category\.BROWSABLE/);
   assert.equal(fs.existsSync(path.join(root, 'android/NexusConsole/app/src/main/java/local/nexus/console/QrScannerActivity.java')), false);
   assert.doesNotMatch(consoleManifest(), /<queries|com\.tailscale\.ipn/);

@@ -35,6 +35,7 @@ const { ToolBus } = require('../agents/tool-bus');
 const { normalizeArtifacts } = require('../application/artifact-stream');
 const { normalizeConversationPreferences } = require('../shared/conversation-preferences');
 const { deviceGraph } = require('./device-graph');
+const { DeviceNotificationHub } = require('./device-notification-hub');
 const { MAX_SPEECH_TEXT, MAX_SPEECH_AUDIO } = require('../voice/speech-segments');
 const { PRIVATE_LITERAL_PATTERN } = require('../research/research-policy');
 const { servePublicWebApp, loadPublicWebApp, withNonce, webAppCsp } = require('./public-web-app');
@@ -642,7 +643,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, webImageSearch = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, webImageSearch = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS, deviceNotificationHub = null } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -740,6 +741,10 @@ class RemoteSessionGateway {
     this.telemetryStreams = new Set();
     this.telemetryCache = { expiresAt: 0, value: null };
     this.telemetryProbe = null;
+    // Notifiche opache per NexusNXS Control: viaggiano sugli stream Console già
+    // aperti e, con l'app in background, su un long-poll autenticato.
+    this.deviceNotifications = deviceNotificationHub || new DeviceNotificationHub();
+    this.deviceNotifications.subscribe((notification, instance) => this.pushDeviceNotification(notification, instance));
     // Chiave soltanto in memoria: consente di correlare gli accessi nella
     // sessione corrente senza conservare o mostrare l'indirizzo originale.
     this.observabilitySecret = crypto.randomBytes(32);
@@ -1376,6 +1381,13 @@ class RemoteSessionGateway {
     }
   }
 
+  pushDeviceNotification(notification, instance) {
+    const frame = `data: ${JSON.stringify({ type: 'notification', instance, notification })}\n\n`;
+    for (const stream of [...this.eventStreams, ...this.telemetryStreams]) {
+      if (stream.scopes.has('console')) this.writeDeviceStream(stream, frame, 'console');
+    }
+  }
+
   closeDeviceStream(stream) {
     if (stream.closed) return;
     stream.closed = true;
@@ -1640,6 +1652,7 @@ class RemoteSessionGateway {
     this.server = null;
     this.publicServer = null;
     for (const stream of [...this.eventStreams, ...this.telemetryStreams]) this.closeDeviceStream(stream);
+    if (final) this.deviceNotifications.close();
     this.telemetryCache = { expiresAt: 0, value: null };
     this.telemetryProbe = null;
     for (const queued of this.guestQueue.splice(0)) {
@@ -2589,6 +2602,21 @@ class RemoteSessionGateway {
         this.openTelemetryStream(request, response, device.id);
         return;
       }
+      if (request.method === 'GET' && url.pathname === '/api/notifications/events') {
+        if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
+        const sinceParam = url.searchParams.get('since');
+        const waitMs = Math.max(0, Math.min(55_000, Number(url.searchParams.get('wait')) || 0));
+        const result = await this.deviceNotifications.wait({
+          since: sinceParam === null ? undefined : sinceParam,
+          instance: url.searchParams.get('instance') || '',
+          timeoutMs: waitMs,
+          signal: this.deviceRequestContexts.get(request)?.controller?.signal
+        });
+        if (response.destroyed || response.writableEnded) return;
+        // Il token può essere stato revocato durante l'attesa.
+        this.assertRequestAuthorized(request);
+        return this.json(response, 200, { ...result, serverTime: Date.now() });
+      }
       if (request.method === 'GET' && url.pathname === '/api/system/telemetry') {
         if (!this.hasScope(device, 'console')) return this.json(response, 403, { error: 'Autorizzazione Console richiesta.' });
         return this.json(response, 200, await this.telemetrySnapshot());
@@ -3110,6 +3138,7 @@ class RemoteSessionGateway {
             frame({ type: 'phase', activity: { text: String(message || '').slice(0, 160), phase } });
           };
           report('Comprendo la richiesta e preparo il contesto…');
+          const generationStartedAt = Date.now();
           try {
             const { signal } = this.deviceRequestContexts.get(request).controller;
             const assertAuthorized = () => {
@@ -3139,6 +3168,8 @@ class RemoteSessionGateway {
               }
             }
             report('Risposta pronta', 'done');
+            // Solo tipo e durata: il testo resta nella conversazione autenticata.
+            this.deviceNotifications.publish('response-ready', { reference: `conversation:${record.id}`, durationMs: Date.now() - generationStartedAt });
             this.broadcast({ type: 'conversation', conversationId: record.id, updatedAt: updated.updatedAt });
             if (!streaming) return this.json(response, 200, updated);
             const answer = [...(updated.turns || [])].reverse().find((turn) => turn.role === 'assistant')?.content || '';

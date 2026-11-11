@@ -70,6 +70,7 @@ recordModuleStage('stores');
 const { snapshotUserData } = require('../infrastructure/storage/version-snapshot');
 const { RemoteSessionGateway } = require('../remote/remote-session-gateway');
 const { createLocalPresenceBridgeClient } = require('../remote/local-presence-bridge');
+const { createRelayPublisher, startRelayReader } = require('../remote/device-notification-relay');
 const { SecurityEventStore } = require('../security/security-event-store');
 recordModuleStage('remote-security');
 const { configureContinuityTask } = require('../infrastructure/windows/continuity-task');
@@ -194,6 +195,7 @@ function bootstrapElectron({ env = process.env } = {}) {
   let actionRuntime;
   let workflowRuntime;
   let remoteGatewayInstance = null;
+  let stopNotificationRelay = null;
   const bridgeSecretProtection = createSafeStorageSecretProtection(safeStorage);
   const presenceBridgeClient = createLocalPresenceBridgeClient({
     sharedDataRoot,
@@ -356,7 +358,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         { label: 'voce neurale', run: () => neuralSpeechService.shutdown() },
         { label: 'voce espressiva', run: () => expressiveSpeechService.shutdown() },
         { label: 'voce remota', run: () => remoteSpeechQueue.shutdown() },
-        { label: 'sessione remota', run: () => remoteGatewayInstance?.stop() },
+        { label: 'sessione remota', run: () => { stopNotificationRelay?.(); return remoteGatewayInstance?.stop(); } },
         { label: 'bridge presenza', run: async () => {
           if (headlessMode) publishActivity('idle');
           await activitySync;
@@ -644,6 +646,23 @@ function bootstrapElectron({ env = process.env } = {}) {
         publicPort: serverMode ? Number(env.NEXUS_PUBLIC_PORT || 32147) : 0
       });
       remoteGatewayInstance = remoteGateway;
+      // Il Core headless possiede il gateway letto da NexusNXS Control: la UI
+      // desktop, processo separato, gli inoltra gli eventi tramite il relay locale.
+      const notificationRelayDirectory = path.join(sharedDataRoot, 'device-notifications');
+      const coreLockPath = path.join(sharedDataRoot, 'headless-server.lock');
+      if (headlessMode) {
+        stopNotificationRelay = startRelayReader({ directory: notificationRelayDirectory, hub: remoteGateway.deviceNotifications, logger });
+      }
+      const deviceNotificationPublisher = createRelayPublisher({
+        directory: notificationRelayDirectory,
+        localHub: remoteGateway.deviceNotifications,
+        shouldRelay: () => {
+          if (headlessMode) return false;
+          const core = readLock(coreLockPath);
+          return Boolean(core && core.pid !== process.pid && isProcessAlive(core.pid));
+        },
+        logger
+      });
       actionRuntime = new ActionRuntime({
         vaultPath: vaultLocation.vaultPath,
         auditPath: path.join(localData.logs, 'action-audit.jsonl'),
@@ -656,11 +675,19 @@ function bootstrapElectron({ env = process.env } = {}) {
         shell,
         logger
       });
+      // Una proposta ancora in attesa dopo la tolleranza diventa un evento
+      // "consenso richiesto" opaco per NexusNXS Control; decisa o scaduta, si ritira.
+      actionRuntime.proposalObserver = ({ event, id, expiresAt }) => {
+        const reference = `proposal:${id}`;
+        if (event === 'proposed') deviceNotificationPublisher.publish('consent-required', { reference, expiresAt });
+        else deviceNotificationPublisher.resolve(reference);
+      };
       workflowRuntime = new WorkflowRuntime({
         actionRuntime,
         checkpointDirectory: path.join(localData.root, 'workflow-checkpoints')
       });
       ipcServices = registerIpcHandlers({
+        deviceNotificationPublisher,
         trustedRendererUrl: RENDERER_ENTRY_URL,
         vaultPath: vaultLocation.vaultPath,
         vaultLocation,

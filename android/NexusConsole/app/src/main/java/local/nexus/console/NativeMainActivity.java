@@ -28,6 +28,7 @@ import android.graphics.drawable.RippleDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Handler;
@@ -293,6 +294,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     @Override protected void onResume() {
         super.onResume();
         foreground = true;
+        ConsoleNotifications.appInForeground = true;
+        NotificationWatchJob.cancel(this);
+        consumeNotificationLink(getIntent());
         if (frameBudgetMonitor != null) frameBudgetMonitor.start();
         if (materializeOnResume && materializationOverlay != null) {
             materializeOnResume = false;
@@ -316,11 +320,39 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }
         else main.post(reconnect);
         if (!token.isEmpty()) main.post(securityRefresh);
+        if (!token.isEmpty()) syncNotificationCursor();
+    }
+
+    /**
+     * Allinea il cursore eventi al ritorno in primo piano: una risposta pronta
+     * non va più notificata, un consenso ancora aperto sì.
+     */
+    private void syncNotificationCursor() {
+        long cursor = ConsoleNotifications.cursor(this);
+        String instance = ConsoleNotifications.instance(this);
+        String path = cursor >= 0 && !instance.isEmpty()
+            ? "/api/notifications/events?since=" + cursor + "&instance=" + Uri.encode(instance)
+            : "/api/notifications/events";
+        request("GET", path, null, true, result -> ConsoleNotifications.deliver(this, result, true), true);
+    }
+
+    private void consumeNotificationLink(Intent intent) {
+        Uri data = intent == null ? null : intent.getData();
+        if (!ConsoleNotifications.isKnownLink(data)) return;
+        intent.setData(null);
+        boolean consent = ConsoleNotifications.LINK_CONSENT.equals(data.toString());
+        if (!consent) ConsoleNotifications.cancelResponse(this);
+        android.widget.Toast.makeText(this, consent
+            ? "Un'azione di NexusNXS attende la tua conferma dove l'hai avviata."
+            : "Risposta pronta: la trovi nella conversazione NexusNXS.", android.widget.Toast.LENGTH_LONG).show();
     }
 
     @Override protected void onPause() {
         persistNavigation();
         foreground = false;
+        ConsoleNotifications.appInForeground = false;
+        // Ascolto in background a bassa frequenza: solo con sessione e permesso.
+        if (!token.isEmpty() && !isChangingConfigurations()) NotificationWatchJob.start(this);
         materializeOnResume = !isFinishing();
         if (frameBudgetMonitor != null) frameBudgetMonitor.stop();
         stopLiveTelemetry();
@@ -1614,6 +1646,16 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private void consumeLiveEvent(String raw, int generation, String requestToken) {
         try {
             JSONObject event = new JSONObject(raw);
+            if ("notification".equals(event.optString("type"))) {
+                JSONObject notification = event.optJSONObject("notification");
+                if (notification == null) return;
+                JSONObject batch = new JSONObject()
+                    .put("instance", event.optString("instance", ""))
+                    .put("cursor", notification.optLong("cursor", -1L))
+                    .put("events", new org.json.JSONArray().put(notification));
+                postUi(() -> ConsoleNotifications.deliver(this, batch, true));
+                return;
+            }
             if (!"telemetry".equals(event.optString("type"))) return;
             JSONObject snapshot = event.optJSONObject("snapshot");
             if (snapshot == null) return;
@@ -2766,6 +2808,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         channel.setDescription("Sicurezza e operazioni richieste da NexusNXS Control");
         channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PRIVATE);
         manager.createNotificationChannel(channel);
+        ConsoleNotifications.ensureChannels(this);
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 88);
     }

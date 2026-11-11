@@ -355,8 +355,17 @@ function publicSettings(settings) {
 
 // #region 02 — Handler IPC privilegiati
 
-function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, runtimeConfig, runtimeEndpointLocked = false, distributionMode = 'developer', logger, getIndex, aiRuntime, actionRuntime, workflowRuntime, speechService, neuralSpeechService, expressiveSpeechService, trainingStore, memoryStore, conversationStore, performanceStore, responseCache, remoteGateway, webResearchService = null, hardwareProfile, runtimeTuning = { contextTokens: 4096, plannerTokens: 256, quickTokens: 768, deepTokens: 1536, keepAlive: '10m' }, managedRuntimeState, managedRuntime, presenceStateSynchronizer }) {
+function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRendererUrl, vaultPath, vaultLocation, runtimeConfig, runtimeEndpointLocked = false, distributionMode = 'developer', logger, getIndex, aiRuntime, actionRuntime, workflowRuntime, speechService, neuralSpeechService, expressiveSpeechService, trainingStore, memoryStore, conversationStore, performanceStore, responseCache, remoteGateway, webResearchService = null, hardwareProfile, runtimeTuning = { contextTokens: 4096, plannerTokens: 256, quickTokens: 768, deepTokens: 1536, keepAlive: '10m' }, managedRuntimeState, managedRuntime, presenceStateSynchronizer }) {
   if (!workflowRuntime) throw new TypeError('WorkflowRuntime non disponibile.');
+  // Una generazione lunga terminata mentre la finestra desktop non ha il focus
+  // diventa un evento opaco "risposta pronta" per NexusNXS Control.
+  const announceResponseReady = (event, requestId, durationMs) => {
+    try {
+      if (BrowserWindow.fromWebContents(event.sender)?.isFocused?.()) return;
+      // In architettura Core+UI il publisher inoltra l'evento al Core headless.
+      (deviceNotificationPublisher || remoteGateway.deviceNotifications)?.publish?.('response-ready', { reference: `desktop:${requestId}`, durationMs });
+    } catch (error) { logger.warn('Notifica risposta pronta non pubblicata.', { error: error?.message || String(error) }); }
+  };
   let remoteWakeBlocker = null;
   const syncRemoteWake = (status) => {
     if (!powerSaveBlocker) return;
@@ -1650,6 +1659,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
     senderRequests.set(event.sender.id, requestId);
     const controller = new AbortController();
     requestSignals.set(requestId, controller);
+    const chatStartedAt = Date.now();
     try {
       const settings = await adaptiveSettings();
       throwIfRequestAborted(controller.signal);
@@ -1694,6 +1704,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
       secured = { ...secured, text: finalGrounding.text };
       if (secured.changed) logger.warn('Output AI oscurato dal confine di sicurezza.', { requestId, issues: secured.issues });
       logger.info('Richiesta chat completata.', { mode, model: selectedModel, sources: prepared.sources.length, attachments: attachmentIds.length, requestId, qualityIssues: quality.issues });
+      announceResponseReady(event, requestId, Date.now() - chatStartedAt);
       return { answer: secured.text || 'NEXUSNXS non ha completato la risposta.', sources: prepared.publicSources, mode, requestId, usage: result.usage };
     } catch (error) {
       const normalized = normalizeAIError(error, 'ollama');
@@ -1960,6 +1971,7 @@ function registerIpcHandlers({ trustedRendererUrl, vaultPath, vaultLocation, run
           responseCache?.put(question, finalResult.message.content, { namespace: cacheNamespace, model });
         }
         emit(event, { type: 'complete', requestId, result: finalResult });
+        announceResponseReady(event, requestId, performance.now() - startedAt);
         recordPerformance({ success: true, modelClass: model === settings.chatModel ? 'primary' : 'fast', corrected: finalResult.corrected === true });
         return finalResult;
       };

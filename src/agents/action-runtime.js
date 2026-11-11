@@ -576,6 +576,15 @@ class ActionRuntime {
     this.tickets = new Map();
     this.activeProcesses = new Set();
     this.acceptingActions = true;
+    // Osservatore opzionale: riceve solo { event, id, expiresAt }, mai
+    // strumento, argomenti o anteprima (es. notifiche "consenso richiesto").
+    this.proposalObserver = null;
+  }
+
+  notifyProposal(event, id, expiresAt = 0) {
+    if (typeof this.proposalObserver !== 'function') return;
+    try { this.proposalObserver({ event, id, expiresAt }); }
+    catch (error) { this.logger?.warn?.('Osservatore proposte non disponibile.', { error: error?.message || String(error) }); }
   }
 
   setWorkspaceRoot(workspacePath) {
@@ -612,6 +621,7 @@ class ActionRuntime {
     const id = asText(ticketId, 'Il ticket', 128);
     const ticket = this.tickets.get(id);
     this.tickets.delete(id);
+    this.notifyProposal('settled', id);
     if (!ticket) return { status: 'cancelled' };
     // Revocation never validates or touches the filesystem: it must remain
     // possible after a workspace change or after a document was removed.
@@ -740,7 +750,7 @@ class ActionRuntime {
   propose(plan, { subjectId = '', deviceIdentity = null } = {}) {
     assertRemoteToolAllowed(plan.tool, Boolean(subjectId || deviceIdentity));
     if (!this.acceptingActions) throw new Error('NexusNXS è in fase di chiusura: nessuna nuova azione può essere pianificata.');
-    for (const [id, ticket] of this.tickets) if (ticket.expiresAt < this.now()) this.tickets.delete(id);
+    for (const [id, ticket] of this.tickets) if (ticket.expiresAt < this.now()) { this.tickets.delete(id); this.notifyProposal('settled', id); }
     if (this.tickets.size >= MAX_PENDING_TICKETS) throw new Error('Troppe proposte operative in attesa. Completa o lascia scadere quelle esistenti.');
     const definition = TOOL_DEFINITIONS.find((item) => item.name === plan.tool);
     if (!definition) throw new Error(`Strumento non disponibile: ${plan.tool}.`);
@@ -771,6 +781,7 @@ class ActionRuntime {
       expiresAt: this.now() + TICKET_TTL_MS
     };
     this.tickets.set(ticket.id, ticket);
+    this.notifyProposal('proposed', ticket.id, ticket.expiresAt);
     return { ...ticket, args: { ...ticket.args } };
   }
 
@@ -1071,6 +1082,7 @@ class ActionRuntime {
     // equivalente ma non canonico (spazi, String object) non deve lasciare una
     // capability riutilizzabile nella mappa.
     this.tickets.delete(canonicalTicketId);
+    this.notifyProposal('settled', canonicalTicketId);
     if (!ticket || ticket.expiresAt < this.now()) throw new Error('La proposta è scaduta o non è valida. Pianifica nuovamente l’azione.');
     const caller = actionSubjectBinding({ subjectId, deviceIdentity });
     if (requireSubject && (!ticket.subjectId || !caller.subjectId)) {
