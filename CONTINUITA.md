@@ -51,6 +51,62 @@ GitHub, service restart. Site: sync-ai-shell, sync-public-release
 Expected live result: manifest 200 v0.3.38, POST /updates/preview/health
 returns 204, and 0.3.37 updates itself. The PC is NOT restarted.
 
+## In-app desktop update — 12 November 2026 (VERIFIED, committed)
+
+Requested by the owner: the update must appear inside the app; the user clicks
+"Aggiorna", it downloads and the app restarts itself.
+
+Main (update-manager.js):
+- autoDownload=false: the check announces `available` with version, notes and
+  size.
+- New IPC updateDownload (`nexus:update-download`; preload `downloadUpdate`)
+  downloads with progress, transferred bytes, total and speed.
+- On `update-downloaded`: status `installing`, then after 1.4 s
+  quitAndInstall(silent, forceRunAfter), so the app reopens by itself.
+- A periodic check never interrupts a download or restart already running;
+  a failed re-check never hides an update already offered.
+- A failed download becomes `error`/`download` and can be retried.
+- The signed feed, rollout and health beacon are unchanged.
+
+UI:
+- New web/src/UpdateCard.tsx and update-card.css replace the pill:
+  - glass card with a rotating conic aura and a progress ring;
+  - morphing icons (spring), shimmer bar, percentage, MB, MB/s and time left;
+  - restart veil, amber error state with "Riprova";
+  - reduced motion respected, narrow layout handled.
+- ControlCenter → Sistema: "Aggiorna e riavvia" button and labels for every
+  status.
+
+Checks:
+- update-manager 6/6 (2 new tests: download → installing → silent restart,
+  and failed download → retry);
+- full suite 1230/1230 (2 skipped);
+- tsc clean; hygiene and sections PASS;
+- check:ui 37/37 at 15 resolutions;
+- visual preview of all 5 states at desktop and 380 px width, no console
+  errors.
+
+Limitation: users reach this flow only from the release AFTER the one that
+ships it. Installs at 0.3.38 receive the next version through the old flow:
+background download plus a "Riavvia" pill.
+
+## Local 0.3.27 → 0.3.38 install — 12 November 2026 (DONE)
+
+Result: installer exit 0, NexusNXS.exe 0.3.38.0, uninstall entry
+"NexusNXS 0.3.38", Start-menu shortcut unchanged, readyz 32145/32147 still
+200. Old installers 0.3.35–0.3.37 (+ blockmaps, and an orphan 0.3.17
+blockmap) moved to the Recycle Bin at the owner's request (~324 MB); in
+release/ only 0.3.38 and its manifests remain.
+
+Requested by the owner: remove old versions from the PC, install the current
+one, updates automatic. Found: per-user copy 0.3.27 in
+%LOCALAPPDATA%\Programs\NexusNXS (Start-menu shortcut); scheduled tasks use the
+source checkout, not that copy. Operation: release/NexusNXS-0.3.38-Setup.exe /S
+(SHA-512 equal to the live latest.yml; deleteAppDataOnUninstall=false, so
+user data are kept). Expected: NexusNXS.exe ProductVersion 0.3.38, service
+untouched. Public channel already at 0.3.38: installs ≥0.3.37 update
+themselves; ≤0.3.36 must update by hand once (known limitation).
+
 ## Control notifications — 11 November 2026 (VERIFIED ON PHONE, committed)
 
 Commit fbaeb56 pushed to origin/main (9f39bd8..fbaeb56), notification files

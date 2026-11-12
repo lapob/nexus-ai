@@ -87,8 +87,11 @@ async function withOfflineUpdater(feed, callback) {
     manager = exports.createUpdateManager({ updateUrl: 'https://updates.example.test', channel: feed.channel || 'stable',
       manifestPublicKey: feed.publicKey, manifestKeyId: 'test-key', trustedRendererUrl: 'nexus://app/index.html',
       logger: { info() {}, warn() {}, error() {}, debug() {} } });
-    const check = () => handlers.get(CHANNELS.updateCheck)({ sender: { getURL: () => 'nexus://app/index.html' } });
-    await callback({ check, requests, downloads, instance, manager, ...exports });
+    const sender = { sender: { getURL: () => 'nexus://app/index.html' } };
+    const check = () => handlers.get(CHANNELS.updateCheck)(sender);
+    const download = () => handlers.get(CHANNELS.updateDownload)(sender);
+    const install = () => handlers.get(CHANNELS.updateInstall)(sender);
+    await callback({ check, download, install, requests, downloads, instance, manager, ...exports });
   } finally {
     manager?.stop();
     Module._load = originalLoad;
@@ -123,8 +126,15 @@ test('l updater accetta soltanto una origine HTTPS pulita', () => {
 for (const channel of ['stable', 'beta']) {
   test(`il vero provider NSIS usa soltanto latest.yml firmato per ${channel}, mai il canale mutabile`, async () => {
     const feed = { ...signedFeed(channel), channel };
-    await withOfflineUpdater(feed, async ({ check, requests, downloads, instance }) => {
+    await withOfflineUpdater(feed, async ({ check, download, requests, downloads, instance, manager }) => {
       await check();
+      // Annunciato ma non scaricato: il download parte soltanto con "Aggiorna".
+      assert.equal(downloads.length, 0);
+      assert.equal(manager.status().status, 'available');
+      assert.equal(manager.status().version, '2.0.0');
+      assert.equal(manager.status().currentVersion, '1.0.0');
+      await download();
+      await new Promise((resolve) => setImmediate(resolve));
       assert.equal(downloads.length, 1);
       assert.equal(downloads[0].info.version, '2.0.0');
       assert.equal(downloads[0].files[0].url.href, 'https://updates.example.test/NexusNXS-2.0.0-Setup.exe');
@@ -132,7 +142,7 @@ for (const channel of ['stable', 'beta']) {
       assert.equal(downloads[0].files[0].info.sha2, feed.sha256);
       assert.deepEqual(requests.sort(), ['/latest.yml', '/release-manifest.json', '/release-manifest.sig.json'].sort());
       assert.equal(instance.disableWebInstaller, true);
-      assert.equal(instance.autoDownload, true);
+      assert.equal(instance.autoDownload, false);
       assert.equal(instance.autoInstallOnAppQuit, true);
       assert.equal(instance.allowDowngrade, false);
       assert.equal(instance.verifySignature, RealNsisUpdater.prototype.verifySignature, 'Authenticode remains the upstream verifier');
@@ -154,6 +164,52 @@ for (const channel of ['stable', 'beta']) {
     });
   });
 }
+
+test('"Aggiorna" scarica, poi riavvia da solo con installazione silenziosa', async () => {
+  await withOfflineUpdater({ ...signedFeed('stable'), channel: 'stable' }, async ({ check, download, install, downloads, instance, manager }) => {
+    const restarts = [];
+    instance.quitAndInstall = (silent, runAfter) => restarts.push({ silent, runAfter });
+    await check();
+    assert.equal(await install(), false, 'nessun riavvio prima del download');
+    await download();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(manager.status().status, 'downloading');
+    // Un controllo periodico durante il download non lo interrompe né lo ripete.
+    await check();
+    assert.equal(manager.status().status, 'downloading');
+    assert.equal(downloads.length, 1);
+    instance.emit('download-progress', { percent: 41.6, transferred: 416, total: 1000, bytesPerSecond: 200 });
+    assert.deepEqual(
+      (({ progress, transferred, total, bytesPerSecond }) => ({ progress, transferred, total, bytesPerSecond }))(manager.status()),
+      { progress: 42, transferred: 416, total: 1000, bytesPerSecond: 200 }
+    );
+    instance.emit('update-downloaded', { version: '2.0.0' });
+    assert.equal(manager.status().status, 'installing');
+    assert.equal(restarts.length, 0, 'la UI mostra prima il riavvio');
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    assert.deepEqual(restarts, [{ silent: true, runAfter: true }]);
+  });
+});
+
+test('un download fallito si può riprovare e non avvia riavvii', async () => {
+  await withOfflineUpdater({ ...signedFeed('stable'), channel: 'stable' }, async ({ check, download, downloads, instance, manager }) => {
+    const restarts = [];
+    instance.quitAndInstall = () => restarts.push(true);
+    await check();
+    instance.downloadUpdate = async () => { throw new Error('rete assente'); };
+    await download();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(manager.status().status, 'error');
+    assert.equal(manager.status().phase, 'download');
+    assert.equal(manager.status().version, '2.0.0');
+    instance.downloadUpdate = async () => { downloads.push('retry'); return []; };
+    await download();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(manager.status().status, 'downloading');
+    assert.deepEqual(downloads, ['retry']);
+    assert.equal(restarts.length, 0);
+  });
+});
 
 test('rollout in pausa e feed alterato non raggiungono il download NSIS', async () => {
   await withOfflineUpdater(signedFeed('stable', { paused: true }), async ({ check, downloads, manager }) => {

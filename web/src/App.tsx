@@ -7,6 +7,7 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import type { Capabilities, PlanStep, Preferences } from './api';
 import { highlight, lexicalSearch, semanticSearch, type SearchDoc, type SearchHit } from './search';
 import { useDesktopPresence, useDesktopUpdate } from './desktopPresence';
+import { UpdateCard } from './UpdateCard';
 import { desktopBridge, platform } from './platform';
 import { pairDevice, pairedToken } from './paired';
 import brandIcon from './assets/nexus-mark-ui.png';
@@ -793,14 +794,8 @@ export function App() {
         </AnimatePresence>
 
         <Tooltips />
-        <AnimatePresence>{update.ready && !toast && (
-          <m.div className="update-pill glass" role="status" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>
-            <Icon name="download" size={16} /><span>NexusNXS {update.ready.version} è pronto</span>
-            <button type="button" className="update-now" onClick={update.install}>Riavvia</button>
-            <button type="button" className="icon-button small" aria-label="Più tardi: si installa alla chiusura" title="Più tardi (si installa alla chiusura)" onClick={update.dismiss}><Icon name="close" size={15} /></button>
-          </m.div>
-        )}</AnimatePresence>
-        <AnimatePresence>{memoryReview > 0 && !update.ready && !toast && !controlOpen && (
+        <UpdateCard update={update} hidden={Boolean(toast) && update.state?.status !== 'installing'} />
+        <AnimatePresence>{memoryReview > 0 && !update.visible && !toast && !controlOpen && (
           <m.div className="update-pill glass" role="status" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>
             <Icon name="memory" size={16} /><span>{memoryReview === 1 ? '1 ricordo della settimana da rivedere' : `${memoryReview} ricordi della settimana da rivedere`}</span>
             <button type="button" className="update-now" onClick={() => { setMemoryReview(0); setControlOpen('memory'); }}>Rivedi</button>

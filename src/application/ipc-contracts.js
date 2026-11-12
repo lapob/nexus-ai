@@ -91,6 +91,7 @@ const CHANNELS = Object.freeze({
   updateStatus: 'nexus:update-status',
   updateCheck: 'nexus:update-check',
   updateInstall: 'nexus:update-install',
+  updateDownload: 'nexus:update-download',
   updateEvent: 'nexus:update-event',
   proactiveEvent: 'nexus:proactive-event',
   wakeWordActivation: 'nexus:wake-word-activation',

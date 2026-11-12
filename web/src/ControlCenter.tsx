@@ -331,7 +331,7 @@ function System({ notify }: { notify: (text: string) => void }) {
     const off = bridge().onUpdateEvent?.(setUpdate) as unknown as (() => void) | undefined;
     return () => off?.();
   }, []);
-  const updateLabel: Record<string, string> = { disabled: 'Aggiornamenti disattivati', checking: 'Controllo…', current: 'Aggiornato', downloading: 'Scarico l’aggiornamento…', ready: 'Aggiornamento pronto', error: 'Controllo non riuscito' };
+  const updateLabel: Record<string, string> = { disabled: 'Aggiornamenti disattivati', checking: 'Controllo…', current: 'Aggiornato', available: `Disponibile la ${update?.version || 'nuova versione'}`, downloading: 'Scarico l’aggiornamento…', ready: 'Aggiornamento pronto', installing: 'Riavvio in corso…', paused: 'Distribuzione in pausa', deferred: 'In arrivo a breve', error: update?.phase === 'download' ? 'Download interrotto' : 'Controllo non riuscito' };
   return (
     <>
       <Switch label="Parola di attivazione «Nexus»" hint="Dì «Nexus» e l’entità ti ascolta in voce live. Il riconoscimento è locale; si sospende mentre parli o ascolta."
@@ -339,10 +339,11 @@ function System({ notify }: { notify: (text: string) => void }) {
       {startup?.available && <Switch label="Avvio con Windows" hint="Il motore resta attivo in background; l’interfaccia si apre quando serve."
         checked={startup.enabled === true} onChange={async (value) => setStartup(await bridge().configureStartup(value))} />}
       <div className="card">
-        <strong>Versione {update?.version || '—'}</strong>
+        <strong>Versione {update?.currentVersion || update?.version || '—'}</strong>
         <small>{updateLabel[update?.status] || '—'}{update?.status === 'downloading' ? ` · ${Math.round(update.progress || 0)}%` : ''}</small>
         <Row>
           <button type="button" className="secondary" onClick={async () => setUpdate(await bridge().checkForUpdates())}>Controlla aggiornamenti</button>
+          {(update?.status === 'available' || (update?.status === 'error' && update?.phase === 'download')) && <button type="button" className="primary" onClick={async () => setUpdate(await bridge().downloadUpdate())}>Aggiorna e riavvia</button>}
           {update?.status === 'ready' && <button type="button" className="primary" onClick={() => void bridge().installUpdate()}>Installa e riavvia l’app</button>}
         </Row>
       </div>

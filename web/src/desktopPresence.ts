@@ -29,13 +29,21 @@ const PROACTIVE_LABELS: Record<string, (metadata: Record<string, string>) => str
   'device.health': () => 'Stato del dispositivo aggiornato'
 };
 
-export interface UpdateState { status: string; version?: string; progress?: number }
+export interface UpdateState {
+  status: string; phase?: string; version?: string; currentVersion?: string; releaseNotes?: string;
+  progress?: number; transferred?: number; total?: number; bytesPerSecond?: number;
+}
+
+export interface DesktopUpdate { state: UpdateState | null; visible: boolean; download: () => void; install: () => void; dismiss: () => void }
+
+const UPDATE_VISIBLE = new Set(['available', 'downloading', 'ready', 'installing']);
 
 /**
- * Aggiornamenti automatici del desktop: il main process scarica e verifica in background (distinta firmata);
- * qui si espone solo lo stato "pronto" e il riavvio su richiesta. Se ignorato, si installa alla chiusura.
+ * Aggiornamenti del desktop: il main process verifica la distinta firmata e annuncia la nuova versione;
+ * "Aggiorna" la scarica e, appena verificata, riavvia l'app da solo. "Più tardi" nasconde la scheda per
+ * questa versione: se già scaricata, si installa comunque alla chiusura.
  */
-export function useDesktopUpdate(): { ready: UpdateState | null; install: () => void; dismiss: () => void } {
+export function useDesktopUpdate(): DesktopUpdate {
   const [state, setState] = useState<UpdateState | null>(null);
   const [dismissed, setDismissed] = useState('');
   useEffect(() => {
@@ -43,9 +51,15 @@ export function useDesktopUpdate(): { ready: UpdateState | null; install: () => 
     void Promise.resolve(desktopBridge.updateStatus?.()).then((value: UpdateState) => value && setState(value)).catch(() => {});
     return desktopBridge.onUpdateEvent((value: UpdateState) => setState(value)) as () => void;
   }, []);
-  const ready = state?.status === 'ready' && state.version !== dismissed ? state : null;
+  const status = state?.status ?? '';
+  // Un errore resta visibile solo se interrompe un download o un riavvio chiesti dall'utente.
+  const failedAction = status === 'error' && (state?.phase === 'download' || state?.phase === 'install') && Boolean(state?.version);
+  const inFlight = status === 'downloading' || status === 'installing';
+  const visible = Boolean(state) && (UPDATE_VISIBLE.has(status) || failedAction) && (inFlight || state?.version !== dismissed);
   return {
-    ready,
+    state,
+    visible,
+    download: () => { void Promise.resolve(desktopBridge?.downloadUpdate?.()).catch(() => {}); },
     install: () => { void Promise.resolve(desktopBridge?.installUpdate?.()).catch(() => {}); },
     dismiss: () => setDismissed(state?.version ?? '')
   };

@@ -94,6 +94,7 @@ const CHANNELS = Object.freeze({
   updateStatus: 'nexus:update-status',
   updateCheck: 'nexus:update-check',
   updateInstall: 'nexus:update-install',
+  updateDownload: 'nexus:update-download',
   updateEvent: 'nexus:update-event',
   proactiveEvent: 'nexus:proactive-event',
   wakeWordActivation: 'nexus:wake-word-activation',
@@ -191,6 +192,7 @@ contextBridge.exposeInMainWorld('nexus', {
   updateStatus: () => ipcRenderer.invoke(CHANNELS.updateStatus),
   checkForUpdates: () => ipcRenderer.invoke(CHANNELS.updateCheck),
   installUpdate: () => ipcRenderer.invoke(CHANNELS.updateInstall),
+  downloadUpdate: () => ipcRenderer.invoke(CHANNELS.updateDownload),
   onUpdateEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.updateEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.updateEvent, handler); },
   onProactiveEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.proactiveEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.proactiveEvent, handler); },
   onQuickPrompt: (listener) => {

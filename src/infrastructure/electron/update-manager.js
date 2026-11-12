@@ -55,19 +55,25 @@ class VerifiedReleaseProvider extends Provider {
   }
 }
 
+/** Pausa tra lo stato "installing" e la chiusura: lascia vedere l'animazione di riavvio. */
+const INSTALL_DELAY_MS = 1400;
+
 function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey = '', manifestKeyId = '', rolloutSeed = '', trustedRendererUrl, logger, healthStatePath = '' }) {
   channel = ['preview', 'beta', 'stable'].includes(channel) ? channel : 'stable';
   let updater = null;
   let health = null;
   let initialTimer = null;
   let recurringTimer = null;
-  let state = { status: 'disabled', version: app.getVersion(), progress: 0, channel, lastCheckedAt: 0 };
+  let state = { status: 'disabled', version: app.getVersion(), currentVersion: app.getVersion(), progress: 0, channel, lastCheckedAt: 0 };
+  let installWhenReady = false;
+  let installing = false;
   let windowProvider = () => null;
   const publish = () => {
     const window = windowProvider();
     if (window && !window.isDestroyed()) window.webContents.send(CHANNELS.updateEvent, state);
   };
   const setState = (next) => { state = { ...state, ...next }; publish(); };
+  const busy = () => ['downloading', 'ready', 'installing'].includes(state.status);
   const assertTrusted = (event) => {
     if (!event?.sender || event.sender.getURL() !== trustedRendererUrl) throw new Error('Renderer non autorizzato.');
   };
@@ -80,11 +86,42 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     await checkTrustedUpdates({ seeker: true });
     return state;
   });
+  // Riavvio con installazione silenziosa e rilancio automatico: la UI mostra
+  // prima lo stato "installing" per un istante, poi l'app si chiude da sola.
+  const installNow = () => {
+    if (!updater || installing) return false;
+    installing = true;
+    setState({ status: 'installing', progress: 100 });
+    const timer = setTimeout(() => {
+      try { updater.quitAndInstall(true, true); } catch (error) {
+        installing = false;
+        logger.warn('Installazione aggiornamento non avviata.', { error });
+        setState({ status: 'error', phase: 'install', progress: 0 });
+      }
+    }, INSTALL_DELAY_MS);
+    timer.unref?.();
+    return true;
+  };
   ipcMain.handle(CHANNELS.updateInstall, (event) => {
     assertTrusted(event);
     if (!updater || state.status !== 'ready') return false;
-    setImmediate(() => updater.quitAndInstall(false, true));
-    return true;
+    return installNow();
+  });
+  // "Aggiorna": scarica la versione verificata e, appena pronta, riavvia l'app.
+  ipcMain.handle(CHANNELS.updateDownload, async (event) => {
+    assertTrusted(event);
+    if (!updater) return state;
+    if (state.status === 'ready') { installNow(); return state; }
+    if (state.status === 'downloading' || state.status === 'installing') { installWhenReady = true; return state; }
+    if (!['available', 'error'].includes(state.status) || !state.version || state.version === app.getVersion()) return state;
+    installWhenReady = true;
+    setState({ status: 'downloading', phase: 'download', progress: 0, transferred: 0, total: state.total || 0, bytesPerSecond: 0 });
+    updater.downloadUpdate().catch((error) => {
+      installWhenReady = false;
+      logger.warn('Download aggiornamento non riuscito.', { error });
+      setState({ status: 'error', phase: 'download', progress: 0 });
+    });
+    return state;
   });
 
   if (!app.isPackaged || !updateUrl || process.env.NEXUS_DISABLE_UPDATES === '1') {
@@ -95,7 +132,10 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     return { start() {}, stop() {}, setWindowProvider(provider) { windowProvider = provider; }, status: () => state };
   }
   const checkTrustedUpdates = async ({ seeker = false } = {}) => {
-    setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() });
+    // Un download o un riavvio già avviati non vengono interrotti dal controllo periodico.
+    if (busy()) return null;
+    // Con un aggiornamento già proposto la scheda resta visibile durante il ricontrollo.
+    if (state.status !== 'available') setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() });
     const verifiedFeed = await verifyRemoteReleaseFeed({
       updateUrl: cleanUpdateUrl(updateUrl), publicKey: manifestPublicKey,
       keyId: manifestKeyId, channel
@@ -117,19 +157,37 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     cleanUpdateUrl(updateUrl);
     updater = new NsisUpdater({ provider: 'custom', updateProvider: VerifiedReleaseProvider });
     updater.disableWebInstaller = true;
-    updater.autoDownload = true;
+    // Il download parte solo quando l'utente sceglie "Aggiorna" (updateDownload).
+    updater.autoDownload = false;
     updater.autoInstallOnAppQuit = true;
     updater.allowDowngrade = false;
     updater.allowPrerelease = channel !== 'stable';
     updater.logger = logger;
-    updater.on('checking-for-update', () => setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() }));
-    updater.on('update-not-available', () => setState({ status: 'current', progress: 0, lastCheckedAt: Date.now() }));
-    updater.on('update-available', (info) => setState({ status: 'downloading', progress: 0, ...publicUpdateInfo(info) }));
-    updater.on('download-progress', (progress) => setState({ status: 'downloading', progress: Math.max(0, Math.min(100, Math.round(progress.percent || 0))) }));
-    updater.on('update-downloaded', (info) => setState({ status: 'ready', progress: 100, downloadedAt: Date.now(), ...publicUpdateInfo(info) }));
+    updater.on('checking-for-update', () => { if (!busy() && state.status !== 'available') setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() }); });
+    updater.on('update-not-available', () => { if (!busy()) setState({ status: 'current', progress: 0, lastCheckedAt: Date.now() }); });
+    updater.on('update-available', (info) => {
+      if (busy()) return;
+      const size = Number(info?.files?.[0]?.size) || 0;
+      setState({ status: 'available', phase: '', progress: 0, total: size, lastCheckedAt: Date.now(), ...publicUpdateInfo(info) });
+    });
+    updater.on('download-progress', (progress) => setState({
+      status: 'downloading',
+      progress: Math.max(0, Math.min(100, Math.round(progress.percent || 0))),
+      transferred: Math.max(0, Number(progress.transferred) || 0),
+      total: Math.max(0, Number(progress.total) || state.total || 0),
+      bytesPerSecond: Math.max(0, Number(progress.bytesPerSecond) || 0)
+    }));
+    updater.on('update-downloaded', (info) => {
+      setState({ status: 'ready', progress: 100, downloadedAt: Date.now(), ...publicUpdateInfo(info) });
+      if (installWhenReady) installNow();
+    });
     updater.on('error', (error) => {
       logger.warn('Controllo aggiornamenti non riuscito; NexusNXS continuerà con la versione installata.', { error });
-      setState({ status: 'error', progress: 0, lastCheckedAt: Date.now() });
+      // Un ricontrollo fallito non nasconde un aggiornamento già proposto o scaricato.
+      if (installing || state.status === 'ready' || state.status === 'available') return;
+      const phase = state.status === 'downloading' ? 'download' : 'check';
+      installWhenReady = false;
+      setState({ status: 'error', phase, progress: 0, lastCheckedAt: Date.now() });
     });
     state.status = 'current';
     health = createUpdateHealth({
