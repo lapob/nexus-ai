@@ -98,7 +98,7 @@ export function Panel() {
   const showPreview = kind !== null && view === 'preview';
   const lines = document_.text.split('\n').length;
   return (
-    <m.aside className="panel glass" aria-label={`Pannello: ${document_.title}`} key={document_.id}
+    <m.aside className="doc-panel glass" aria-label={`Pannello: ${document_.title}`} key={document_.id}
       initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 28 }} transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}>
       <header className="panel-head">
         <span className="panel-title"><Icon name={kind ? KIND_ICON[kind] : 'code'} size={18} /><span title={document_.title}>{document_.title}</span><small>{document_.language} · {lines} {lines === 1 ? 'riga' : 'righe'}</small></span>

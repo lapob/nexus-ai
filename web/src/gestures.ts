@@ -34,7 +34,7 @@ export function useSwipeGestures(state: SwipeState, actions: SwipeActions) {
       if (event.touches.length !== 1) { start = null; return; }
       const touch = event.touches[0];
       const target = event.target instanceof Element ? event.target : null;
-      start = { x: touch.clientX, y: touch.clientY, t: performance.now(), inPanel: Boolean(target?.closest('.panel')), inScroller: Boolean(target?.closest(HORIZONTAL_SCROLL)) };
+      start = { x: touch.clientX, y: touch.clientY, t: performance.now(), inPanel: Boolean(target?.closest('.doc-panel, .panel')), inScroller: Boolean(target?.closest(HORIZONTAL_SCROLL)) };
     };
     const up = (event: TouchEvent) => {
       if (!start) return;

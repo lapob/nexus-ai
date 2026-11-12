@@ -46,7 +46,7 @@
   :focus-visible { outline: 2px solid color-mix(in oklch, var(--cyan) 88%, white); outline-offset: 2px; animation: focus-ring .22s var(--ease-emphasized); }
   @keyframes focus-ring { from { outline-offset: 6px; outline-color: transparent; } }
   /* Dentro contenitori che tagliano o scorrono l'anello resta interno al controllo: mai mozzato, mai sporgente. */
-  :is(.sidebar, .conversation-list, .panel, .tabs, .profile-menu, .palette, .slash-menu, .select-panel, .segmented, .sheet, .plan-card, .agent-trail) :focus-visible { outline-offset: -2px; }
+  :is(.sidebar, .conversation-list, .panel, .doc-panel, .tabs, .profile-menu, .palette, .slash-menu, .select-panel, .segmented, .sheet, .plan-card, .agent-trail) :focus-visible { outline-offset: -2px; }
   :is(input, textarea, .field, .select-trigger):focus-visible { animation: none; }
   /* Righe della cronologia: il focus illumina la riga intera, azioni comprese. */
   .conversation > button:focus-visible { outline: none; }
@@ -383,7 +383,8 @@
   .sheet > .field { width: 100%; min-height: 42px; padding: 9px 12px; border-radius: 12px; color: var(--ice); background: color-mix(in oklch, var(--ink) 55%, transparent); border: 1px solid color-mix(in oklch, var(--hairline) 40%, transparent); font: inherit; }
   .segmented { display: flex; flex-wrap: wrap; gap: 6px; }
   /* Centro di controllo (desktop): stesse superfici vetro, schede orizzontali scorrevoli. */
-  .sheet.control { width: min(680px, 100%); max-height: min(86dvh, 820px); grid-template-rows: auto auto minmax(0, 1fr); margin-block: auto; }
+  /* Altezza fissa: cambiando scheda il foglio non salta né si ridimensiona; il contenuto scorre dentro. */
+  .sheet.control { width: min(680px, 100%); height: min(86dvh, 720px); max-height: min(86dvh, 820px); grid-template-rows: auto auto minmax(0, 1fr); margin-block: auto; }
   .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .tabs::-webkit-scrollbar { display: none; }
   .tabs button { flex: none; min-height: 36px; padding: 0 14px; border-radius: 99px; font-size: .86rem; color: var(--mist); }
@@ -703,9 +704,12 @@
   /* ── Pannello laterale: codice e documenti accanto alla conversazione ── */
   .app[data-panel='true'] { grid-template-columns: 288px minmax(0, 1fr) minmax(380px, 42%); }
   .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 64px minmax(0, 1fr) minmax(420px, 48%); }
-  .panel { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; height: 100dvh; border-radius: 0; border-width: 0 0 0 1px; z-index: 25;
+  /* Nome distinto da .panel (contenuto delle schede del Centro di controllo): le regole non si mescolano. */
+  .doc-panel { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; align-content: start; overflow-y: auto; scrollbar-width: none; padding: 2px;
+    min-width: 0; min-height: 0; height: 100dvh; border-radius: 0; border-width: 0 0 0 1px; z-index: 25;
     background: linear-gradient(var(--surface), var(--surface)), #040809; box-shadow: -30px 0 80px -40px color-mix(in oklch, var(--cyan) 30%, transparent); }
-  .panel { container: panel / inline-size; }
+  .doc-panel::-webkit-scrollbar { display: none; }
+  .doc-panel { container: panel / inline-size; }
   @container panel (max-width: 560px) { .segmented button span { display: none; } .segmented button { padding: 0 9px; } }
   .panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 12px 10px 16px; border-bottom: 1px solid color-mix(in oklch, var(--hairline) 22%, transparent); }
   .panel-title { flex: 1 1 180px; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; }
@@ -747,9 +751,9 @@
   @media (max-width: 1099px) {
     .app[data-panel='true'], .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 288px minmax(0, 1fr); }
     .app[data-panel='true'][data-collapsed='true'] { grid-template-columns: 64px minmax(0, 1fr); }
-    .panel { position: fixed; inset: 0 0 0 auto; width: min(600px, 100vw); z-index: 40; box-shadow: -40px 0 120px -20px #000; }
+    .doc-panel { position: fixed; inset: 0 0 0 auto; width: min(600px, 100vw); z-index: 40; box-shadow: -40px 0 120px -20px #000; }
   }
-  @media (max-width: 839px) { .app[data-panel='true'] { grid-template-columns: minmax(0, 1fr); } .panel { border-width: 0; } }
+  @media (max-width: 839px) { .app[data-panel='true'] { grid-template-columns: minmax(0, 1fr); } .doc-panel { border-width: 0; } }
 
   /* Bordi morbidi: il contenuto che scorre si dissolve invece di essere tagliato. La
      sfumatura appare solo sul lato con contenuto nascosto (timeline di scroll, niente JS);

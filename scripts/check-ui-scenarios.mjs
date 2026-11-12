@@ -70,6 +70,29 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 
 // #region 03 — Dati sintetici (nessun contenuto reale)
 
+/**
+ * Ponte IPC del desktop simulato (serializzato nella pagina da addInitScript): dati sintetici per il Centro
+ * di controllo; ogni altro metodo risponde vuoto, gli abbonamenti `on…` restituiscono la disiscrizione.
+ */
+function fakeDesktopBridge() {
+  const answers = {
+    bootstrap: { settings: { autoSelectModel: true, responseStyle: 'natural', userName: 'Prova', assistantName: 'NexusNXS', temperature: 0.4, memoryEnabled: true } },
+    saveSettings: { autoSelectModel: true },
+    health: { ok: true, status: 'ready' },
+    listModels: [{ name: 'qwen3:14b', size: 9.3e9, capabilities: { chat: true } }, { name: 'gemma3:12b', size: 8.1e9, capabilities: { chat: true } }],
+    provisioningStatus: { profiles: [], recommended: null, installed: [] },
+    listConversationHistory: [], voiceCapabilities: { available: false }, neuralVoiceCapabilities: { available: false },
+    updateStatus: { state: 'idle', currentVersion: '0.0.0-prova' }
+  };
+  const bridge = new Proxy({}, { get: (_target, name) => {
+    if (name === 'then') return undefined;
+    if (name === 'streamChat') return async () => ({ ok: true });
+    if (typeof name === 'string' && name.startsWith('on')) return () => () => {};
+    return async () => (name in answers ? structuredClone(answers[name]) : null);
+  } });
+  Object.defineProperty(window, 'nexus', { value: bridge, configurable: true });
+}
+
 const now = Date.now();
 const day = 86_400_000;
 const msg = (id, role, content, at, extra = {}) => ({ id, role, content, createdAt: at, ...extra });
@@ -113,7 +136,7 @@ const scenarios = [
   { name: 'project-thread', viewport: desktop, state: projects, expect: ['.project-banner', '.project-chip', '.project-row[data-active="true"]'] },
   { name: 'project-home', viewport: desktop, state: { ...projects, activeId: null }, expect: ['.project-eyebrow'] },
   { name: 'project-sheet', viewport: desktop, state: projects, run: async (page) => { await page.click('[aria-label="Impostazioni di Tesi di laurea"]'); }, expect: ['.project-sheet #project-instructions'] },
-  { name: 'panel-code', viewport: { width: 1440, height: 860 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.panel .panel-code .line'] },
+  { name: 'panel-code', viewport: { width: 1440, height: 860 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.doc-panel .panel-code .line'] },
   { name: 'panel-svg', viewport: { width: 1440, height: 860 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=1'); }, expect: ['.panel-svg img'] },
   { name: 'panel-html', viewport: { width: 1440, height: 860 }, sandbox: true, state: { ...thread, activeId: 'h1', conversations: [{ id: 'h1', title: 'Pagina', createdAt: now, updatedAt: now, messages: [
     msg('h1a', 'user', 'Fammi una pagina', now - 3000),
@@ -129,7 +152,7 @@ const scenarios = [
     if (parentAccess !== 'madre protetta') throw new Error(`la sandbox vede la pagina madre (${parentAccess})`);
   }, expect: ['.panel-html iframe[sandbox="allow-scripts allow-modals"]'] },
   { name: 'panel-csv', viewport: { width: 1180, height: 760 }, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=2'); }, expect: ['.panel-table td'] },
-  { name: 'panel-mobile', viewport: mobile, mobile: true, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.panel'] },
+  { name: 'panel-mobile', viewport: mobile, mobile: true, state: artifacts, run: async (page) => { await page.click('.open-panel >> nth=0'); }, expect: ['.doc-panel'] },
   { name: 'tooltip', viewport: desktop, run: async (page) => {
     await page.hover('button[title="Altre idee"]'); await page.waitForTimeout(650);
     if (await page.locator('button[title="Altre idee"]').count()) throw new Error('il title nativo resta attivo');
@@ -308,6 +331,36 @@ const scenarios = [
     const probe = await page.evaluate(() => { const b = document.createElement('button'); document.body.append(b); const r = getComputedStyle(b).borderRadius; b.remove(); return r; });
     if (probe === '0px') throw new Error(`pulsante senza raggio: ${bare}/${probe}`);
   }, expect: ['.conversation-list'] },
+  // Centro di controllo (solo desktop): ponte IPC simulato, ogni scheda deve restare dentro il foglio
+  // e i selettori devono avere l'altezza di un campo, non quella dello schermo.
+  { name: 'control-center', viewport: { width: 1268, height: 958 }, init: fakeDesktopBridge, run: async (page) => {
+    await page.keyboard.press('Control+k');
+    await page.keyboard.type('Centro di controllo');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.sheet.control [role="tabpanel"] .field');
+    let firstTop = null;
+    for (const tab of await page.$$eval('.sheet.control [role="tab"]', (tabs) => tabs.map((node) => node.id))) {
+      await page.click(`#${tab}`);
+      await page.waitForTimeout(450);
+      const layout = await page.evaluate(() => {
+        const sheet = document.querySelector('.sheet.control').getBoundingClientRect();
+        const panel = document.querySelector('.sheet.control [role="tabpanel"]');
+        const box = panel.getBoundingClientRect();
+        const tall = [...panel.querySelectorAll('.field, button, .select-trigger')].filter((node) => !node.matches('textarea'))
+          .map((node) => ({ name: node.id || node.textContent.trim().slice(0, 20), h: node.getBoundingClientRect().height })).filter((item) => item.h > 64);
+        return { sheetBottom: sheet.bottom, panelBottom: box.bottom, panelTop: box.top, sheetTop: sheet.top, h: innerHeight, tall, display: getComputedStyle(panel).gridTemplateRows };
+      });
+      if (layout.tall.length) throw new Error(`${tab}: controlli troppo alti ${JSON.stringify(layout.tall)}`);
+      firstTop ??= layout.sheetTop;
+      if (Math.abs(layout.sheetTop - firstTop) > 1) throw new Error(`${tab}: il foglio salta cambiando scheda (${firstTop} → ${layout.sheetTop})`);
+      if (layout.panelBottom > layout.sheetBottom + 1 || layout.panelTop < layout.sheetTop || layout.sheetBottom > layout.h) throw new Error(`${tab}: contenuto fuori dal foglio ${JSON.stringify(layout)}`);
+      await page.screenshot({ path: path.join(out, `control-center-${tab.replace('tab-', '')}.png`) });
+    }
+    await page.click('#tab-models');
+    await page.click('#model-select');
+    await page.waitForSelector('.select-panel li');
+    await page.keyboard.press('Escape');
+  }, expect: ['.sheet.control #model-select'] },
   { name: 'custom-select', viewport: { width: 1280, height: 560 }, state: thread,
   run: async (page) => {
     await page.evaluate(() => {
@@ -382,7 +435,9 @@ const scenarios = [
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] });
 const failures = [];
-for (const scenario of scenarios) {
+// NEXUS_UI_ONLY=nome1,nome2 esegue solo quegli scenari (sviluppo); il gate completo li esegue tutti.
+const only = (process.env.NEXUS_UI_ONLY || '').split(',').map((name) => name.trim()).filter(Boolean);
+for (const scenario of only.length ? scenarios.filter((item) => only.includes(item.name)) : scenarios) {
   const context = await browser.newContext({ viewport: scenario.viewport, deviceScaleFactor: 1, colorScheme: 'dark', reducedMotion: scenario.reducedMotion || 'no-preference',
     isMobile: Boolean(scenario.mobile), hasTouch: Boolean(scenario.mobile) });
   const page = await context.newPage();
@@ -396,6 +451,7 @@ for (const scenario of scenarios) {
   // Ospite della sandbox servito come in produzione (stessa pagina e CSP di src/shared/sandbox-host.js).
   await context.route('https://nexusnxs.com/sandbox/v1', (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8',
     headers: { 'Content-Security-Policy': sandboxHostPolicy('http://127.0.0.1:*') }, body: SANDBOX_HOST_HTML }));
+  if (scenario.init) await context.addInitScript(scenario.init);
   if (scenario.state) await context.addInitScript((value) => { if (window === window.top) localStorage.setItem('nxs.next.state.v1', JSON.stringify(value)); }, scenario.state);
   try {
     await page.goto(base, { waitUntil: 'load' });
