@@ -2,6 +2,7 @@
  * @module web/voice
  * @description Voce della web app: registrazione con arresto sul silenzio, conversione locale in WAV PCM 16 kHz mono e riproduzione progressiva della sintesi.
  */
+import { createBargeInDetector } from './barge-in';
 
 const SAMPLE_RATE = 16_000;
 const MAX_SECONDS = 11.5;
@@ -127,12 +128,10 @@ export function isNoiseTranscript(text: string): boolean {
   return clean.length < 2 || NOISE_TRANSCRIPTS.test(clean);
 }
 
-const BARGE_RMS = 0.07;
-const BARGE_MS = 320;
-
 /**
  * Voce live: mentre l'entità parla ascolta il microfono (con cancellazione dell'eco)
- * e chiama `onSpeech` quando l'utente parla sopra con decisione. Restituisce lo stop.
+ * e chiama `onSpeech` quando l'utente parla sopra con decisione. La soglia si adatta
+ * al rumore di fondo (vedi barge-in.ts). Restituisce lo stop.
  */
 export async function listenForBargeIn(onSpeech: () => void): Promise<() => void> {
   const stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints());
@@ -141,8 +140,8 @@ export async function listenForBargeIn(onSpeech: () => void): Promise<() => void
   analyser.fftSize = 1024;
   context.createMediaStreamSource(stream).connect(analyser);
   const samples = new Float32Array(analyser.fftSize);
-  let loud = 0;
-  let last = performance.now();
+  const detector = createBargeInDetector();
+  const started = performance.now();
   let timer = 0;
   let stopped = false;
   const stop = () => {
@@ -157,10 +156,7 @@ export async function listenForBargeIn(onSpeech: () => void): Promise<() => void
     analyser.getFloatTimeDomainData(samples);
     let sum = 0;
     for (const value of samples) sum += value * value;
-    const now = performance.now();
-    loud = Math.sqrt(sum / samples.length) > BARGE_RMS ? loud + (now - last) : 0;
-    last = now;
-    if (loud >= BARGE_MS) { stop(); onSpeech(); }
+    if (detector.push(Math.sqrt(sum / samples.length), performance.now() - started)) { stop(); onSpeech(); }
   }, 40);
   return stop;
 }
