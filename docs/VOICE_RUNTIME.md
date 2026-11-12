@@ -54,6 +54,14 @@ realtime e non sostituisce automaticamente Kokoro. Nel setup pubblico resterà
 un componente opzionale finché un runtime GPU verificato non offrirà latenza,
 dimensioni e fallback adatti alla distribuzione generale.
 
+Qwen3-TTS (GPU, PyTorch ROCm) è un'opzione sperimentale `NEXUS_VOICE_ENGINE=qwen3`
+servita da `FallbackSpeechService`: usa Qwen3 quando runtime e pesi sono
+presenti e ricade automaticamente su Kokoro in caso di errore. Il worker genera
+in streaming (primo blocco ~200 ms sulla RX 9070 XT) e accetta `cancel` senza
+perdere il modello caldo. Con RTF ≈ 1 e il contratto attuale "una WAV per
+segmento" non è il predefinito. Misure e motivazioni sono in
+`docs/QWEN3-TTS-EVALUATION.md`.
+
 ## Verifica
 
 ```powershell

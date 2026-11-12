@@ -274,6 +274,22 @@ src/infrastructure/electron/update-health.js (not touched by this work).
 
 ## Qwen3-TTS evaluation — 12 November 2026 (DONE: opt-in, not default)
 
+Update, commit "Voce Qwen3-TTS opzionale":
+- The GGUF path (llama.cpp Vulkan + ONNX DirectML, vendor/qwen3-tts-gguf) is
+  wired in bootstrap via NEXUS_VOICE_ENGINE=qwen3 + NEXUS_QWEN3_RUNTIME=gguf.
+- Measured by the side session: RTF 0.18 on 0.6B (1.2 GB) and 0.21 on 1.7B
+  (1.7 GB).
+- Bootstrap-style smoke: warm first audio 262 ms; 6.6 s of audio in 1.18 s;
+  stop settles in 9 ms; the first call costs 5.6 s cold.
+- npm test 1234 pass / 0 fail / 2 skipped; npm run check PASS.
+- Kokoro stays the default; the option is experimental.
+Still open:
+- TTS and LLM generating at the same time;
+- human listening;
+- the opt-in voice inside the running Electron app;
+- chunk streaming IPC to the renderer (the app still waits for one WAV per
+  segment).
+
 Result in docs/QWEN3-TTS-EVALUATION.md. Measured on RX 9070 XT with a
 ~9.9 GB LLM resident and idle (another session's llama-server).
 Qwen3 0.6B Base (voice clone of Kokoro im_nicola/if_sara):

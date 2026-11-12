@@ -58,6 +58,7 @@ const { LocalIntegrations, connectionsFromFile, disableConnectionInFile } = requ
 const { NeuralSpeechService } = require('../voice/neural-speech');
 const { RemoteSpeechQueue } = require('../voice/speech-arbiter');
 const { ExpressiveSpeechService } = require('../voice/expressive-speech');
+const { FallbackSpeechService, createQwen3SpeechService, qwen3Option } = require('../voice/qwen3-speech');
 recordModuleStage('agents-voice');
 const { TrainingStore } = require('../infrastructure/storage/training-store');
 const { PersonalMemoryStore } = require('../infrastructure/storage/personal-memory-store');
@@ -295,7 +296,7 @@ function bootstrapElectron({ env = process.env } = {}) {
   const pythonRuntimeDirectory = app.isPackaged
     ? path.join(process.resourcesPath, 'python', 'windows-x64')
     : path.join(appRoot, ...pythonRuntimeManifest.runtimeDirectory.split('/'));
-  const neuralSpeechService = new NeuralSpeechService({
+  const kokoroSpeechService = new NeuralSpeechService({
     workerPath: app.isPackaged
       ? path.join(process.resourcesPath, 'kokoro', 'worker.py')
       : path.join(appRoot, 'src', 'voice', 'neural-worker.py'),
@@ -304,6 +305,29 @@ function bootstrapElectron({ env = process.env } = {}) {
       : path.join(appRoot, 'vendor', 'kokoro'),
     pythonRuntimeDirectory
   });
+  // Qwen3-TTS (GPU) è opzionale: NEXUS_VOICE_ENGINE=qwen3. Senza opzione,
+  // runtime o pesi la voce resta Kokoro; un errore Qwen3 ricade su Kokoro.
+  // NEXUS_QWEN3_RUNTIME=gguf usa llama.cpp Vulkan + ONNX DirectML (RTF ~0,2).
+  const qwen3 = qwen3Option();
+  const qwen3Gguf = qwen3.runtime === 'gguf';
+  const qwen3Folder = qwen3Gguf ? 'qwen3-tts-gguf' : 'qwen3-tts';
+  const qwen3Root = process.env.NEXUS_QWEN3_ROOT
+    || (app.isPackaged ? path.join(process.resourcesPath, qwen3Folder) : path.join(appRoot, 'vendor', qwen3Folder));
+  const neuralSpeechService = qwen3.enabled
+    ? new FallbackSpeechService({
+      primary: createQwen3SpeechService({
+        runtime: qwen3.runtime,
+        enabled: true,
+        size: qwen3.size,
+        runtimeDirectory: qwen3Root,
+        ...(qwen3Gguf && !app.isPackaged ? { voicesDirectory: path.join(appRoot, 'vendor', 'qwen3-tts', 'voices') } : {}),
+        workerPath: app.isPackaged
+          ? path.join(qwen3Root, 'worker.py')
+          : path.join(appRoot, 'src', 'voice', qwen3Gguf ? 'qwen3-gguf-worker.py' : 'qwen3-worker.py')
+      }),
+      fallback: kokoroSpeechService
+    })
+    : kokoroSpeechService;
   const expressiveSpeechService = new ExpressiveSpeechService({
     runtimeDirectory: app.isPackaged
       ? path.join(process.resourcesPath, 'chatterbox')
