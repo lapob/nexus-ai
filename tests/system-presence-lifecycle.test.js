@@ -101,8 +101,8 @@ test('la capability startup documenta Core persistente e UI on-demand', () => {
   assert.equal(state.mode, 'headless-core');
   assert.equal(state.coreRunsWhenUiClosed, true);
   assert.equal(state.fullUi, 'on-demand');
-  assert.equal(state.presence.placement, 'adaptive-single-display');
-  assert.deepEqual(state.presence.placementPolicy, { one: 'primary', two: 'secondary', threeOrMore: 'primary' });
+  assert.equal(state.presence.surface, 'system-tray');
+  assert.equal(state.presence.placement, undefined, 'nessuna finestra sul desktop da posizionare');
   assert.equal(state.presence.ownsAiRuntime, false);
   assert.equal(state.presence.ownsRemoteGateway, false);
   assert.ok(state.activation.includes('approved-remote-action'));

@@ -85,9 +85,7 @@ function startupCapability({ available, enabled }) {
     presence: {
       enabled: Boolean(enabled),
       lightweight: true,
-      multiDisplay: true,
-      placement: 'adaptive-single-display',
-      placementPolicy: { one: 'primary', two: 'secondary', threeOrMore: 'primary' },
+      surface: 'system-tray',
       ownsAiRuntime: false,
       ownsRemoteGateway: false
     },

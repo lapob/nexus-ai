@@ -1,3 +1,30 @@
+## Block 1 review — 12 November 2026 (IN PROGRESS, source only)
+
+Operation: complete verification of the local Qwen3 commit 1f8b3a0 (not
+pushed), plus cleanup.
+
+Found and fixed:
+- `npm run check` failed on scripts/evaluate-qwen3-coexistence.js (no
+  #region markers). Regions added.
+- The `check` script contained an empty `node --check`. Removed.
+- The startup capability still described the removed desktop pet window
+  (multiDisplay, adaptive placement). It is now `surface: 'system-tray'`.
+- The remaining nucleus/select-display names are the Android protocol and
+  were kept on purpose for compatibility.
+
+Measured:
+- Model preload on warm service restarts is now 5–8 ms (nexus.log, 12 Nov),
+  so the 104 s figure is obsolete for warm restarts. Cold-boot preload has
+  not been re-measured.
+
+Added:
+- qa:desktop:overlay now runs at 1920/1366/1024/900/720 px. It checks that
+  every visible control is inside the window and that no two controls
+  overlap, and saves full-window captures.
+
+Expected verification: npm test, check, check:ui and overlay QA all PASS
+before commit; push only after that.
+
 ## Preview 0.3.39 — 12 November 2026 (PUBLISHED, verified live)
 
 Published state:
