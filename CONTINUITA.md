@@ -1,4 +1,16 @@
-## Preview 0.3.39 — 12 November 2026 (RELEASE IN PROGRESS)
+## Preview 0.3.39 — 12 November 2026 (PUBLISHED, verified live)
+
+Published state:
+- main pushed at 54f9477; GitHub release v0.3.39-preview.1.
+- Service restarted (readyz 200).
+- Site promoted as 65407b76 (website 518ece9, site tests 45/45, e2e 36/36);
+  live manifest 200 v0.3.39; ai.nexusnxs.com healthz 200.
+
+Not verified:
+- Automatic update of an installed copy from 0.3.37/0.3.38 (the rollout is
+  staged: 25%, then 60% after 2 h, then 100% after 6 h).
+- The Authenticode signature, which is waiting for the owner's account or
+  certificate.
 
 Operation: Preview 0.3.39 release, from the owner's reports and a full visual
 check.
@@ -28,7 +40,47 @@ Checks:
 answers 422/405, site e2e 36/36. Qwen3 files from the other session are not
 included. Flow as for 0.3.38; the PC is NOT restarted.
 
-## Qwen3-TTS GGUF (Vulkan + ONNX DirectML) — 12 November 2026 (IN PROGRESS)
+## Qwen3-TTS GGUF (Vulkan + ONNX DirectML) — 12 November 2026 (MEASURED, NOT COMMITTED)
+
+Result, with a ~10.6 GB LLM resident and idle, as in the baseline:
+
+| | RTF | First audio | VRAM | WER |
+|---|---|---|---|---|
+| GGUF 0.6B | 0.18 | 252 ms | 1.2 GB | 0.078 |
+| GGUF 1.7B | 0.21 | 309 ms | 1.7 GB | 0.036 |
+| PyTorch 0.6B | 0.98 | 194 ms | 2.6 GB | 0.066 |
+| Kokoro | 0.19 | – | – | 0.048 |
+
+GGUF barge-in: 4–12 ms, the worker stays warm. The RTF ≤ 0.6 threshold is met.
+
+Files touched in this block:
+- New: `src/voice/qwen3-gguf-worker.py`.
+- `src/voice/qwen3-speech.js`: `Qwen3GgufSpeechService`,
+  `createQwen3SpeechService`, `NEXUS_QWEN3_RUNTIME`, and the `workerEnv()` hook.
+- `tests/qwen3-speech.test.js`: 3 new tests.
+- `scripts/evaluate-qwen3-voice.js`: `--runtime gguf`, `--vulkan-devices`, and
+  VRAM read from the process tree.
+- `docs/QWEN3-TTS-EVALUATION.md`.
+
+`bootstrap.js` is deliberately untouched, so the GGUF runtime is not wired into
+the app yet.
+
+Checks:
+- `node scripts/run-tests.js`: 1236 tests, 1234 pass, 0 fail, 2 skipped.
+- `tests/qwen3-speech.test.js`: 12/12.
+
+Open:
+- (a) TTS during concurrent LLM generation is NOT measured. The only LLM on
+  disk is the 27B under another session's eval (ollama 11435), and it was not
+  touched.
+- (b) Wiring in bootstrap.
+- (c) Streaming to the renderer.
+- (d) Human A/B listening of `qa-artifacts/qwen3-voice/qwen3-gguf-*`.
+
+Two early runs were anomalous (RTF 1.4 on 0.6B, first sentence 10.5 s on 1.7B)
+and did not recur. The cause is not proven; it is probably GPU contention.
+
+Setup notes:
 
 Operation: measure HaujetZhao/Qwen3-TTS-GGUF on the RX 9070 XT against the
 PyTorch ROCm baseline. Everything third-party lives in
