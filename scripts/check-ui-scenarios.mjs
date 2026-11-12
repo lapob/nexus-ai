@@ -233,6 +233,63 @@ const scenarios = [
     if (!(await page.$('.empty-list'))) throw new Error('nessun messaggio «Nessun risultato»');
     await page.fill('.sidebar-full input[type="search"]', 'treni');
   }, expect: ['.search-hit-button .snippet'] },
+  { name: 'live-voice', viewport: desktop,
+  run: async (page) => {
+    // La voce live richiede microfono e voce del PC: qui si monta lo stesso markup per verificare il CSS reale.
+    await page.evaluate(() => {
+      const panel = document.createElement('section');
+      panel.className = 'live-panel glass';
+      panel.innerHTML = '<span class="live-state" role="status" data-state="listening"><i aria-hidden="true"></i><span class="live-text">Ti ascolto… una frase lunga per verificare che l’ellissi tagli solo il testo e mai il pallino</span></span><span class="live-actions"><button type="button" class="live-end">Termina</button></span>';
+      (document.querySelector('.composer')?.parentElement || document.body).append(panel);
+    });    await page.waitForSelector('.live-panel .live-state i');
+    await page.waitForTimeout(700);
+    const clip = await page.evaluate(() => {
+      const dot = document.querySelector('.live-state i');
+      const halo = 8;
+      const box = dot.getBoundingClientRect();
+      for (let node = dot.parentElement; node && node !== document.body; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.overflow !== 'visible' || style.overflowX !== 'visible') {
+          const area = node.getBoundingClientRect();
+          if (box.left - halo < area.left || box.top - halo < area.top || box.bottom + halo > area.bottom) return node.className;
+        }
+      }
+      return '';
+    });
+    if (clip) throw new Error(`il pallino in ascolto è tagliato da .${clip}`);
+  }, expect: ['.live-panel .live-text'] },
+  { name: 'guest-footer', viewport: desktop, state: thread,
+  run: async (page) => {
+    const contrast = await page.evaluate(() => {
+      const icon = [...document.querySelectorAll('.profile-button .profile-more')].find((node) => node.getClientRects().length);
+      if (!icon) return 0;
+      const color = getComputedStyle(icon).color.match(/[\d.]+/g).map(Number);
+      return color.length > 3 ? color[3] ?? 1 : 1;
+    });
+    if (contrast < 0.7) throw new Error(`indicatore del profilo poco visibile (alpha ${contrast})`);
+    await page.locator('.profile-button:visible').first().hover();
+    await page.waitForTimeout(250);
+  }, expect: ['.sidebar-full .profile-more svg'] },
+  { name: 'icon-tooltips', viewport: desktop, state: thread,
+  run: async (page) => {
+    // Ogni controllo di sola icona, ovunque, deve avere un nome e quindi un suggerimento.
+    const unnamed = async () => page.$$eval('button, a[href], [role="button"], [role="switch"]', (items) => items.filter((item) => {
+      if (!item.getClientRects().length || getComputedStyle(item).visibility === 'hidden') return false;
+      if ((item.innerText || '').trim()) return false;
+      return !(item.getAttribute('aria-label') || item.getAttribute('title') || item.dataset.tip || item.getAttribute('aria-labelledby'));
+    }).map((item) => item.outerHTML.slice(0, 120)));
+    const missing = [...await unnamed()];
+    await page.click('[aria-label="Nascondi barra laterale (Ctrl+B)"]'); await page.waitForTimeout(450);
+    missing.push(...await unnamed());
+    if (missing.length) throw new Error(`icone senza nome/suggerimento: ${missing.join(' | ')}`);
+    await page.click('[aria-label*="barra laterale"]'); await page.waitForTimeout(450);
+    // Un'icona con solo aria-label mostra il suggerimento in vetro.
+    const target = page.locator('.message-actions button[aria-label]:visible, .msg-actions button[aria-label]:visible').first();
+    const fallback = page.locator('button[aria-label]:not([title]):visible').filter({ hasNotText: /\S/ }).first();
+    const icon = (await target.count()) ? target : fallback;
+    await icon.hover();
+    await page.waitForSelector('.tooltip', { timeout: 2_000 });
+  }, expect: ['.tooltip'] },
   { name: 'focus-contained', viewport: desktop, state: thread,
   run: async (page) => {
     await page.focus('.conversation-list .conversation button');

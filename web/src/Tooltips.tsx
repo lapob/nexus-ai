@@ -2,7 +2,8 @@
  * @module web/src/Tooltips
  * @description Tooltip moderni per tutta l'interfaccia: un solo gestore globale sostituisce il riquadro
  * nativo di `title` con un'etichetta in vetro animata, posizionata sopra o sotto secondo lo spazio,
- * mostrata anche al focus da tastiera e mai sul touch. Nessun componente deve cambiare.
+ * mostrata anche al focus da tastiera e mai sul touch. Nessun componente deve cambiare: ogni controllo di sola
+ * icona riceve il suggerimento dal proprio nome accessibile (aria-label), con la scorciatoia se dichiarata.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -12,6 +13,9 @@ const SPOTLIGHT = '.chip, .category, .new-chat, .project-row, .profile-button, .
 const DELAY = 420;
 const WARM = 650; // dopo un tooltip, i successivi compaiono subito per questo tempo
 
+/** Controlli che possono avere un suggerimento: title/data-tip espliciti o controlli di sola icona con aria-label. */
+const TIPPABLE = '[title]:not(iframe),[data-tip],button[aria-label],a[aria-label],[role="button"][aria-label],[role="switch"][aria-label]';
+
 /** Sposta `title` in `data-tip` (niente riquadro nativo) senza perdere il nome accessibile. */
 function adopt(element: HTMLElement): string | null {
   const title = element.getAttribute('title');
@@ -20,7 +24,13 @@ function adopt(element: HTMLElement): string | null {
     element.removeAttribute('title');
     if (!element.hasAttribute('aria-label') && !element.textContent?.trim()) element.setAttribute('aria-label', title);
   }
-  return element.dataset.tip?.trim() || null;
+  const explicit = element.dataset.tip?.trim();
+  if (explicit) return explicit;
+  // Solo icona: il nome accessibile diventa il suggerimento; i pulsanti con testo visibile non ne hanno bisogno.
+  const label = element.getAttribute('aria-label')?.trim();
+  if (!label || (element.innerText || '').trim()) return null;
+  const keys = element.getAttribute('aria-keyshortcuts')?.trim();
+  return keys && !label.includes('(') ? `${label} (${keys.replace(/Control/g, 'Ctrl')})` : label;
 }
 
 export function Tooltips() {
@@ -32,7 +42,7 @@ export function Tooltips() {
     let current: HTMLElement | null = null;
     let hiddenAt = 0;
     // Gli iframe usano `title` come nome accessibile, non come suggerimento: restano esclusi.
-    const find = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>('[title]:not(iframe),[data-tip]') : null);
+    const find = (target: EventTarget | null) => (target instanceof Element ? target.closest<HTMLElement>(TIPPABLE) : null);
     const show = (element: HTMLElement) => {
       const text = adopt(element);
       if (!text || element === current) return;

@@ -30,10 +30,12 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
     icon: path.join(__dirname, '..', '..', '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     title: 'NEXUSNXS',
     titleBarStyle: 'hidden',
+    // Controlli di Windows trasparenti sopra la barra dell'app: nessun riquadro nero, stessa altezza
+    // della barra (l'interfaccia riserva lo spazio con env(titlebar-area-*)).
     titleBarOverlay: {
-      color: '#020405',
-      symbolColor: '#9fe7e7',
-      height: 34
+      color: '#00000000',
+      symbolColor: '#cfeff0',
+      height: 56
     },
     // All'avvio con Windows NexusNXS prepara AI e remoto senza imporre una
     // finestra. Una seconda apertura richiama normalmente la finestra unica.

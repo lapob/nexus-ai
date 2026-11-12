@@ -15,7 +15,6 @@ import { ACCEPT, formatSize, limitsFor, prepareFiles, type Pending } from './att
 import { Core, type CoreState } from './Core';
 import { Markdown } from './Markdown';
 import { Icon, type IconName } from './Icon';
-import { Select } from './Select';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { Tooltips } from './Tooltips';
@@ -28,6 +27,8 @@ import { closePanel, openPanel, usePanel } from './panelStore';
 
 // Centro di controllo solo desktop (protocollo nexus://, script-src 'self'): caricato alla prima apertura, fuori dal bundle iniziale.
 const ControlCenter = lazy(() => import('./ControlCenter').then((module) => ({ default: module.ControlCenter })));
+// Il selettore serve solo nelle preferenze: resta fuori dal bundle di avvio.
+const Select = lazy(() => import('./Select').then((module) => ({ default: module.Select })));
 
 /** Rinomina e, dove la cronologia vive altrove (desktop), salva subito anche le conversazioni non attive. */
 function rename(id: string, title: string) {
@@ -694,7 +695,7 @@ export function App() {
             <m.section className="live-panel glass" aria-label="Voce live" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}>
               <span className="live-state" role="status" aria-live="polite" data-state={coreState}>
                 <i aria-hidden="true" />
-                {recording ? 'Ti ascolto…' : transcribing ? 'Comprendo…' : generating ? (phase || 'Penso…') : speakingId ? 'Parlo · parla sopra per interrompermi' : 'In attesa…'}
+                <span className="live-text">{recording ? 'Ti ascolto…' : transcribing ? 'Comprendo…' : generating ? (phase || 'Penso…') : speakingId ? 'Parlo · parla sopra per interrompermi' : 'In attesa…'}</span>
               </span>
               <span className="live-actions">
                 {(speakingId || generating) && <button type="button" className="row-button" onClick={() => { if (generating) stop(); stopSpeaking(); }}><Icon name="stop" />Interrompi</button>}
@@ -1160,8 +1161,8 @@ function MicrophonePicker() {
   return (
     <>
       <label htmlFor="microphone">Microfono</label>
-      <Select id="microphone" className="field" value={selected} onChange={(value) => { setPreferredMicrophone(value); setSelected(value); }}
-        options={[{ value: '', label: 'Predefinito di sistema' }, ...devices.map((device) => ({ value: device.id, label: device.label }))]} />
+      <Suspense fallback={<div className="field select-trigger" aria-hidden="true" />}><Select id="microphone" className="field" value={selected} onChange={(value) => { setPreferredMicrophone(value); setSelected(value); }}
+        options={[{ value: '', label: 'Predefinito di sistema' }, ...devices.map((device) => ({ value: device.id, label: device.label }))]} /></Suspense>
     </>
   );
 }
@@ -1221,7 +1222,7 @@ function ProfileMenu({ status, compactRail = false, onSettings, onControl, onSho
       <button type="button" className="profile-button" aria-haspopup="menu" aria-expanded={open} aria-label={`${who}, ${STATUS_LABEL[status]}: menu`} onClick={() => setOpen((value) => !value)}>
         <span className="avatar" data-status={status}><Icon name="user" size={16} /></span>
         {!compactRail && <span className="profile-text"><strong>{who}</strong><small>{STATUS_LABEL[status]}</small></span>}
-        {!compactRail && <Icon name="more" size={18} />}
+        {!compactRail && <span className="profile-more" aria-hidden="true"><Icon name="chevrons" size={16} /></span>}
       </button>
       <AnimatePresence>
         {open && (

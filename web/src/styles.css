@@ -80,7 +80,15 @@
   .jump .icon { width: 18px; height: 18px; }
   /* Colonna esplicita minmax(0,1fr): la colonna implicita `auto` prendeva la larghezza del titolo senza a capo. */
   .stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; overflow: clip; min-height: 0; isolation: isolate; }
-  .topbar { display: flex; align-items: center; gap: 12px; padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); z-index: 5; }
+  /* Desktop con controlli di Windows sovrapposti (Window Controls Overlay): la barra riserva lo spazio dei
+     pulsanti di sistema a destra, così le azioni non finiscono mai sotto riduci/ingrandisci/chiudi.
+     Senza overlay le variabili mancano e il calcolo ricade sui 16px normali. */
+  .topbar { display: flex; align-items: center; gap: 12px; z-index: 5;
+    padding: 6px max(16px, env(safe-area-inset-right), calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 12px)) 6px max(16px, env(safe-area-inset-left));
+    min-height: max(56px, env(titlebar-area-height, 0px)); }
+  /* La barra e l'intestazione laterale trascinano la finestra; i controlli restano cliccabili. */
+  .topbar, .sidebar-head { -webkit-app-region: drag; app-region: drag; }
+  :is(.topbar, .sidebar-head) :is(button, a, input, select, textarea, [role='button'], [role='switch'], [tabindex]) { -webkit-app-region: no-drag; app-region: no-drag; }
   .title { flex: 1; min-width: 0; margin: 0; font-size: .95rem; font-weight: 550; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; view-transition-name: conversation-title; }
   /* overflow-anchor: mentre la risposta cresce, la parte che si sta leggendo resta ferma. */
   .scroll { overflow-y: auto; overscroll-behavior: contain; overflow-anchor: auto; padding: 8px 16px 24px; z-index: 2; }
@@ -106,8 +114,14 @@
   .brand img { border-radius: 6px; }
   .sidebar-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
   .sidebar-foot { margin-top: auto; display: grid; gap: 2px; }
-  .icon-button { display: grid; place-items: center; width: var(--touch); height: var(--touch); border-radius: 12px; color: var(--mist); transition: background .17s var(--ease-standard), color .17s; }
-  .icon-button:hover { background: color-mix(in oklch, var(--ice) 7%, transparent); color: var(--ice); }
+  .icon-button { display: grid; place-items: center; width: var(--touch); height: var(--touch); border-radius: 12px; color: color-mix(in oklch, var(--mist) 88%, var(--ice));
+    transition: background .17s var(--ease-standard), color .17s, scale .28s var(--spring, var(--ease-emphasized)); }
+  .icon-button:hover { background: color-mix(in oklch, var(--ice) 8%, transparent); color: var(--ice); }
+  /* Pressione tattile: l'icona si comprime e rimbalza, sempre dentro il proprio riquadro. */
+  .icon-button:active:not(:disabled) { scale: .9; transition-duration: .08s; }
+  .icon-button > svg { transition: translate .22s var(--ease-emphasized); }
+  .icon-button:hover:not(:disabled) > svg { translate: 0 -1px; }
+  @media (prefers-reduced-motion: reduce) { .icon-button, .icon-button > svg { transition: background .17s, color .17s; } .icon-button:active, .icon-button:hover > svg { scale: none; translate: none; } }
   .icon-button.small { width: 32px; height: 32px; border-radius: 9px; }
   /* Visibile solo quando la barra laterale è un cassetto. */
   .icon-button.only-compact { display: none; }
@@ -176,7 +190,9 @@
   .app[data-live='true'] .scroll { mask-image: linear-gradient(to bottom, transparent 0, #000 55%); opacity: .55; transition: opacity .4s; }
   .app[data-live='true'] .welcome { visibility: hidden; }
   .live-panel { width: min(560px, calc(100% - 32px)); margin: 0 auto max(16px, env(safe-area-inset-bottom)); border-radius: 99px; padding: 8px 8px 8px 20px; z-index: 6; display: flex; align-items: center; gap: 12px; }
-  .live-state { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 10px; font-size: .92rem; color: var(--ice); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Il pallino pulsa con un alone di 8px: il contenitore non taglia, solo il testo va in ellissi. */
+  .live-state { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 12px; font-size: .92rem; color: var(--ice); }
+  .live-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .live-state i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 14px var(--cyan); }
   .live-state[data-state='listening'] i { animation: listen 1.05s var(--ease-standard) infinite alternate; }
   .live-state[data-state='thinking'] i { background: oklch(80% .12 260); box-shadow: 0 0 14px oklch(80% .12 260); animation: listen .6s var(--ease-standard) infinite alternate; }
@@ -216,7 +232,7 @@
   .answer { line-height: 1.68; font-size: 1rem; }
   .message.error .answer { color: var(--attention); }
   .note { margin: 6px 0 0; color: var(--mist); font-size: .82rem; }
-  .answer-actions { display: flex; gap: 2px; margin-top: 6px; opacity: .65; transition: opacity .17s; }
+  .answer-actions { display: flex; gap: 2px; margin-top: 6px; opacity: .82; transition: opacity .17s; }
   .message:hover .answer-actions, .answer-actions:focus-within { opacity: 1; }
 
   .markdown > :first-child { margin-top: 0; }
@@ -788,6 +804,10 @@
   .profile-text { flex: 1; min-width: 0; display: grid; line-height: 1.25; }
   .profile-text strong { font-size: .88rem; font-weight: 600; color: var(--ice); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .profile-text small { font-size: .76rem; color: var(--mist); }
+  /* Indicatore del menu: leggibile su ogni sfondo, si accende al passaggio e quando il menu è aperto. */
+  .profile-more { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: color-mix(in oklch, var(--ice) 78%, transparent);
+    background: color-mix(in oklch, var(--ice) 6%, transparent); border: 1px solid color-mix(in oklch, var(--ice) 10%, transparent); transition: color .18s, background .18s, border-color .18s, rotate .3s var(--ease-emphasized); }
+  .profile-button:hover .profile-more, .profile-button[aria-expanded='true'] .profile-more { color: var(--cyan); border-color: color-mix(in oklch, var(--cyan) 35%, transparent); background: color-mix(in oklch, var(--cyan) 10%, transparent); }
   .profile-menu { position: absolute; z-index: 50; left: 0; right: 0; bottom: calc(100% + 8px); display: grid; gap: 2px; padding: 6px; border-radius: 14px; transform-origin: 50% 100%;
     box-shadow: 0 24px 60px -18px #000d, 0 0 0 1px color-mix(in oklch, var(--cyan) 10%, transparent); }
   /* Nella barra a icone il menu si apre a destra del pulsante, fuori dalla colonna da 64px, senza tagli. */

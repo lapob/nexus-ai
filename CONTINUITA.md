@@ -1,3 +1,45 @@
+## Preview 0.3.39 — 12 November 2026 (RELEASE IN PROGRESS)
+
+Operation: Preview 0.3.39 release, from the owner's reports and a full visual
+check.
+
+Fixes:
+- Desktop: Windows controls are now transparent (titleBarOverlay #00000000,
+  56 px). The bar reserves their space with env(titlebar-area-*), so actions
+  are no longer covered. The bar and the side header drag the window.
+  Measured live in Electron with npm run qa:desktop:overlay, at 1366 and
+  900 px.
+- Live voice dot no longer clipped: only the text is ellipsized.
+- Visible profile indicator (chevrons).
+- Tooltips on every icon-only control: the aria-label is used as the tip,
+  plus the keyboard shortcut.
+- Icon buttons have more contrast and a press feedback.
+- The Select component is lazy-loaded, so the startup bundle drops to
+  406151 bytes, under the 400 KiB budget.
+- New UI scenarios: live-voice, guest-footer, icon-tooltips.
+
+Checks:
+- npm test: 1233 tests, 1231 pass, 0 fail, 2 skipped.
+- npm run check: PASS.
+- check:ui: 37/37 and 15/15.
+- Overlay QA: PASS.
+
+0.3.38 is published and verified live: manifest 200, the health endpoint
+answers 422/405, site e2e 36/36. Qwen3 files from the other session are not
+included. Flow as for 0.3.38; the PC is NOT restarted.
+
+## Qwen3-TTS GGUF (Vulkan + ONNX DirectML) — 12 November 2026 (IN PROGRESS)
+
+Operation: measure HaujetZhao/Qwen3-TTS-GGUF on the RX 9070 XT against the
+PyTorch ROCm baseline. Everything third-party lives in
+`vendor/qwen3-tts-gguf/` (gitignored): `src/` (repo main, codeload zip),
+`llama-b11789/` (from `.toolchains/cache`, SHA-256 29502BD5…B7EC). Binding
+patch: `llama.py` targets b10621; for b11789 `lazy_mode` was added to
+`llama_model_params` and `moe_cache_size` to `llama_context_params`. The 40
+function signatures used are unchanged. Export uses the existing verified
+weights only, with no new downloads. Expected result: comparison table in
+`docs/QWEN3-TTS-EVALUATION.md`. No commits.
+
 ## Preview 0.3.38 — 11 November 2026 (RELEASE IN PROGRESS)
 
 Operation: release Preview 0.3.38 (owner: "esegui tutto … al massimo").
@@ -178,7 +220,44 @@ qa-artifacts/control-notifications-restart-2.log; then live test driven over
 ADB plus the desktop app. check-source-sections fails only on
 src/infrastructure/electron/update-health.js (not touched by this work).
 
-## Qwen3-TTS evaluation — 11 November 2026 (IN PROGRESS)
+## Qwen3-TTS evaluation — 12 November 2026 (DONE: opt-in, not default)
+
+Result in docs/QWEN3-TTS-EVALUATION.md. Measured on RX 9070 XT with a
+~9.9 GB LLM resident and idle (another session's llama-server).
+Qwen3 0.6B Base (voice clone of Kokoro im_nicola/if_sara):
+- first streamed audio 194 ms median;
+- RTF 0.98;
+- 2.6 GB VRAM;
+- barge-in settles in 69 ms with the worker kept warm;
+- Whisper WER 0.066 vs Kokoro 0.048.
+Kokoro: 1026 ms per complete segment, RTF 0.16. 1.7B: RTF ~1.3, 4.5 GB, does
+not fit next to the LLM.
+Not default because:
+- RTF ≈ 1;
+- the app contract is one WAV per segment, which makes perceived first audio
+  ~5.5 s;
+- 6 GB runtime.
+ROCm fixes in the worker: MIOpen off for the decoder (RTF 2.1 → 1.0), user
+profile env passed for kernel caches, os._exit because HIP teardown hangs.
+Files on disk, NOT committed (left out of 0.3.38 by the release session):
+- src/voice/qwen3-speech.js, src/voice/qwen3-worker.py;
+- tests/qwen3-speech.test.js;
+- scripts/evaluate-qwen3-voice.js, scripts/evaluate-qwen3-coexistence.js;
+- the Qwen3 hunks in src/application/bootstrap.js;
+- .env.example, docs/QWEN3-TTS-EVALUATION.md, the docs/VOICE_RUNTIME.md
+  paragraph.
+Checks: node scripts/run-tests.js 1230 pass / 0 fail / 2 skipped. npm test
+from the background shell failed only because node was not on npm's PATH.
+Not verified:
+- TTS and LLM generating at the same time (GPU held by another session's eval);
+- human listening A/B;
+- the opt-in path inside the running Electron app.
+Next:
+1. GGUF Vulkan + ONNX DirectML path.
+2. Chunk streaming IPC to the renderer.
+3. evaluate-qwen3-coexistence.js on a free GPU.
+
+### Plan as recorded at the start
 
 Operation: evaluate Qwen3-TTS as optional NexusNXS voice on RX 9070 XT
 (Windows, ROCm). Runtime: vendor/qwen3-tts/.venv (Python 3.12, torch
