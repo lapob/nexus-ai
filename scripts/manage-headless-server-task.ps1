@@ -3,7 +3,7 @@
   @description Installs, removes, or inspects the portable headless server task.
 #>
 param(
-  [ValidateSet('install', 'remove', 'start', 'stop', 'restart', 'status')]
+  [ValidateSet('install', 'install-watchdog', 'remove', 'start', 'stop', 'restart', 'status')]
   [string]$Action = 'status',
   [ValidateSet('Boot', 'Logon')]
   [string]$StartupMode = 'Boot'
@@ -15,6 +15,7 @@ $presenceTaskName = 'NexusNXS Presence'
 $desktopBridgeTaskName = 'NexusNXS Desktop Bridge'
 $deviceCoreTaskName = 'NexusNXS Connectivity'
 $legacyTaskName = 'Nexus AI Server'
+$watchdogTaskName = 'NexusNXS Watchdog'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $pwshPath = (Get-Command pwsh.exe -ErrorAction Stop).Source
 $runnerPath = Join-Path $projectRoot 'scripts\run-headless-server.ps1'
@@ -219,6 +220,35 @@ exit `$LASTEXITCODE
   return "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encoded"
 }
 
+function Install-WatchdogTask {
+  # Sorvegliante esterno ogni 2 minuti: riavvia il server se il processo è vivo ma non pronto
+  # (scripts/server-watchdog.ps1). Stesso utente e stesso tipo di accesso del server, nessun privilegio extra.
+  $arguments = Get-PortableTaskArguments -EntryPoint (Join-Path $projectRoot 'scripts\server-watchdog.ps1')
+  $action = New-ScheduledTaskAction -Execute $pwshPath -Argument $arguments -WorkingDirectory $env:SystemRoot
+  $ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) -RepetitionInterval (New-TimeSpan -Minutes 2)
+  $principal = if ($StartupMode -eq 'Boot') {
+    New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType S4U -RunLevel Limited
+  } else {
+    New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
+  }
+  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
+  $description = 'NexusNXS health watchdog: restarts the server only when it stays not ready (max 2/hour).'
+  try {
+    Register-ScheduledTask -TaskName $watchdogTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
+      -Description $description -Force -ErrorAction Stop | Out-Null
+    Write-Output "NexusNXS Watchdog installed (every 2 minutes, $($principal.LogonType))."
+  } catch [Microsoft.Management.Infrastructure.CimException] {
+    if ($principal.LogonType -ne 'S4U') { throw }
+    # S4U richiede un PowerShell amministratore. Riserva: gira mentre il proprietario è connesso.
+    $interactive = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
+    Register-ScheduledTask -TaskName $watchdogTaskName -Action $action -Trigger $trigger -Principal $interactive -Settings $settings `
+      -Description $description -Force -ErrorAction Stop | Out-Null
+    Write-Warning 'NexusNXS Watchdog installed only for the logged-on session. Run this action from an administrator PowerShell to cover boot without logon.'
+  }
+}
+
 function Install-ServerTask {
   # La workstation usa --server come unico Core autorevole. Una vecchia attivita
   # --background della distribuzione pubblica condividerebbe lo stesso lock e
@@ -279,6 +309,7 @@ function Install-ServerTask {
   if ($legacyTaskName -ne $taskName) {
     Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false -ErrorAction SilentlyContinue
   }
+  Install-WatchdogTask
   Write-Output "NexusNXS Server autostart installed ($StartupMode) from $projectRoot."
 }
 
@@ -295,6 +326,7 @@ if ($Action -eq 'remove') {
   }
   Unregister-ScheduledTask -TaskName $presenceTaskName -Confirm:$false -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $desktopBridgeTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $watchdogTaskName -Confirm:$false -ErrorAction SilentlyContinue
   Write-Output 'NexusNXS Server autostart removed.'
   exit 0
 }
@@ -389,6 +421,11 @@ if ($Action -eq 'status') {
     DataRoot = Join-Path (Split-Path $projectRoot -Parent) '.nexus-data'
     LastLogEvent = $lastLog
   } | Format-List
+  exit 0
+}
+
+if ($Action -eq 'install-watchdog') {
+  Install-WatchdogTask
   exit 0
 }
 

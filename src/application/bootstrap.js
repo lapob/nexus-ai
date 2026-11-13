@@ -78,6 +78,7 @@ const { configureContinuityTask } = require('../infrastructure/windows/continuit
 const { CrashReportStore } = require('../infrastructure/storage/crash-report-store');
 const { createUpdateManager } = require('../infrastructure/electron/update-manager');
 const { ProcessLock, isProcessAlive, readLock } = require('../infrastructure/electron/process-lock');
+const { wakeServerCore } = require('../infrastructure/electron/core-service');
 const { coordinateShutdown } = require('./shutdown-coordinator');
 const { runtimeWarmupPolicy, warmupRetryDelay } = require('./runtime-warmup-policy');
 const { ProactiveEventBus } = require('./proactive-event-bus');
@@ -879,6 +880,10 @@ function bootstrapElectron({ env = process.env } = {}) {
           // Il Core possiede già gateway, remoto e processi operativi. La UI è
           // soltanto un client interattivo e non tenta un secondo bind locale.
           logger.info('Gateway remoto affidato al Core NexusNXS gia attivo.');
+        } else if (!smokeTest && await wakeServerCore({ logger })) {
+          // Server installato come servizio ma momentaneamente giù: lo si risveglia e la UI resta
+          // client. Mai un gateway posseduto dalla finestra: chiuderla fermerebbe il servizio pubblico.
+          logger.info('Gateway remoto riservato al servizio server NexusNXS; la UI resta client.');
         } else {
           remoteGateway.start()
             .then((status) => {

@@ -1,3 +1,37 @@
+## Server independent from the desktop app — 13 November 2026 (in progress)
+
+Owner request: closing the desktop app must never stop the server.
+
+Verified live:
+- The Core is "NexusNXS Server": boot task, S4U, restart 999 every minute.
+- Process chain: svchost → pwsh → node → electron --server → ollama →
+  llama-server. The desktop UI is a separate process chain (WMI/cmd).
+- So closing the UI does not touch the Core.
+
+Gap fixed (source):
+- If the UI started while the Core was down (restart window, crash), it
+  started its own gateway. Closing it would then stop the public service, and
+  the Core would find its ports taken.
+- Now src/infrastructure/electron/core-service.js wakes the "NexusNXS Server"
+  task (schtasks /Run) and the UI stays a client. tests/core-service.test.js.
+
+Added:
+- scripts/server-watchdog.ps1 plus the "NexusNXS Watchdog" task, every 2 min
+  (manage-headless-server-task.ps1 -Action install-watchdog; `install`
+  includes it, `remove` removes it).
+- Rules:
+  - ready → reset the failure count;
+  - task stopped → start it;
+  - not ready for 3 checks in a row and Core older than 10 min (lock
+    createdAt) → coordinated restart;
+  - at most 2 restarts per hour;
+  - pause while maintenance.flag is younger than 2 h, or while the manager is
+    running.
+- Log: .nexus-data/logs/watchdog.log; state:
+  .nexus-data/metrics/watchdog-state.json.
+- Releases: create .nexus-data/maintenance.flag before a planned restart, then
+  remove it.
+
 ## Integrated confirmations and Control Center fix — 13 November 2026 (source, verified)
 
 Owner reports:
