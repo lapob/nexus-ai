@@ -54,7 +54,12 @@ function classifyHardware(input = {}) {
   };
 }
 
-function runtimeTuning(hardware = {}) {
+/**
+ * @param {object} hardware
+ * @param {{ gpuVoice?: boolean }} [options] gpuVoice: a GPU voice (Qwen3-TTS,
+ *   NEXUS_VOICE_ENGINE=qwen3) shares the VRAM with the LLM.
+ */
+function runtimeTuning(hardware = {}, { gpuVoice = false } = {}) {
   const profile = classifyHardware(hardware);
   const memoryGiB = profile.totalMemoryBytes / GIB;
   const gpuGiB = profile.gpuMemoryBytes / GIB;
@@ -72,10 +77,14 @@ function runtimeTuning(hardware = {}) {
       : profile.performanceLevel >= 4 ? 8192 : baseContext;
   const maximumContext = profile.performanceLevel >= 5 ? 32768
     : profile.performanceLevel >= 4 ? 16384 : 12288;
-  const contextTokens = clamp(minimumContext, maximumContext, stepped(
+  // Measured 13/11/2026 on 16 GB with Qwen3-TTS GGUF: at 32K (13.7 GB) the TTS
+  // pushes 1.2 GB of the LLM into shared memory and the LLM drops from 52 to
+  // 23 tok/s; at 16K (11.3 GB) they coexist (TTS RTF <= 0.26, LLM 38.6 tok/s).
+  const voiceCap = gpuVoice && gpuGiB > 0 && gpuGiB < 20 ? 16384 : Infinity;
+  const contextTokens = Math.min(voiceCap, clamp(minimumContext, maximumContext, stepped(
     baseContext + (Math.max(0, memoryGiB - 8) * 256) + (Math.min(gpuGiB, 16) * 64),
     512
-  ));
+  )));
   const cpuScale = clamp(0.72, 1, profile.cpuThreads / 12);
   const quickTokens = stepped(clamp(profile.performanceLevel === 1 ? 224 : 320, 1024, (contextTokens / 6) * cpuScale), 32);
   const deepTokens = stepped(clamp(640, profile.performanceLevel >= 5 ? 8192 : 4096, (contextTokens / 3) * cpuScale), 64);

@@ -120,9 +120,36 @@ VRAM rule (owner's choice, "Kokoro if VRAM is full"):
 - Checked live with the 14b resident: it reports `vram-spill` and no worker
   starts.
 
+13 November — measured on the app runtime (Ollama 17968, qwen3:14b), with
+GGUF 0.6B TTS:
+
+| | 32K (13.7 GB) | 16K (11.3 GB) |
+|---|---|---|
+| TTS, LLM idle: RTF / first audio | 0.20 / 294 ms | 0.24 / 315 ms |
+| TTS, LLM generating: RTF / first audio | 0.33 / 455 ms | 0.26 / 363 ms |
+| LLM alone | 52 tok/s | 52 tok/s |
+| LLM during TTS | 23.1 tok/s | 38.6 tok/s |
+
+- At 32K the TTS pushes 1.18 GB of the LLM into shared memory, and the
+  memory stays there after the TTS closes.
+- The app LLM was restored to 32K afterwards: 13.7 GB, 51.2 tok/s.
+- Applied: with `NEXUS_VOICE_ENGINE=qwen3`, `runtimeTuning(..., { gpuVoice })`
+  caps the LLM context at 16K on GPUs under 20 GB. Files:
+  `src/ai/hardware-profile.js`, one line in `src/application/bootstrap.js`,
+  and `tests/hardware-profile.test.js`.
+- The script gained `--num-ctx`.
+- The owner confirmed the 16K cap with Qwen3 active (13 November), and it
+  is committed.
+
+Checks:
+- Focused tests (hardware-profile, gpu-memory, qwen3-speech): 24/24.
+- Full suite: 1258 tests, 1252 pass, 4 FAIL, 2 skipped. The 4 failures are
+  all in `tests/response-consent.test.js`, `consentDialog is not defined`.
+  They come from another session's ongoing in-app dialog change in
+  `register-ipc.js` (18:27), not from this work.
+
 Open:
-- (a) Measure `qwen3:14b` at 16K together with the TTS. This needs the
-  app's model to be reloaded.
+- Human listening of the A/B pairs.
 - (c) Streaming to the renderer: DONE on 13 November.
   - `src/voice/speech-stream.js`, IPC channel `nexus:neural-voice-chunk`,
     `onVoiceChunk` in the preload, and `web/src/platform.ts`.

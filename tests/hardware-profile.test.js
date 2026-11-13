@@ -51,6 +51,13 @@ test('adatta contesto, output e permanenza del modello al computer', () => {
   );
   assert.equal(maximum.contextTokens, 32768);
   assert.equal(runtimeTuning({ totalMemoryBytes: 32 * GIB, cpuThreads: 16, gpuMemoryBytes: 14 * GIB }).contextTokens, 16384, 'sotto 15 GB di VRAM resta 16K');
+  // Voce Qwen3 su GPU: a 16 GB il contesto scende a 16K per lasciarle la VRAM (misurato 13/11/2026).
+  const workstation = { totalMemoryBytes: 32 * GIB, cpuThreads: 16, gpuMemoryBytes: 16 * GIB };
+  assert.equal(runtimeTuning(workstation, { gpuVoice: true }).contextTokens, 16384);
+  assert.equal(runtimeTuning(workstation, { gpuVoice: false }).contextTokens, 32768);
+  assert.ok(runtimeTuning(workstation, { gpuVoice: true }).deepTokens <= performance.deepTokens, 'gli output seguono il contesto ridotto');
+  assert.equal(runtimeTuning({ totalMemoryBytes: 64 * GIB, cpuThreads: 24, gpuMemoryBytes: 24 * GIB }, { gpuVoice: true }).contextTokens, 32768, 'con 24 GB entrano entrambi');
+  assert.equal(runtimeTuning({ totalMemoryBytes: 16 * GIB, cpuThreads: 8, gpuMemoryBytes: 4 * GIB }, { gpuVoice: true }).contextTokens, 4096, 'sotto il tetto non cambia nulla');
   assert.ok(lite.quickTokens < balanced.quickTokens);
   assert.equal(efficient.performanceLevel, 2);
   assert.ok(lite.contextTokens < efficient.contextTokens);

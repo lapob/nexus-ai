@@ -263,10 +263,12 @@ Osservazioni:
     1,09 GB in memoria condivisa, perché quanto sta in VRAM dipende dal
     desktop: dwm da solo ha 1–1,3 GB. La velocità resta 51,2 tok/s.
 
-  Per avere Qwen3 come voce con il 14b serve quindi il contesto a 16K quando
-  Qwen3 è attivo. È una politica di `hardware-profile.js`, che oggi fissa 32K
-  sulle GPU da 16 GB, e decide il proprietario. Con la regola attuale (Kokoro
-  se la VRAM è piena) a 32K parla Kokoro, ed è il comportamento voluto.
+  **Applicato:** con `NEXUS_VOICE_ENGINE=qwen3`, `runtimeTuning(hardware, {
+  gpuVoice: true })` limita il contesto dell'LLM a 16K sulle GPU sotto i 20 GB.
+  Lo passa bootstrap, e il test è in `tests/hardware-profile.test.js`. Senza
+  l'opzione Qwen3 nulla cambia: Kokoro predefinito e 32K. Con 24 GB restano
+  32K. Il `VramGate` resta la seconda difesa: se il desktop o un altro modello
+  occupano la VRAM, parla Kokoro.
 
   Con l'LLM da ~10,6 GB (sopra) il TTS resta a RTF 0,18: entro quel budget
   la convivenza funziona.
@@ -367,8 +369,8 @@ sintesi annullata con Kokoro.
 2. ~~Convivenza con `qwen3:14b`~~: misurata, a 32K non c'è VRAM per il TTS.
    ~~Regola automatica~~: fatta, Kokoro se la VRAM è piena (`VramGate`).
    Il decoder ONNX su CPU è stato misurato e non basta. ~~LLM a 16K~~:
-   misurato, convivono (vedi «32K contro 16K»). Da decidere: 16K automatico
-   quando Qwen3 è attivo.
+   misurato, convivono (vedi «32K contro 16K»). ~~16K automatico quando Qwen3
+   è attivo~~: fatto (`runtimeTuning`, `gpuVoice`).
 3. ~~Streaming dei blocchi fino al renderer~~: implementato da un'altra
    sessione (`src/voice/speech-stream.js`, IPC `nexus:neural-voice-chunk`,
    `web/src/platform.ts`).

@@ -506,7 +506,9 @@ function bootstrapElectron({ env = process.env } = {}) {
         cachePath: path.join(sharedDataRoot, 'hardware-profile.json')
       });
       recordSmokeStage('hardware-ready');
-      const tuning = runtimeTuning(hardwareProfile);
+      // With the opt-in GPU voice the LLM context is capped so both fit in VRAM
+      // (docs/QWEN3-TTS-EVALUATION.md, «32K contro 16K»).
+      const tuning = runtimeTuning(hardwareProfile, { gpuVoice: qwen3.enabled });
       // Chatterbox viene esposto soltanto con opt-in di sviluppo: il runtime
       // PyTorch CPU-only attuale supera il limite di latenza anche su hardware
       // performance. Sarà abilitato di default dopo un runtime GPU verificato.
