@@ -7,7 +7,9 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { Qwen3SpeechService } = require('../src/voice/qwen3-speech');
+const { createQwen3SpeechService } = require('../src/voice/qwen3-speech');
+
+// #region 01 — Misure LLM e voce
 
 const argument = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback; };
 const sentences = [
@@ -17,10 +19,15 @@ const sentences = [
 ];
 const median = (values) => { const s = values.filter(Number.isFinite).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
 
+// --num-ctx forces the LLM context (Ollama reloads the model when it changes);
+// without it the server default is used, as the app does.
+const numCtx = Number.parseInt(argument('num-ctx', ''), 10);
+
 async function generate(base, model, numPredict = 256) {
+  const options = { num_predict: numPredict, temperature: 0.2, ...(Number.isInteger(numCtx) && numCtx >= 2048 ? { num_ctx: numCtx } : {}) };
   const response = await fetch(`${base}/api/generate`, { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ model, prompt: 'Spiega in italiano, in modo dettagliato, come organizzare una settimana di lavoro.', stream: false, think: false,
-      keep_alive: '10m', options: { num_predict: numPredict, temperature: 0.2 } }) });
+      keep_alive: '10m', options }) });
   if (!response.ok) throw new Error(`Ollama ${response.status}`);
   const body = await response.json();
   return { tokens: body.eval_count, tokensPerSecond: Number((body.eval_count / (body.eval_duration / 1e9)).toFixed(1)) };
@@ -44,16 +51,24 @@ async function speak(service) {
     medianRtf: median(rows.map((r) => r.totalMs / r.audioMs)), minGpuFreeMb: Math.min(...rows.map((r) => r.gpuFreeMb)), rows };
 }
 
+// #endregion
+// #region 02 — Esecuzione e rapporto
+
 (async () => {
   const root = path.resolve(__dirname, '..');
   const base = argument('ollama', 'http://127.0.0.1:11436');
   const model = argument('model', 'qwen3:14b');
   const size = argument('size', '0.6b');
-  const report = { evaluatedAt: new Date().toISOString(), model, size };
+  const report = { evaluatedAt: new Date().toISOString(), model, size, numCtx: Number.isInteger(numCtx) ? numCtx : 'server-default' };
   report.llmAlone = await generate(base, model);
   report.llmLoaded = await loaded(base);
-  const service = new Qwen3SpeechService({ enabled: true, size, runtimeDirectory: path.join(root, 'vendor', 'qwen3-tts'),
-    workerPath: path.join(root, 'src', 'voice', 'qwen3-worker.py') });
+  const runtime = argument('runtime', 'gguf') === 'torch' ? 'torch' : 'gguf';
+  report.runtime = runtime;
+  // vramGate: false — this script measures exactly the case the gate would avoid.
+  const service = createQwen3SpeechService({ runtime, enabled: true, size, vramGate: false,
+    runtimeDirectory: path.join(root, 'vendor', runtime === 'gguf' ? 'qwen3-tts-gguf' : 'qwen3-tts'),
+    ...(runtime === 'gguf' ? { voicesDirectory: path.join(root, 'vendor', 'qwen3-tts', 'voices') } : {}),
+    workerPath: path.join(root, 'src', 'voice', runtime === 'gguf' ? 'qwen3-gguf-worker.py' : 'qwen3-worker.py') });
   try {
     const coldAt = performance.now();
     service.warmUp();
@@ -69,9 +84,11 @@ async function speak(service) {
   } finally { service.shutdown(); }
   const dir = path.join(root, 'qa-artifacts', 'qwen3-voice');
   fs.mkdirSync(dir, { recursive: true });
-  const target = path.join(dir, `coexistence-${model.replace(/[^a-z0-9.]+/gi, '_')}-${size}.json`);
+  const target = path.join(dir, `coexistence-${model.replace(/[^a-z0-9.]+/gi, '_')}-${runtime}-${size}${Number.isInteger(numCtx) ? `-ctx${numCtx}` : ''}.json`);
   fs.writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`);
   const { rows: _a, ...idle } = report.ttsWithIdleLlm; const { rows: _b, ...busy } = report.ttsDuringLlm;
   process.stdout.write(`${JSON.stringify({ target: path.relative(root, target), llmAlone: report.llmAlone, llmLoaded: report.llmLoaded, ttsReady: report.ttsReady,
     ttsColdStartMs: report.ttsColdStartMs, idle, busy, llmDuringTts: report.llmDuringTts, llmLoadedAfter: report.llmLoadedAfter }, null, 2)}\n`);
 })().catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
+
+// #endregion

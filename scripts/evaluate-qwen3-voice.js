@@ -27,7 +27,9 @@ function gpuProcessMb(pid) {
 
 function qwen3Service(root, size, runtime) {
   const gguf = runtime === 'gguf';
-  return createQwen3SpeechService({ runtime, enabled: true, size, vulkanDevices: argument('vulkan-devices', '0'),
+  // The VRAM gate would hand the voice to Kokoro: the benchmark measures Qwen3 anyway.
+  return createQwen3SpeechService({ runtime, enabled: true, size, vramGate: false, vulkanDevices: argument('vulkan-devices', '0'),
+    onnxProvider: argument('onnx-provider', 'DML'),
     runtimeDirectory: path.join(root, 'vendor', gguf ? 'qwen3-tts-gguf' : 'qwen3-tts'),
     voicesDirectory: path.join(root, 'vendor', 'qwen3-tts', 'voices'),
     workerPath: path.join(root, 'src', 'voice', gguf ? 'qwen3-gguf-worker.py' : 'qwen3-worker.py') });

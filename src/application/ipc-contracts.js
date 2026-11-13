@@ -44,6 +44,7 @@ const CHANNELS = Object.freeze({
   neuralVoiceCapabilities: 'nexus:neural-voice-capabilities',
   neuralVoiceSpeak: 'nexus:neural-voice-speak',
   neuralVoiceStop: 'nexus:neural-voice-stop',
+  neuralVoiceChunk: 'nexus:neural-voice-chunk',
   knowledgeList: 'nexus:knowledge-list',
   knowledgeRead: 'nexus:knowledge-read',
   trainingExample: 'nexus:training-example',

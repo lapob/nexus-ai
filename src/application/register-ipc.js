@@ -36,6 +36,7 @@ const { publicErrorMessage } = require('../core/errors');
 const { normalizeAIError, AI_ERROR_CODES } = require('../ai/ai-errors');
 const { assertRuntimeAdmission } = require('../ai/managed-ollama-runtime');
 const { SpeechArbiter } = require('../voice/speech-arbiter');
+const { createChunkRelay, synthesizeWithRelay } = require('../voice/speech-stream');
 const { speculativeInferencePolicy } = require('./speculative-inference-policy');
 const { parseAgentPlan } = require('../agents/action-runtime');
 const { agentModelFor, createNativeToolConsent, createTurnTools, runAgentTurn } = require('./agent-chat');
@@ -1534,12 +1535,15 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     // voce di sistema.
     const expressiveReady = engine === 'expressive'
       && expressiveSpeechService?.capabilities?.().available === true;
-    return naturalSpeech.synthesize({
-      engine: expressiveReady ? 'expressive' : 'neural',
-      text,
-      gender,
-      language,
-      delivery
+    // stream:true + streamId: i blocchi (Qwen3) arrivano subito al renderer;
+    // con Kokoro ogni segmento intero diventa un blocco, senza ripetizioni.
+    const sender = event.sender;
+    const relay = createChunkRelay({ stream: options.stream, streamId: options.streamId,
+      send: (payload) => { if (!sender.isDestroyed?.()) sender.send(CHANNELS.neuralVoiceChunk, payload); } });
+    return synthesizeWithRelay({
+      synthesize: (request) => naturalSpeech.synthesize(request),
+      relay,
+      options: { engine: expressiveReady ? 'expressive' : 'neural', text, gender, language, delivery }
     });
   });
   ipcMain.handle(CHANNELS.neuralVoiceStop, (event) => {

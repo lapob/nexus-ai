@@ -154,15 +154,29 @@ function desktopPlatform(bridge: Bridge): Platform {
       }, []) ?? [text.slice(0, 850)];
       const stop = () => { void bridge.stopSpeaking?.(); };
       signal.addEventListener('abort', stop, { once: true });
+      const toBuffer = (audio: unknown) => {
+        const bytes = audio instanceof Uint8Array ? audio : new Uint8Array((audio as ArrayLike<number>) || []);
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      };
+      // Streaming: i blocchi arrivano mentre la voce viene generata (Qwen3) e si
+      // accodano in ordine; uno stream interrotto non suona più nulla.
+      const streamId = typeof bridge.onVoiceChunk === 'function' && typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : null;
+      let chain: Promise<void> = Promise.resolve();
+      const unsubscribe = streamId ? bridge.onVoiceChunk((chunk: { streamId?: string; audio?: unknown }) => {
+        if (chunk?.streamId !== streamId || signal.aborted) return;
+        const wav = toBuffer(chunk.audio);
+        chain = chain.then(() => (signal.aborted ? undefined : onSegment(wav))).catch(() => undefined);
+      }) : null;
       try {
         for (const part of parts) {
           if (signal.aborted) return;
-          const result = await bridge.synthesizeVoice({ text: part.trim(), gender: 'male', language: 'it', delivery: 'warm' });
+          const result = await bridge.synthesizeVoice({ text: part.trim(), gender: 'male', language: 'it', delivery: 'warm', ...(streamId ? { stream: true, streamId } : {}) });
           if (signal.aborted) return;
-          const bytes = result?.audio instanceof Uint8Array ? result.audio : new Uint8Array(result?.audio || []);
-          await onSegment(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+          if (result?.streamed) { await chain; continue; }
+          await chain;
+          await onSegment(toBuffer(result?.audio));
         }
-      } finally { signal.removeEventListener('abort', stop); }
+      } finally { signal.removeEventListener('abort', stop); unsubscribe?.(); }
     },
     pickAttachments: async () => {
       const selected = await bridge.selectAttachments() as Array<{ id: string; name: string; kind?: string; size?: number }>;

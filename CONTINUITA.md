@@ -96,12 +96,42 @@ Checks:
 - `node scripts/run-tests.js`: 1236 tests, 1234 pass, 0 fail, 2 skipped.
 - `tests/qwen3-speech.test.js`: 12/12.
 
+Update at 21:20:
+- Bootstrap wired: done by the main session, via `createQwen3SpeechService`.
+- Coexistence with `qwen3:14b` at 32K, the app runtime: measured, and it does
+  NOT fit.
+  - The LLM uses 13.7 GB: 12 GB dedicated plus ~2 GB spilled into shared
+    memory. It runs at 15 tok/s on its own and 12.5 tok/s during TTS.
+  - GGUF 0.6B TTS reaches RTF 0.77 with the LLM idle and 1.04 while it
+    generates. With the decoder on the CPU it is still RTF 0.67.
+  - Qwen3 can only become the default with a VRAM budget: either a smaller
+    LLM context when Qwen3 is active (the owner decides), or Kokoro when the
+    LLM is above ~13 GB.
+
+VRAM rule (owner's choice, "Kokoro if VRAM is full"):
+- New `src/voice/gpu-memory.js` (`VramGate`), wired into
+  `createQwen3SpeechService`; bootstrap is unchanged because it already uses
+  the factory. New test file `tests/gpu-memory.test.js`.
+- Windows counters are read every 20 s. Qwen3 is used only when free VRAM
+  (counting its own) is at least the need plus 512 MB, and other processes
+  have spilled less than 1 GB into shared memory. Otherwise Kokoro speaks and
+  an idle Qwen3 worker is closed.
+- The state is "pending" until the first reading.
+- Checked live with the 14b resident: it reports `vram-spill` and no worker
+  starts.
+
 Open:
-- (a) TTS during concurrent LLM generation is NOT measured. The only LLM on
-  disk is the 27B under another session's eval (ollama 11435), and it was not
-  touched.
-- (b) Wiring in bootstrap.
-- (c) Streaming to the renderer.
+- (a) Measure `qwen3:14b` at 16K together with the TTS. This needs the
+  app's model to be reloaded.
+- (c) Streaming to the renderer: DONE on 13 November.
+  - `src/voice/speech-stream.js`, IPC channel `nexus:neural-voice-chunk`,
+    `onVoiceChunk` in the preload, and `web/src/platform.ts`.
+  - New test file `tests/speech-stream.test.js`, plus the preload contract.
+  - Checked in Electron with an isolated smoke profile
+    (`qa-artifacts/qwen3-electron-stream.js`). With the 14b resident the gate
+    picked Kokoro. Blocks arrived in order, with no duplicated audio.
+  - Qwen3 itself was not exercised inside Electron, because the gate is
+    closed while the 14b is resident.
 - (d) Human A/B listening of `qa-artifacts/qwen3-voice/qwen3-gguf-*`.
 
 Two early runs were anomalous (RTF 1.4 on 0.6B, first sentence 10.5 s on 1.7B)

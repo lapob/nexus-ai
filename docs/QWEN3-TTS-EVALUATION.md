@@ -7,9 +7,14 @@ predefinito**. Kokoro resta la voce di default e il fallback automatico.
 Aggiornamento 12 novembre: il percorso **GGUF** (llama.cpp Vulkan + ONNX
 DirectML) misura **RTF 0,18 e 1,2 GB di VRAM** sul 0.6B e **RTF 0,21 e 1,7 GB**
 sul 1.7B. Il primo audio è sotto i 330 ms. È candidato a runtime Qwen3
-predefinito al posto di PyTorch ROCm (`NEXUS_QWEN3_RUNTIME=gguf`). Prima
-servono la misura con un LLM in generazione e lo streaming fino al renderer:
-vedi «Percorso GGUF».
+predefinito al posto di PyTorch ROCm (`NEXUS_QWEN3_RUNTIME=gguf`). Questi
+numeri valgono con un LLM da ~10,6 GB. Con `qwen3:14b` a 32K (13,7 GB) la
+VRAM da 16 GB si esaurisce: LLM e TTS finiscono in parte in memoria
+condivisa, il TTS sale a RTF 0,77–1,04 e l'LLM scende a 12–15 token/s.
+Serve un budget di VRAM prima di renderlo predefinito (vedi «Convivenza»).
+Il 13/11, con l'LLM a 16K, convivono: TTS a RTF ≤ 0,26 e LLM a 38,6
+tok/s mentre parla. A 32K il TTS costa all'LLM il 55%, perché lo spinge in
+memoria condivisa. Il gate `VramGate` sceglie già Kokoro in quel caso.
 
 ## Percorso scelto e alternative
 
@@ -36,6 +41,28 @@ riguarda soltanto il testo in ingresso). Il worker `src/voice/qwen3-worker.py`:
 - emette i blocchi PCM su JSONL;
 - su `{"type":"cancel"}` interrompe la generazione al frame successivo, senza
   terminare il processo (il modello resta caldo).
+
+Fino al renderer (`src/voice/speech-stream.js`):
+
+- il renderer chiede `synthesizeVoice({ stream: true, streamId })`;
+- il processo principale inoltra ogni blocco WAV su `nexus:neural-voice-chunk`
+  (id validato, al massimo 4 MB per blocco) e restituisce `{ streamed: true }`
+  senza ripetere l'audio;
+- `web/src/platform.ts` accoda i blocchi in ordine nel player esistente;
+- con Kokoro di ripiego ogni segmento intero diventa un blocco; se Qwen3 cade
+  dopo aver già parlato la frase non viene ripetuta.
+
+Verifica in Electron (13 novembre, profilo isolato, `NEXUS_VOICE_ENGINE=qwen3`,
+`NEXUS_QWEN3_RUNTIME=gguf`, con `qwen3:14b` residente):
+
+- `VramGate` ha scelto Kokoro (VRAM piena), come previsto;
+- 3 frasi in streaming, ogni volta 1 blocco in ordine, senza audio duplicato
+  nella risposta, primo blocco a 1,3–1,4 s a caldo (3,6 s a freddo);
+- la chiamata senza `stream` restituisce ancora l'audio intero.
+
+Il percorso Qwen3 vero e proprio dentro Electron non è stato eseguito, perché
+il gate resta chiuso con il 14b residente. Lo streaming Qwen3 è verificato a
+livello di servizio (primo audio a caldo 262 ms) e con i test del relay.
 
 ## Misure (0.6B, bf16, SDPA, con un LLM da ~9 GB residente e inattivo)
 
@@ -136,13 +163,113 @@ Osservazioni:
 - **LLM residente e inattivo** (~10,6 GB): misurato. La GPU arriva a ~13 GB su
   16, e il TTS GGUF (1,2 o 1,7 GB) entra con 1,5–2 GB di margine. Il PyTorch
   1.7B (4,5 GB) non entrava.
-- **LLM in generazione contemporanea: non misurato.** L'unico LLM su disco è
-  il 27B in valutazione dall'altra sessione, e un secondo LLM non entra in
-  VRAM. Inviare richieste al suo runtime ne avrebbe falsato le misure. Lo
-  script `evaluate-qwen3-coexistence.js` è da estendere con `--runtime gguf`
-  ed è da eseguire con l'eval di quella sessione terminata. Con RTF ≈ 0,2 il
-  margine è ~5× (contro ~1× di PyTorch): un rallentamento anche di 2–3× sotto
-  contesa resterebbe in tempo reale, ma va misurato.
+- **Con `qwen3:14b` a 32K di contesto, il modello di ogni giorno: misurato,
+  e non entra.**
+  - Comando: `node scripts/evaluate-qwen3-coexistence.js --ollama <runtime
+    dell'app> --model qwen3:14b --size 0.6b --runtime gguf`.
+  - Report: `qa-artifacts/qwen3-voice/coexistence-qwen3_14b-gguf-0.6b.json`.
+
+  | | Primo audio (mediana / max) | RTF TTS | LLM token/s |
+  |---|---|---|---|
+  | LLM da solo | – | – | 15,3 |
+  | TTS GGUF 0.6B, LLM inattivo | 1040 / 1093 ms | 0,77 | – |
+  | TTS GGUF 0.6B, LLM in generazione | 1422 / 2464 ms | 1,04 | 12,5 |
+
+  **La causa è la VRAM, non il calcolo.** Ollama riporta 13,7 GB per
+  `qwen3:14b` a 32K. I contatori Windows mostrano il `llama-server` con
+  12,3 GB dedicati e **2,0 GB già riversati nella memoria condivisa**:
+  l'adattatore è a 15,0/16 GB, con ~1,6 GB tenuti da dwm, dal desktop e dai
+  browser. Per questo l'LLM gira a 15 token/s anche da solo, contro i ~39 con
+  tutto in VRAM (`hardware-profile.js`, 9/11). Il TTS (1,2 GB) aggrava la
+  pressione: entrambi lavorano in parte nella RAM di sistema via PCIe, e il TTS
+  passa da RTF 0,18 a 0,77–1,04.
+
+  Con lo stesso `qwen3:14b` residente e inattivo, e con il `llama-server` a
+  11,9 GB dedicati più 2,4 GB condivisi:
+
+  | | RTF | Primo audio | VRAM TTS |
+  |---|---|---|---|
+  | Decoder DirectML | 0,71 | 961 ms | 0,5–0,85 GB dedicati |
+  | Decoder CPU (`--onnx-provider CPU`) | 0,67 | 1002 ms (max 1804) | 0,46–0,48 GB |
+
+  Report: `qa-artifacts/qwen3-voice/qwen3-gguf-0.6b{,-cpudec}-14b-resident`.
+  **Spostare il decoder sulla CPU non basta:** il collo di bottiglia è il
+  talker su una GPU senza VRAM libera.
+
+  **Conseguenza:** su una GPU da 16 GB, il Qwen3 su GPU (GGUF o PyTorch) e
+  `qwen3:14b` a 32K non convivono.
+
+  ### Regola VRAM (scelta del proprietario, 12/11): Kokoro se la VRAM è piena
+
+  `src/voice/gpu-memory.js` (`VramGate`) legge i contatori Windows ogni 20 s,
+  in modo asincrono, con una sola passata PowerShell da ~1,5 s:
+  - la VRAM totale, dal registro (`qwMemorySize`, a 64 bit);
+  - l'uso dedicato e condiviso dell'adattatore principale;
+  - l'uso dell'albero di processi del worker Qwen3.
+
+  Qwen3 è disponibile solo se valgono entrambe le condizioni:
+  - **VRAM libera**, cioè totale − usata + quella del worker stesso, ≥
+    fabbisogno + 512 MB di margine. Fabbisogno misurato: GGUF 1,25 GB (0.6B)
+    o 1,7 GB (1.7B); PyTorch 2,7 GB o 4,6 GB.
+  - **memoria degli altri processi riversata nella RAM condivisa < 1 GB.** È
+    il segnale decisivo: con `qwen3:14b` a 32K risultano ~2 GB "liberi", ma
+    l'LLM ha già riversato 2,6 GB in memoria condivisa.
+
+  Se il gate è chiuso:
+  - `capabilities()` riporta `available: false` con `unavailableReason:
+    'vram-spill' | 'vram-full'`, e `FallbackSpeechService` parla con Kokoro;
+  - il worker Qwen3 inattivo viene chiuso, per restituire la VRAM all'LLM. Mai
+    durante una sintesi.
+
+  Quando la VRAM torna disponibile, il worker si riscalda da solo. Fino alla
+  prima lettura lo stato è `pending` e parla Kokoro, così all'avvio non si
+  carica un worker in una GPU piena. Senza contatori (fuori da Windows o se la
+  lettura fallisce) il gate non blocca.
+
+  Il gate è collegato in `createQwen3SpeechService`, che bootstrap già usa.
+  `vramGate: false` lo esclude, ed è quello che fanno gli script di
+  valutazione. Verificato dal vivo con `qwen3:14b` residente: all'avvio lo
+  stato è `vram-pending`, dopo la lettura `vram-spill`, e nessun worker parte.
+  Test: `tests/gpu-memory.test.js`, con gli snapshot misurati.
+
+  ### 32K contro 16K (13 novembre, con l'LLM dell'app ricaricato e poi riportato a 32K)
+
+  Comando: `evaluate-qwen3-coexistence.js --num-ctx 32768|16384`.
+  Report: `qa-artifacts/qwen3-voice/coexistence-qwen3_14b-gguf-0.6b-ctx{32768,16384}.json`.
+
+  Oggi l'LLM a 32K entrava quasi tutto in VRAM (0,15 GB condivisi), a
+  differenza del 12/11 (2,4 GB). Come detto sotto, quella quota cambia con
+  quanto usa il desktop.
+
+  | `qwen3:14b` + TTS GGUF 0.6B | 32K (13,7 GB) | 16K (11,3 GB) |
+  |---|---|---|
+  | LLM da solo | 51,9 tok/s | 52,0 tok/s |
+  | TTS, LLM inattivo: primo audio / RTF | 294 ms / 0,20 | 315 ms / 0,24 |
+  | TTS, LLM in generazione: primo audio / RTF | 455 ms / 0,33 | 363 ms (max 485) / 0,26 |
+  | **LLM durante il TTS** | **23,1 tok/s (−55%)** | **38,6 tok/s (−26%)** |
+  | Memoria dell'LLM in RAM condivisa dopo il TTS | 1,18 GB | 0,2 GB |
+  | Verdetto `VramGate` per il GGUF 0.6B, LLM caricato e TTS spento | `full`, 321 MB liberi | `ok`, 1845 MB liberi |
+
+  Lettura:
+  - **A 32K il TTS parla bene, ma lo paga l'LLM.** Windows fa posto al worker
+    spostando 1,18 GB dell'LLM nella RAM condivisa, e quella memoria resta lì
+    anche dopo la chiusura del TTS. Il dimezzamento dei token/s viene da questo
+    e dalla contesa sulla GPU. Il verdetto `full` del gate è quindi corretto:
+    Kokoro evita di rallentare l'LLM.
+  - **A 16K convivono:** il TTS resta in tempo reale con margine (RTF ≤ 0,26),
+    l'LLM perde il 26% solo mentre il TTS sintetizza, e il gate lo ammette da
+    solo. Il GGUF 1.7B (servono 1,7 GB + 512) e PyTorch restano esclusi.
+  - **A 32K l'LLM è al limite della VRAM anche da solo.** Dopo il ripristino ha
+    1,09 GB in memoria condivisa, perché quanto sta in VRAM dipende dal
+    desktop: dwm da solo ha 1–1,3 GB. La velocità resta 51,2 tok/s.
+
+  Per avere Qwen3 come voce con il 14b serve quindi il contesto a 16K quando
+  Qwen3 è attivo. È una politica di `hardware-profile.js`, che oggi fissa 32K
+  sulle GPU da 16 GB, e decide il proprietario. Con la regola attuale (Kokoro
+  se la VRAM è piena) a 32K parla Kokoro, ed è il comportamento voluto.
+
+  Con l'LLM da ~10,6 GB (sopra) il TTS resta a RTF 0,18: entro quel budget
+  la convivenza funziona.
 
 ### Preparazione del runtime (riproducibile, gitignored)
 
@@ -219,9 +346,8 @@ $env:NEXUS_QWEN3_RUNTIME = 'gguf'   # vuoto/torch = PyTorch ROCm
 ```
 
 `qwen3Option()` legge `NEXUS_QWEN3_RUNTIME` e `createQwen3SpeechService()`
-costruisce `Qwen3GgufSpeechService`. Il collegamento in
-`src/application/bootstrap.js` non è ancora fatto: oggi bootstrap istanzia
-direttamente `Qwen3SpeechService`. Il servizio GGUF richiede che in
+costruisce `Qwen3GgufSpeechService`. Bootstrap lo usa con le voci di
+`vendor/qwen3-tts/voices` in sviluppo. Il servizio GGUF richiede che in
 `vendor/qwen3-tts-gguf` ci siano `.venv`, `llama.dll`, i due GGUF, i tre ONNX
 fp16 e `tokenizer.json`, oltre alla voce in `voicesDirectory`. Se manca un
 file, la voce resta Kokoro.
@@ -236,16 +362,16 @@ sintesi annullata con Kokoro.
 
 ## Prossimi passi consigliati
 
-1. ~~Misurare il percorso GGUF~~: fatto, RTF 0,18–0,21. Va collegato
-   `createQwen3SpeechService(qwen3Option())` in bootstrap, a cura del
-   proprietario di `bootstrap.js`.
-2. Misurare TTS e LLM in generazione contemporanea, aggiungendo `--runtime
-   gguf` a `evaluate-qwen3-coexistence.js`, quando la GPU non è usata dall'eval
-   di un'altra sessione.
-3. Streaming dei blocchi fino al renderer: un evento IPC per blocco, buffer di
-   riproduzione senza pause da ~300 ms e stop che invia il `cancel` al worker.
-   Senza, il primo audio percepito resta la sintesi completa (~1,0–1,3 s con
-   il GGUF, paragonabile a Kokoro).
+1. ~~Misurare il percorso GGUF~~: fatto, RTF 0,18–0,21. Collegato in
+   bootstrap con `createQwen3SpeechService` e `NEXUS_QWEN3_RUNTIME=gguf`.
+2. ~~Convivenza con `qwen3:14b`~~: misurata, a 32K non c'è VRAM per il TTS.
+   ~~Regola automatica~~: fatta, Kokoro se la VRAM è piena (`VramGate`).
+   Il decoder ONNX su CPU è stato misurato e non basta. ~~LLM a 16K~~:
+   misurato, convivono (vedi «32K contro 16K»). Da decidere: 16K automatico
+   quando Qwen3 è attivo.
+3. ~~Streaming dei blocchi fino al renderer~~: implementato da un'altra
+   sessione (`src/voice/speech-stream.js`, IPC `nexus:neural-voice-chunk`,
+   `web/src/platform.ts`).
 4. Ascolto umano delle coppie A/B (`qa-artifacts/qwen3-voice/qwen3-gguf-*`).
    Scegliere fra 0.6B e 1.7B: il 1.7B GGUF ha il WER migliore a un costo
    marginale.

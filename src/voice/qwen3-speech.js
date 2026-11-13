@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
+const { VramGate, requiredVramMb } = require('./gpu-memory');
 
 const QWEN3_LANGUAGES = Object.freeze(['de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pt', 'ru', 'zh']);
 const QWEN3_MODELS = Object.freeze({ '0.6b': 'Qwen3-TTS-12Hz-0.6B-Base', '1.7b': 'Qwen3-TTS-12Hz-1.7B-Base' });
@@ -73,6 +74,35 @@ class Qwen3SpeechService {
     this.pending = new Map();
     this.readyWaiters = new Set();
     this.disposed = false;
+    this.vramGate = null;
+  }
+
+  /**
+   * VRAM budget (voice/gpu-memory): when the LLM leaves no room, capabilities()
+   * reports unavailable so FallbackSpeechService speaks with Kokoro, and an idle
+   * worker is closed to give its VRAM back to the LLM.
+   */
+  attachVramGate(gate) {
+    this.vramGate = gate || null;
+    if (!gate) return false;
+    gate.ownPid = () => this.child?.pid ?? null;
+    gate.onChange = (verdict) => {
+      if (!verdict.allowed) this.releaseIdleWorker();
+      else if (this.enabled && !this.disposed) this.warmUp();
+    };
+    return gate.start?.() ?? false;
+  }
+
+  vramAllowed() { return !this.vramGate || this.vramGate.allowed(); }
+
+  /** Closes the warm worker only when nothing is being synthesized. */
+  releaseIdleWorker() {
+    const child = this.child;
+    if (!child || this.pending.size) return false;
+    this.child = null;
+    this.ready = false;
+    this.terminateProcess(child);
+    return true;
   }
 
   paths() {
@@ -88,9 +118,11 @@ class Qwen3SpeechService {
 
   capabilities() {
     const files = this.paths();
-    const available = this.enabled && !this.disposed && Object.values(files).every((file) => fs.existsSync(file));
+    const installed = this.enabled && !this.disposed && Object.values(files).every((file) => fs.existsSync(file));
+    const available = installed && this.vramAllowed();
     return { available, backend: available ? 'qwen3-tts' : null, local: true, streaming: true, model: QWEN3_MODELS[this.size],
-      genders: ['male', 'female'], languages: [...QWEN3_LANGUAGES] };
+      genders: ['male', 'female'], languages: [...QWEN3_LANGUAGES],
+      ...(installed && !available ? { unavailableReason: `vram-${this.vramGate?.verdict?.reason || 'full'}` } : {}) };
   }
 
   // #endregion
@@ -293,6 +325,7 @@ class Qwen3SpeechService {
   shutdown() {
     if (this.disposed) return false;
     this.disposed = true;
+    this.vramGate?.stop?.();
     const child = this.child;
     this.rejectPending(null, () => new Error('Sintesi Qwen3 terminata.'));
     if (child) this.terminateProcess(child);
@@ -351,8 +384,18 @@ class Qwen3GgufSpeechService extends Qwen3SpeechService {
 }
 
 /** Builds the worker requested by qwen3Option().runtime. */
-function createQwen3SpeechService({ runtime = 'torch', ...options } = {}) {
-  return runtime === 'gguf' ? new Qwen3GgufSpeechService(options) : new Qwen3SpeechService(options);
+/**
+ * Builds the worker requested by qwen3Option().runtime. When enabled it also
+ * attaches the VRAM budget: Kokoro speaks whenever the LLM leaves no room
+ * (owner's choice, 12/11/2026). `vramGate: false` disables it; a gate object
+ * replaces the default one (tests).
+ */
+function createQwen3SpeechService({ runtime = 'torch', vramGate, ...options } = {}) {
+  const service = runtime === 'gguf' ? new Qwen3GgufSpeechService(options) : new Qwen3SpeechService(options);
+  if (vramGate === false || !service.enabled) return service;
+  service.attachVramGate(vramGate || new VramGate({ requiredMb: requiredVramMb(runtime === 'gguf' ? 'gguf' : 'torch', service.size),
+    platform: service.platform }));
+  return service;
 }
 
 // #endregion
@@ -392,9 +435,14 @@ class FallbackSpeechService {
 
   async synthesize(options = {}) {
     const language = String(options.language || 'it');
+    const forward = typeof options.onChunk === 'function' ? options.onChunk : null;
+    const { onChunk: _ignored, ...plain } = options;
     if (this.primaryUsable(language)) {
+      let emitted = 0;
       try {
-        const result = await this.primary.synthesize(options);
+        const result = await this.primary.synthesize(forward
+          ? { ...plain, onChunk: (chunk) => { emitted += 1; forward(chunk); } }
+          : plain);
         this.failures = 0;
         this.lastBackend = result.backend;
         return result;
@@ -402,10 +450,15 @@ class FallbackSpeechService {
         if (error?.code === 'VOICE_CANCELLED') throw error;
         this.failures += 1;
         if (this.failures >= this.failureLimit) { this.disabledUntil = this.now() + this.cooldownMs; this.failures = 0; }
+        // Part of the sentence was already heard: repeating it with Kokoro would
+        // say it twice. The caller falls back to the next segment instead.
+        if (emitted > 0) throw error;
       }
     }
-    const result = await this.fallback.synthesize(options);
+    const result = await this.fallback.synthesize(plain);
     this.lastBackend = result?.backend || null;
+    // In streaming the renderer receives every segment as a block, Kokoro too.
+    if (forward && result?.audio) forward({ ...result, seq: 0 });
     return result;
   }
 

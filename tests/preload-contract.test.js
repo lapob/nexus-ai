@@ -56,4 +56,6 @@ test('ogni metodo preload usa esattamente il canale IPC autoritativo', async () 
   assert.equal(calls.at(-2).channel, CHANNELS.voiceActivity); assert.equal(calls.at(-1).removal, true);
   const stopVoicePartial = value.onVoicePartial(() => {}); stopVoicePartial();
   assert.equal(calls.at(-2).channel, CHANNELS.voicePartial); assert.equal(calls.at(-1).removal, true);
+  const stopVoiceChunk = value.onVoiceChunk(() => {}); stopVoiceChunk();
+  assert.equal(calls.at(-2).channel, CHANNELS.neuralVoiceChunk); assert.equal(calls.at(-2).subscription, true); assert.equal(calls.at(-1).removal, true);
 });

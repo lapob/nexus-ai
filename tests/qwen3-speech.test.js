@@ -157,7 +157,7 @@ test('il runtime GGUF richiede DLL llama.cpp, GGUF, ONNX, tokenizer e voce condi
   const root = ggufRuntime(t);
   const voicesDirectory = path.join(root, 'shared-voices');
   assert.equal(new Qwen3GgufSpeechService({ runtimeDirectory: root, voicesDirectory }).capabilities().available, false);
-  const gguf = createQwen3SpeechService({ runtime: 'gguf', runtimeDirectory: root, voicesDirectory, enabled: true });
+  const gguf = createQwen3SpeechService({ runtime: 'gguf', runtimeDirectory: root, voicesDirectory, enabled: true, vramGate: false });
   assert.ok(gguf instanceof Qwen3GgufSpeechService);
   const capabilities = gguf.capabilities();
   assert.equal(capabilities.available, true);
@@ -171,7 +171,7 @@ test('il runtime GGUF richiede DLL llama.cpp, GGUF, ONNX, tokenizer e voce condi
     fs.writeFileSync(file, '');
   }
   // Il 1.7B non esportato non è disponibile: la voce resta Kokoro.
-  assert.equal(createQwen3SpeechService({ runtime: 'gguf', runtimeDirectory: root, voicesDirectory, enabled: true, size: '1.7b' }).capabilities().available, false);
+  assert.equal(createQwen3SpeechService({ runtime: 'gguf', runtimeDirectory: root, voicesDirectory, enabled: true, size: '1.7b', vramGate: false }).capabilities().available, false);
   assert.ok(!(createQwen3SpeechService({ runtime: 'torch', runtimeDirectory: root }) instanceof Qwen3GgufSpeechService));
 });
 
