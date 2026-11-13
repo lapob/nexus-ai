@@ -1,4 +1,28 @@
-# Preview 0.3.37 — 11 November 2026 (PUBLISHED: production cbaf7740, website 6c92cc7)
+# Particle field rebuild — 13 November 2026
+
+- Formation: per-chapter geometry is computed once per frame (no per-grain
+  `matches()`/dataset reads); chapter changes no longer morph point to point.
+  Grains leave the old form outward along a curved arc with a common gentle
+  swirl and land in the next form from outside, in a staggered wave
+  (low-discrepancy order), dimming slightly in flight. The page-load entrance
+  gathers from beyond the field the same way. Rotation follows a damped
+  scroll (pitch 0.62 instead of 1.15) so forms never flatten edge-on.
+- Scroll cost: the sticky hero geometry and word halos are sampled only when
+  scroll changes (or every 500 ms while settling), not with createRange on
+  every frame. Measured headless 1440x900 after scrolling: 10.45 ms paint at
+  ~98 fps vs 16.3 ms at ~60 fps on the published build.
+- Edges: the canvas feathers out on all four sides (CSS mask) and a fixed
+  progressive blur veil softens content at the top, bottom, left and right
+  viewport edges (below navigation, above content, pointer-events none).
+- Hand interaction: zero-gravity sand (`advanceSand`). Only a moving hand
+  pushes; every grain scatters on its own heading plus a sideways wake, glides
+  loose (~190 px over 1.5 s for a 350 px/s stroke), rests, then re-gathers in a
+  staggered critically damped wave (~4 s), frame-rate independent (tested at
+  30/60/120/144 Hz).
+- Reload: `history.scrollRestoration = 'manual'` so a reload no longer freezes
+  and jumps down to the old position after load.
+- Verified: npm test 46/46, e2e 36/36. Not yet verified on a physical phone.
+
 
 - Live verified: update feed 200/302/404 as designed, manifest signature
   valid, /sandbox/v1 CSP without network, new photos served (103 KB).

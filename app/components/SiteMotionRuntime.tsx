@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { advanceDrift, strokeDistance } from "./particle-drift";
+import { advanceSand, strokeDistance } from "./particle-drift";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -20,9 +20,14 @@ type CosmicParticle = {
   offsetY: number;
   vx: number;
   vy: number;
+  calm: number;
 };
 
-const MOTION_TIER_CLASSES = ["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
+// A reload must never freeze and then jump to the previous position once the page
+// has loaded: the narrative restarts from its opening (anchors still work natively).
+if (typeof window !== "undefined" && "scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+
+const MOTION_TIER_CLASSES =["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
 
 function resolveMotionTier(runtime: RuntimeNavigator): MotionTier {
   const cores = runtime.hardwareConcurrency ?? 8;
@@ -92,6 +97,29 @@ export function SiteMotionRuntime() {
     let mobileArtAnchors: number[] = [];
     let readingHalos: {left:number;right:number;top:number;bottom:number}[] = [];
     let heroCore: { x: number; y: number; size: number } | null = null;
+    let heroLive: { x: number; y: number } | null = null;
+    let heroHalos: {left:number;right:number;top:number;bottom:number}[] = [];
+    let heroReadScroll = Number.NaN;
+    let heroReadTime = 0;
+    let travelScroll = window.scrollY;
+    // The hero scene is sticky: its viewport geometry changes with scroll, so it
+    // is sampled when scroll moves instead of forcing layout reads every frame.
+    // Protect the actual words, not the full-width grid row: a row-sized
+    // exclusion erased the stars into a dark horizontal band around the CTA.
+    const readHeroLayout = (now: number) => {
+      heroReadScroll = window.scrollY;
+      heroReadTime = now;
+      const bounds = heroCore ? document.querySelector('.home-neural-core')?.getBoundingClientRect() : undefined;
+      heroLive = bounds ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 } : null;
+      heroHalos = [];
+      if (!heroCore || window.scrollY > window.innerHeight * 1.6) return;
+      for (const element of document.querySelectorAll('.hero-entry p,.hero-entry a')) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const rect = range.getBoundingClientRect();
+        heroHalos.push({left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY});
+      }
+    };
     let sceneProgress = 0;
     let paintMs = 0;
     let drawCount = 0;
@@ -135,6 +163,7 @@ export function SiteMotionRuntime() {
       offsetY: 0,
       vx: 0,
       vy: 0,
+      calm: 10,
     }));
     // Independent persistent stars: composing a shape never empties the sky.
     const backgroundStars = Array.from({ length: tier === "lite" ? 180 : 520 }, () => ({
@@ -158,6 +187,7 @@ export function SiteMotionRuntime() {
       const heroBounds = document.querySelector('.home-neural-core')?.getBoundingClientRect();
       heroCore = heroBounds ? { x: heroBounds.left + heroBounds.width / 2,
         y: heroBounds.top + window.scrollY + heroBounds.height / 2, size: Math.min(heroBounds.width, heroBounds.height) } : null;
+      heroReadScroll = Number.NaN;
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
       mobileArtAnchors = sections.map((section, index) => sectionAnchors[index] + section.offsetHeight - cosmicHeight * .32);
       readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.presence-grid,.inner-page h1,.inner-page h2,.inner-page p,.service-list,.legal-content,.legal-nav,.release-list,.security-summary')).map(element=>{
@@ -197,7 +227,6 @@ export function SiteMotionRuntime() {
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
       const viewportAnchor = window.scrollY;
-      const liveHeroBounds = heroCore ? document.querySelector('.home-neural-core')?.getBoundingClientRect() : null;
       let currentSection = Math.max(0, sectionAnchors.findLastIndex(top => top <= viewportAnchor));
       currentSection = Math.min(currentSection, Math.max(0, sections.length - 1));
       const sectionStart = sectionAnchors[currentSection] || 0;
@@ -212,9 +241,10 @@ export function SiteMotionRuntime() {
       sceneProgress += sceneDistance * (reduced ? 1 : 1 - Math.exp(-catchup * delta));
       if (window.scrollY < 4 && initialSceneFinished) sceneProgress = 0;
       const sectionPosition = sceneProgress;
-      const sectionIndex = Math.floor(sectionPosition);
-      const sectionMixRaw = sectionPosition - sectionIndex;
-      const sectionMix = sectionMixRaw * sectionMixRaw * (3 - 2 * sectionMixRaw);
+      // Rotation follows a damped scroll; positions stay anchored to the page.
+      travelScroll += (viewportAnchor - travelScroll) * (reduced ? 1 : 1 - Math.exp(-9 * delta));
+      // Sticky hero geometry is read only when scroll changed (or twice a second while it settles).
+      if (window.scrollY !== heroReadScroll || now - heroReadTime > 500) readHeroLayout(now);
       const laneFor = (index: number) => {
         const scene = sections[index]?.dataset.cosmicScene;
         return scene === "center" ? .5 : scene === "left" ? .24 : scene === "right" ? .76 : index % 2 === 0 ? .76 : .24;
@@ -223,33 +253,44 @@ export function SiteMotionRuntime() {
         const lane = laneFor(index);
         return cosmicWidth < 801 ? .5 : lane;
       };
-      const topology = sectionPosition;
-      const topologyIndex = Math.floor(topology);
-      const topologyMixRaw = topology - topologyIndex;
-      const topologyMix = topologyMixRaw * topologyMixRaw * (3 - 2 * topologyMixRaw);
-      const topologyPoint = (particle: CosmicParticle, index: number, shape: number) => {
-        const form = sections[shape]?.dataset.cosmicForm;
-        if (form === 'ambient' || quietPage) return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
+      const topologyIndex = Math.floor(sectionPosition);
+      const topologyMixRaw = sectionPosition - topologyIndex;
+      // Per-frame geometry of a chapter's form: computed once per frame, not per grain.
+      const frameFor = (shape: number) => {
+        const section = sections[shape];
+        const form = section?.dataset.cosmicForm;
+        const ambient = quietPage || !form || form === 'ambient';
+        if (ambient) return { form, ambient, centerX: cosmicWidth / 2, centerY: cosmicHeight / 2, unit: 0, cosYaw: 1, sinYaw: 0, cosPitch: 1, sinPitch: 0 };
         const isHero = shape === 0 && heroCore !== null;
-        const centerX = isHero ? heroCore!.x : cosmicWidth * responsiveLane(shape);
-        const mobileReading = cosmicWidth < 801 && sections[shape]?.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
+        const centerX = isHero ? (heroLive ? heroLive.x : heroCore!.x) : cosmicWidth * responsiveLane(shape);
+        const mobileReading = cosmicWidth < 801 && section!.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
         // On phones the artwork occupies real space after the copy, rather
         // than being clipped offscreen or projected behind readable text.
-        const centerY = isHero ? (liveHeroBounds ? liveHeroBounds.top + liveHeroBounds.height / 2 : heroCore!.y - window.scrollY) : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
+        const centerY = isHero ? (heroLive ? heroLive.y : heroCore!.y - window.scrollY) : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
         let unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
         // Fit the projected artwork, not only its DOM anchor, inside safe edges.
         const horizontalSpace = Math.max(1, Math.min(centerX - 24, cosmicWidth - 24 - centerX));
         unit = Math.min(unit, horizontalSpace / .58, cosmicHeight * .42 / .58);
-        // Orthographic 3D: rotation adds depth without a cursor-driven zoom.
-        const travel = reduced ? 0 : Math.min(1, Math.max(0, (viewportAnchor - (sectionAnchors[shape] || 0)) / cosmicHeight));
+        // Orthographic 3D on a damped scroll: the form turns gently, never edge-on.
+        const travel = reduced ? 0 : Math.min(1, Math.max(0, (travelScroll - (sectionAnchors[shape] || 0)) / cosmicHeight));
         const depth = shape === 0 ? travel : 1;
-        const pitch = depth * .16 + travel * 1.15 + inspection.x;
+        const pitch = depth * .16 + travel * .62 + inspection.x;
         const yaw = depth * Math.sin(time * .025) * .06 + travel * .28 + inspection.y;
+        return { form, ambient, centerX, centerY, unit, cosYaw: Math.cos(yaw), sinYaw: Math.sin(yaw), cosPitch: Math.cos(pitch), sinPitch: Math.sin(pitch) };
+      };
+      type ShapeFrame = ReturnType<typeof frameFor>;
+      const frameA = frameFor(topologyIndex);
+      const frameB = frameFor(topologyIndex + 1);
+      const minDimension = Math.min(cosmicWidth, cosmicHeight);
+      const flightCenterX = (frameA.centerX + frameB.centerX) / 2;
+      const flightCenterY = (frameA.centerY + frameB.centerY) / 2;
+      const topologyPoint = (particle: CosmicParticle, index: number, frame: ShapeFrame) => {
+        if (frame.ambient) return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
+        const { form, centerX, centerY, unit, cosYaw, sinYaw, cosPitch, sinPitch } = frame;
         const project = (x: number, y: number, z: number) => {
-          const rx = x * Math.cos(yaw) + z * Math.sin(yaw);
-          const rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
-          const perspective = 1;
-          return { x:centerX+rx*unit*perspective, y:centerY+(y*Math.cos(pitch)-rz*Math.sin(pitch))*unit*perspective };
+          const rx = x * cosYaw + z * sinYaw;
+          const rz = -x * sinYaw + z * cosYaw;
+          return { x:centerX+rx*unit, y:centerY+(y*cosPitch-rz*sinPitch)*unit };
         };
         if (form === 'helix') {
           const along = (index * .61803398875) % 1;
@@ -300,15 +341,8 @@ export function SiteMotionRuntime() {
       initialSceneFinished ||= age >= arrivalDelay + arrivalDuration || window.scrollY > cosmicHeight * .65;
       const entranceTime = initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
-      // Sticky content has viewport coordinates; a cached document rectangle drifts on scroll.
-      // Protect the actual words, not the full-width grid row: a row-sized
-      // exclusion erased the stars into a dark horizontal band around the CTA.
-      for (const element of document.querySelectorAll('.hero-entry p,.hero-entry a')) {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        const rect = range.getBoundingClientRect();
-        visibleHalos.push({left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY});
-      }
+      // Sticky hero words, sampled by readHeroLayout (not every frame).
+      visibleHalos.push(...heroHalos);
       const readingOpacity = (x: number, y: number) => {
         let fade = 0;
         for (const rect of visibleHalos) {
@@ -339,36 +373,70 @@ export function SiteMotionRuntime() {
         const sourceStar = !quietPage && index < backgroundStars.length && index % 4 === 0 ? backgroundStars[index] : undefined;
         const baseX = particle.x * cosmicWidth + (sourceStar ? Math.sin(time * .09 + sourceStar.phase) * 5 : 0);
         // Never wrap a grain across the viewport while a form is dissolving.
-        const baseY = sourceStar ? ((sourceStar.y * cosmicHeight - window.scrollY * (.012 + sourceStar.depth * .025)) % cosmicHeight + cosmicHeight) % cosmicHeight : (particle.y + Math.sin(scroll * Math.PI) * particle.depth * .13) * cosmicHeight;
-        const first = topologyPoint(particle, index, topologyIndex);
-        const second = topologyPoint(particle, index, topologyIndex + 1);
-        const targetX = first.x + (second.x - first.x) * topologyMix;
-        const targetY = first.y + (second.y - first.y) * topologyMix;
-        // Tra due capitoli la forma si apre nello spazio, attraversa la pagina
-        // e si ricompone nella topologia seguente. Il campo resta continuo:
-        // non ci sono cambi di scena o salti di corsia a meta scroll.
-        const transitionScatter = Math.sin(sectionMix * Math.PI) * .025;
-        // Reload starts with dispersed matter, not a blank canvas followed
-        // by a finished diagram. The same particles keep moving on scroll.
-        const arrivalTime = entranceTime;
+        let baseY = sourceStar ? ((sourceStar.y * cosmicHeight - window.scrollY * (.012 + sourceStar.depth * .025)) % cosmicHeight + cosmicHeight) % cosmicHeight : (particle.y + Math.sin(scroll * Math.PI) * particle.depth * .13) * cosmicHeight;
+        let startX = baseX;
+        // Low-discrepancy order: grains leave and arrive in a soft wave, never all at once.
+        const order = (index * .7548776662) % 1;
+        const first = topologyPoint(particle, index, frameA);
+        const second = topologyPoint(particle, index, frameB);
+        // Tra due capitoli la forma si scioglie verso l'esterno e i grani arrivano
+        // nella forma seguente da fuori, lungo un arco: niente morph punto-punto.
+        const local = Math.min(1, Math.max(0, (topologyMixRaw - order * .42) / .58));
+        const mix = local ** 3 * (local * (local * 6 - 15) + 10);
+        const span = Math.hypot(second.x - first.x, second.y - first.y);
+        const midX = (first.x + second.x) / 2, midY = (first.y + second.y) / 2;
+        let outX = midX - flightCenterX, outY = midY - flightCenterY;
+        const outLength = Math.hypot(outX, outY);
+        if (outLength < 1) { outX = Math.cos(particle.phase); outY = Math.sin(particle.phase); } else { outX /= outLength; outY /= outLength; }
+        // A slight common swirl turns the dispersal into one harmonious vortex.
+        const swirlX = outX * .88 - outY * .48, swirlY = outX * .48 + outY * .88;
+        const lift = minDimension * (.14 + particle.depth * .2) * Math.min(1, span / (minDimension * .3));
+        const controlX = midX + swirlX * lift, controlY = midY + swirlY * lift;
+        const rest = 1 - mix;
+        const targetX = rest * rest * first.x + 2 * rest * mix * controlX + mix * mix * second.x;
+        const targetY = rest * rest * first.y + 2 * rest * mix * controlY + mix * mix * second.y;
+        const flight = 4 * mix * rest * Math.min(1, span / (minDimension * .2));
+        // Reload starts with dispersed matter gathering from outside, in a staggered wave.
+        if (!sourceStar && !initialSceneFinished) {
+          startX = targetX + (baseX - targetX) * 1.45;
+          baseY = targetY + (baseY - targetY) * 1.45;
+        }
+        const entryLocal = Math.min(1, Math.max(0, (entranceTime - order * .38) / .62));
         // Zero velocity at both ends: acceleration never snaps into the final form.
-        const arrival = reduced ? 1 : arrivalTime ** 3 * (arrivalTime * (arrivalTime * 6 - 15) + 10);
-        const compose = (1 - transitionScatter) * arrival;
-        const x = baseX * (1 - compose) + targetX * compose + Math.sin(time * particle.speed + particle.phase) * (1 + particle.depth * 2);
-        const y = baseY * (1 - compose) + targetY * compose + Math.cos(time * particle.speed * .72 + particle.phase) * (1 + particle.depth * 2);
-        // Local, depth-dependent momentum follows the entire hand stroke.
-        // Dissipation restores the shape without a rubber-band spring or zoom.
-        const distance = strokeDistance(x + particle.offsetX, y + particle.offsetY,
-          pointer.frameX, pointer.frameY, pointer.x, pointer.y);
+        const arrival = reduced ? 1 : entryLocal ** 3 * (entryLocal * (entryLocal * 6 - 15) + 10);
+        const away = 1 - arrival;
+        const curl = Math.hypot(targetX - startX, targetY - baseY) * .22 * (index % 2 ? 1 : -1);
+        const entryLength = Math.max(1, Math.hypot(targetX - startX, targetY - baseY));
+        const entryControlX = (startX + targetX) / 2 - (targetY - baseY) / entryLength * curl;
+        const entryControlY = (baseY + targetY) / 2 + (targetX - startX) / entryLength * curl;
+        const wobble = 1 + particle.depth * 2;
+        const x = away * away * startX + 2 * away * arrival * entryControlX + arrival * arrival * targetX + Math.sin(time * particle.speed + particle.phase) * wobble;
+        const y = away * away * baseY + 2 * away * arrival * entryControlY + arrival * arrival * targetY + Math.cos(time * particle.speed * .72 + particle.phase) * wobble;
+        // Zero-gravity sand: only a moving hand pushes; every grain scatters on its own
+        // heading, glides loose, then the form re-gathers in a staggered soft wave.
+        const grainX = x + particle.offsetX, grainY = y + particle.offsetY;
+        const distance = strokeDistance(grainX, grainY, pointer.frameX, pointer.frameY, pointer.x, pointer.y);
         const radius = Math.min(150, Math.max(85, cosmicWidth * .085));
         const proximity = Math.max(0, 1 - distance / radius);
-        const influence = (reduced ? 0 : pointer.active) * proximity * proximity * (3 - 2 * proximity);
-        const driftX = advanceDrift(particle.offsetX, particle.vx, pointer.vx * influence, particle.depth, delta);
-        const driftY = advanceDrift(particle.offsetY, particle.vy, pointer.vy * influence, particle.depth, delta);
-        particle.offsetX = reduced ? 0 : driftX.offset;
-        particle.offsetY = reduced ? 0 : driftY.offset;
-        particle.vx = reduced ? 0 : driftX.velocity;
-        particle.vy = reduced ? 0 : driftY.velocity;
+        const handSpeed = Math.hypot(pointer.vx, pointer.vy);
+        const strength = (reduced ? 0 : pointer.active) * proximity * proximity * (3 - 2 * proximity) * Math.min(1, handSpeed / 60);
+        if (reduced) {
+          particle.offsetX = particle.offsetY = particle.vx = particle.vy = 0;
+        } else {
+          let kickX = 0, kickY = 0;
+          if (strength > .015) {
+            const heading = Math.sin(particle.phase * 3.7) * .62;
+            const carry = (.42 + particle.depth * .3) * (.7 + .6 * ((particle.phase * 1.3) % 1));
+            const cos = Math.cos(heading), sin = Math.sin(heading);
+            kickX = (pointer.vx * cos - pointer.vy * sin) * carry;
+            kickY = (pointer.vx * sin + pointer.vy * cos) * carry;
+            // The hand also parts the sand sideways, like a wake.
+            const awayX = grainX - pointer.x, awayY = grainY - pointer.y, awayLength = Math.max(1, Math.hypot(awayX, awayY));
+            kickX += awayX / awayLength * handSpeed * .28;
+            kickY += awayY / awayLength * handSpeed * .28;
+          }
+          advanceSand(particle, kickX, kickY, strength, particle.depth, .5 + (1 - particle.depth) * .45 + order * .55, delta);
+        }
         maxDrift = Math.max(maxDrift, Math.hypot(particle.offsetX, particle.offsetY));
         const px = x + particle.offsetX, py = y + particle.offsetY;
         // One uninterrupted field: text must not punch rectangular holes in it.
@@ -383,7 +451,7 @@ export function SiteMotionRuntime() {
           readingFade=Math.max(readingFade,weight*weight*(3-2*weight));
         }
 
-        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (quietPage ? .12 : 1);
+        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (1 - .32 * flight) * (quietPage ? .12 : 1);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
       interactivePoints = entranceTime < 1 || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
@@ -439,6 +507,16 @@ export function SiteMotionRuntime() {
     root.dataset.motionTier = tier;
     root.dataset.nexusRoute = routeName;
     document.body.prepend(cosmicCanvas);
+    // Soft optical edges on all four sides: content melts into the frame, never cut.
+    const edgeVeil = document.createElement("div");
+    edgeVeil.className = "nxs-edge-veil";
+    edgeVeil.setAttribute("aria-hidden", "true");
+    for (const side of ["top", "bottom", "left", "right"]) {
+      const band = document.createElement("span");
+      band.dataset.edge = side;
+      edgeVeil.append(band);
+    }
+    document.body.append(edgeVeil);
     resizeCosmicField();
     drawCosmicField(performance.now());
     // Images and fonts can change the reading lanes without resizing the window.
@@ -589,6 +667,7 @@ export function SiteMotionRuntime() {
       delete root.dataset.nexusRoute;
       root.style.removeProperty("--nxs-scroll");
       cosmicCanvas.remove();
+      edgeVeil.remove();
     };
   }, []);
 
