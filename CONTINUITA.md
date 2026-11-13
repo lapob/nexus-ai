@@ -178,7 +178,11 @@ Checks:
   `register-ipc.js` (18:27), not from this work.
 
 Open:
-- Human listening of the A/B pairs.
+- Human listening of the A/B pairs: DONE by the owner on 13 November.
+  - Choice: Qwen3 0.6B. It is already the default of `NEXUS_QWEN3_SIZE`, so
+    no code changes.
+  - Qwen3 stays opt-in (`NEXUS_VOICE_ENGINE=qwen3`). Kokoro remains the
+    default voice.
 - (c) Streaming to the renderer: DONE on 13 November.
   - `src/voice/speech-stream.js`, IPC channel `nexus:neural-voice-chunk`,
     `onVoiceChunk` in the preload, and `web/src/platform.ts`.

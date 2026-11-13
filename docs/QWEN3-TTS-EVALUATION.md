@@ -374,8 +374,8 @@ sintesi annullata con Kokoro.
 3. ~~Streaming dei blocchi fino al renderer~~: implementato da un'altra
    sessione (`src/voice/speech-stream.js`, IPC `nexus:neural-voice-chunk`,
    `web/src/platform.ts`).
-4. Ascolto umano delle coppie A/B (`qa-artifacts/qwen3-voice/qwen3-gguf-*`).
-   Scegliere fra 0.6B e 1.7B: il 1.7B GGUF ha il WER migliore a un costo
-   marginale.
+4. ~~Ascolto umano delle coppie A/B~~: fatto dal proprietario il 13 novembre.
+   Scelta: **0.6B**, che è già il valore predefinito di `NEXUS_QWEN3_SIZE`.
+   Il 1.7B resta selezionabile.
 5. Distribuzione: valutare il pacchetto runtime GGUF (DLL llama.cpp, ONNX
    Runtime DirectML, Python 3.14) per l'installer.
