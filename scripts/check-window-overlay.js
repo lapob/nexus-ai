@@ -1,8 +1,8 @@
 /**
  * @module scripts/check-window-overlay
- * @description Verifica reale della Window Controls Overlay su Windows: apre il renderer compilato con le stesse
- * opzioni della finestra principale, misura le azioni della barra rispetto ai controlli di sistema e salva una
- * cattura. Uso: npm run qa:desktop:overlay (richiede renderer-dist aggiornato).
+ * @description Verifica reale della barra alta su Windows: apre il renderer compilato con le stesse opzioni della
+ * finestra principale (nessun pulsante di sistema), misura riduci/ingrandisci/chiudi integrati, allineamento,
+ * collisioni e trascinamento, e salva le catture. Uso: npm run qa:desktop:overlay.
  */
 const path = require('node:path');
 const fs = require('node:fs');
@@ -20,8 +20,11 @@ app.whenReady().then(async () => {
   registerRendererProtocol(path.join(root, 'renderer-dist'));
   const results = [];
   // show:false + showInactive: la finestra di prova non ruba il fuoco e non riceve ciò che il proprietario sta digitando.
+  // Stesse opzioni della finestra principale: nessun pulsante di sistema, controlli integrati nella barra.
+  const { ipcMain } = require('electron');
+  ipcMain.handle('nexus:window-action', () => ({ maximized: false, fullscreen: false, focused: true }));
   const win = new BrowserWindow({ show: false, width: 1366, height: 720, x: 40, y: 40, backgroundColor: '#030405', titleBarStyle: 'hidden',
-      titleBarOverlay: { color: '#00000000', symbolColor: '#cfeff0', height: 56 }, webPreferences: { sandbox: true, contextIsolation: true } });
+      webPreferences: { sandbox: true, contextIsolation: true, preload: path.join(root, 'src', 'preload.js') } });
   win.showInactive();
   await win.loadURL(RENDERER_ENTRY_URL).catch((e) => log('loadErr ' + e.message));
   for (const [width, height] of [[1920, 1040], [1366, 720], [1024, 700], [900, 640], [720, 560]]) {
@@ -34,7 +37,10 @@ app.whenReady().then(async () => {
         .filter((node) => node.getClientRects().length).map((node) => node.getBoundingClientRect());
       const right = Math.max(...actions.map((box) => box.right));
       const drag = getComputedStyle(document.querySelector('.topbar')).getPropertyValue('app-region') || getComputedStyle(document.querySelector('.topbar')).webkitAppRegion;
+      const controls = [...document.querySelectorAll('.window-controls .window-control')].map((node) => node.getBoundingClientRect());
       const bar = document.querySelector('.topbar'); const probe = document.createElement('div'); probe.style.cssText = 'position:fixed;left:env(titlebar-area-x, -1px);width:env(titlebar-area-width, 3px);height:env(titlebar-area-height, 5px)'; document.body.append(probe); const pr = probe.getBoundingClientRect(); const sheet = [...document.styleSheets].flatMap((s) => { try { return [...s.cssRules].map((r) => r.cssText); } catch { return []; } }).join(' '); const tb = bar.getBoundingClientRect(); const cmd = [...bar.querySelectorAll('button')].pop()?.getBoundingClientRect(); return { barH: tb.height, iconMid: cmd ? cmd.top + cmd.height / 2 : null, pad: getComputedStyle(bar).paddingRight, probe: [pr.left, pr.width, pr.height], hasEnv: sheet.includes('titlebar-area'), hasDrag: /app-region/.test(sheet), visible: Boolean(wco?.visible), areaRight: area ? area.x + area.width : null, areaHeight: area?.height ?? null, actionsRight: right, viewport: innerWidth, drag,
+        controls: controls.length, controlsRight: controls.length ? Math.max(...controls.map((box) => box.right)) : null,
+        controlsMidOffset: controls.length ? Math.max(...controls.map((box) => Math.abs(box.top + box.height / 2 - (tb.top + tb.height / 2)))) : null,
         collisions: (() => {
           // Ogni controllo visibile e cliccabile deve stare nella finestra e non coprire un altro controllo.
           const hit = [...document.querySelectorAll('button, a[href], input, textarea, [role="button"], [role="switch"], [role="combobox"]')]
@@ -69,7 +75,7 @@ app.whenReady().then(async () => {
   }
   win.destroy();
   fs.writeFileSync(path.join(out, 'overlay.json'), JSON.stringify(results, null, 2));
-  const broken = results.filter((entry) => !entry.visible || entry.actionsRight > entry.areaRight || Math.abs(entry.iconMid - entry.areaHeight / 2) > 2 || entry.drag !== 'drag' || entry.collisions.length);
-  console.log(broken.length ? `Sovrapposizione con i controlli di Windows: ${JSON.stringify(broken)}` : `Barra desktop corretta su ${results.length} larghezze: azioni fuori dai controlli, centri allineati, trascinabile.`);
+  const broken = results.filter((entry) => entry.visible || entry.controls !== 3 || entry.controlsRight > entry.viewport - 4 || entry.controlsMidOffset > 1.5 || entry.drag !== 'drag' || entry.collisions.length);
+  console.log(broken.length ? `Barra desktop non corretta: ${JSON.stringify(broken)}` : `Barra desktop corretta su ${results.length} larghezze: riduci/ingrandisci/chiudi integrati, centrati, nessuna collisione, trascinabile.`);
   app.exit(broken.length ? 1 : 0);
 });

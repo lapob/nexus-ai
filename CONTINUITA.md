@@ -2562,6 +2562,14 @@ Website source build, performance and 37 tests pass, including clean GitHub exec
 
 Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS does not prove natural conversation quality. Cold boot has not been tested by restarting the PC. Full security coverage, production signing, signed update origin and external restore remain open. No approved training data or model promotion is available. Always-on automations need an owner-selected node; iOS requires macOS/Xcode and a device. A paying pilot needs a selected service and actual customer measurements.
 
+## Window controls, settings and touch feedback (0.3.40 candidate)
+
+- The desktop window no longer uses Windows caption buttons over the transparent bar. Minimize, maximize/restore (icon morphs with the real state, including full screen) and close are integrated controls with Italian labels, contained hover/press areas and a red close state; only three known actions pass through a trusted IPC handler. Real QA `npm run qa:desktop:overlay`: 5 widths, controls centred, no collisions, bar draggable. Windows 11 snap-layout flyout on hover is no longer available (Win+Z still works).
+- Settings: the new UI had no Ctrl+, shortcut and the menu said only "Preferenze". Ctrl+, now toggles "Impostazioni e preferenze"; menu, palette and shortcut list show it. The Electron smoke used to exit 0 silently when the renderer closed mid-check and still looked for an old Control Center button; it now fails on socket close, keeps the window alive 12 s, measures settled layout and verifies Ctrl+, , the profile menu, Control Center and window controls in real Electron.
+- Live agent chip: the icon pulse drew a square box-shadow around the SVG; replaced by a breathing sparkle with soft glow and a conic light travelling around the pill (reduced motion respected). Phones: browser tap highlight removed; `press.ts` (lazy) gives a contained spring press via Web Animations without touching component transitions.
+- Server independence verified: NexusNXS Server, Desktop Bridge and Watchdog run from this source checkout and `.nexus-data`; nothing depends on the installed app under AppData\Local\Programs, so uninstalling it leaves server, phone control and notifications running.
+- Gates: npm test 1279 pass / 0 fail, check:ui 39/39 + 15/15, startup bundle 408907 bytes, real Electron smoke pass, overlay QA pass.
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

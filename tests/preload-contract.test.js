@@ -69,6 +69,10 @@ test('ogni metodo preload usa esattamente il canale IPC autoritativo', async () 
   assert.equal(calls.at(-2).channel, CHANNELS.confirmRequest); assert.equal(calls.at(-1).removal, true);
   await value.answerConfirm('a'.repeat(32), true);
   assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify({ channel: CHANNELS.confirmAnswer, args: [{ id: 'a'.repeat(32), answer: true }] }));
+  await value.windowAction('toggle-maximize');
+  assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify({ channel: CHANNELS.windowAction, args: ['toggle-maximize'] }));
+  await value.windowAction('quit-everything');
+  assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify({ channel: CHANNELS.windowAction, args: ['state'] }), 'azioni sconosciute ridotte a lettura dello stato');
   const stopVoiceChunk = value.onVoiceChunk(() => {}); stopVoiceChunk();
   assert.equal(calls.at(-2).channel, CHANNELS.neuralVoiceChunk); assert.equal(calls.at(-2).subscription, true); assert.equal(calls.at(-1).removal, true);
   await value.voicePackStatus(); await value.installVoicePack(); await value.cancelVoicePack(); await value.removeVoicePack(); await value.restartForVoicePack();

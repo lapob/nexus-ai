@@ -1,5 +1,7 @@
 /* NexusNXS AI · web app. Token da config/nexus-design-tokens.json. */
 @layer reset, tokens, base, layout, components, motion;
+/* Angolo animabile per la luce che percorre i bordi (fuori dai layer: @property è globale). */
+@property --trail-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 
 @layer tokens {
   :root {
@@ -32,6 +34,10 @@
 @layer base {
   /* Gli swipe orizzontali sono gesti dell'app: niente "indietro" accidentale del browser. */
   html, body { overscroll-behavior-x: none; }
+  /* Sul telefono niente riquadro grigio/blu del browser al tocco: il feedback è la pressione morbida di press.ts,
+     contenuta nel controllo stesso. */
+  html { -webkit-tap-highlight-color: transparent; }
+  @media (hover: none) { :is(button, a, [role='button'], [role='menuitem'], [role='tab'], [role='radio']) { -webkit-touch-callout: none; } }
   body {
     /* Campo stellare a tre strati (solo gradienti: niente immagini da caricare) sopra la nebulosa. */
     background:
@@ -80,12 +86,12 @@
   .jump .icon { width: 18px; height: 18px; }
   /* Colonna esplicita minmax(0,1fr): la colonna implicita `auto` prendeva la larghezza del titolo senza a capo. */
   .stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; overflow: clip; min-height: 0; isolation: isolate; }
-  /* Desktop con controlli di Windows sovrapposti (Window Controls Overlay): la barra riserva lo spazio dei
-     pulsanti di sistema a destra, così le azioni non finiscono mai sotto riduci/ingrandisci/chiudi.
-     Senza overlay le variabili mancano e il calcolo ricade sui 16px normali. */
+  /* Sul desktop riduci/ingrandisci/chiudi sono controlli integrati in fondo alla barra (WindowControls):
+     nessun pulsante di sistema sovrapposto, quindi nessuno spazio da riservare. */
   .topbar { display: flex; align-items: center; gap: 12px; z-index: 5;
-    padding: 6px max(16px, env(safe-area-inset-right), calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 12px)) 6px max(16px, env(safe-area-inset-left));
-    min-height: max(56px, env(titlebar-area-height, 0px)); }
+    padding: 6px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
+    min-height: 56px; }
+  .topbar:has(.window-controls) { padding-right: max(8px, env(safe-area-inset-right)); }
   /* La barra e l'intestazione laterale trascinano la finestra; i controlli restano cliccabili. */
   .topbar, .sidebar-head { -webkit-app-region: drag; app-region: drag; }
   :is(.topbar, .sidebar-head) :is(button, a, input, select, textarea, [role='button'], [role='switch'], [tabindex]) { -webkit-app-region: no-drag; app-region: no-drag; }
@@ -110,6 +116,37 @@
 }
 
 @layer components {
+  /* Controlli finestra integrati: area di selezione contenuta, glifi nitidi a 1.5px, ingrandisci ⇄ ripristina
+     si trasforma (un quadrato diventa due sovrapposti), chiudi si accende di rosso solo al passaggio. */
+  .window-controls[data-placeholder] { width: 134px; height: 34px; }
+  .window-controls { display: flex; align-items: center; gap: 2px; margin-left: 4px; padding-left: 8px; position: relative; }
+  .window-controls::before { content: ''; position: absolute; left: 0; top: 50%; width: 1px; height: 20px; translate: 0 -50%;
+    background: linear-gradient(transparent, color-mix(in oklch, var(--hairline) 70%, transparent), transparent); }
+  .window-control { position: relative; display: grid; place-items: center; width: 40px; height: 34px; border-radius: 10px;
+    color: color-mix(in oklch, var(--mist) 92%, var(--ice)); isolation: isolate;
+    transition: color .18s var(--ease-standard), scale .22s var(--ease-emphasized); }
+  .window-control::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; opacity: 0; scale: .86;
+    background: color-mix(in oklch, var(--ice) 9%, transparent);
+    transition: opacity .18s var(--ease-standard), scale .26s var(--ease-emphasized), background .18s var(--ease-standard); }
+  .window-control:hover, .window-control:focus-visible { color: var(--ice); }
+  .window-control:hover::before, .window-control:focus-visible::before { opacity: 1; scale: 1; }
+  .window-control:active { scale: .94; }
+  .window-control:focus-visible { outline: none; }
+  .window-control:focus-visible::before { box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--cyan) 70%, transparent); }
+  .window-control svg { width: 16px; height: 16px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; shape-rendering: geometricPrecision; }
+  .window-control[data-action='close']:hover, .window-control[data-action='close']:focus-visible { color: #fff; }
+  .window-control[data-action='close']:hover::before, .window-control[data-action='close']:focus-visible::before { background: oklch(58% .2 25); }
+  .window-control[data-action='close']:hover svg { transform: rotate(90deg); }
+  .window-control[data-action='close'] svg { transition: transform .32s var(--ease-emphasized); }
+  .window-control[data-action='minimize']:hover svg { transform: translateY(1.5px); }
+  .window-control[data-action='minimize'] svg { transition: transform .22s var(--ease-emphasized); }
+  .window-glyph-front, .window-glyph-back { transform-box: view-box; transform-origin: 8px 8px;
+    transition: transform .34s var(--ease-emphasized), opacity .22s var(--ease-standard); }
+  .window-glyph-back { opacity: 0; transform: translate(-2px, 2px); }
+  .window-controls[data-expanded='true'] .window-glyph-front { transform: translate(-1px, 1.5px) scale(.78); }
+  .window-controls[data-expanded='true'] .window-glyph-back { opacity: 1; transform: none; }
+  .window-controls[data-focused='false'] .window-control:not(:hover) { color: color-mix(in oklch, var(--mist) 55%, transparent); }
+  @media (prefers-reduced-motion: reduce) { .window-control, .window-control::before, .window-control svg, .window-glyph-front, .window-glyph-back { transition: none; } }
   .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: .02em; }
   .brand img { border-radius: 6px; }
   .sidebar-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
@@ -283,7 +320,17 @@
     border: 1px solid color-mix(in oklch, var(--hairline) 35%, transparent); background: color-mix(in oklch, var(--surface) 55%, transparent); transition: color .18s, background .18s, border-color .18s; }
   .trail-toggle:hover, .trail-toggle:focus-visible { color: var(--ice); border-color: color-mix(in oklch, var(--cyan) 30%, transparent); }
   .trail-toggle > span:not(.trail-chevron) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .agent-trail[data-live='true'] .trail-toggle > .icon { color: var(--cyan); animation: listen 1s var(--ease-standard) infinite alternate; }
+  /* Al lavoro: niente anelli squadrati sull'icona. La stella respira con un bagliore morbido
+     e una luce sottile percorre il bordo della pillola (gradiente conico su @property). */
+  .agent-trail[data-live='true'] .trail-toggle { position: relative; border-color: transparent;
+    background: linear-gradient(color-mix(in oklch, var(--surface) 82%, var(--ink)), color-mix(in oklch, var(--surface) 82%, var(--ink))) padding-box,
+      conic-gradient(from var(--trail-angle), color-mix(in oklch, var(--hairline) 30%, transparent) 0 62%, color-mix(in oklch, var(--cyan) 85%, transparent) 80%, color-mix(in oklch, var(--hairline) 30%, transparent) 96%) border-box;
+    animation: trail-sweep 2.6s linear infinite; }
+  .agent-trail[data-live='true'] .trail-toggle > .icon { color: var(--cyan); transform-origin: 50% 50%;
+    filter: drop-shadow(0 0 5px color-mix(in oklch, var(--cyan) 60%, transparent)); animation: sparkle-breathe 1.8s var(--ease-standard) infinite; }
+  @keyframes trail-sweep { to { --trail-angle: 360deg; } }
+  @keyframes sparkle-breathe { 0%, 100% { scale: .88; rotate: 0deg; opacity: .78; } 50% { scale: 1.06; rotate: 14deg; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .agent-trail[data-live='true'] .trail-toggle, .agent-trail[data-live='true'] .trail-toggle > .icon { animation: none; } }
   .trail-chevron { display: grid; transition: rotate .28s var(--ease-emphasized); }
   .trail-toggle[aria-expanded='true'] .trail-chevron { rotate: 180deg; }
   /* Luce che scorre sul testo della fase corrente (come "Thinking" negli assistenti migliori). */

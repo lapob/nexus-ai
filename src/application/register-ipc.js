@@ -1454,6 +1454,20 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     assertTrustedSender(event);
     return workflowRuntime.list({ limit: value?.limit ?? 20 });
   });
+  // Controlli finestra integrati (riduci, ingrandisci/ripristina, chiudi) al posto dei pulsanti di sistema.
+  ipcMain.handle(CHANNELS.windowAction, (event, action) => {
+    assertTrustedSender(event);
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return null;
+    if (action === 'minimize') win.minimize();
+    else if (action === 'toggle-maximize') {
+      if (win.isFullScreen()) win.setFullScreen(false);
+      else if (win.isMaximized()) win.unmaximize();
+      else win.maximize();
+    } else if (action === 'close') win.close();
+    else if (action !== 'state') throw new Error('Azione finestra non valida.');
+    return win.isDestroyed() ? null : { maximized: win.isMaximized(), fullscreen: win.isFullScreen(), focused: win.isFocused() };
+  });
   ipcMain.handle(CHANNELS.windowCompact, (event, enabled) => {
     assertTrustedSender(event);
     const win = BrowserWindow.fromWebContents(event.sender);

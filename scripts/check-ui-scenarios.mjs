@@ -370,7 +370,7 @@ const scenarios = [
     let native = 0;
     page.on('dialog', (dialog) => { native += 1; void dialog.dismiss(); });
     await page.keyboard.press('Control+k');
-    await page.keyboard.type('Preferenze di risposta');
+    await page.keyboard.type('Impostazioni e preferenze');
     await page.keyboard.press('Enter');
     const conversations = () => page.evaluate(() => JSON.parse(localStorage.getItem('nxs.next.state.v1')).conversations.length);
     const before = await conversations();
@@ -412,7 +412,7 @@ const scenarios = [
       Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { enumerateDevices: async () => fake } });
     });
     await page.keyboard.press('Control+k');
-    await page.keyboard.type('Preferenze di risposta');
+    await page.keyboard.type('Impostazioni e preferenze');
     await page.keyboard.press('Enter');
     await page.waitForSelector('#microphone');
     if (await page.$('select')) throw new Error('resta un <select> nativo');

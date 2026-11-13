@@ -104,7 +104,9 @@ const CHANNELS = Object.freeze({
   wakeWordActivation: 'nexus:wake-word-activation',
   quickPrompt: 'nexus:quick-prompt',
   confirmRequest: 'nexus:confirm-request',
-  confirmAnswer: 'nexus:confirm-answer'
+  confirmAnswer: 'nexus:confirm-answer',
+  windowAction: 'nexus:window-action',
+  windowState: 'nexus:window-state'
 });
 
 // #endregion

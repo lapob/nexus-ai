@@ -107,7 +107,9 @@ const CHANNELS = Object.freeze({
   wakeWordActivation: 'nexus:wake-word-activation',
   quickPrompt: 'nexus:quick-prompt',
   confirmRequest: 'nexus:confirm-request',
-  confirmAnswer: 'nexus:confirm-answer'
+  confirmAnswer: 'nexus:confirm-answer',
+  windowAction: 'nexus:window-action',
+  windowState: 'nexus:window-state'
 });
 
 // #endregion
@@ -223,6 +225,13 @@ contextBridge.exposeInMainWorld('nexus', {
     };
     ipcRenderer.on(CHANNELS.confirmRequest, handler);
     return () => ipcRenderer.removeListener(CHANNELS.confirmRequest, handler);
+  },
+  // Controlli finestra integrati nella barra: solo tre azioni note, lo stato torna come booleani.
+  windowAction: (action) => ipcRenderer.invoke(CHANNELS.windowAction, ['minimize', 'toggle-maximize', 'close', 'state'].includes(action) ? action : 'state'),
+  onWindowState: (listener) => {
+    const handler = (_event, payload) => listener(Object.freeze({ maximized: payload?.maximized === true, fullscreen: payload?.fullscreen === true, focused: payload?.focused !== false }));
+    ipcRenderer.on(CHANNELS.windowState, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.windowState, handler);
   },
   answerConfirm: (id, answer) => ipcRenderer.invoke(CHANNELS.confirmAnswer, { id: String(id).slice(0, 64), answer: answer === 'shown' ? 'shown' : answer === true }),
   onProactiveEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.proactiveEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.proactiveEvent, handler); },

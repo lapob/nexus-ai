@@ -18,6 +18,8 @@ import { Icon, type IconName } from './Icon';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { Tooltips } from './Tooltips';
+// Solo desktop: caricati a parte, così la web app non ne paga il peso all'avvio.
+const WindowControls = lazy(() => import('./WindowControls').then((module) => ({ default: module.WindowControls })));
 import { confirmDialog, currentConfirm, subscribeConfirm } from './confirm';
 import { useSwipeGestures } from './gestures';
 import { mergeStep } from './steps';
@@ -65,7 +67,7 @@ const timeLabel = (at: number) => new Date(at).toLocaleString('it-IT', { day: 'n
 
 const SHORTCUTS: Array<[string, string]> = [
   ['Ctrl+K', 'Comandi e conversazioni'], ['Ctrl+Maiusc+O', 'Nuova conversazione'], ['Ctrl+B', 'Mostra o nascondi la barra laterale'],
-  ['Ctrl+Maiusc+L', 'Voce live'], ['Ctrl+Maiusc+Spazio', 'Barra rapida da qualsiasi programma (app desktop)'], ['Ctrl+/', 'Scorciatoie da tastiera'], ['/', 'Comandi rapidi nel messaggio'],
+  ['Ctrl+Maiusc+L', 'Voce live'], ['Ctrl+Maiusc+Spazio', 'Barra rapida da qualsiasi programma (app desktop)'], ['Ctrl+,', 'Impostazioni e preferenze'], ['Ctrl+/', 'Scorciatoie da tastiera'], ['/', 'Comandi rapidi nel messaggio'],
   ['Invio', 'Invia'], ['Maiusc+Invio', 'Vai a capo'], ['Esc', 'Chiudi pannelli o interrompi la risposta']
 ];
 
@@ -479,6 +481,8 @@ export function App() {
       else if (meta && !event.shiftKey && event.key.toLowerCase() === 'b') { event.preventDefault(); if (window.matchMedia('(min-width: 840px)').matches) toggleSidebar(); else setSidebarOpen((open) => !open); }
       else if (meta && event.shiftKey && event.key.toLowerCase() === 'l') { event.preventDefault(); if (liveRef.current) endLive(); else void startLive(); }
       else if (meta && event.key === '/') { event.preventDefault(); setShortcutsOpen((open) => !open); }
+      // Ctrl+, apre le impostazioni come in ogni app desktop (anche dalla tastiera italiana).
+      else if (meta && !event.shiftKey && (event.key === ',' || event.code === 'Comma')) { event.preventDefault(); setPaletteOpen(false); setSettingsOpen((open) => !open); }
       else if (event.key === 'Escape') {
         if (event.defaultPrevented) return;
         if (liveRef.current && !paletteOpen && !settingsOpen) endLive();
@@ -601,6 +605,7 @@ export function App() {
               <i aria-hidden="true" /><span className="status-text sr-only">{status === 'ready' ? 'Online' : status === 'preparing' ? 'In preparazione' : status === 'offline' ? 'Offline' : 'Connessione…'}</span>
             </span>
             <button type="button" className="icon-button" aria-label="Comandi (Ctrl+K)" onClick={() => setPaletteOpen(true)}><Icon name="command" /></button>
+            {typeof desktopBridge?.windowAction === 'function' && <Suspense fallback={<span className="window-controls" aria-hidden="true" data-placeholder="true" />}><WindowControls /></Suspense>}
           </header>
 
           <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /><div className="core-hud" aria-hidden="true"><i /><i /><i /></div></div>
@@ -800,7 +805,7 @@ export function App() {
             ] : []),
             ...SLASH_COMMANDS.map((item) => ({ id: `s-${item.command}`, label: `Comando rapido: ${item.label}`, hint: `/${item.command}`, icon: item.icon, run: () => applySlash(item) })),
             { id: 'sidebar', label: sidebarHidden ? 'Mostra barra laterale' : 'Nascondi barra laterale', hint: 'Ctrl+B', icon: 'sidebar', run: toggleSidebar },
-            { id: 'prefs', label: 'Preferenze di risposta', icon: 'sliders', run: () => setSettingsOpen(true) },
+            { id: 'prefs', label: 'Impostazioni e preferenze', hint: 'Ctrl+,', icon: 'sliders', run: () => setSettingsOpen(true) },
             { id: 'keys', label: 'Scorciatoie da tastiera', hint: 'Ctrl+/', icon: 'keyboard', run: () => setShortcutsOpen(true) },
             ...(desktopBridge ? [{ id: 'control', label: 'Centro di controllo (modelli, telefono, memoria, sistema)', icon: 'classic' as const, run: () => setControlOpen(true) }] : []),
             ...conversations.slice(0, 12).map((item) => ({ id: `c-${item.id}`, label: item.title, hint: 'Apri', icon: (pinned.includes(item.id) ? 'pin' : 'clock') as IconName, run: () => transition(() => setState((state) => ({ ...state, activeId: item.id }))) }))
@@ -1200,7 +1205,7 @@ function Settings({ preferences, onClose, onCleared }: { preferences: Preference
     <m.div className="overlay" role="presentation" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <m.section className="sheet glass" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={(event) => event.stopPropagation()}
         initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
-        <header><h2 id="settings-title">Preferenze</h2><button type="button" className="icon-button" aria-label="Chiudi" onClick={onClose}><Icon name="close" /></button></header>
+        <header><h2 id="settings-title">Impostazioni e preferenze</h2><button type="button" className="icon-button" aria-label="Chiudi" onClick={onClose}><Icon name="close" /></button></header>
         <label>Lunghezza delle risposte</label>
         {option('responseStyle', [['concise', 'Concise'], ['natural', 'Naturali'], ['detailed', 'Dettagliate']])}
         <label>Tono</label>
@@ -1246,7 +1251,7 @@ function ProfileMenu({ status, compactRail = false, onSettings, onControl, onSho
       <AnimatePresence>
         {open && (
           <m.div className="profile-menu glass" role="menu" initial={{ opacity: 0, y: 6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 4, scale: 0.98 }} transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}>
-            <button type="button" role="menuitem" autoFocus onClick={() => run(onSettings)}><Icon name="sliders" size={18} />Preferenze</button>
+            <button type="button" role="menuitem" autoFocus onClick={() => run(onSettings)}><Icon name="sliders" size={18} />Impostazioni<kbd>Ctrl+,</kbd></button>
             {onControl && <button type="button" role="menuitem" onClick={() => run(onControl)}><Icon name="classic" size={18} />Centro di controllo</button>}
             <button type="button" role="menuitem" onClick={() => run(onShortcuts)}><Icon name="keyboard" size={18} />Scorciatoie<kbd>Ctrl+/</kbd></button>
           </m.div>

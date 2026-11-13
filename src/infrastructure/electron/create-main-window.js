@@ -29,14 +29,9 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
     backgroundColor: '#030405',
     icon: path.join(__dirname, '..', '..', '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     title: 'NEXUSNXS',
+    // Nessun pulsante di sistema: riduci, ingrandisci/ripristina e chiudi sono controlli integrati
+    // nella barra dell'app, con icone che cambiano con lo stato e suggerimenti in italiano.
     titleBarStyle: 'hidden',
-    // Controlli di Windows trasparenti sopra la barra dell'app: nessun riquadro nero, stessa altezza
-    // della barra (l'interfaccia riserva lo spazio con env(titlebar-area-*)).
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: '#cfeff0',
-      height: 56
-    },
     // All'avvio con Windows NexusNXS prepara AI e remoto senza imporre una
     // finestra. Una seconda apertura richiama normalmente la finestra unica.
     show: !smokeTest && !startHidden && !process.argv.includes('--background'),
@@ -506,6 +501,15 @@ function createMainWindow({ rendererUrl, smokeTest, startHidden = false, screens
     }, screenshotPath ? 4400 : 2500));
   }
   if (!smokeTest && !startHidden) win.once('ready-to-show', () => win.show());
+  // Stato per i controlli integrati: stesso nome di CHANNELS.windowState (verificato dai test).
+  const sendWindowState = () => {
+    try {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+      win.webContents.send('nexus:window-state', { maximized: win.isMaximized(), fullscreen: win.isFullScreen(), focused: win.isFocused() });
+    } catch { /* La finestra si sta chiudendo: lo stato non serve più. */ }
+  };
+  for (const name of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen', 'focus', 'blur', 'restore']) win.on(name, sendWindowState);
+  win.webContents.on('did-finish-load', sendWindowState);
   win.on('close', () => {
     logger?.info?.('Chiusura UI: richiesta finestra ricevuta.');
     if (!smokeTest) saveWindowState(statePath, win);

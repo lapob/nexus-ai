@@ -38,6 +38,8 @@ function launchElectron() {
     env: {
       ...process.env,
       NEXUS_SMOKE_TEST: '1',
+      // Il contratto apre anche impostazioni e menu profilo: la finestra resta viva abbastanza da verificarli.
+      NEXUS_SMOKE_HOLD_MS: '12000',
       NEXUS_SMOKE_DEBUG_PORT: String(debugPort),
       NEXUS_SMOKE_STAGE_PATH: path.join(smokeProfile, 'smoke-stages.log'),
       // Mantiene i log del bootstrap nel profilo effimero del test: in caso di
@@ -90,6 +92,8 @@ async function inspectBridge(target) {
     socket.addEventListener('error', reject, { once: true });
   });
   const result = await new Promise((resolve, reject) => {
+    // Se il renderer si chiude a metà, il contratto fallisce: mai un'uscita silenziosa con codice 0.
+    socket.addEventListener('close', () => reject(new Error('Renderer chiuso prima della fine del contratto smoke.')), { once: true });
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.id !== 1) return;
@@ -101,6 +105,9 @@ async function inspectBridge(target) {
       method: 'Runtime.evaluate',
       params: {
         expression: `(async () => {
+          window.__smokeErrors = [];
+          window.addEventListener('error', (event) => window.__smokeErrors.push(String(event.message)));
+          window.addEventListener('unhandledrejection', (event) => window.__smokeErrors.push(String(event.reason?.message || event.reason)));
           for (let attempt = 0; attempt < 20 && typeof window.nexus !== 'object'; attempt += 1) {
             await new Promise((resolve) => setTimeout(resolve, 20));
           }
@@ -114,7 +121,10 @@ async function inspectBridge(target) {
             permissionPersistence = afterPartialSave.actionApprovalMode === 'full-access';
           }
           const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-          const fits = (element) => { const rect = element?.getBoundingClientRect(); return Boolean(rect && rect.width > 0 && rect.left >= 0 && rect.top >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight); };
+          // La finestra smoke è nascosta e Chromium rallenta i frame: si misura il layout finale,
+          // senza la traslazione d'ingresso ancora in corso.
+          const settledRect = (element) => { if (!element) return null; const previous = element.style.transform; element.style.transform = 'none'; const rect = element.getBoundingClientRect(); element.style.transform = previous; return rect; };
+          const fits = (element) => { const rect = settledRect(element); return Boolean(rect && rect.width > 0 && rect.left >= 0 && rect.top >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight); };
           for (let attempt = 0; attempt < 200 && !document.querySelector('canvas.core'); attempt += 1) await wait(25);
           await wait(160);
           const corePresent = Boolean(document.querySelector('canvas.core'));
@@ -131,7 +141,10 @@ async function inspectBridge(target) {
           const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
           if (composerInput && setter) { setter.call(composerInput, draft); composerInput.dispatchEvent(new Event('input', { bubbles: true })); await wait(60); }
           const composerKeepsDraft = composer?.querySelector('textarea')?.value === draft;
-          [...document.querySelectorAll('.sidebar-foot button')].find((button) => /Centro di controllo/.test(button.textContent))?.click();
+          // Il Centro di controllo si apre dal menu profilo in fondo alla barra laterale.
+          document.querySelector('.profile-button')?.click();
+          await wait(250);
+          [...document.querySelectorAll('.profile-menu [role=menuitem]')].find((item) => /Centro di controllo/.test(item.textContent))?.click();
           // Il pannello entra con un'animazione: si attende che compaia e si fermi (max 3 s), non un tempo fisso.
           const controlStarted = performance.now();
           for (let attempt = 0; attempt < 120 && !document.querySelector('.sheet.control'); attempt += 1) await wait(25);
@@ -139,10 +152,30 @@ async function inspectBridge(target) {
           await wait(400);
           const control = document.querySelector('.sheet.control');
           const controlFits = fits(control) && document.querySelectorAll('.sheet.control [role=tab]').length >= 6;
-          const controlGeometry = control ? (({ left, top, right, bottom }) => ({ left, top, right, bottom, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }))(control.getBoundingClientRect())
+          const controlGeometry = control ? (({ left, top, right, bottom }) => ({ left, top, right, bottom, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }))(settledRect(control))
             : { missing: true, controlAppearedMs, footButtons: [...document.querySelectorAll('.sidebar-foot button')].map((button) => button.textContent.trim()), sheets: [...document.querySelectorAll('.sheet, [role=dialog]')].map((element) => element.className || element.getAttribute('role')) };
           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          await wait(400);
+          // Impostazioni: scorciatoia Ctrl+, e voce del menu profilo devono aprire davvero il pannello.
+          const settingsVisible = async () => { for (let attempt = 0; attempt < 80; attempt += 1) { const sheet = document.querySelector('[aria-labelledby="settings-title"]'); if (sheet && fits(sheet)) return true; await wait(25); } return false; };
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: ',', code: 'Comma', ctrlKey: true, bubbles: true }));
+          const settingsByShortcut = await settingsVisible();
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          await wait(400);
+          document.querySelector('.sidebar-full .profile-button, .profile-button')?.click();
+          await wait(250);
+          [...document.querySelectorAll('.profile-menu [role=menuitem]')].find((item) => /Impostazioni/.test(item.textContent))?.click();
+          const settingsByMenu = await settingsVisible();
+          const settingsDiagnostic = (() => { const sheet = document.querySelector('[aria-labelledby="settings-title"]'); const rect = sheet?.getBoundingClientRect(); return { present: Boolean(sheet), rect: rect ? [rect.left, rect.top, rect.right, rect.bottom] : null, viewport: [innerWidth, innerHeight], menuItems: [...document.querySelectorAll('.profile-menu [role=menuitem]')].map((item) => item.textContent), overlays: [...document.querySelectorAll('.overlay, [role=dialog]')].map((node) => node.className), errors: window.__smokeErrors || [] }; })();
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          await wait(300);
+          const windowControls = document.querySelectorAll('.window-controls .window-control').length === 3
+            && typeof (await window.nexus.windowAction('state'))?.maximized === 'boolean';
           return {
+            settingsByShortcut,
+            settingsByMenu,
+            settingsDiagnostic,
+            windowControls,
             bridgeComplete,
             bridgeKeys: typeof window.nexus === 'object' ? Object.keys(window.nexus).sort() : [],
             bootstrapComplete: Boolean(data?.settings && data?.stats),
@@ -168,7 +201,7 @@ async function inspectBridge(target) {
 (async () => {
   debugPort = await reserveDebugPort();
   launchElectron();
-    const timeout = setTimeout(() => child.kill(), 25000);
+  const timeout = setTimeout(() => child.kill(), 40000);
   try {
     let contract;
     let lastInspectionError;
@@ -182,6 +215,7 @@ async function inspectBridge(target) {
       }
     }
     if (!contract) throw lastInspectionError || new Error('Impossibile ispezionare il renderer Electron.');
+    if (process.env.NEXUS_SMOKE_VERBOSE === '1') console.error(JSON.stringify(contract));
     const code = await exit;
     if (code !== 0) throw new Error(`Electron terminato con codice ${code} e segnale ${child.signalCode || 'nessuno'}.`);
     if (!contract.bridgeComplete) throw new Error(`Il preload ha esposto un bridge NexusNXS incompleto: ${JSON.stringify(contract)}.`);
@@ -193,6 +227,9 @@ async function inspectBridge(target) {
     if (!contract.composerFits) throw new Error('Il composer o il controllo allegati non rientra nella finestra Electron.');
     if (!contract.composerKeepsDraft) throw new Error('Il composer non conserva la bozza.');
     if (!contract.controlFits) throw new Error(`Il Centro di controllo non rientra nella finestra Electron: ${JSON.stringify(contract.controlGeometry)}.`);
+    if (!contract.settingsByShortcut) throw new Error('Ctrl+, non apre le impostazioni nella finestra Electron.');
+    if (!contract.settingsByMenu) throw new Error('Il menu profilo non apre le impostazioni nella finestra Electron.');
+    if (!contract.windowControls) throw new Error('Controlli finestra integrati assenti o senza stato reale.');
     console.log(`Electron, preload, CSP, renderer e IPC caricati correttamente; bridge completo e bootstrap verificato.`);
   } catch (error) {
     child.kill();
