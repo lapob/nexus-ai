@@ -96,7 +96,9 @@ const CHANNELS = Object.freeze({
   updateEvent: 'nexus:update-event',
   proactiveEvent: 'nexus:proactive-event',
   wakeWordActivation: 'nexus:wake-word-activation',
-  quickPrompt: 'nexus:quick-prompt'
+  quickPrompt: 'nexus:quick-prompt',
+  confirmRequest: 'nexus:confirm-request',
+  confirmAnswer: 'nexus:confirm-answer'
 });
 
 // #endregion

@@ -3,7 +3,7 @@
  * @description Shell della nuova web app NexusNXS AI: conversazioni locali, streaming con fasi, nucleo WebGPU, palette comandi e preferenze.
  */
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'framer-motion';
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Capabilities, PlanStep, Preferences } from './api';
 import { highlight, lexicalSearch, semanticSearch, type SearchDoc, type SearchHit } from './search';
 import { useDesktopPresence, useDesktopUpdate } from './desktopPresence';
@@ -18,6 +18,7 @@ import { Icon, type IconName } from './Icon';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { Tooltips } from './Tooltips';
+import { confirmDialog, currentConfirm, subscribeConfirm } from './confirm';
 import { useSwipeGestures } from './gestures';
 import { mergeStep } from './steps';
 import { activeConversation, appendMessage, assignProject, createProject, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, openProject, projectContext, projectFor, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
@@ -29,6 +30,23 @@ import { closePanel, openPanel, usePanel } from './panelStore';
 const ControlCenter = lazy(() => import('./ControlCenter').then((module) => ({ default: module.ControlCenter })));
 // Il selettore serve solo nelle preferenze: resta fuori dal bundle di avvio.
 const Select = lazy(() => import('./Select').then((module) => ({ default: module.Select })));
+// Conferme: il dialogo si carica alla prima richiesta (montato alla radice: overlay fisso sopra ogni foglio).
+const ConfirmDialog = lazy(() => import('./ConfirmDialog').then((module) => ({ default: module.ConfirmDialog })));
+function Confirmations() {
+  const request = useSyncExternalStore(subscribeConfirm, currentConfirm, () => null);
+  // Desktop: consensi e conferme del processo principale. «shown» avvisa che il dialogo è visibile
+  // (altrimenti il PC ripiega sul dialogo di sistema); la scelta torna con lo stesso id monouso.
+  useEffect(() => {
+    if (!desktopBridge?.onConfirmRequest) return;
+    return desktopBridge.onConfirmRequest((request: { id: string; title: string; message: string; detail: string; confirmLabel: string; cancelLabel: string; tone: 'default' | 'danger' | 'warning' }) => {
+      void desktopBridge?.answerConfirm(request.id, 'shown');
+      void confirmDialog({ title: request.title || request.message, message: request.title ? request.message : undefined, detail: request.detail || undefined,
+        confirmLabel: request.confirmLabel || undefined, cancelLabel: request.cancelLabel || undefined, tone: request.tone })
+        .then((approved) => desktopBridge?.answerConfirm(request.id, approved));
+    }) as () => void;
+  }, []);
+  return <AnimatePresence>{request && <Suspense key={request.id} fallback={null}><ConfirmDialog request={request} /></Suspense>}</AnimatePresence>;
+}
 
 /** Rinomina e, dove la cronologia vive altrove (desktop), salva subito anche le conversazioni non attive. */
 function rename(id: string, title: string) {
@@ -795,6 +813,7 @@ export function App() {
         </AnimatePresence>
 
         <Tooltips />
+        <Confirmations />
         <UpdateCard update={update} hidden={Boolean(toast) && update.state?.status !== 'installing'} />
         <AnimatePresence>{memoryReview > 0 && !update.visible && !toast && !controlOpen && (
           <m.div className="update-pill glass" role="status" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>
@@ -1191,7 +1210,7 @@ function Settings({ preferences, onClose, onCleared }: { preferences: Preference
         <MicrophonePicker />
         <p className="muted">Le preferenze accompagnano le richieste; nome e dati personali non vengono inviati.</p>
         <button type="button" className="danger" onClick={async () => {
-          if (!window.confirm('Cancellare tutte le conversazioni salvate su questo dispositivo?')) return;
+          if (!await confirmDialog({ title: 'Cancellare tutte le conversazioni?', message: 'Le conversazioni salvate su questo dispositivo verranno eliminate. L’operazione non si può annullare.', confirmLabel: 'Cancella tutto', tone: 'danger' })) return;
           for (const conversation of getState().conversations) platform.removeConversation(conversation.id);
           clearAll(); await platform.forgetRemote(); onClose(); onCleared();
         }}><Icon name="trash" />Cancella dati locali</button>

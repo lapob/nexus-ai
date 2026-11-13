@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon } from './Icon';
 import { Select } from './Select';
+import { confirmDialog } from './confirm';
 import { setWakeWordEnabled, wakeWordEnabled } from './desktopPresence';
 import { desktopBridge } from './platform';
 
@@ -119,7 +120,7 @@ function Models({ settings, save, notify }: { settings: Any; save: (patch: Any) 
             provisioning.active || progress
               ? <Row><span className="muted">Installazione {progress}</span><button type="button" className="secondary" onClick={() => void bridge().cancelProvisioning()}>Annulla</button></Row>
               : <button type="button" className="secondary" onClick={async () => {
-                if (!window.confirm(`Scaricare il profilo «${recommended.label}» (${formatBytes(recommended.downloadBytes)})?`)) return;
+                if (!await confirmDialog({ title: `Scaricare il profilo «${recommended.label}»?`, message: `Verranno scaricati ${formatBytes(recommended.downloadBytes)} di modelli locali. Puoi annullare durante il download.`, confirmLabel: 'Scarica' })) return;
                 try { await bridge().startProvisioning(recommended.id); } catch (error) { notify(message(error, 'Installazione non avviata.')); }
               }}>Installa modelli consigliati · {recommended.label} ({formatBytes(recommended.downloadBytes)})</button>
           )}
@@ -208,7 +209,7 @@ function Phone({ notify }: { notify: (text: string) => void }) {
         <ul className="list">{status.devices.map((device: Any) => (
           <li key={device.id}><span><strong>{device.name}</strong><small>Ultimo accesso {formatDate(device.lastSeenAt)}</small></span>
             <button type="button" className="icon-button small" aria-label={`Revoca ${device.name}`} onClick={async () => {
-              if (!window.confirm(`Revocare l’accesso di «${device.name}»?`)) return;
+              if (!await confirmDialog({ title: `Revocare l’accesso di «${device.name}»?`, message: 'Il dispositivo non potrà più usare NexusNXS finché non lo associ di nuovo.', confirmLabel: 'Revoca', tone: 'danger' })) return;
               setStatus(await bridge().revokeRemoteDevice(device.id));
             }}><Icon name="trash" /></button></li>
         ))}</ul>
@@ -383,7 +384,7 @@ function Data({ notify, onImported }: { notify: (text: string) => void; onImport
           catch (error) { notify(message(error, 'Backup non riuscito.')); }
         }}>Esporta backup</button>
         <button type="button" className="secondary" disabled={!strong} onClick={async () => {
-          if (!window.confirm('Importare un backup? Le impostazioni attuali verranno sostituite.')) return;
+          // La conferma arriva dopo la scelta del file, quando l'archivio è già verificato (dialogo integrato dal processo principale).
           try { const result = await bridge().importPersonalData(passphrase); if (result?.status === 'imported') { notify('Backup importato.'); await onImported(); } }
           catch (error) { notify(message(error, 'Importazione non riuscita.')); }
         }}>Importa backup</button>

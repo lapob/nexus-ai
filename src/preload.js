@@ -99,7 +99,9 @@ const CHANNELS = Object.freeze({
   updateEvent: 'nexus:update-event',
   proactiveEvent: 'nexus:proactive-event',
   wakeWordActivation: 'nexus:wake-word-activation',
-  quickPrompt: 'nexus:quick-prompt'
+  quickPrompt: 'nexus:quick-prompt',
+  confirmRequest: 'nexus:confirm-request',
+  confirmAnswer: 'nexus:confirm-answer'
 });
 
 // #endregion
@@ -196,6 +198,21 @@ contextBridge.exposeInMainWorld('nexus', {
   installUpdate: () => ipcRenderer.invoke(CHANNELS.updateInstall),
   downloadUpdate: () => ipcRenderer.invoke(CHANNELS.updateDownload),
   onUpdateEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.updateEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.updateEvent, handler); },
+  // Conferme del processo principale (consensi, ripristino) mostrate con il dialogo integrato.
+  // Solo testo, lunghezze limitate; la risposta torna con l'id monouso ricevuto.
+  onConfirmRequest: (listener) => {
+    const text = (value, max) => String(value ?? '').slice(0, max);
+    const handler = (_event, payload) => {
+      const id = text(payload?.id, 64);
+      if (!/^[a-f0-9]{32}$/.test(id)) return;
+      const tone = ['danger', 'warning'].includes(payload?.tone) ? payload.tone : 'default';
+      listener(Object.freeze({ id, tone, title: text(payload?.title, 200), message: text(payload?.message, 600), detail: text(payload?.detail, 2400),
+        confirmLabel: text(payload?.confirmLabel, 40), cancelLabel: text(payload?.cancelLabel, 40) }));
+    };
+    ipcRenderer.on(CHANNELS.confirmRequest, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.confirmRequest, handler);
+  },
+  answerConfirm: (id, answer) => ipcRenderer.invoke(CHANNELS.confirmAnswer, { id: String(id).slice(0, 64), answer: answer === 'shown' ? 'shown' : answer === true }),
   onProactiveEvent: (listener) => { const handler = (_event, payload) => listener(payload); ipcRenderer.on(CHANNELS.proactiveEvent, handler); return () => ipcRenderer.removeListener(CHANNELS.proactiveEvent, handler); },
   onQuickPrompt: (listener) => {
     const handler = (_event, payload) => {

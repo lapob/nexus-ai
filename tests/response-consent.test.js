@@ -10,12 +10,14 @@ function handlers({ decision = 0, distributionMode = 'developer' } = {}) {
   const end = source.indexOf('  ipcMain.handle(CHANNELS.trainingStats,', start);
   assert.ok(start > 0 && end > start);
   const registered = new Map(), saved = [], sent = [], logs = [], dialogs = [];
+  const dialog = { showMessageBox: async (_parent, options) => { dialogs.push(options); return { response: decision }; } };
+  // Il consenso passa dal dialogo integrato (stessa firma del dialogo di sistema).
+  assert.match(source, /trainingExample[\s\S]{0,400}consentDialog\.showMessageBox/, 'il contributo usa il dialogo integrato');
   vm.runInNewContext(source.slice(start, end), {
-    CHANNELS, parseRequestId, parseTrainingExample, distributionMode,
+    CHANNELS, parseRequestId, parseTrainingExample, distributionMode, consentDialog: dialog,
     assertTrustedSender() {},
     ipcMain: { handle: (name, handler) => registered.set(name, handler) },
     BrowserWindow: { fromWebContents: () => ({ isDestroyed: () => false }) },
-    dialog: { showMessageBox: async (_parent, options) => { dialogs.push(options); return { response: decision }; } },
     logger: { info: (_message, metadata) => logs.push(metadata) },
     getSettings: () => ({}), ensureRuntime: async () => {},
     aiRuntime: { submitFeedback: async example => { sent.push(example); return { id: 'public' }; } },

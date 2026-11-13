@@ -36,6 +36,7 @@ const { publicErrorMessage } = require('../core/errors');
 const { normalizeAIError, AI_ERROR_CODES } = require('../ai/ai-errors');
 const { assertRuntimeAdmission } = require('../ai/managed-ollama-runtime');
 const { SpeechArbiter } = require('../voice/speech-arbiter');
+const { createInAppDialog } = require('../infrastructure/electron/in-app-dialog');
 const { createChunkRelay, synthesizeWithRelay } = require('../voice/speech-stream');
 const { speculativeInferencePolicy } = require('./speculative-inference-policy');
 const { parseAgentPlan } = require('../agents/action-runtime');
@@ -356,6 +357,8 @@ function publicSettings(settings) {
 
 function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRendererUrl, vaultPath, vaultLocation, runtimeConfig, runtimeEndpointLocked = false, distributionMode = 'developer', logger, getIndex, aiRuntime, actionRuntime, workflowRuntime, speechService, neuralSpeechService, expressiveSpeechService, trainingStore, memoryStore, conversationStore, performanceStore, responseCache, remoteGateway, webResearchService = null, hardwareProfile, runtimeTuning = { contextTokens: 4096, plannerTokens: 256, quickTokens: 768, deepTokens: 1536, keepAlive: '10m' }, managedRuntimeState, managedRuntime, presenceStateSynchronizer }) {
   if (!workflowRuntime) throw new TypeError('WorkflowRuntime non disponibile.');
+  // Consensi e conferme nel dialogo integrato dell'interfaccia; il dialogo di sistema resta come riserva.
+  const consentDialog = createInAppDialog({ ipcMain, nativeDialog: dialog, channels: CHANNELS, logger });
   // Una generazione lunga terminata mentre la finestra desktop non ha il focus
   // diventa un evento opaco "risposta pronta" per NexusNXS Control.
   const announceResponseReady = (event, requestId, durationMs) => {
@@ -1264,7 +1267,7 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     const example = parseTrainingExample(value);
     const parentWindow = BrowserWindow.fromWebContents(event.sender);
     if (!parentWindow || parentWindow.isDestroyed()) return { status: 'cancelled' };
-    const decision = await dialog.showMessageBox(parentWindow, {
+    const decision = await consentDialog.showMessageBox(parentWindow, {
       type: 'question', title: 'Contributo volontario',
       message: 'Autorizzi l’utilizzo di questa conversazione per migliorare NexusNXS?',
       detail: distributionMode === 'public'
@@ -1395,13 +1398,13 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     const passphrase = String(payload?.passphrase || '');
     const archive = container?.schemaVersion === 2 ? decryptArchive(container, passphrase) : container;
     if (archive?.schemaVersion !== 1 || !archive.settings || !Array.isArray(archive.training)) throw new Error('Archivio NEXUSNXS non valido.');
-    const confirmation = await dialog.showMessageBox(parentWindow, {
+    const confirmation = await consentDialog.showMessageBox(parentWindow, {
       type: 'warning',
       buttons: ['Annulla', 'Ripristina'],
       defaultId: 0,
       cancelId: 0,
-      title: 'Ripristina dati personali',
-      message: 'Le impostazioni e gli esempi di apprendimento correnti saranno sostituiti.'
+      title: 'Ripristinare il backup?',
+      message: 'Le impostazioni e gli esempi di apprendimento correnti saranno sostituiti da quelli dell’archivio.'
     });
     if (confirmation.response !== 1) return { status: 'cancelled' };
     const settings = alignRuntimeEndpoint(validateSettings(archive.settings, runtimeConfig.ai), runtimeConfig, runtimeEndpointLocked);
@@ -1862,7 +1865,7 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
             onMemory: (memory) => emit(event, { type: 'memory', requestId, memory: { ...memory, count: 1, content: String(memory.content || '').slice(0, 240) } }),
             onPlan: (plan) => emit(event, { type: 'plan', requestId, plan }),
             getApprovalMode: () => getSettings().actionApprovalMode || 'dangerous-only',
-            requestActionApproval: createNativeActionApproval({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) })
+            requestActionApproval: createNativeActionApproval({ dialog: consentDialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) })
           });
           const outcome = await runAgentTurn({
             aiRuntime, logger, requestId, messages: prepared.messages, model: agentModel,
@@ -1871,7 +1874,7 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
             mode: mode === 'deep' ? 'deep' : 'quick', think: false, temperature: settings.temperature, signal: controller.signal,
             requestOptions: { maxTokens: mode === 'deep' ? runtimeTuning.deepTokens : runtimeTuning.quickTokens, numCtx: runtimeTuning.contextTokens, keepAlive: runtimeTuning.keepAlive, timeoutMs: requestTimeout(mode), ...(deepModel ? { maxTokens: DEEP_MODEL_REQUEST.maxTokens, timeoutMs: DEEP_MODEL_REQUEST.timeoutMs } : {}) },
             tools,
-            requestConsent: createNativeToolConsent({ dialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) }),
+            requestConsent: createNativeToolConsent({ dialog: consentDialog, getWindow: () => BrowserWindow.fromWebContents(event.sender) }),
             onPhase: (label) => emit(event, { type: 'phase', requestId, phase: { step: 'execute', label } })
           });
           throwIfRequestAborted(controller.signal);

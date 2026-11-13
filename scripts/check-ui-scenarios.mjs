@@ -84,11 +84,15 @@ function fakeDesktopBridge() {
     listConversationHistory: [], voiceCapabilities: { available: false }, neuralVoiceCapabilities: { available: false },
     updateStatus: { state: 'idle', currentVersion: '0.0.0-prova' }
   };
+  // Abbonamenti e chiamate registrati: gli scenari possono simulare eventi del processo principale.
+  const listeners = {};
+  const calls = [];
+  Object.defineProperty(window, '__nxsBridge', { value: { listeners, calls }, configurable: true });
   const bridge = new Proxy({}, { get: (_target, name) => {
     if (name === 'then') return undefined;
     if (name === 'streamChat') return async () => ({ ok: true });
-    if (typeof name === 'string' && name.startsWith('on')) return () => () => {};
-    return async () => (name in answers ? structuredClone(answers[name]) : null);
+    if (typeof name === 'string' && name.startsWith('on')) return (listener) => { listeners[name] = listener; return () => { delete listeners[name]; }; };
+    return async (...args) => { calls.push([name, ...args]); return name in answers ? structuredClone(answers[name]) : null; };
   } });
   Object.defineProperty(window, 'nexus', { value: bridge, configurable: true });
 }
@@ -361,6 +365,46 @@ const scenarios = [
     await page.waitForSelector('.select-panel li');
     await page.keyboard.press('Escape');
   }, expect: ['.sheet.control #model-select'] },
+  // Conferme integrate: niente window.confirm; fuoco su Annulla, Esc chiude solo il dialogo, consenso dal processo principale.
+  { name: 'confirm-dialog', viewport: { width: 1280, height: 760 }, state: thread, init: fakeDesktopBridge, run: async (page) => {
+    let native = 0;
+    page.on('dialog', (dialog) => { native += 1; void dialog.dismiss(); });
+    await page.keyboard.press('Control+k');
+    await page.keyboard.type('Preferenze di risposta');
+    await page.keyboard.press('Enter');
+    const conversations = () => page.evaluate(() => JSON.parse(localStorage.getItem('nxs.next.state.v1')).conversations.length);
+    const before = await conversations();
+    await page.click('button.danger:has-text("Cancella dati locali")');
+    await page.waitForSelector('.confirm[role="alertdialog"]');
+    await page.waitForTimeout(400);
+    const shown = await page.evaluate(() => {
+      const box = document.querySelector('.confirm').getBoundingClientRect();
+      return { focus: document.activeElement?.className, inside: box.top >= 0 && box.left >= 0 && box.bottom <= innerHeight && box.right <= innerWidth, tone: document.querySelector('.confirm').dataset.tone };
+    });
+    if (shown.focus !== 'confirm-cancel' || !shown.inside || shown.tone !== 'danger') throw new Error(`dialogo di conferma: ${JSON.stringify(shown)}`);
+    await page.keyboard.press('Tab');
+    if (!(await page.evaluate(() => document.activeElement?.classList.contains('confirm-ok')))) throw new Error('Tab non resta nel dialogo');
+    await page.keyboard.press('Tab');
+    if (!(await page.evaluate(() => document.activeElement?.classList.contains('confirm-cancel')))) throw new Error('Tab non torna ad Annulla');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(350);
+    if (await page.$('.confirm')) throw new Error('Esc non chiude il dialogo');
+    if (!(await page.$('.sheet'))) throw new Error('Esc ha chiuso anche le preferenze');
+    if ((await conversations()) !== before) throw new Error(`annullare ha cambiato i dati (${before} → ${await conversations()})`);
+    await page.keyboard.press('Escape');
+    // Consenso dal processo principale: dialogo integrato, «shown» subito, risposta con lo stesso id.
+    const id = 'c'.repeat(32);
+    await page.evaluate((value) => window.__nxsBridge.listeners.onConfirmRequest({ id: value, tone: 'warning', title: 'Autorizzazione azione', message: 'NexusNXS vuole eseguire: apri app',
+      detail: 'Rischio: medio · Ripristino: non garantito\nAutorizzazione valida una sola volta.', confirmLabel: 'Autorizza una volta', cancelLabel: 'Rifiuta' }), id);
+    await page.waitForSelector('.confirm .confirm-detail');
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(out, 'confirm-dialog-consent.png') });
+    await page.click('.confirm-ok');
+    await page.waitForTimeout(300);
+    const answers = await page.evaluate(() => window.__nxsBridge.calls.filter(([name]) => name === 'answerConfirm').map(([, ...args]) => args));
+    if (JSON.stringify(answers) !== JSON.stringify([[id, 'shown'], [id, true]])) throw new Error(`risposte al processo principale: ${JSON.stringify(answers)}`);
+    if (native) throw new Error(`${native} dialoghi nativi del browser`);
+  }, expect: ['.composer'] },
   { name: 'custom-select', viewport: { width: 1280, height: 560 }, state: thread,
   run: async (page) => {
     await page.evaluate(() => {
