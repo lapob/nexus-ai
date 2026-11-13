@@ -257,8 +257,25 @@ Open:
       eligible. The voice stayed Kokoro because VRAM was full.
   - Still to do:
     - hosting, then fill `url` and `sha256` in the catalog;
-    - a pinned python-build-standalone 3.14 (needs download approval);
-    - the button in the Control Center.
+    - a pinned python-build-standalone 3.14 (needs download approval).
+  - Control Center button: DONE on 13 November (Sistema → «Voce Qwen3 su GPU»).
+    - Download with confirmation, a progress bar across every phase,
+      Annulla, «Riavvia NexusNXS» and Rimuovi with a danger confirmation.
+    - New IPC `nexus:voice-pack-restart`. It relaunches only when a pack
+      change is waiting, never at the renderer's will.
+    - Install no longer blocks the main process: streamed sha256 and
+      verification with byte progress, `tar` through spawn, async rename and
+      removal. `sha256FileSync` is kept only for the prepare script.
+    - Tests: voice-pack 9/9, preload-contract. Typecheck, sections and
+      publication pass.
+    - Real Electron QA from the 1.63 GB tar
+      (`qa-artifacts/voice-pack-ui.js install|installed`, isolated profile):
+      - the UI stayed responsive, with screenshots taken during extraction
+        and verification;
+      - phases ran extract → verify 3…97% → «Installata. Riavvia NexusNXS».
+    - Not verified: narrow layout and reduced motion of the card (it reuses
+      `Row` and `.plan-progress`). The restart was not clicked, since it
+      would relaunch the app.
 
 - (c) Streaming to the renderer: DONE on 13 November.
   - `src/voice/speech-stream.js`, IPC channel `nexus:neural-voice-chunk`,

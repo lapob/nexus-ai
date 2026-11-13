@@ -348,6 +348,7 @@ function System({ notify }: { notify: (text: string) => void }) {
           {update?.status === 'ready' && <button type="button" className="primary" onClick={() => void bridge().installUpdate()}>Installa e riavvia l’app</button>}
         </Row>
       </div>
+      <VoicePack notify={notify} />
       <div className="card">
         <strong>Stato</strong>
         <small>AI {diagnostics?.ai?.ok ? 'pronta' : diagnostics?.ai?.status || '—'} · Voce {diagnostics?.voice?.available ? 'disponibile' : 'non disponibile'} · Motore {diagnostics?.runtime?.available ? 'attivo' : '—'}</small>
@@ -363,6 +364,84 @@ function System({ notify }: { notify: (text: string) => void }) {
       ))}</ul> : <p className="muted">Nessuna azione registrata.</p>}
       <button type="button" className="secondary" onClick={async () => { const result = await bridge().undoLastAction(); notify(result?.message || 'Fatto.'); }}>Annulla l’ultima modifica a un file</button>
     </>
+  );
+}
+
+// Pacchetto voce Qwen3 su GPU (voice/voice-pack nel processo principale): scaricato
+// solo su richiesta, verificato file per file, attivo dopo il riavvio dell'app.
+type PackProgress = { phase: string; received: number; total: number } | null;
+const PACK_PHASE: Record<string, string> = { download: 'Scarico', hash: 'Controllo l’archivio', extract: 'Estraggo i file', verify: 'Verifico l’integrità', done: 'Installato' };
+// Quota della barra complessiva per fase: [inizio, ampiezza]. L'estrazione non riporta byte e avanza a gradino.
+const PACK_SPAN: Record<string, [number, number]> = { download: [0, 50], hash: [0, 50], extract: [50, 10], verify: [60, 38], done: [100, 0] };
+const ipcMessage = (error: unknown, fallback: string) => message(error, fallback).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+function VoicePack({ notify }: { notify: (text: string) => void }) {
+  const [pack, setPack] = useState<Any>(null);
+  const [engine, setEngine] = useState<string>('');
+  const [progress, setProgress] = useState<PackProgress>(null);
+  const [working, setWorking] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const refresh = useCallback(async () => {
+    const [status, caps] = await Promise.all([bridge().voicePackStatus(), bridge().neuralVoiceCapabilities().catch(() => null)]);
+    setPack(status);
+    setEngine(String(caps?.backend || ''));
+  }, []);
+  useEffect(() => {
+    if (typeof bridge().voicePackStatus !== 'function') return undefined;
+    void refresh().catch(() => setPack(null));
+    const off = bridge().onVoicePackEvent?.((event: Any) => setProgress({ phase: String(event?.phase || ''), received: Number(event?.received) || 0, total: Number(event?.total) || 0 })) as unknown as (() => void) | undefined;
+    return () => off?.();
+  }, [refresh]);
+  if (!pack || pack.reason === 'unsupported') return null;
+
+  const size = pack.downloadBytes ? formatBytes(pack.downloadBytes) : '1,6 GB';
+  const percent = progress?.total ? Math.min(100, Math.round((progress.received / progress.total) * 100)) : null;
+  const [spanStart, spanWidth] = PACK_SPAN[progress?.phase || ''] || [0, 0];
+  const overall = Math.max(2, Math.round(spanStart + (spanWidth * (percent ?? 0)) / 100));
+  const install = async () => {
+    if (!await confirmDialog({ title: 'Scaricare la voce Qwen3?', message: `Verranno scaricati ${size}. La voce usa la GPU e richiede il riavvio di NexusNXS.`,
+      detail: 'Ogni file viene verificato prima dell’uso. Quando la VRAM è occupata dal modello di conversazione parla automaticamente Kokoro.', confirmLabel: 'Scarica' })) return;
+    setWorking(true);
+    setInstalling(true);
+    setProgress({ phase: '', received: 0, total: 0 });
+    try { await bridge().installVoicePack(); notify('Voce Qwen3 installata. Riavvia NexusNXS per usarla.'); }
+    catch (error) { notify(/annullata/i.test(ipcMessage(error, '')) ? 'Installazione annullata.' : ipcMessage(error, 'Installazione della voce non riuscita.')); }
+    finally { setWorking(false); setInstalling(false); setProgress(null); await refresh().catch(() => null); }
+  };
+  const remove = async () => {
+    if (!await confirmDialog({ title: 'Rimuovere la voce Qwen3?', message: `Libera ${pack.bytes ? formatBytes(pack.bytes) : 'lo spazio del pacchetto'} sul disco. NexusNXS tornerà a parlare con Kokoro.`, confirmLabel: 'Rimuovi', tone: 'danger' })) return;
+    setWorking(true);
+    try { await bridge().removeVoicePack(); notify('Voce Qwen3 rimossa.'); }
+    catch (error) { notify(ipcMessage(error, 'Rimozione non riuscita.')); }
+    finally { setWorking(false); await refresh().catch(() => null); }
+  };
+  const restart = async () => {
+    try { if (!await bridge().restartForVoicePack()) await refresh(); } catch (error) { notify(ipcMessage(error, 'Riavvio non riuscito.')); }
+  };
+  const busy = working || Boolean(pack.busy);
+  const summary = !pack.eligible
+    ? 'Richiede Windows e una GPU con almeno 12 GB di VRAM. Su questo computer parla Kokoro.'
+    : busy && progress ? `${PACK_PHASE[progress.phase] || 'Preparo'}${percent !== null ? ` · ${percent}%` : '…'}`
+      : pack.restartRequired ? (pack.installed ? 'Installata. Riavvia NexusNXS per usarla.' : 'Rimossa. Riavvia NexusNXS per completare.')
+        : pack.active ? (engine === 'qwen3-tts' ? `In uso · versione ${pack.version} · ${formatBytes(pack.bytes)}` : 'Installata · la GPU è occupata dal modello, ora parla Kokoro')
+          : pack.available ? `Voce più naturale sulla GPU, da scaricare (${size}). Kokoro resta la riserva.` : 'Pacchetto non ancora pubblicato.';
+  return (
+    <div className="card" aria-busy={busy}>
+      <strong>Voce Qwen3 su GPU</strong>
+      <small role="status" aria-live="polite">{summary}</small>
+      {busy && (
+        <span className="plan-progress" role="progressbar" aria-label="Avanzamento della voce Qwen3" aria-valuemin={0} aria-valuemax={100}
+          aria-valuenow={overall} aria-valuetext={summary} style={{ '--plan-progress': `${overall}%` } as CSSProperties}><i /></span>
+      )}
+      {pack.eligible && (
+        <Row>
+          {installing && progress?.phase !== 'done' && <button type="button" className="secondary" onClick={() => void bridge().cancelVoicePack()}><Icon name="close" />Annulla</button>}
+          {!busy && !pack.installed && <button type="button" className="primary" disabled={!pack.available} onClick={() => void install()}><Icon name="download" />Scarica la voce ({size})</button>}
+          {!busy && pack.restartRequired && pack.canRestart && <button type="button" className="primary" onClick={() => void restart()}><Icon name="retry" />Riavvia NexusNXS</button>}
+          {!busy && pack.installed && <button type="button" className="secondary" onClick={() => void remove()}><Icon name="trash" />Rimuovi</button>}
+        </Row>
+      )}
+    </div>
   );
 }
 

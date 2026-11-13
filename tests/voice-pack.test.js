@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { QWEN3_PACK_ID, MIN_GPU_BYTES, buildManifest, verifyPack, installedPack, eligibility, installPack, removePack,
+const { QWEN3_PACK_ID, MIN_GPU_BYTES, buildManifest, verifyPack, verifyPackIntegrity, sha256File, installedPack, eligibility, installPack, removePack,
   createVoicePackController } = require('../src/voice/voice-pack');
 const { Qwen3GgufSpeechService } = require('../src/voice/qwen3-speech');
 
@@ -27,14 +27,16 @@ function tarOf(directory, archive) {
   return archive;
 }
 
-test('il manifest elenca ogni file con dimensione e sha256 e la verifica profonda li controlla', (t) => {
+test('il manifest elenca ogni file con dimensione e sha256 e la verifica profonda li controlla', async (t) => {
   const pack = makePack(path.join(temp(t), 'pack'));
-  const manifest = verifyPack(pack, { deep: true });
+  const progress = [];
+  const manifest = await verifyPackIntegrity(pack, { onProgress: (p) => progress.push(p) });
   assert.equal(manifest.files.length, 4);
   assert.ok(manifest.files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256)));
+  assert.deepEqual(progress.at(-1), { phase: 'verify', received: manifest.bytes, total: manifest.bytes });
   write(pack, 'worker.py', 'print(2)');
   assert.doesNotThrow(() => verifyPack(pack), 'stessa dimensione: la verifica rapida non rilegge i file');
-  assert.throws(() => verifyPack(pack, { deep: true }), /Integrità non valida: worker.py/);
+  await assert.rejects(verifyPackIntegrity(pack), /Integrità non valida: worker.py/);
 });
 
 test('file estranei, percorsi fuori dal pacchetto e id diverso vengono rifiutati', (t) => {
@@ -66,14 +68,14 @@ test('installazione da archivio: digest verificato, staging atomico, rimozione',
   await assert.rejects(installPack({ packsRoot, archivePath: archive, sha256: 'b'.repeat(64) }), /Digest del pacchetto voce non corrispondente/);
   assert.equal(installedPack(packsRoot), null);
   const phases = [];
-  const result = await installPack({ packsRoot, archivePath: archive, sha256: require('../src/voice/voice-pack').sha256File(archive), onProgress: (p) => phases.push(p.phase) });
+  const result = await installPack({ packsRoot, archivePath: archive, sha256: await sha256File(archive), onProgress: (p) => { if (phases.at(-1) !== p.phase) phases.push(p.phase); } });
   assert.equal(result.version, '2');
   assert.deepEqual(phases, ['hash', 'extract', 'verify', 'done']);
   assert.equal(installedPack(packsRoot).manifest.version, '2');
   assert.deepEqual(fs.readdirSync(packsRoot), [QWEN3_PACK_ID], 'nessun residuo di staging');
-  assert.equal(removePack({ packsRoot }), true);
+  assert.equal(await removePack({ packsRoot }), true);
   assert.deepEqual(fs.readdirSync(packsRoot), []);
-  assert.equal(removePack({ packsRoot }), false);
+  assert.equal(await removePack({ packsRoot }), false);
 });
 
 test('un archivio manomesso non sostituisce il pacchetto già installato', { skip: !tarAvailable }, async (t) => {
@@ -110,7 +112,8 @@ test('il controller libera la voce, impedisce operazioni sovrapposte e chiede il
   const pending = controller.install();
   assert.equal(controller.status().busy, 'install');
   await assert.rejects(controller.install(), /già in corso/);
-  assert.throws(() => controller.remove(), /già in corso/);
+  await assert.rejects(controller.remove(), /già in corso/);
+  assert.throws(() => controller.restart(), /in corso/);
   finish();
   assert.equal((await pending).restartRequired, true);
   assert.equal(released, 1);
@@ -120,6 +123,23 @@ test('il controller libera la voce, impedisce operazioni sovrapposte e chiede il
   const unpublished = createVoicePackController({ packsRoot, getHardware: () => ({ platform: 'win32', gpuMemoryBytes: 16 * 1024 ** 3 }) });
   assert.equal(unpublished.status().available, false);
   await assert.rejects(unpublished.install(), /non è ancora pubblicato/);
+});
+
+test('il riavvio è concesso solo quando un cambio di pacchetto lo richiede', async (t) => {
+  const packsRoot = temp(t);
+  let restarts = 0;
+  const hardware = () => ({ platform: 'win32', gpuMemoryBytes: 16 * 1024 ** 3 });
+  const controller = createVoicePackController({ packsRoot, localArchive: 'x.tar', getHardware: hardware, restartApp: () => { restarts += 1; },
+    install: async () => ({ id: QWEN3_PACK_ID, version: '1', bytes: 1 }) });
+  assert.equal(controller.status().canRestart, true);
+  assert.equal(controller.restart(), false, 'nessun cambio in attesa');
+  await controller.install();
+  assert.equal(controller.status().restartRequired, true);
+  assert.equal(controller.restart(), true);
+  assert.equal(restarts, 1);
+  const headless = createVoicePackController({ packsRoot, getHardware: hardware });
+  assert.equal(headless.status().canRestart, false);
+  assert.equal(headless.restart(), false);
 });
 
 test('con il pacchetto il worker GGUF usa il Python incluso e aggiunge le sue site-packages', () => {

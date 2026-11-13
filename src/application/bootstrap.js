@@ -345,7 +345,9 @@ function bootstrapElectron({ env = process.env } = {}) {
     releaseVoice: () => qwen3Service?.shutdown(),
     localArchive: String(env.NEXUS_QWEN3_PACK_ARCHIVE || '').trim(),
     localSha256: String(env.NEXUS_QWEN3_PACK_SHA256 || '').trim(),
-    activePackVersion: voicePack?.manifest.version ?? null
+    activePackVersion: voicePack?.manifest.version ?? null,
+    // Il riavvio passa per la barriera di chiusura (servizi e worker fermati) e riapre l'interfaccia.
+    restartApp: () => { app.relaunch(); app.quit(); }
   });
   const expressiveSpeechService = new ExpressiveSpeechService({
     runtimeDirectory: app.isPackaged

@@ -71,8 +71,8 @@ test('ogni metodo preload usa esattamente il canale IPC autoritativo', async () 
   assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify({ channel: CHANNELS.confirmAnswer, args: [{ id: 'a'.repeat(32), answer: true }] }));
   const stopVoiceChunk = value.onVoiceChunk(() => {}); stopVoiceChunk();
   assert.equal(calls.at(-2).channel, CHANNELS.neuralVoiceChunk); assert.equal(calls.at(-2).subscription, true); assert.equal(calls.at(-1).removal, true);
-  await value.voicePackStatus(); await value.installVoicePack(); await value.cancelVoicePack(); await value.removeVoicePack();
-  assert.deepEqual(calls.slice(-4).map(({ channel }) => channel), [CHANNELS.voicePackStatus, CHANNELS.voicePackInstall, CHANNELS.voicePackCancel, CHANNELS.voicePackRemove]);
+  await value.voicePackStatus(); await value.installVoicePack(); await value.cancelVoicePack(); await value.removeVoicePack(); await value.restartForVoicePack();
+  assert.deepEqual(calls.slice(-5).map(({ channel }) => channel), [CHANNELS.voicePackStatus, CHANNELS.voicePackInstall, CHANNELS.voicePackCancel, CHANNELS.voicePackRemove, CHANNELS.voicePackRestart]);
   const stopVoicePack = value.onVoicePackEvent(() => {}); stopVoicePack();
   assert.equal(calls.at(-2).channel, CHANNELS.voicePackEvent); assert.equal(calls.at(-1).removal, true);
 });

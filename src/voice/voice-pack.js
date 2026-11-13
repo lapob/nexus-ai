@@ -3,13 +3,15 @@
  * @description Optional voice packs downloaded on request (Qwen3-TTS GGUF):
  * layout, sha256 manifest, verified installation and removal. The installer
  * never contains them; Kokoro remains the voice whenever a pack is missing.
+ * Installation runs in the Electron main process, so all heavy work (hashing
+ * 1.6 GB, extraction, retries) is asynchronous and never blocks the windows.
  */
 // #region 01 — Layout e manifest
 
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { spawnSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 
 const QWEN3_PACK_ID = 'qwen3-tts-gguf-0.6b';
 const MANIFEST = 'manifest.json';
@@ -20,6 +22,8 @@ const SAFE_RELATIVE = { test: (value) => typeof value === 'string' && value.leng
   && value.split('/').every((segment) => segment && segment !== '.' && segment !== '..') };
 // Qwen3 needs a Vulkan GPU with room for the TTS next to the LLM (docs/QWEN3-TTS-EVALUATION.md).
 const MIN_GPU_BYTES = 12 * 1024 ** 3;
+// qwen3_tts_gguf opens its log file under src/log on import: the only place a pack may write.
+const MUTABLE_PREFIX = 'src/log/';
 
 function packLayout(directory) {
   return {
@@ -32,7 +36,8 @@ function packLayout(directory) {
   };
 }
 
-function sha256File(file) {
+/** Synchronous hash, for the offline prepare script only. */
+function sha256FileSync(file) {
   const hash = crypto.createHash('sha256');
   const descriptor = fs.openSync(file, 'r');
   try {
@@ -42,6 +47,21 @@ function sha256File(file) {
   } finally { fs.closeSync(descriptor); }
   return hash.digest('hex');
 }
+
+/** Streaming hash that yields to the event loop; onBytes reports progress. */
+function sha256File(file, { onBytes, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(file, { highWaterMark: 4 * 1024 * 1024 });
+    const abort = () => stream.destroy(abortedError());
+    signal?.addEventListener('abort', abort, { once: true });
+    stream.on('data', (chunk) => { hash.update(chunk); onBytes?.(chunk.length); });
+    stream.once('error', (error) => { signal?.removeEventListener('abort', abort); reject(error); });
+    stream.once('end', () => { signal?.removeEventListener('abort', abort); resolve(hash.digest('hex')); });
+  });
+}
+
+function abortedError() { return Object.assign(new Error('Installazione annullata.'), { code: 'ABORTED' }); }
 
 function listFiles(root, relative = '') {
   const out = [];
@@ -56,9 +76,9 @@ function listFiles(root, relative = '') {
 
 /** Builds the manifest of a prepared pack directory (used by the prepare script). */
 function buildManifest(directory, { id = QWEN3_PACK_ID, version, engine = 'qwen3-tts-gguf', size = '0.6b' } = {}) {
-  const files = listFiles(directory).filter((file) => file !== MANIFEST && !file.startsWith('src/log/')).sort().map((file) => {
+  const files = listFiles(directory).filter((file) => file !== MANIFEST && !file.startsWith(MUTABLE_PREFIX)).sort().map((file) => {
     const full = path.join(directory, ...file.split('/'));
-    return { path: file, size: fs.statSync(full).size, sha256: sha256File(full) };
+    return { path: file, size: fs.statSync(full).size, sha256: sha256FileSync(full) };
   });
   return { schema: MANIFEST_SCHEMA, id, version: String(version || '1'), engine, size, bytes: files.reduce((sum, file) => sum + file.size, 0), files };
 }
@@ -78,23 +98,19 @@ function readManifest(directory) {
 }
 
 /**
- * Checks a pack directory against its manifest: files present with the
- * expected size (fast) and, with deep, the sha256 of each file. Files that
- * the manifest does not list are refused.
+ * Fast structural check against the manifest: every listed file present with
+ * its size, nothing unlisted (except the library log), the entry points there.
  */
-function verifyPack(directory, { deep = false, expectedId = QWEN3_PACK_ID } = {}) {
+function verifyPack(directory, { expectedId = QWEN3_PACK_ID } = {}) {
   const manifest = readManifest(directory);
   if (expectedId && manifest.id !== expectedId) throw new Error('Il pacchetto voce non corrisponde a quello richiesto.');
   const listed = new Set(manifest.files.map((file) => file.path));
-  // qwen3_tts_gguf opens its log file under src/log on import: the only place a pack may write.
-  const extra = listFiles(directory).filter((file) => file !== MANIFEST && !listed.has(file) && !file.startsWith('src/log/'));
+  const extra = listFiles(directory).filter((file) => file !== MANIFEST && !listed.has(file) && !file.startsWith(MUTABLE_PREFIX));
   if (extra.length) throw new Error(`File non previsti nel pacchetto voce: ${extra.slice(0, 3).join(', ')}`);
   for (const file of manifest.files) {
-    const full = path.join(directory, ...file.path.split('/'));
     let stat;
-    try { stat = fs.statSync(full); } catch { throw new Error(`File mancante nel pacchetto voce: ${file.path}`); }
+    try { stat = fs.statSync(path.join(directory, ...file.path.split('/'))); } catch { throw new Error(`File mancante nel pacchetto voce: ${file.path}`); }
     if (!stat.isFile() || stat.size !== file.size) throw new Error(`Dimensione non valida: ${file.path}`);
-    if (deep && sha256File(full) !== file.sha256) throw new Error(`Integrità non valida: ${file.path}`);
   }
   for (const required of ['python/python.exe', 'worker.py']) {
     if (!listed.has(required)) throw new Error(`Il pacchetto voce non contiene ${required}.`);
@@ -102,15 +118,30 @@ function verifyPack(directory, { deep = false, expectedId = QWEN3_PACK_ID } = {}
   return manifest;
 }
 
+/** Structural check plus the sha256 of every file, asynchronously, with byte progress. */
+async function verifyPackIntegrity(directory, { expectedId = QWEN3_PACK_ID, onProgress, signal } = {}) {
+  const manifest = verifyPack(directory, { expectedId });
+  let done = 0;
+  for (const file of manifest.files) {
+    if (signal?.aborted) throw abortedError();
+    const digest = await sha256File(path.join(directory, ...file.path.split('/')), { signal,
+      onBytes: (bytes) => { done += bytes; onProgress?.({ phase: 'verify', received: done, total: manifest.bytes }); } });
+    if (digest !== file.sha256) throw new Error(`Integrità non valida: ${file.path}`);
+  }
+  return manifest;
+}
+
 // #endregion
 // #region 02 — Installazione verificata
 
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Windows keeps the DLLs of a worker that has just exited mapped for a moment (EBUSY/EPERM).
-function renameWithRetry(from, to, { attempts = 20, delayMs = 250 } = {}) {
+async function renameWithRetry(from, to, { attempts = 20, delayMs = 250 } = {}) {
   for (let attempt = 1; ; attempt += 1) {
-    try { fs.renameSync(from, to); return; } catch (error) {
+    try { await fs.promises.rename(from, to); return; } catch (error) {
       if (attempt >= attempts || !['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) throw error;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+      await pause(delayMs);
     }
   }
 }
@@ -154,6 +185,7 @@ async function downloadTo(url, target, { fetchImpl = fetch, signal, onProgress }
   let received = 0;
   try {
     for await (const chunk of response.body) {
+      if (signal?.aborted) throw abortedError();
       hash.update(chunk);
       received += chunk.length;
       if (!out.write(chunk)) await new Promise((resolve) => out.once('drain', resolve));
@@ -163,11 +195,23 @@ async function downloadTo(url, target, { fetchImpl = fetch, signal, onProgress }
   return hash.digest('hex');
 }
 
-function extractTar(archive, destination, { runTar = spawnSync } = {}) {
+function extractTar(archive, destination, { spawnProcess = spawn, signal } = {}) {
   // bsdtar di Windows rifiuta percorsi assoluti e "..": i file finiscono solo nella cartella di staging.
   const tar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
-  const result = runTar(tar, ['-xf', archive, '-C', destination], { windowsHide: true, encoding: 'utf8', timeout: 20 * 60_000 });
-  if (result.error || result.status !== 0) throw new Error(`Estrazione del pacchetto voce non riuscita${result.stderr ? `: ${String(result.stderr).trim().slice(0, 200)}` : ''}.`);
+  return new Promise((resolve, reject) => {
+    const child = spawnProcess(tar, ['-xf', archive, '-C', destination], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    const abort = () => child.kill();
+    signal?.addEventListener('abort', abort, { once: true });
+    child.stderr?.on('data', (chunk) => { stderr = `${stderr}${chunk}`.slice(-400); });
+    child.once('error', (error) => { signal?.removeEventListener('abort', abort); reject(error); });
+    child.once('close', (code) => {
+      signal?.removeEventListener('abort', abort);
+      if (signal?.aborted) reject(abortedError());
+      else if (code === 0) resolve();
+      else reject(new Error(`Estrazione del pacchetto voce non riuscita${stderr ? `: ${stderr.trim().slice(0, 200)}` : ''}.`));
+    });
+  });
 }
 
 /**
@@ -175,11 +219,11 @@ function extractTar(archive, destination, { runTar = spawnSync } = {}) {
  * catalog. The archive sha256 must match the pinned value; every file is then
  * checked against the manifest before the staging folder replaces the old one.
  */
-async function installPack({ packsRoot, archivePath, url, sha256, id = QWEN3_PACK_ID, fetchImpl, signal, onProgress, runTar } = {}) {
+async function installPack({ packsRoot, archivePath, url, sha256, id = QWEN3_PACK_ID, fetchImpl, signal, onProgress, spawnProcess } = {}) {
   if (!packsRoot) throw new Error('Cartella dei pacchetti voce non configurata.');
   if (!archivePath && !url) throw new Error('Nessuna sorgente per il pacchetto voce.');
   if (url && !/^[a-f0-9]{64}$/i.test(String(sha256 || ''))) throw new Error('Digest del pacchetto voce mancante.');
-  fs.mkdirSync(packsRoot, { recursive: true });
+  await fs.promises.mkdir(packsRoot, { recursive: true });
   const stamp = `${process.pid}-${Date.now()}`;
   const staging = path.join(packsRoot, `.staging-${id}-${stamp}`);
   const download = path.join(packsRoot, `.download-${id}-${stamp}.tar`);
@@ -190,39 +234,41 @@ async function installPack({ packsRoot, archivePath, url, sha256, id = QWEN3_PAC
       digest = await downloadTo(url, download, { fetchImpl, signal, onProgress });
       archive = download;
     } else if (sha256) {
-      onProgress?.({ phase: 'hash' });
-      digest = sha256File(archive);
+      const total = (await fs.promises.stat(archive)).size;
+      let received = 0;
+      onProgress?.({ phase: 'hash', received, total });
+      digest = await sha256File(archive, { signal, onBytes: (bytes) => { received += bytes; onProgress?.({ phase: 'hash', received, total }); } });
     }
     if (sha256 && digest !== String(sha256).toLowerCase()) throw new Error('Digest del pacchetto voce non corrispondente.');
-    if (signal?.aborted) throw Object.assign(new Error('Installazione annullata.'), { code: 'ABORTED' });
-    fs.mkdirSync(staging);
+    if (signal?.aborted) throw abortedError();
+    await fs.promises.mkdir(staging);
     onProgress?.({ phase: 'extract' });
-    extractTar(archive, staging, { runTar });
-    onProgress?.({ phase: 'verify' });
-    const manifest = verifyPack(staging, { deep: true, expectedId: id });
+    await extractTar(archive, staging, { spawnProcess, signal });
+    onProgress?.({ phase: 'verify', received: 0, total: 0 });
+    const manifest = await verifyPackIntegrity(staging, { expectedId: id, onProgress, signal });
     const target = packDirectory(packsRoot, id);
     const previous = `${target}.old-${stamp}`;
-    if (fs.existsSync(target)) renameWithRetry(target, previous);
-    try { fs.renameSync(staging, target); } catch (error) {
-      if (fs.existsSync(previous)) fs.renameSync(previous, target);
+    if (fs.existsSync(target)) await renameWithRetry(target, previous);
+    try { await renameWithRetry(staging, target); } catch (error) {
+      if (fs.existsSync(previous)) await renameWithRetry(previous, target);
       throw error;
     }
-    fs.rmSync(previous, { recursive: true, force: true });
+    await fs.promises.rm(previous, { recursive: true, force: true });
     onProgress?.({ phase: 'done' });
     return { id, version: manifest.version, bytes: manifest.bytes, directory: target };
   } finally {
-    fs.rmSync(staging, { recursive: true, force: true });
-    fs.rmSync(download, { force: true });
+    await fs.promises.rm(staging, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    await fs.promises.rm(download, { force: true });
   }
 }
 
-function removePack({ packsRoot, id = QWEN3_PACK_ID } = {}) {
+async function removePack({ packsRoot, id = QWEN3_PACK_ID } = {}) {
   const target = packDirectory(packsRoot, id);
   if (!fs.existsSync(target)) return false;
   // Rinomina prima di cancellare: un processo che usa ancora i file non lascia un pacchetto a metà.
   const trash = `${target}.removing-${process.pid}-${Date.now()}`;
-  renameWithRetry(target, trash);
-  fs.rmSync(trash, { recursive: true, force: true });
+  await renameWithRetry(target, trash);
+  await fs.promises.rm(trash, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   return true;
 }
 
@@ -236,14 +282,14 @@ function removePack({ packsRoot, id = QWEN3_PACK_ID } = {}) {
  * NexusNXS restarts, Kokoro speaks meanwhile.
  */
 function createVoicePackController({ packsRoot, catalog = {}, getHardware = () => ({}), releaseVoice = () => {},
-  localArchive = '', localSha256 = '', activePackVersion = null, install = installPack, remove = removePack } = {}) {
+  localArchive = '', localSha256 = '', activePackVersion = null, install = installPack, remove = removePack, restartApp = null } = {}) {
   let busy = null;
   let abort = null;
   let restartRequired = false;
   const status = () => {
     const current = packStatus({ packsRoot, hardware: getHardware(), catalog });
     return { ...current, available: current.available || Boolean(localArchive), busy, active: activePackVersion !== null && current.installed && !restartRequired,
-      restartRequired: restartRequired || (current.installed && activePackVersion === null) };
+      restartRequired: restartRequired || (current.installed && activePackVersion === null), canRestart: typeof restartApp === 'function' };
   };
   return {
     status,
@@ -257,27 +303,34 @@ function createVoicePackController({ packsRoot, catalog = {}, getHardware = () =
       busy = 'install';
       abort = new AbortController();
       try {
-        releaseVoice();
+        await releaseVoice();
         const result = await install({ packsRoot, ...source, signal: abort.signal, onProgress });
         restartRequired = true;
         return { ...result, restartRequired: true };
       } finally { busy = null; abort = null; }
     },
-    remove() {
+    async remove() {
       if (busy) throw new Error('Operazione sul pacchetto voce già in corso.');
       busy = 'remove';
       try {
-        releaseVoice();
-        const removed = remove({ packsRoot });
+        await releaseVoice();
+        const removed = await remove({ packsRoot });
         if (removed) restartRequired = activePackVersion !== null;
         return { removed, restartRequired };
       } finally { busy = null; }
     },
-    cancel() { abort?.abort(); return Boolean(abort); }
+    cancel() { abort?.abort(); return Boolean(abort); },
+    /** Restarts NexusNXS only when a pack change is waiting for it: the renderer cannot restart the app at will. */
+    restart() {
+      if (busy) throw new Error('Operazione sul pacchetto voce in corso.');
+      if (!status().restartRequired || typeof restartApp !== 'function') return false;
+      restartApp();
+      return true;
+    }
   };
 }
 
 // #endregion
 
-module.exports = { QWEN3_PACK_ID, MIN_GPU_BYTES, packLayout, sha256File, buildManifest, readManifest, verifyPack,
-  packDirectory, installedPack, eligibility, packStatus, installPack, removePack, createVoicePackController };
+module.exports = { QWEN3_PACK_ID, MIN_GPU_BYTES, packLayout, sha256File, sha256FileSync, buildManifest, readManifest, verifyPack,
+  verifyPackIntegrity, packDirectory, installedPack, eligibility, packStatus, installPack, removePack, createVoicePackController };

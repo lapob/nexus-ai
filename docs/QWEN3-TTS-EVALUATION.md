@@ -580,5 +580,17 @@ Ancora da fare:
 - **CPython per la distribuzione.** Il pacchetto v1 contiene il CPython 3.14
   installato in locale. Per la distribuzione conviene un python-build-standalone
   3.14 con versione e sha256 fissati; serve l'approvazione per scaricarlo.
-- **Interfaccia.** Manca il pulsante nel Centro di controllo, in un file oggi
-  modificato da un'altra sessione. I canali IPC sono pronti.
+
+Interfaccia (13 novembre): Centro di controllo → Sistema → «Voce Qwen3 su
+GPU».
+
+- Funzioni:
+  - scaricamento con conferma;
+  - barra di avanzamento su tutte le fasi (download o controllo
+    dell'archivio, estrazione, verifica file per file);
+  - Annulla;
+  - «Riavvia NexusNXS», concesso dal processo principale solo quando un
+    cambio di pacchetto è in attesa;
+  - Rimuovi, con conferma.
+- L'installazione è interamente asincrona: hash in streaming e `tar` in un
+  processo separato, quindi le finestre restano reattive anche con 1,6 GB.

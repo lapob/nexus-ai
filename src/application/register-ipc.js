@@ -1524,6 +1524,7 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
   });
   ipcMain.handle(CHANNELS.voicePackCancel, (event) => { assertTrustedSender(event); return requireVoicePacks().cancel(); });
   ipcMain.handle(CHANNELS.voicePackRemove, (event) => { assertTrustedSender(event); return requireVoicePacks().remove(); });
+  ipcMain.handle(CHANNELS.voicePackRestart, (event) => { assertTrustedSender(event); return requireVoicePacks().restart(); });
   ipcMain.handle(CHANNELS.voiceCapabilities, (event) => {
     assertTrustedSender(event);
     if (distributionMode === 'public') return { available: true, backend: 'nexus-service', local: false, remote: true };

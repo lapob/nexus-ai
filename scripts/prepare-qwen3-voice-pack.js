@@ -13,7 +13,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { QWEN3_PACK_ID, buildManifest, sha256File, verifyPack } = require('../src/voice/voice-pack');
+const { QWEN3_PACK_ID, buildManifest, sha256FileSync, verifyPack } = require('../src/voice/voice-pack');
 
 const root = path.resolve(__dirname, '..');
 const argument = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback; };
@@ -89,14 +89,14 @@ function main() {
 
   const manifest = buildManifest(staging, { version });
   fs.writeFileSync(path.join(staging, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  verifyPack(staging, { deep: false });
+  verifyPack(staging);
 
   const archive = `${staging}.tar`;
   fs.rmSync(archive, { force: true });
   const tar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
   const packed = spawnSync(tar, ['-cf', archive, '-C', staging, '.'], { windowsHide: true, encoding: 'utf8' });
   if (packed.status !== 0) throw new Error(`Archivio non creato: ${packed.stderr || packed.error}`);
-  const archiveSha256 = sha256File(archive);
+  const archiveSha256 = sha256FileSync(archive);
   const mb = (bytes) => Math.round(bytes / 1024 / 1024);
   process.stdout.write(`${JSON.stringify({ id: QWEN3_PACK_ID, version, directory: path.relative(root, staging), archive: path.relative(root, archive),
     archiveBytes: fs.statSync(archive).size, archiveSha256, files: manifest.files.length,

@@ -49,6 +49,7 @@ const CHANNELS = Object.freeze({
   voicePackInstall: 'nexus:voice-pack-install',
   voicePackCancel: 'nexus:voice-pack-cancel',
   voicePackRemove: 'nexus:voice-pack-remove',
+  voicePackRestart: 'nexus:voice-pack-restart',
   voicePackEvent: 'nexus:voice-pack-event',
   knowledgeList: 'nexus:knowledge-list',
   knowledgeRead: 'nexus:knowledge-read',
