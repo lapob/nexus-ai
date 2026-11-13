@@ -217,6 +217,23 @@ Open:
     no code changes.
   - Qwen3 stays opt-in (`NEXUS_VOICE_ENGINE=qwen3`). Kokoro remains the
     default voice.
+  - 13 November: objective analysis of the 24 A/B WAVs (librosa, no model
+    downloaded). Results are in docs/QWEN3-TTS-EVALUATION.md, «Analisi
+    oggettiva dei campioni A/B».
+    - No engine has artefacts.
+    - GGUF 0.6B is equal to or more stable than PyTorch.
+    - Qwen3 ends 1–2 of 6 phrases abruptly; this is the codec, in both
+      runtimes.
+    - Final fade: DONE and committed on 13 November (worker, test, this
+      note; the report section rides with the voice-pack session's edits).
+      - `TailCloser` in both workers: 20 ms cosine fade plus 120 ms of
+        silence.
+      - New test in tests/qwen3-speech.test.js; 13/13 pass.
+      - GGUF 0.6B regenerated (`qwen3-gguf-0.6b-fade`): 6 of 6 endings are
+        clean; first audio 312 ms, RTF 0.23, WER 0.036.
+      - The PyTorch worker was covered only by the unit test.
+    - Repeatable blind page: `qa-artifacts/qwen3-voice/ascolto-ab.html`
+      (local).
 - (c) Streaming to the renderer: DONE on 13 November.
   - `src/voice/speech-stream.js`, IPC channel `nexus:neural-voice-chunk`,
     `onVoiceChunk` in the preload, and `web/src/platform.ts`.
@@ -226,7 +243,8 @@ Open:
     picked Kokoro. Blocks arrived in order, with no duplicated audio.
   - Qwen3 itself was not exercised inside Electron, because the gate is
     closed while the 14b is resident.
-- (d) Human A/B listening of `qa-artifacts/qwen3-voice/qwen3-gguf-*`.
+- (d) Human A/B listening of `qa-artifacts/qwen3-voice/qwen3-gguf-*`: DONE
+  (see above).
 
 Two early runs were anomalous (RTF 1.4 on 0.6B, first sentence 10.5 s on 1.7B)
 and did not recur. The cause is not proven; it is probably GPU contention.

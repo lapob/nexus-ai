@@ -241,6 +241,35 @@ print("qwen3 gguf worker boundaries PASS")`;
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('i worker Qwen3 chiudono ogni frase con dissolvenza e silenzio', (t) => {
+  const { spawnSync } = require('node:child_process');
+  // Serve numpy: si usa il venv del runtime GGUF quando è installato (gitignored).
+  const python = path.join(__dirname, '..', 'vendor', 'qwen3-tts-gguf', '.venv', 'Scripts', 'python.exe');
+  if (!fs.existsSync(python)) return t.skip('Runtime Qwen3 GGUF non installato');
+  const workers = ['qwen3-gguf-worker.py', 'qwen3-worker.py'].map((name) => path.join(__dirname, '..', 'src', 'voice', name));
+  const code = `import runpy,sys
+import numpy as np
+for worker in sys.argv[1:]:
+    Closer = runpy.run_path(worker)["TailCloser"]
+    closer = Closer(24000)
+    assert (closer.hold, closer.pad) == (480, 2880)
+    source = np.full(24000, 0.5, dtype=np.float32)
+    parts = [closer.push(block) for block in np.split(source, [300, 2000, 9000])]
+    assert len(parts[0]) == 0, "un blocco più corto della coda resta trattenuto"
+    end = closer.finish()
+    out = np.concatenate(parts + [end])
+    assert len(out) == len(source) + 2880
+    assert np.array_equal(out[:-480 - 2880], source[:-480]), "il parlato prima della coda non cambia"
+    fade = out[-480 - 2880:-2880]
+    assert fade[0] == 0.5 and abs(fade[-1]) < 1e-6 and np.all(np.diff(fade) <= 0)
+    assert not out[-2880:].any()
+    assert closer.tail is None
+    assert len(Closer(24000).finish()) == 2880
+print("qwen3 tail closer PASS")`;
+  const result = spawnSync(python, ['-I', '-c', code, ...workers], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
+  assert.equal(result.status, 0, result.stderr);
+});
+
 // #endregion
 
 // #region Fallback automatico

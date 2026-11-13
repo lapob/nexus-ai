@@ -213,6 +213,32 @@ def to_s16(pcm):
     return (np.clip(pcm, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
 
 
+class TailCloser:
+    """Holds back the last few milliseconds of the stream so the final block can
+    fade out and end in silence: the codec sometimes stops inside the last
+    phoneme, which sounds like a hard cut or a click (measured 13/11/2026).
+    Same helper as voice/qwen3-gguf-worker.py."""
+
+    def __init__(self, sample_rate, fade_ms=20, pad_ms=120):
+        self.hold = max(1, int(sample_rate * fade_ms / 1000))
+        self.pad = max(0, int(sample_rate * pad_ms / 1000))
+        self.tail = None
+
+    def push(self, pcm):
+        import numpy as np
+        pcm = np.asarray(pcm, dtype=np.float32).reshape(-1)
+        joined = pcm if self.tail is None else np.concatenate([self.tail, pcm])
+        self.tail = joined[-self.hold:]
+        return joined[:-self.hold]
+
+    def finish(self):
+        import numpy as np
+        tail = np.zeros(0, dtype=np.float32) if self.tail is None else self.tail
+        self.tail = None
+        ramp = 0.5 * (1.0 + np.cos(np.linspace(0.0, np.pi, len(tail), dtype=np.float32)))
+        return np.concatenate([tail * ramp, np.zeros(self.pad, dtype=np.float32)])
+
+
 def main():
     sys.stdin.reconfigure(encoding="utf-8")
     root = Path(os.environ.get("NEXUS_QWEN3_ROOT") or Path.cwd())
@@ -273,16 +299,25 @@ def main():
             first = [None]
             blocks = []
             seq = [0]
+            closer = TailCloser(engine.sample_rate)
 
-            def on_chunk(pcm):
+            def send(pcm):
+                if not len(pcm):
+                    return
                 if first[0] is None:
                     first[0] = time.perf_counter() - started
                 blocks.append(pcm)
                 emit({"id": identifier, "type": "chunk", "seq": seq[0], "pcm": base64.b64encode(to_s16(pcm)).decode("ascii")})
                 seq[0] += 1
 
+            def on_chunk(pcm):
+                send(closer.push(pcm))
+
             with contextlib.redirect_stdout(sys.stderr):
                 engine.stream(text, language, gender, cancel, on_chunk)
+                if not blocks and closer.tail is None:
+                    raise ValueError("Invalid audio")
+                send(closer.finish())
                 audio = np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.float32)
                 if not len(audio) or not np.isfinite(audio).all():
                     raise ValueError("Invalid audio")
