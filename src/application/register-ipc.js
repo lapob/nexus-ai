@@ -355,7 +355,7 @@ function publicSettings(settings) {
 
 // #region 02 — Handler IPC privilegiati
 
-function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRendererUrl, vaultPath, vaultLocation, runtimeConfig, runtimeEndpointLocked = false, distributionMode = 'developer', logger, getIndex, aiRuntime, actionRuntime, workflowRuntime, speechService, neuralSpeechService, expressiveSpeechService, trainingStore, memoryStore, conversationStore, performanceStore, responseCache, remoteGateway, webResearchService = null, hardwareProfile, runtimeTuning = { contextTokens: 4096, plannerTokens: 256, quickTokens: 768, deepTokens: 1536, keepAlive: '10m' }, managedRuntimeState, managedRuntime, presenceStateSynchronizer }) {
+function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRendererUrl, vaultPath, vaultLocation, runtimeConfig, runtimeEndpointLocked = false, distributionMode = 'developer', logger, getIndex, aiRuntime, actionRuntime, workflowRuntime, speechService, neuralSpeechService, voicePackController = null, expressiveSpeechService, trainingStore, memoryStore, conversationStore, performanceStore, responseCache, remoteGateway, webResearchService = null, hardwareProfile, runtimeTuning = { contextTokens: 4096, plannerTokens: 256, quickTokens: 768, deepTokens: 1536, keepAlive: '10m' }, managedRuntimeState, managedRuntime, presenceStateSynchronizer }) {
   if (!workflowRuntime) throw new TypeError('WorkflowRuntime non disponibile.');
   // Consensi e conferme nel dialogo integrato dell'interfaccia; il dialogo di sistema resta come riserva.
   const consentDialog = createInAppDialog({ ipcMain, nativeDialog: dialog, channels: CHANNELS, logger });
@@ -1503,6 +1503,27 @@ function registerIpcHandlers({ deviceNotificationPublisher = null, trustedRender
     actionRuntime.integrations?.revoke(id);
     return { revoked: true };
   });
+  // Pacchetto voce Qwen3 opzionale (voice/voice-pack): mai nel client pubblico,
+  // che parla con la voce del Core.
+  const voicePacks = distributionMode === 'public' ? null : voicePackController;
+  const requireVoicePacks = () => { if (!voicePacks) throw new Error('Pacchetti voce non disponibili.'); return voicePacks; };
+  ipcMain.handle(CHANNELS.voicePackStatus, (event) => {
+    assertTrustedSender(event);
+    return voicePacks ? voicePacks.status() : { installed: false, available: false, eligible: false, reason: 'unsupported' };
+  });
+  ipcMain.handle(CHANNELS.voicePackInstall, async (event) => {
+    assertTrustedSender(event);
+    const sender = event.sender;
+    let last = 0;
+    return requireVoicePacks().install({ onProgress: (progress) => {
+      const now = Date.now();
+      if (progress.phase === 'download' && now - last < 250) return;
+      last = now;
+      if (!sender.isDestroyed?.()) sender.send(CHANNELS.voicePackEvent, { phase: progress.phase, received: progress.received || 0, total: progress.total || 0 });
+    } });
+  });
+  ipcMain.handle(CHANNELS.voicePackCancel, (event) => { assertTrustedSender(event); return requireVoicePacks().cancel(); });
+  ipcMain.handle(CHANNELS.voicePackRemove, (event) => { assertTrustedSender(event); return requireVoicePacks().remove(); });
   ipcMain.handle(CHANNELS.voiceCapabilities, (event) => {
     assertTrustedSender(event);
     if (distributionMode === 'public') return { available: true, backend: 'nexus-service', local: false, remote: true };

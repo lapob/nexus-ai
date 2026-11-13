@@ -362,6 +362,52 @@ la capability è falsa e la voce resta Kokoro. Dopo 2 errori consecutivi Qwen3
 viene escluso per 5 minuti. `FallbackSpeechService` non sostituisce mai una
 sintesi annullata con Kokoro.
 
+## Analisi oggettiva dei campioni A/B (13 novembre)
+
+Questa analisi completa l'ascolto del proprietario, non lo sostituisce. È
+calcolata su 24 WAV a 24 kHz: 6 frasi per 4 motori, cioè Kokoro, 0.6B PyTorch,
+0.6B GGUF e 1.7B GGUF (`-r2`). Non usa modelli scaricati: solo librosa (pyin
+per la F0) e soundfile. Metriche per file in
+`qa-artifacts/qwen3-voice/ab-metrics.json` (locale). C'è anche una pagina di
+ascolto alla cieca ripetibile: `qa-artifacts/qwen3-voice/ascolto-ab.html`, con
+24 prove e risultati esportabili in JSON.
+
+| Media su 6 frasi | Kokoro | 0.6B PyTorch | 0.6B GGUF | 1.7B GGUF |
+|---|---|---|---|---|
+| WER Whisper | 0,048 | 0,066 | 0,078 | 0,036 |
+| Sillabe/s nel parlato | 4,9 | 5,4 | 5,3 | 5,3 |
+| Estensione F0 (semitoni, p5–p95) | 10,5 | 13,6 | 11,5 | 9,8 |
+| Pause interne ≥150 ms (su 2,3 attese) | 1,2 | 0,8 | 0,8 | 1,2 |
+| Parlato sonoro (%) | 78 | 65 | 76 | 72 |
+| Salti di F0 >5 semitoni, clic | 0 | 0 | 0 | 0–1 |
+| Picco (dBFS) / campioni saturi | −1,4 / 0,03 % | −2,8 / 0 | −2,8 / 0 | −2,0 / 0 |
+| Finali troncati (ultimi 20 ms > −30 dB) | 0/6 | 2/6 | 2/6 | 1/6 |
+
+**Nessun motore ha artefatti** (glitch di intonazione, clic, rumore nelle pause).
+Le differenze sono di prosodia e di chiusura delle frasi.
+
+- **GGUF contro PyTorch (0.6B):** nessuna perdita dovuta all'export.
+  - Stesso ritmo, nessun artefatto.
+  - Il GGUF ha un timbro più stabile: F0 maschile tra 83 e 93 Hz, contro 88–118
+    Hz del PyTorch fra una frase e l'altra.
+  - Il GGUF ha meno parlato «soffiato»: 76 % di parlato sonoro, contro 65 %.
+  - Su «prosodia» e «dialogo» il PyTorch non fa alcuna pausa.
+- **Qwen3 contro Kokoro:**
+  - Qwen3 parla circa il 10 % più veloce, fino a 6,6–6,9 sillabe/s su
+    «energia» e «pause».
+  - Kokoro chiude sempre con silenzio, ma va a 0 dBFS e satura leggermente
+    nelle frasi femminili.
+- **1.7B contro 0.6B:**
+  - Il 1.7B legge meglio (WER 0,036) e fa più pause sulla punteggiatura.
+  - L'intonazione è un po' più piatta (9,8 semitoni).
+  - Il proprietario ha preferito il 0.6B.
+- **Finali troncati** (Qwen3, entrambi i runtime):
+  - Alcune frasi finiscono con il parlato ancora a piena energia: l'ultimo
+    campione arriva a 0,14 di ampiezza.
+  - Il codec smette di generare dentro l'ultimo fonema, e all'ascolto suona
+    come una chiusura secca o un piccolo clic.
+  - Nel worker non esiste dissolvenza né coda di silenzio.
+
 ## Prossimi passi consigliati
 
 1. ~~Misurare il percorso GGUF~~: fatto, RTF 0,18–0,21. Collegato in
@@ -377,5 +423,162 @@ sintesi annullata con Kokoro.
 4. ~~Ascolto umano delle coppie A/B~~: fatto dal proprietario il 13 novembre.
    Scelta: **0.6B**, che è già il valore predefinito di `NEXUS_QWEN3_SIZE`.
    Il 1.7B resta selezionabile.
-5. Distribuzione: valutare il pacchetto runtime GGUF (DLL llama.cpp, ONNX
-   Runtime DirectML, Python 3.14) per l'installer.
+5. ~~Distribuzione: valutare il pacchetto runtime GGUF~~: valutato il 13
+   novembre, vedi «Pacchetto runtime GGUF per l'installer».
+6. ~~Chiusura delle frasi~~: fatta il 13 novembre. Entrambi i worker usano
+   `TailCloser`, che trattiene gli ultimi 20 ms dello stream e alla fine li
+   chiude con una dissolvenza a coseno seguita da 120 ms di silenzio.
+   - Rigenerazione GGUF 0.6B (`qwen3-gguf-0.6b-fade`):
+     - 6 finali su 6 chiusi in silenzio (137–182 ms), prima erano 2 troncati
+       su 6;
+     - primo audio 312 ms, RTF 0,23, WER 0,036;
+     - barge-in in 7 ms.
+   - Il worker PyTorch ha la stessa classe ed è coperto dal test unitario, ma
+     non è stato rigenerato.
+
+## Pacchetto runtime GGUF per l'installer (valutazione, 13 novembre)
+
+### Come si distribuisce oggi
+
+- **Installer pubblico (0.3.39, 108 MB)**: client leggero.
+  `run-electron-builder.js` svuota `extraResources` e l'installer contiene
+  solo `app.asar`. Voce e AI girano sul Core del proprietario.
+- **Pacchetto completo** (privato, oppure `NEXUS_BUNDLE_OFFLINE_VOICE=1`):
+  aggiunge circa 700 MB di runtime neurali, prima della compressione.
+
+  | Componente | Dimensione |
+  |---|---|
+  | Kokoro, modelli | 337 MB |
+  | Kokoro, site-packages | 166 MB |
+  | CPython standalone 3.13 condiviso | 47 MB |
+  | Whisper | 154 MB |
+
+- Il modello Kokoro è identico: Python standalone in `resources/python`,
+  più `site-packages` e i modelli in `resources/kokoro`.
+
+### Cosa servirebbe per Qwen3 GGUF 0.6B
+
+Solo i file usati a runtime, misurati in `vendor/qwen3-tts-gguf`:
+
+| Parte | Dimensione |
+|---|---|
+| talker `q5_k.gguf` | 301 MB |
+| predictor `q8_0.gguf` | 144 MB |
+| decoder ONNX fp16 | 219 MB |
+| encoder codec + speaker fp16 (per clonare la voce di riferimento) | 126 MB |
+| embeddings `.npy` | 429 MB |
+| tokenizer | 11 MB |
+| **Modello, totale** | **circa 1,23 GB** |
+| DLL llama.cpp Vulkan (senza server, cli, bench e quantize) | circa 60 MB |
+| Pacchetto `qwen3_tts_gguf/inference` | pochi MB |
+| site-packages (onnxruntime-directml 71, numpy 52, scipy 129 per lo spettrogramma mel, tokenizers, gguf, soundfile, protobuf, flatbuffers; senza sympy, sounddevice, hf_hub, pip) | circa 280 MB |
+| CPython 3.14 standalone | circa 50 MB |
+| **Totale** | **circa 1,6 GB** |
+
+Il totale scende di circa 250 MB (encoder e scipy) se la voce di riferimento
+viene precalcolata. GGUF quantizzato e fp16 si comprimono poco, quindi
+l'installer crescerebbe di circa 1,4–1,5 GB.
+
+### Ostacoli concreti
+
+1. **Python.** `qwen3_tts_gguf` dichiara `requires-python >=3.14`, e le 129
+   estensioni del venv sono `cp314`. Il venv attuale punta al Python 3.14
+   installato nel profilo utente, quindi non si può distribuire così.
+   Servirebbe un secondo CPython standalone, con versione e sha256 fissati
+   come in `config/python-runtime.json`. In alternativa si può verificare
+   la 3.13 (senza garanzia upstream).
+2. **Layout.** `Qwen3GgufSpeechService.paths()` cerca
+   `<runtime>/.venv/Scripts/python.exe`. Per il pacchetto deve accettare,
+   come Kokoro, un `pythonExecutable` condiviso più un `PYTHONPATH`.
+   Va cambiato anche `after-pack` per la pulizia delle site-packages.
+3. **Limite NSIS.** I dati di un installer NSIS singolo superano male i
+   2 GB. Pacchetto completo (circa 0,7 GB) più Qwen3 (circa 1,5 GB) supera
+   quella soglia.
+4. **Hardware.** Qwen3 serve solo con una GPU Vulkan e VRAM libera (oltre al
+   16K, c'è il `VramGate`). Sugli altri PC il pacchetto sarebbe peso morto,
+   perché parla comunque Kokoro.
+5. **Licenze, compatibili con la ridistribuzione** (da riportare negli
+   avvisi di terze parti):
+
+   | Componente | Licenza |
+   |---|---|
+   | `qwen3-tts-gguf` | MIT |
+   | llama.cpp | MIT |
+   | ONNX Runtime | MIT |
+   | DirectML | Microsoft, redistribuibile con ORT |
+   | Pesi Qwen3-TTS | Apache-2.0 |
+   | Riferimenti voce generati con Kokoro | Apache-2.0 |
+
+### Raccomandazione
+
+Non mettere Qwen3 nell'installer, né in quello pubblico né in quello
+completo. Distribuirlo come **pacchetto voce opzionale scaricato su
+richiesta**:
+
+- un archivio di circa 1,3–1,6 GB con manifest sha256, CPython 3.14 fissato
+  e solo i file runtime;
+- si installa nella cartella dati portabile, con la stessa verifica di
+  integrità dei runtime esistenti;
+- è proposto solo se l'hardware lo regge (GPU Vulkan, almeno 12 GB di VRAM);
+- si attiva con `NEXUS_VOICE_ENGINE=qwen3`, o con una futura impostazione.
+
+Il fallback resta Kokoro. Costi in codice:
+
+- `paths()` con Python condiviso;
+- uno script `prepare-qwen3-voice-pack`, che sfoltisce, scrive il manifest
+  e crea l'archivio;
+- un passo di provisioning.
+
+Non serve nessuna modifica all'installer.
+
+### Implementazione (13 novembre)
+
+| Parte | Cosa fa |
+|---|---|
+| `src/voice/voice-pack.js` | Gestisce layout, manifest (sha256 e dimensione per file), verifica rapida e profonda, installazione e rimozione. Rifiuta file estranei e percorsi non sicuri, ma tollera `src/log/`, dove la libreria scrive il suo log. |
+| `scripts/prepare-qwen3-voice-pack.js` (`npm run voice:qwen3:pack -- --python <CPython 3.14>`) | Crea in `release/voice-packs/` il pacchetto con i soli file di runtime, il manifest e un `.tar` non compresso. Il risultato è una build generata e non va nel repository. |
+| `Qwen3GgufSpeechService` | Accetta `pythonExecutable` e `sitePackages`, e avvia il worker con `-I -B` e `site.addsitedir`. Con `-B` il pacchetto resta privo di `__pycache__`. |
+| `config/voice-packs.json` | Catalogo con URL e sha256 fissati. Con l'URL vuoto il pacchetto risulta «non ancora pubblicato». |
+| Bootstrap | Se `<dati>/voice-packs/qwen3-tts-gguf-0.6b` è valido, attiva Qwen3 GGUF 0.6B con il Python del pacchetto. `NEXUS_VOICE_ENGINE=kokoro` lo lascia spento. Il limite a 16K e il `VramGate` restano attivi. |
+| IPC e preload | `voicePackStatus`, `installVoicePack`, `cancelVoicePack`, `removeVoicePack`, `onVoicePackEvent` (avanzamento). Non esistono nel client pubblico. |
+
+Comportamento di installazione e rimozione:
+
+- l'installazione libera prima la voce Qwen3 in uso, e il nuovo pacchetto
+  vale dopo il riavvio dell'app;
+- la sorgente è l'URL del catalogo; per il proprietario va bene anche un
+  archivio locale (`NEXUS_QWEN3_PACK_ARCHIVE`, opzionale
+  `NEXUS_QWEN3_PACK_SHA256`);
+- un archivio con digest errato o file manomessi non sostituisce il
+  pacchetto già installato.
+
+Misure con il pacchetto reale v1:
+
+- 1548 MB, 3040 file;
+- archivio `.tar` da 1,63 GB, sha256 `72b3be39…37e4e6`;
+- nel pacchetto: Python 3.14.7 (36 MB), site-packages (209 MB),
+  libreria e DLL (72 MB), modello (1230 MB).
+
+Verifica (`qa-artifacts/qwen3-voice-pack-smoke.js`):
+
+- installazione da `.tar` con sha256 profondo: 6,5 s;
+- sintesi usando solo il pacchetto: primo blocco a caldo in 290 ms, primo
+  avvio in circa 26 s;
+- dopo l'uso la verifica passa ancora e la rimozione riesce.
+
+In Electron, con un profilo isolato e il pacchetto installato:
+
+- `voicePackStatus` risponde `installed`, `active` ed `eligible`;
+- la voce è rimasta Kokoro perché la VRAM era piena: 433 MB liberi, motivo
+  `full`. È il comportamento voluto del gate.
+
+Ancora da fare:
+
+- **Hosting.** Pubblicare il `.tar` e compilare `url` e `sha256` nel
+  catalogo. Va scelto dove ospitarlo: GitHub Releases ha un limite di 2 GB
+  per file, quindi va bene.
+- **CPython per la distribuzione.** Il pacchetto v1 contiene il CPython 3.14
+  installato in locale. Per la distribuzione conviene un python-build-standalone
+  3.14 con versione e sha256 fissati; serve l'approvazione per scaricarlo.
+- **Interfaccia.** Manca il pulsante nel Centro di controllo, in un file oggi
+  modificato da un'altra sessione. I canali IPC sono pronti.

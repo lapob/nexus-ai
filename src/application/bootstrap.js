@@ -59,6 +59,8 @@ const { NeuralSpeechService } = require('../voice/neural-speech');
 const { RemoteSpeechQueue } = require('../voice/speech-arbiter');
 const { ExpressiveSpeechService } = require('../voice/expressive-speech');
 const { FallbackSpeechService, createQwen3SpeechService, qwen3Option } = require('../voice/qwen3-speech');
+const { createVoicePackController, installedPack } = require('../voice/voice-pack');
+const voicePackCatalog = require('../../config/voice-packs.json');
 recordModuleStage('agents-voice');
 const { TrainingStore } = require('../infrastructure/storage/training-store');
 const { PersonalMemoryStore } = require('../infrastructure/storage/personal-memory-store');
@@ -309,26 +311,42 @@ function bootstrapElectron({ env = process.env } = {}) {
   // Qwen3-TTS (GPU) è opzionale: NEXUS_VOICE_ENGINE=qwen3. Senza opzione,
   // runtime o pesi la voce resta Kokoro; un errore Qwen3 ricade su Kokoro.
   // NEXUS_QWEN3_RUNTIME=gguf usa llama.cpp Vulkan + ONNX DirectML (RTF ~0,2).
-  const qwen3 = qwen3Option();
+  // Il pacchetto voce scaricato su richiesta (voice/voice-pack) attiva Qwen3 GGUF
+  // 0.6B con il suo Python; NEXUS_VOICE_ENGINE=kokoro lo lascia inattivo.
+  const voicePacksRoot = path.join(sharedDataRoot, 'voice-packs');
+  const voicePack = String(env.NEXUS_VOICE_ENGINE || '').trim().toLowerCase() === 'kokoro' ? null : installedPack(voicePacksRoot);
+  const qwen3 = voicePack ? { enabled: true, size: '0.6b', runtime: 'gguf', pack: voicePack } : qwen3Option();
   const qwen3Gguf = qwen3.runtime === 'gguf';
   const qwen3Folder = qwen3Gguf ? 'qwen3-tts-gguf' : 'qwen3-tts';
-  const qwen3Root = process.env.NEXUS_QWEN3_ROOT
+  const qwen3Root = voicePack?.directory || process.env.NEXUS_QWEN3_ROOT
     || (app.isPackaged ? path.join(process.resourcesPath, qwen3Folder) : path.join(appRoot, 'vendor', qwen3Folder));
-  const neuralSpeechService = qwen3.enabled
-    ? new FallbackSpeechService({
-      primary: createQwen3SpeechService({
-        runtime: qwen3.runtime,
-        enabled: true,
-        size: qwen3.size,
-        runtimeDirectory: qwen3Root,
-        ...(qwen3Gguf && !app.isPackaged ? { voicesDirectory: path.join(appRoot, 'vendor', 'qwen3-tts', 'voices') } : {}),
-        workerPath: app.isPackaged
-          ? path.join(qwen3Root, 'worker.py')
-          : path.join(appRoot, 'src', 'voice', qwen3Gguf ? 'qwen3-gguf-worker.py' : 'qwen3-worker.py')
-      }),
-      fallback: kokoroSpeechService
+  const qwen3Service = qwen3.enabled
+    ? createQwen3SpeechService({
+      runtime: qwen3.runtime,
+      enabled: true,
+      size: qwen3.size,
+      runtimeDirectory: qwen3Root,
+      ...(voicePack ? { voicesDirectory: voicePack.layout.voices, pythonExecutable: voicePack.layout.python, sitePackages: voicePack.layout.sitePackages }
+        : qwen3Gguf && !app.isPackaged ? { voicesDirectory: path.join(appRoot, 'vendor', 'qwen3-tts', 'voices') } : {}),
+      workerPath: voicePack ? voicePack.layout.worker : app.isPackaged
+        ? path.join(qwen3Root, 'worker.py')
+        : path.join(appRoot, 'src', 'voice', qwen3Gguf ? 'qwen3-gguf-worker.py' : 'qwen3-worker.py')
     })
+    : null;
+  const neuralSpeechService = qwen3Service
+    ? new FallbackSpeechService({ primary: qwen3Service, fallback: kokoroSpeechService })
     : kokoroSpeechService;
+  let voicePackHardware = {};
+  const voicePackController = createVoicePackController({
+    packsRoot: voicePacksRoot,
+    catalog: voicePackCatalog,
+    getHardware: () => voicePackHardware,
+    // I file del pacchetto non devono essere in uso: la voce passa a Kokoro fino al riavvio.
+    releaseVoice: () => qwen3Service?.shutdown(),
+    localArchive: String(env.NEXUS_QWEN3_PACK_ARCHIVE || '').trim(),
+    localSha256: String(env.NEXUS_QWEN3_PACK_SHA256 || '').trim(),
+    activePackVersion: voicePack?.manifest.version ?? null
+  });
   const expressiveSpeechService = new ExpressiveSpeechService({
     runtimeDirectory: app.isPackaged
       ? path.join(process.resourcesPath, 'chatterbox')
@@ -507,6 +525,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         cachePath: path.join(sharedDataRoot, 'hardware-profile.json')
       });
       recordSmokeStage('hardware-ready');
+      voicePackHardware = { gpuMemoryBytes: hardwareProfile.gpuMemoryBytes, platform: process.platform };
       // With the opt-in GPU voice the LLM context is capped so both fit in VRAM
       // (docs/QWEN3-TTS-EVALUATION.md, «32K contro 16K»).
       const tuning = runtimeTuning(hardwareProfile, { gpuVoice: qwen3.enabled });
@@ -741,6 +760,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         workflowRuntime,
         speechService,
         neuralSpeechService,
+        voicePackController,
         expressiveSpeechService,
         trainingStore,
         memoryStore,

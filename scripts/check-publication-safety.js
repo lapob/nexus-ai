@@ -71,6 +71,8 @@ const allowedPackagedConfig = new Set([
   'config/public-client.json',
   'config/public-client.release.json',
   'config/python-runtime.json',
+  // Catalogo dei pacchetti voce opzionali: solo URL pubblici, digest e dimensioni.
+  'config/voice-packs.json',
   // Contiene esclusivamente soglie di qualità e URL pubblici; bootstrap e
   // installer devono condividere gli stessi obiettivi verificabili.
   'config/product-slo.json'

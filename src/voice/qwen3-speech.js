@@ -132,6 +132,15 @@ class Qwen3SpeechService {
   /** Variabili aggiuntive per il worker (le sottoclassi le estendono). */
   workerEnv() { return {}; }
 
+  /** Interpreter arguments: isolated mode, plus the pack's site-packages when present. */
+  workerArgs(files) {
+    if (!files.sitePackages) return ['-I', files.worker];
+    // -I ignores PYTHONPATH and PYTHONDONTWRITEBYTECODE: -B keeps the verified
+    // pack free of __pycache__, site.addsitedir also honours its .pth files.
+    return ['-I', '-B', '-c',['import runpy,site', `site.addsitedir(${JSON.stringify(files.sitePackages)})`,
+      `runpy.run_path(${JSON.stringify(files.worker)},run_name='__main__')`].join(';')];
+  }
+
   ensureWorker() {
     if (this.disposed) throw new Error('Sintesi Qwen3 terminata.');
     if (this.child && !this.child.killed) return this.child;
@@ -139,7 +148,7 @@ class Qwen3SpeechService {
     const files = this.paths();
     this.buffer = '';
     this.ready = false;
-    const child = this.spawnProcess(files.python, ['-I', files.worker], {
+    const child = this.spawnProcess(files.python, this.workerArgs(files), {
       cwd: this.runtimeDirectory,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -153,7 +162,7 @@ class Qwen3SpeechService {
         USERPROFILE: process.env.USERPROFILE,
         LOCALAPPDATA: process.env.LOCALAPPDATA,
         APPDATA: process.env.APPDATA,
-        PATH: [path.join(this.runtimeDirectory, '.venv', 'Scripts'), path.join(process.env.SystemRoot || 'C:\\Windows', 'System32')].join(path.delimiter),
+        PATH: [path.dirname(files.python), path.join(this.runtimeDirectory, '.venv', 'Scripts'), path.join(process.env.SystemRoot || 'C:\\Windows', 'System32')].join(path.delimiter),
         PYTHONDONTWRITEBYTECODE: '1',
         NEXUS_QWEN3_ROOT: this.runtimeDirectory,
         NEXUS_QWEN3_SIZE: this.size,
@@ -348,9 +357,12 @@ class Qwen3SpeechService {
  * DLLs in `inference/bin`, and the exports in `models/<model>`.
  */
 class Qwen3GgufSpeechService extends Qwen3SpeechService {
-  constructor({ voicesDirectory, onnxProvider = 'DML', vulkanDevices = '0', ...options } = {}) {
+  constructor({ voicesDirectory, pythonExecutable, sitePackages, onnxProvider = 'DML', vulkanDevices = '0', ...options } = {}) {
     super(options);
     this.voicesDirectory = voicesDirectory || path.join(this.runtimeDirectory, 'voices');
+    // Voice pack (voice/voice-pack): its own CPython and site-packages instead of a local venv.
+    this.pythonExecutable = pythonExecutable || '';
+    this.sitePackages = sitePackages || '';
     this.onnxProvider = ['DML', 'CPU'].includes(onnxProvider) ? onnxProvider : 'DML';
     // llama.cpp would otherwise split the layers across every Vulkan device,
     // integrated GPU included (Ryzen 9800X3D + RX 9070 XT).
@@ -361,7 +373,8 @@ class Qwen3GgufSpeechService extends Qwen3SpeechService {
     const venv = path.join(this.runtimeDirectory, '.venv');
     const model = path.join(this.runtimeDirectory, 'models', QWEN3_MODELS[this.size]);
     return {
-      python: path.join(venv, 'Scripts', 'python.exe'),
+      python: this.pythonExecutable || path.join(venv, 'Scripts', 'python.exe'),
+      ...(this.sitePackages ? { sitePackages: this.sitePackages } : {}),
       worker: this.workerPath || path.join(this.runtimeDirectory, 'worker.py'),
       llama: path.join(this.runtimeDirectory, 'src', 'qwen3_tts_gguf', 'inference', 'bin', 'llama.dll'),
       talker: path.join(model, 'qwen3_tts_talker.q5_k.gguf'),

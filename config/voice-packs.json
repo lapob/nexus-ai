@@ -1,0 +1,9 @@
+{
+  "qwen3-tts-gguf-0.6b": {
+    "version": "1",
+    "url": "",
+    "sha256": "",
+    "bytes": 1626014720,
+    "note": "Optional GPU voice. Empty url = not published yet; fill url and the archive sha256 printed by scripts/prepare-qwen3-voice-pack.js when it is hosted."
+  }
+}
