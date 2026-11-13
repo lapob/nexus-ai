@@ -1,3 +1,12 @@
+# Preview 0.3.40 — 14 November 2026 (PUBLISHED: production bd6996f8, website a14d9fd)
+
+- Windows v0.3.40-preview.1 published and verified on GitHub; public AI shell
+  synced from main (integrated window controls are desktop-only; Ctrl+,
+  settings, modern live chip and soft touch press reach the web app).
+- Gates: npm test 46/46, e2e 36/36; release:prepare candidate bd34cf5d,
+  promote verified 13 routes, navbar, headers and ai.nexusnxs.com/healthz.
+- Next: physical phone check of the sand interaction and touch press.
+
 # Particle field rebuild — 13 November 2026
 
 - Formation: per-chapter geometry is computed once per frame (no per-grain
