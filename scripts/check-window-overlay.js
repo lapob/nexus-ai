@@ -4,6 +4,7 @@
  * finestra principale (nessun pulsante di sistema), misura riduci/ingrandisci/chiudi integrati, allineamento,
  * collisioni e trascinamento, e salva le catture. Uso: npm run qa:desktop:overlay.
  */
+// #region 01 — Preparazione
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -16,6 +17,9 @@ const log = (message) => console.error(message);
 process.on('uncaughtException', (e) => { log('ERR ' + e.stack); app.exit(1); });
 protocol.registerSchemesAsPrivileged([{ scheme: 'nexus', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const { registerRendererProtocol, RENDERER_ENTRY_URL } = require(path.join(root, 'src/infrastructure/electron/renderer-protocol'));
+// #endregion
+
+// #region 02 — Misure e verdetto
 app.whenReady().then(async () => {
   registerRendererProtocol(path.join(root, 'renderer-dist'));
   const results = [];
@@ -79,3 +83,4 @@ app.whenReady().then(async () => {
   console.log(broken.length ? `Barra desktop non corretta: ${JSON.stringify(broken)}` : `Barra desktop corretta su ${results.length} larghezze: riduci/ingrandisci/chiudi integrati, centrati, nessuna collisione, trascinabile.`);
   app.exit(broken.length ? 1 : 0);
 });
+// #endregion

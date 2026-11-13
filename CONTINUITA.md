@@ -2570,6 +2570,8 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 - Server independence verified: NexusNXS Server, Desktop Bridge and Watchdog run from this source checkout and `.nexus-data`; nothing depends on the installed app under AppData\Local\Programs, so uninstalling it leaves server, phone control and notifications running.
 - Gates: npm test 1279 pass / 0 fail, check:ui 39/39 + 15/15, startup bundle 408907 bytes, real Electron smoke pass, overlay QA pass.
 
+- Release 0.3.40: release:public:preview passed (verify, smoke, SBOM 331 components), manifest refreshed, bundle verified (5 artefacts), Founder Preview prepared. Next: push main, publish-github-preview, coordinated server restart with maintenance.flag, readyz and live checks.
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
