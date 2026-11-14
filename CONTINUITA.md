@@ -2648,6 +2648,50 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 
 - Release 0.3.40: release:public:preview passed (verify, smoke, SBOM 331 components), manifest refreshed, bundle verified (5 artefacts), Founder Preview prepared. Next: push main, publish-github-preview, coordinated server restart with maintenance.flag, readyz and live checks.
 
+## Server Console and windowless background tasks (14 November 2026)
+
+- Cause of the window flashing every 2 minutes: NexusNXS Watchdog (Interactive) launched pwsh with
+  -WindowStyle Hidden, but Windows 11 delegates consoles to Windows Terminal, which ignores it. Owner-session
+  tasks now run through `conhost.exe --headless` (New-OwnerSessionTaskAction). Watchdog re-registered and
+  verified: run at 10:50, state updated, no new WindowsTerminal/OpenConsole process. Note: conhost does not
+  propagate pwsh's exit code (LastTaskResult 0); the watchdog keeps its own log.
+- NexusNXS Desktop Bridge was registered from an administrator session: the user registration gets Access
+  denied. Owner action, administrator PowerShell:
+  `pwsh -File scripts/manage-headless-server-task.ps1 -Action install-bridge` (and `-Action install-watchdog`
+  to move the watchdog to S4U, active before login).
+- New `scripts/server-console.ps1` (+ `open-server-console.ps1`, `npm run server:console`):
+  - full-screen two-column TUI with:
+    - state and private/public readiness;
+    - uptime and boot time;
+    - process tree with RAM/CPU;
+    - autostart;
+    - AI engine (model, P50/P95, queue, CPU/RAM/GPU);
+    - watchdog (last/next check, failures, restarts/hour);
+    - maintenance;
+    - intentional stop;
+    - network (site, public AI, Tailscale);
+    - data (free space, encrypted backup, security log, errors in the last hour);
+    - recent events.
+  - Keys: R restart, A stop/start, M maintenance, L log (errors filter, server/watchdog), D diagnostics, W web
+    app, C data folder, P power, H guide, Q exit. Every action goes through the coordinated manager.
+  - Power: requires typing SPEGNI/RIAVVIA, stops the server cleanly first (the PC is never touched if the stop
+    fails), then `shutdown /t 60` with X to cancel (cancelling restarts the server).
+  - Single instance (mutex). A console error goes to logs/server-console.log, and the server is never touched.
+- Task `NexusNXS Console` (Interactive, at logon +12 s, windowless; opens Windows Terminal) plus the Start menu
+  shortcut "NexusNXS Server Console". Installed and opened on this workstation; screenshot checked. Closing the
+  console does not stop the server.
+- Intentional stop: `-Action stop` writes `.nexus-data/server-stopped.flag`; start/restart remove it. The
+  watchdog does not intervene while the flag exists and discards it if it predates the PC's latest boot.
+- Checks:
+  - `tests/server-console.test.js` (static contract plus simulated flows with a fake manager and fake shutdown);
+  - `server-watchdog.test.js` and `headless-server-startup.test.js` updated; focused tests 45/45 and 12/12.
+  - `npm test` 1295/1298: the only failure is "NexusNXS Control offre controlli…" on the Android changes still
+    in progress in another session.
+  - `npm run check` is over budget (411,707 bytes) because of `web/src/Core.tsx` from the core session; not in
+    this commit.
+- Observed in the console: security log "integrity false" with 4 critical events in 24 h (one is the PC
+  shutdown requested on 13/11). To verify separately.
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

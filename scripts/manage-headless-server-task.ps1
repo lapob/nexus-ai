@@ -3,7 +3,7 @@
   @description Installs, removes, or inspects the portable headless server task.
 #>
 param(
-  [ValidateSet('install', 'install-watchdog', 'remove', 'start', 'stop', 'restart', 'status')]
+  [ValidateSet('install', 'install-watchdog', 'install-bridge', 'install-console', 'remove', 'start', 'stop', 'restart', 'status')]
   [string]$Action = 'status',
   [ValidateSet('Boot', 'Logon')]
   [string]$StartupMode = 'Boot'
@@ -16,14 +16,22 @@ $desktopBridgeTaskName = 'NexusNXS Desktop Bridge'
 $deviceCoreTaskName = 'NexusNXS Connectivity'
 $legacyTaskName = 'Nexus AI Server'
 $watchdogTaskName = 'NexusNXS Watchdog'
+$consoleTaskName = 'NexusNXS Console'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $pwshPath = (Get-Command pwsh.exe -ErrorAction Stop).Source
+# Windows 11 inoltra le console a Windows Terminal, che ignora -WindowStyle Hidden:
+# ogni esecuzione di un task interattivo aprirebbe una finestra. conhost --headless
+# crea una console senza finestra e senza delega al terminale predefinito.
+$conhostPath = Join-Path $env:SystemRoot 'System32\conhost.exe'
 $runnerPath = Join-Path $projectRoot 'scripts\run-headless-server.ps1'
 $shutdownRequester = Join-Path $projectRoot 'scripts\request-headless-shutdown.js'
 $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
 $dataRoot = Join-Path (Split-Path $projectRoot -Parent) '.nexus-data'
 $headlessLockPath = Join-Path $dataRoot 'headless-server.lock'
 $presenceLockPath = Join-Path $dataRoot 'system-presence.lock'
+# Arresto voluto dal proprietario: il watchdog non riavvia il server finché esiste
+# (scade da solo al riavvio del PC, così l'accensione riporta sempre il servizio).
+$ownerStopFlag = Join-Path $dataRoot 'server-stopped.flag'
 $gatewayPorts = @(32145, 32147)
 $coldStartTimeoutSeconds = 360
 
@@ -220,11 +228,67 @@ exit `$LASTEXITCODE
   return "-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand $encoded"
 }
 
+function New-OwnerSessionTaskAction([Parameter(Mandatory)][string]$Arguments) {
+  # Task nella sessione del proprietario: nessuna finestra, mai. Il codice di uscita
+  # di pwsh non risale attraverso conhost; questi script scrivono il proprio registro.
+  if (Test-Path -LiteralPath $conhostPath -PathType Leaf) {
+    return New-ScheduledTaskAction -Execute $conhostPath -Argument ('--headless "{0}" {1}' -f $pwshPath, $Arguments) -WorkingDirectory $env:SystemRoot
+  }
+  return New-ScheduledTaskAction -Execute $pwshPath -Argument $Arguments -WorkingDirectory $env:SystemRoot
+}
+
+function Install-DesktopBridgeTask {
+  # Session 0 cannot display windows or inspect the owner's foreground app.
+  # Reuse the authenticated, lightweight bridge in the interactive session;
+  # it owns neither the AI runtime nor either remote gateway.
+  $ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $bridgeArguments = Get-PortableTaskArguments -EntryPoint (Join-Path $projectRoot 'scripts\run-presence.ps1') -Interactive
+  $bridgeAction = New-OwnerSessionTaskAction -Arguments $bridgeArguments
+  $bridgeTrigger = New-ScheduledTaskTrigger -AtLogOn -User $ownerSid
+  $bridgePrincipal = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
+  $bridgeSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $desktopBridgeTaskName -Action $bridgeAction -Trigger $bridgeTrigger `
+    -Principal $bridgePrincipal -Settings $bridgeSettings `
+    -Description 'Owner-session desktop controls and tray; no AI runtime or public gateway; no console window.' -Force | Out-Null
+  Write-Output 'NexusNXS Desktop Bridge installed (logon, no window).'
+}
+
+function Install-ConsoleTask {
+  # Console di controllo visibile all'accesso: solo interfaccia. Il server resta un
+  # servizio separato, quindi chiudere la console non lo arresta mai.
+  $ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $opener = Join-Path $projectRoot 'scripts\open-server-console.ps1'
+  $arguments = Get-PortableTaskArguments -EntryPoint $opener -Interactive
+  $action = New-OwnerSessionTaskAction -Arguments $arguments
+  $trigger = New-ScheduledTaskTrigger -AtLogOn -User $ownerSid
+  $trigger.Delay = 'PT12S'
+  $principal = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
+  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $consoleTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings `
+    -Description 'Opens the NexusNXS Server Console at logon. Closing it never stops the server.' -Force | Out-Null
+
+  # Collegamento nel menu Start per riaprirla quando serve.
+  $programs = [Environment]::GetFolderPath('Programs')
+  $shortcutPath = Join-Path $programs 'NexusNXS Server Console.lnk'
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcut = $shell.CreateShortcut($shortcutPath)
+  $shortcut.TargetPath = $conhostPath
+  $shortcut.Arguments = ('--headless "{0}" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}"' -f $pwshPath, $opener)
+  $shortcut.WorkingDirectory = $env:SystemRoot
+  $shortcut.Description = 'NexusNXS Server Console'
+  $icon = Join-Path $projectRoot 'build\icon.ico'
+  if (Test-Path -LiteralPath $icon) { $shortcut.IconLocation = "$icon,0" }
+  $shortcut.Save()
+  Write-Output "NexusNXS Console installed (logon) with Start menu shortcut."
+}
+
 function Install-WatchdogTask {
   # Sorvegliante esterno ogni 2 minuti: riavvia il server se il processo è vivo ma non pronto
   # (scripts/server-watchdog.ps1). Stesso utente e stesso tipo di accesso del server, nessun privilegio extra.
   $arguments = Get-PortableTaskArguments -EntryPoint (Join-Path $projectRoot 'scripts\server-watchdog.ps1')
-  $action = New-ScheduledTaskAction -Execute $pwshPath -Argument $arguments -WorkingDirectory $env:SystemRoot
+  $action = New-OwnerSessionTaskAction -Arguments $arguments
   $ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
   $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) -RepetitionInterval (New-TimeSpan -Minutes 2)
   $principal = if ($StartupMode -eq 'Boot') {
@@ -286,18 +350,7 @@ function Install-ServerTask {
     -Description "NexusNXS headless server ($StartupMode); waits for its external SSD; no desktop UI." `
     -Force | Out-Null
 
-  if ($StartupMode -eq 'Boot') {
-    # Session 0 cannot display windows or inspect the owner's foreground app.
-    # Reuse the authenticated, lightweight bridge in the interactive session;
-    # it owns neither the AI runtime nor either remote gateway.
-    $bridgeArguments = Get-PortableTaskArguments -EntryPoint (Join-Path $projectRoot 'scripts\run-presence.ps1') -Interactive
-    $bridgeAction = New-ScheduledTaskAction -Execute $pwshPath -Argument $bridgeArguments -WorkingDirectory $env:SystemRoot
-    $bridgeTrigger = New-ScheduledTaskTrigger -AtLogOn -User $ownerSid
-    $bridgePrincipal = New-ScheduledTaskPrincipal -UserId $ownerSid -LogonType Interactive -RunLevel Limited
-    Register-ScheduledTask -TaskName $desktopBridgeTaskName -Action $bridgeAction -Trigger $bridgeTrigger `
-      -Principal $bridgePrincipal -Settings $settings `
-      -Description 'Owner-session desktop controls and tray; no AI runtime or public gateway.' -Force | Out-Null
-  }
+  if ($StartupMode -eq 'Boot') { Install-DesktopBridgeTask }
 
   # Do not alter existing tasks if primary registration fails (e.g. access denied).
   Unregister-ScheduledTask -TaskName $deviceCoreTaskName -Confirm:$false -ErrorAction SilentlyContinue
@@ -310,6 +363,7 @@ function Install-ServerTask {
     Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false -ErrorAction SilentlyContinue
   }
   Install-WatchdogTask
+  Install-ConsoleTask
   Write-Output "NexusNXS Server autostart installed ($StartupMode) from $projectRoot."
 }
 
@@ -327,6 +381,8 @@ if ($Action -eq 'remove') {
   Unregister-ScheduledTask -TaskName $presenceTaskName -Confirm:$false -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $desktopBridgeTaskName -Confirm:$false -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $watchdogTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $consoleTaskName -Confirm:$false -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Programs')) 'NexusNXS Server Console.lnk') -ErrorAction SilentlyContinue
   Write-Output 'NexusNXS Server autostart removed.'
   exit 0
 }
@@ -334,6 +390,13 @@ if ($Action -eq 'remove') {
 if ($Action -in @('start', 'stop', 'restart')) {
   $installedTaskName = Get-InstalledTaskName
   $task = if ($installedTaskName) { Get-ScheduledTask -TaskName $installedTaskName -ErrorAction SilentlyContinue } else { $null }
+  if ($Action -eq 'stop') {
+    # Prima dell'arresto: il watchdog non deve riaccendere un server spento di proposito.
+    [IO.Directory]::CreateDirectory($dataRoot) | Out-Null
+    [IO.File]::WriteAllText($ownerStopFlag, [DateTime]::UtcNow.ToString('o'), [Text.UTF8Encoding]::new($false))
+  } elseif (Test-Path -LiteralPath $ownerStopFlag) {
+    Remove-Item -LiteralPath $ownerStopFlag -Force -ErrorAction SilentlyContinue
+  }
   if ($Action -in @('stop', 'restart')) {
     Stop-HeadlessServer -InstalledTaskName $installedTaskName
     if (-not (Wait-ForGateway $false)) {
@@ -426,6 +489,16 @@ if ($Action -eq 'status') {
 
 if ($Action -eq 'install-watchdog') {
   Install-WatchdogTask
+  exit 0
+}
+
+if ($Action -eq 'install-bridge') {
+  Install-DesktopBridgeTask
+  exit 0
+}
+
+if ($Action -eq 'install-console') {
+  Install-ConsoleTask
   exit 0
 }
 

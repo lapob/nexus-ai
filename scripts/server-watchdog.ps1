@@ -55,6 +55,17 @@ if ((Test-Path -LiteralPath $maintenanceFlag) -and ((Get-Date) - (Get-Item -Lite
   Write-Output 'Manutenzione in corso: nessun intervento.'
   exit 0
 }
+$ownerStopFlag = Join-Path $dataRoot 'server-stopped.flag'
+if (Test-Path -LiteralPath $ownerStopFlag) {
+  # Arresto voluto dal proprietario (console o gestore): rispettarlo fino al riavvio del PC.
+  $bootTime = try { (Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime } catch { [DateTime]::MinValue }
+  if ((Get-Item -LiteralPath $ownerStopFlag).LastWriteTime -gt $bootTime) {
+    Write-Output 'Server arrestato dal proprietario: nessun intervento.'
+    exit 0
+  }
+  if (-not $DryRun) { Remove-Item -LiteralPath $ownerStopFlag -Force -ErrorAction SilentlyContinue }
+  Write-WatchdogLog 'info' 'Arresto manuale precedente al riavvio del PC: sorveglianza ripresa.'
+}
 $managerBusy = @(Get-CimInstance Win32_Process -Filter "Name='pwsh.exe'" -ErrorAction SilentlyContinue |
   Where-Object { [string]$_.CommandLine -like '*manage-headless-server-task.ps1*' -and $_.ProcessId -ne $PID }).Count -gt 0
 if ($managerBusy) { Write-Output 'Gestore del server gia attivo: nessun intervento.'; exit 0 }

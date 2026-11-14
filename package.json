@@ -36,6 +36,7 @@
     "server:foreground": "node scripts/prepare-development.js --mode=start && node scripts/start-electron.js --server",
     "shortcut:refresh": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/refresh-desktop-shortcut.ps1",
     "presence:foreground": "node scripts/start-electron.js --presence",
+    "server:console": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/open-server-console.ps1",
     "server:dashboard": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/open-server-dashboard.ps1",
     "control:status": "pwsh -NoProfile -File scripts/server-dashboard.ps1 -Once",
     "connections:audit": "pwsh -NoProfile -File scripts/audit-connections.ps1",

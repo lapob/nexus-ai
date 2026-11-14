@@ -228,8 +228,8 @@ test('portable scanner bootstrap discovers existing tools without changing PATH 
 for (const mode of ['Boot', 'Logon']) {
   test(`${mode} task uses owner identity, limited privileges and preserves tasks on registration failure`, { skip: !windows }, () => {
     for (const fail of [true, false]) {
-      const result = run(`${functions(['Install-ServerTask'])}
-        $ErrorActionPreference='Stop'; $StartupMode='${mode}'; $projectRoot='C:\\fixture';
+      const result = run(`${functions(['Install-ServerTask', 'Install-DesktopBridgeTask', 'New-OwnerSessionTaskAction'])}
+        $ErrorActionPreference='Stop'; $StartupMode='${mode}'; $projectRoot='C:\\fixture'; $conhostPath='C:\\fixture\\conhost.exe';
         $taskName='Server'; $legacyTaskName='Legacy'; $deviceCoreTaskName='Connectivity'; $presenceTaskName='Presence'; $desktopBridgeTaskName='Bridge';
         $pwshPath='pwsh.exe'; $runnerPath='runner.ps1'; $script:events=@(); $script:registrations=@();
         function Get-PortableTaskArguments { '-EncodedCommand fixture' }

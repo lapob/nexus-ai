@@ -29,7 +29,7 @@ test('pausa in manutenzione e con un gestore già attivo; DryRun non scrive né 
 
 test('il gestore installa e rimuove il sorvegliante insieme al server', () => {
   assert.match(manager, /'install-watchdog'/);
-  assert.match(manager, /Install-WatchdogTask\s+Write-Output "NexusNXS Server autostart installed/);
+  assert.match(manager, /Install-WatchdogTask\s+Install-ConsoleTask\s+Write-Output "NexusNXS Server autostart installed/);
   assert.match(manager, /Unregister-ScheduledTask -TaskName \$watchdogTaskName/);
   assert.match(manager, /-RepetitionInterval \(New-TimeSpan -Minutes 2\)/);
 });
