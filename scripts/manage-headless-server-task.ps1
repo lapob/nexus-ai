@@ -275,7 +275,7 @@ function Install-ConsoleTask {
   $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($shortcutPath)
   $shortcut.TargetPath = $conhostPath
-  $shortcut.Arguments = ('--headless "{0}" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}"' -f $pwshPath, $opener)
+  $shortcut.Arguments = ('--headless "{0}" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}" -Normal' -f $pwshPath, $opener)
   $shortcut.WorkingDirectory = $env:SystemRoot
   $shortcut.Description = 'NexusNXS Server Console'
   $icon = Join-Path $projectRoot 'build\icon.ico'

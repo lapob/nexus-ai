@@ -36,6 +36,11 @@ test('la console si apre all accesso, una sola istanza, e si rimuove con il serv
   assert.match(opener, /TryOpenExisting\('Local\\NexusNXS\.ServerConsole'/);
   assert.match(consoleScript, /Mutex\]::new\(\$false, 'Local\\NexusNXS\.ServerConsole'/);
   assert.match(opener, /NEXUS_DESKTOP_BRIDGE_ONLY/, 'le variabili del bridge non devono passare alla console');
+  // All'accesso parte ridotta a icona senza rubare il focus; dal menu Start (-Normal) torna davanti.
+  assert.match(opener, /ShowWindow\(\$handle, 7\)/);
+  assert.match(opener, /TotalMilliseconds -ge 1500/);
+  assert.match(opener, /if \(\$Normal\) \{[\s\S]*?ShowWindow\(\$handle, 9\)/);
+  assert.match(manager, /open-server-console\.ps1|\$opener[\s\S]*?-Normal' -f \$pwshPath, \$opener/);
 });
 
 test('arresto voluto: il gestore lo segna, il watchdog lo rispetta fino al riavvio del PC', () => {

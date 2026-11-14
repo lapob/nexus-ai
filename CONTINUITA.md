@@ -2783,6 +2783,23 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 - Observed in the console: security log "integrity false" with 4 critical events in 24 h (one is the PC
   shutdown requested on 13/11). To verify separately.
 
+## Server Console minimized at logon (14 November 2026)
+
+- The owner ran `install-bridge` and `install-watchdog` from an administrator PowerShell. Verified state:
+  - Watchdog is S4U and windowless.
+  - Bridge is Interactive and windowless. Re-registering it closed the running instance; it was restarted, no
+    new terminal window appeared, and the presence process is active.
+- At logon `open-server-console.ps1` opens the console minimized to the taskbar without taking focus
+  (SW_SHOWMINNOACTIVE). It insists until the window stays minimized for 1.5 s, because Windows Terminal shows it
+  again at the end of initialization. Tested twice with the real task: 1 window, minimized, 1 instance.
+- The Start menu shortcut (`-Normal`) opens the console, or brings back to the front the one already open,
+  without a second window.
+- At logon, from NexusNXS: Server and Watchdog run in session 0 (invisible), the Bridge is windowless, and only
+  the Console opens, minimized. No recurring windows.
+- Server: at 11:08 "Runtime AI non raggiungibile" followed by a coordinated stop requested by the local manager;
+  at 11:11 a start from the Console; ready again at 11:15 (`readyz` 32145/32147). The source of the 11:08 stop
+  has been asked of the Control session (rescue gateway work in progress).
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
