@@ -205,7 +205,7 @@
     "@vitejs/plugin-react": "^6.0.4",
     "electron": "43.8.3",
     "electron-builder": "26.15.3",
-    "framer-motion": "^12.43.0",
+    "framer-motion": "^14.10.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
