@@ -16,8 +16,15 @@
   ms), after scroll 9.68/9.06 ms; 390x844 after scroll 6.50/6.27 ms.
 - The same breath is in the AI app core (`.AI` web/src/core-breath.ts, WGSL +
   Canvas fallback); the edge AI shell was resynced with it.
-- Verified: npm test 47/47, e2e 37/37 (new breathing test). Not checked on a
-  physical phone or a real 120/144 Hz display.
+- Reload + immediate scroll (owner: "la forma si compone all'istante… lag
+  devastante"): scrolling past 65% of the viewport set the entrance complete
+  in one frame. The entrance is now integrated state: scrolling past 20% makes
+  it hurry (speed ramps smoothly, ~1.6 s) and grains fly on their arcs straight
+  into the current chapter's form; background stars fade instead of popping.
+  Measured max arrival speed after reload + fast scroll (paced rAF): 60 Hz
+  57.5/s → 1.8/s, 120 Hz 65.8/s → 1.5/s, 144 Hz 69.9/s → 1.3/s. New e2e.
+- Verified: npm test 47/47, e2e 38/38 (breathing + reload/scroll tests). Not
+  checked on a physical phone or a real 120/144 Hz display.
 
 # Preview 0.3.40 — 14 November 2026 (PUBLISHED: production bd6996f8, website a14d9fd)
 

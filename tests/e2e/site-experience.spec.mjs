@@ -702,3 +702,23 @@ test("the hero core breathes apart and back together, and stays composed with re
   expect(Number(await field.getAttribute("data-core-scatter"))).toBe(0);
   expect(Number(await field.getAttribute("data-core-breath"))).toBe(0);
 });
+
+test("reloading and scrolling at once never composes the form in a single frame", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/", { waitUntil: "load" });
+  const field = page.locator(".nxs-cosmic-field");
+  await expect(field).toHaveAttribute("data-arrival", /\d/);
+  await page.evaluate(() => {
+    window.nxsArrivalTrace = [];
+    const sample = (t) => { window.nxsArrivalTrace.push([t, Number(document.querySelector(".nxs-cosmic-field").dataset.arrival)]); if (window.nxsArrivalTrace.length < 600) requestAnimationFrame(sample); };
+    requestAnimationFrame(sample);
+  });
+  // Several chapters at once, like a fast wheel right after the reload.
+  await page.evaluate(async () => { for (let y = 0; y <= 2600; y += 90) { scrollTo(0, y); await new Promise(r => setTimeout(r, 16)); } });
+  await expect(field).toHaveAttribute("data-arrival", "1.000", { timeout: 6000 });
+  const trace = await page.evaluate(() => window.nxsArrivalTrace);
+  let fastest = 0;
+  for (let i = 1; i < trace.length; i++) fastest = Math.max(fastest, (trace[i][1] - trace[i - 1][1]) / Math.max(4, trace[i][0] - trace[i - 1][0]) * 1000);
+  // Before the fix the entrance jumped to 1 in one frame (~60/s); now it hurries smoothly (≈0.6/s).
+  expect(fastest).toBeLessThan(4);
+});

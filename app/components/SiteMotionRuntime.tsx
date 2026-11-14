@@ -130,6 +130,11 @@ export function SiteMotionRuntime() {
     const arrivalDuration = 8.2;
     let initialSceneFinished = false;
     let breathRamp = 0;
+    let entranceProgress = 0;
+    let entranceRate = 0;
+    let entranceRush = false;
+    let skyFade = 0;
+    const entranceRushSeconds = 1.6;
     let ambientTime = 0;
     const inspection = { id: -1, startX: 0, startY: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
     let strainedSeconds = 0;
@@ -250,10 +255,20 @@ export function SiteMotionRuntime() {
       // Sticky hero geometry is read only when scroll changed (or twice a second while it settles).
       if (window.scrollY !== heroReadScroll || now - heroReadTime > 500) readHeroLayout(now);
       const age = Math.max(0, now - fieldStarted) / 1000;
-      // The long entrance belongs only to opening the page. Once the visitor
-      // leaves the hero, scrolling never waits for or restarts that entrance.
-      initialSceneFinished ||= age >= arrivalDelay + arrivalDuration || window.scrollY > cosmicHeight * .65;
-      const entranceTime = initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
+      // The long entrance belongs only to opening the page. If the visitor scrolls
+      // away while it runs, it must never snap complete in one frame: the entrance
+      // hurries (its speed ramps up smoothly) and the grains keep flying on their
+      // arcs straight into the current chapter's form, in the same staggered wave.
+      entranceRush ||= window.scrollY > cosmicHeight * .2;
+      if (reduced) { entranceProgress = 1; skyFade = 1; }
+      else {
+        const targetRate = entranceRush ? 1 / entranceRushSeconds : age > arrivalDelay ? 1 / arrivalDuration : 0;
+        entranceRate += (targetRate - entranceRate) * (1 - Math.exp(-5 * delta));
+        entranceProgress = Math.min(1, entranceProgress + entranceRate * delta);
+        if (age > 1.5 || entranceRush) skyFade = Math.min(1, skyFade + delta / (entranceRush ? .8 : 1.7));
+      }
+      initialSceneFinished = entranceProgress >= 1;
+      const entranceTime = entranceProgress;
       // The breath grows in softly (~3 s) once the core has landed; reduced motion keeps it composed.
       breathRamp = reduced ? 0 : entranceTime < 1 ? 0 : Math.min(1, breathRamp + delta / 3);
       const breathAmount = breathRamp * breathRamp * (3 - 2 * breathRamp);
@@ -373,7 +388,7 @@ export function SiteMotionRuntime() {
         }
         return 1-.94*fade;
       };
-      cosmicContext.globalAlpha = reduced || initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - 1.5) / 1.7);
+      cosmicContext.globalAlpha = skyFade * skyFade * (3 - 2 * skyFade);
       for (const [index, star] of backgroundStars.entries()) {
         // These grains are rendered below and travel into the current form.
         if (!quietPage && index % 4 === 0) continue;
