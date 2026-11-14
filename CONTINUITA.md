@@ -1,4 +1,13 @@
-# Breathing core — 14 November 2026 (site + AI edge shell)
+# Breathing core — 14 November 2026 (PUBLISHED: production 9b73e8d7, website 2475ed7)
+
+- Released from a clean worktree at 2475ed7 (candidate 2ec88a5c: tests
+  47/47, e2e 38/38) because another session was editing the shared checkout;
+  candidate b5bbe228 from the shared folder was NOT promoted. Live check:
+  reload + fast scroll on nexusnxs.com, max arrival speed 1.9/s at 60 Hz and
+  1.2/s at 144 Hz. Incident: removing that worktree with --force followed its
+  node_modules junction and emptied .SITE/node_modules; restored with npm ci
+  (esbuild, wrangler 4.149.0, workerd verified). Never junction node_modules
+  into a worktree that will be force-removed.
 
 - Owner request: a softer, less static core that breaks apart and re-forms,
   zooming in and out. The hero sigil and the ringed reactor now breathe on a
