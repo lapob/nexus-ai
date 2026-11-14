@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { advanceSand, strokeDistance } from "./particle-drift";
+import { advanceSand, breatheCorePoint, coreBreath, coreZoom, strokeDistance } from "./particle-drift";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -28,6 +28,8 @@ type CosmicParticle = {
 if (typeof window !== "undefined" && "scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
 
 const MOTION_TIER_CLASSES =["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
+// Forms that are a living core (hero sigil, ringed reactor): they breathe apart and back together.
+const CORE_FORMS = new Set<string | undefined>(["sigil", "reactor"]);
 
 function resolveMotionTier(runtime: RuntimeNavigator): MotionTier {
   const cores = runtime.hardwareConcurrency ?? 8;
@@ -127,6 +129,7 @@ export function SiteMotionRuntime() {
     const arrivalDelay = 3.2;
     const arrivalDuration = 8.2;
     let initialSceneFinished = false;
+    let breathRamp = 0;
     let ambientTime = 0;
     const inspection = { id: -1, startX: 0, startY: 0, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
     let strainedSeconds = 0;
@@ -201,6 +204,7 @@ export function SiteMotionRuntime() {
     };
 
     let interactivePoints: {x:number;y:number}[] = [];
+    const breathPoint = { x: 0, y: 0, z: 0 };
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const paintStart = performance.now();
@@ -245,6 +249,14 @@ export function SiteMotionRuntime() {
       travelScroll += (viewportAnchor - travelScroll) * (reduced ? 1 : 1 - Math.exp(-9 * delta));
       // Sticky hero geometry is read only when scroll changed (or twice a second while it settles).
       if (window.scrollY !== heroReadScroll || now - heroReadTime > 500) readHeroLayout(now);
+      const age = Math.max(0, now - fieldStarted) / 1000;
+      // The long entrance belongs only to opening the page. Once the visitor
+      // leaves the hero, scrolling never waits for or restarts that entrance.
+      initialSceneFinished ||= age >= arrivalDelay + arrivalDuration || window.scrollY > cosmicHeight * .65;
+      const entranceTime = initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
+      // The breath grows in softly (~3 s) once the core has landed; reduced motion keeps it composed.
+      breathRamp = reduced ? 0 : entranceTime < 1 ? 0 : Math.min(1, breathRamp + delta / 3);
+      const breathAmount = breathRamp * breathRamp * (3 - 2 * breathRamp);
       const laneFor = (index: number) => {
         const scene = sections[index]?.dataset.cosmicScene;
         return scene === "center" ? .5 : scene === "left" ? .24 : scene === "right" ? .76 : index % 2 === 0 ? .76 : .24;
@@ -260,7 +272,7 @@ export function SiteMotionRuntime() {
         const section = sections[shape];
         const form = section?.dataset.cosmicForm;
         const ambient = quietPage || !form || form === 'ambient';
-        if (ambient) return { form, ambient, centerX: cosmicWidth / 2, centerY: cosmicHeight / 2, unit: 0, cosYaw: 1, sinYaw: 0, cosPitch: 1, sinPitch: 0 };
+        if (ambient) return { form, ambient, centerX: cosmicWidth / 2, centerY: cosmicHeight / 2, unit: 0, cosYaw: 1, sinYaw: 0, cosPitch: 1, sinPitch: 0, breath: 0 };
         const isHero = shape === 0 && heroCore !== null;
         const centerX = isHero ? (heroLive ? heroLive.x : heroCore!.x) : cosmicWidth * responsiveLane(shape);
         const mobileReading = cosmicWidth < 801 && section!.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
@@ -276,7 +288,11 @@ export function SiteMotionRuntime() {
         const depth = shape === 0 ? travel : 1;
         const pitch = depth * .16 + travel * .62 + inspection.x;
         const yaw = depth * Math.sin(time * .025) * .06 + travel * .28 + inspection.y;
-        return { form, ambient, centerX, centerY, unit, cosYaw: Math.cos(yaw), sinYaw: Math.sin(yaw), cosPitch: Math.cos(pitch), sinPitch: Math.sin(pitch) };
+        // Living cores breathe: they dissolve and re-form, zooming in on a bloom and out
+        // on a collapse. The breath fades in only after the opening entrance has landed.
+        const breath = CORE_FORMS.has(form) ? breathAmount : 0;
+        if (breath) unit *= 1 + (coreZoom(time) - 1) * breath;
+        return { form, ambient, centerX, centerY, unit, cosYaw: Math.cos(yaw), sinYaw: Math.sin(yaw), cosPitch: Math.cos(pitch), sinPitch: Math.sin(pitch), breath };
       };
       type ShapeFrame = ReturnType<typeof frameFor>;
       const frameA = frameFor(topologyIndex);
@@ -284,7 +300,7 @@ export function SiteMotionRuntime() {
       const minDimension = Math.min(cosmicWidth, cosmicHeight);
       const flightCenterX = (frameA.centerX + frameB.centerX) / 2;
       const flightCenterY = (frameA.centerY + frameB.centerY) / 2;
-      const topologyPoint = (particle: CosmicParticle, index: number, frame: ShapeFrame) => {
+      const topologyPoint = (particle: CosmicParticle, index: number, frame: ShapeFrame): { x: number; y: number; scatter?: number } => {
         if (frame.ambient) return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
         const { form, centerX, centerY, unit, cosYaw, sinYaw, cosPitch, sinPitch } = frame;
         const project = (x: number, y: number, z: number) => {
@@ -304,11 +320,19 @@ export function SiteMotionRuntime() {
           const radius = .29 + Math.cos(tube) * .085;
           return project(Math.cos(angle) * radius, Math.sin(angle) * radius, Math.sin(tube) * .085);
         }
+        // A breathing core point: each grain dissolves on its own stagger (inner grains
+        // first, then a wave outwards), so the form decomposes and re-forms like smoke.
+        const breathe = (x: number, y: number, z: number, reach: number) => {
+          const b = frame.breath ? frame.breath * coreBreath(time, ((index * .7548776662) % 1) * .16 + reach * .14) : 0;
+          if (b !== 0) { breatheCorePoint(breathPoint, x, y, z, b, particle.phase, particle.depth, time); x = breathPoint.x; y = breathPoint.y; z = breathPoint.z; }
+          const rz = -x * sinYaw + z * cosYaw;
+          return { x: centerX + (x * cosYaw + z * sinYaw) * unit, y: centerY + (y * cosPitch - rz * sinPitch) * unit, scatter: b < 0 ? -b : b };
+        };
         if (form === 'reactor') {
           const ring = index % 7;
           const a = particle.phase + time * (ring % 2 ? .055 : -.04);
           const radius = ring === 0 ? Math.sqrt(particle.depth) * .09 : .12 + ring * .045;
-          return project(Math.cos(a) * radius, Math.sin(a) * radius, Math.sin(particle.phase * 3) * .008);
+          return breathe(Math.cos(a) * radius, Math.sin(a) * radius, Math.sin(particle.phase * 3) * .008, ring / 6);
         }
         if (form === 'saturn') {
           const a = index * 2.399963 + time * .015;
@@ -318,10 +342,11 @@ export function SiteMotionRuntime() {
         }
         if (form === 'sigil') {
           const reach = (Math.floor(index / 10) * .61803398875) % 1;
-          const turn = index % 10 * Math.PI / 5 + reach * 2.3 + time * .015;
-          const width = .006 + Math.sin(reach * Math.PI) * .023;
-          const radius = .025 + reach * .42 + Math.sin(particle.phase) * width;
-          return project(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2);
+          const turn = index % 10 * Math.PI / 5 + reach * 2.3 + time * .03;
+          // Softer arms: a slow living ripple widens each filament instead of a rigid line.
+          const width = .008 + Math.sin(reach * Math.PI) * (.026 + Math.sin(time * .4 + reach * 6) * .006);
+          const radius = .025 + reach * .42 + Math.sin(particle.phase + time * .12) * width;
+          return breathe(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2, reach);
         }
         if (form === 'neural') {
           const along = ((index + 1) * .61803398875) % 1;
@@ -335,11 +360,6 @@ export function SiteMotionRuntime() {
       };
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
-      const age = Math.max(0, now - fieldStarted) / 1000;
-      // The long entrance belongs only to opening the page. Once the visitor
-      // leaves the hero, scrolling never waits for or restarts that entrance.
-      initialSceneFinished ||= age >= arrivalDelay + arrivalDuration || window.scrollY > cosmicHeight * .65;
-      const entranceTime = initialSceneFinished ? 1 : Math.min(1, Math.max(0, age - arrivalDelay) / arrivalDuration);
       const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
       // Sticky hero words, sampled by readHeroLayout (not every frame).
       visibleHalos.push(...heroHalos);
@@ -366,6 +386,7 @@ export function SiteMotionRuntime() {
         cosmicContext.fill();
       }
       let maxDrift = 0;
+      let breathPeak = 0;
       const footerIndex = sections.findIndex(section => section.tagName === 'FOOTER');
       const footerEntry = footerIndex < 0 ? 0 : Math.max(0, Math.min(1, (viewportAnchor - sectionAnchors[footerIndex] + cosmicHeight * .7) / (cosmicHeight * .7)));
       const footerQuiet = 1 - .88 * footerEntry * footerEntry * (3 - 2 * footerEntry);
@@ -377,12 +398,14 @@ export function SiteMotionRuntime() {
         let startX = baseX;
         // Low-discrepancy order: grains leave and arrive in a soft wave, never all at once.
         const order = (index * .7548776662) % 1;
-        const first = topologyPoint(particle, index, frameA);
-        const second = topologyPoint(particle, index, frameB);
         // Tra due capitoli la forma si scioglie verso l'esterno e i grani arrivano
         // nella forma seguente da fuori, lungo un arco: niente morph punto-punto.
         const local = Math.min(1, Math.max(0, (topologyMixRaw - order * .42) / .58));
         const mix = local ** 3 * (local * (local * 6 - 15) + 10);
+        // A grain resting in one chapter needs only that chapter's geometry.
+        const next = mix > 0 ? topologyPoint(particle, index, frameB) : undefined;
+        const first = mix < 1 || !next ? topologyPoint(particle, index, frameA) : next;
+        const second = next ?? first;
         const span = Math.hypot(second.x - first.x, second.y - first.y);
         const midX = (first.x + second.x) / 2, midY = (first.y + second.y) / 2;
         let outX = midX - flightCenterX, outY = midY - flightCenterY;
@@ -396,6 +419,9 @@ export function SiteMotionRuntime() {
         const targetX = rest * rest * first.x + 2 * rest * mix * controlX + mix * mix * second.x;
         const targetY = rest * rest * first.y + 2 * rest * mix * controlY + mix * mix * second.y;
         const flight = 4 * mix * rest * Math.min(1, span / (minDimension * .2));
+        // Loose grains of a breathing core glow a little softer than the composed form.
+        const scatter = (first.scatter ?? 0) * rest + (second.scatter ?? 0) * mix;
+        breathPeak = Math.max(breathPeak, scatter);
         // Reload starts with dispersed matter gathering from outside, in a staggered wave.
         if (!sourceStar && !initialSceneFinished) {
           startX = targetX + (baseX - targetX) * 1.45;
@@ -409,7 +435,7 @@ export function SiteMotionRuntime() {
         const entryLength = Math.max(1, Math.hypot(targetX - startX, targetY - baseY));
         const entryControlX = (startX + targetX) / 2 - (targetY - baseY) / entryLength * curl;
         const entryControlY = (baseY + targetY) / 2 + (targetX - startX) / entryLength * curl;
-        const wobble = 1 + particle.depth * 2;
+        const wobble = 1 + particle.depth * 2 + scatter * 3;
         const x = away * away * startX + 2 * away * arrival * entryControlX + arrival * arrival * targetX + Math.sin(time * particle.speed + particle.phase) * wobble;
         const y = away * away * baseY + 2 * away * arrival * entryControlY + arrival * arrival * targetY + Math.cos(time * particle.speed * .72 + particle.phase) * wobble;
         // Zero-gravity sand: only a moving hand pushes; every grain scatters on its own
@@ -451,7 +477,7 @@ export function SiteMotionRuntime() {
           readingFade=Math.max(readingFade,weight*weight*(3-2*weight));
         }
 
-        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (1 - .32 * flight) * (quietPage ? .12 : 1);
+        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (1 - .32 * flight) * (1 - .26 * scatter) * (quietPage ? .12 : 1);
         return { x: px, y: py, depth: particle.depth, visibility };
       });
       interactivePoints = entranceTime < 1 || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
@@ -493,6 +519,8 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.sceneProgress = sceneProgress.toFixed(3);
       cosmicCanvas.dataset.sceneTarget = destination.toFixed(3);
       cosmicCanvas.dataset.maxDrift = maxDrift.toFixed(2);
+      cosmicCanvas.dataset.coreBreath = (frameA.breath ? frameA.breath * coreBreath(time, 0) : 0).toFixed(3);
+      cosmicCanvas.dataset.coreScatter = breathPeak.toFixed(3);
       cosmicCanvas.dataset.arrival = (reduced ? 1 : entranceTime).toFixed(3);
       cosmicCanvas.dataset.paintMs = paintMs.toFixed(2);
       cosmicCanvas.dataset.draws = String(++drawCount);

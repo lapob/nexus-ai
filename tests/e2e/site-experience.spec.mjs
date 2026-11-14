@@ -686,3 +686,19 @@ test("reduced motion preserves painted particles through layout resize scroll an
   expect(Number(await field.getAttribute("data-draws"))).toBe(settled);
   expect(await painted()).toBeGreaterThan(500);
 });
+
+test("the hero core breathes apart and back together, and stays composed with reduced motion", async ({ page }) => {
+  await page.goto("/");
+  const field = page.locator(".nxs-cosmic-field");
+  await expect(field).toHaveAttribute("data-arrival", "1.000", { timeout: 18000 });
+  // A whole breath lasts ~14 s: within one cycle the core loosens (scatter) and the global breath moves.
+  await expect.poll(async () => Number(await field.getAttribute("data-core-scatter")), { timeout: 20000, intervals: [250] }).toBeGreaterThan(.5);
+  const breaths = new Set();
+  // Sample past the longest hold (~4.7 s composed) so the global breath must move.
+  for (let i = 0; i < 14; i++) { breaths.add(await field.getAttribute("data-core-breath")); await page.waitForTimeout(450); }
+  expect(breaths.size).toBeGreaterThan(1);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.waitForTimeout(300);
+  expect(Number(await field.getAttribute("data-core-scatter"))).toBe(0);
+  expect(Number(await field.getAttribute("data-core-breath"))).toBe(0);
+});

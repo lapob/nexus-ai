@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceDrift, advanceSand, strokeDistance } from '../app/components/particle-drift.ts';
+import { advanceDrift, advanceSand, breatheCorePoint, CORE_BREATH_PERIOD, coreBreath, coreZoom, strokeDistance } from '../app/components/particle-drift.ts';
 
 test('inertial drift is independent of display refresh rate', () => {
   const simulate = (hz) => {
@@ -50,6 +50,33 @@ test('zero-gravity sand glides loose, rests, then re-gathers at any refresh rate
   const still = { offsetX: 0, offsetY: 0, vx: 0, vy: 0, calm: 10 };
   advanceSand(still, 0, 0, 0, .6, .8, .1);
   assert.deepEqual(still, { offsetX: 0, offsetY: 0, vx: 0, vy: 0, calm: 10.1 });
+});
+
+test('the core breathes apart and back together without jumps, alternating bloom and collapse', () => {
+  const period = CORE_BREATH_PERIOD;
+  // Composed at the start of every cycle, fully loose mid-cycle, opposite sign on the next cycle.
+  assert.equal(coreBreath(0, 0), 0);
+  assert.equal(coreBreath(period * .2, 0), 0);
+  assert.ok(coreBreath(period * .6, 0) > .99);
+  assert.ok(coreBreath(period * 1.6, 0) < -.99);
+  // Smooth everywhere, including across the bloom/collapse boundary: tiny steps, tiny changes.
+  let worst = 0;
+  const step = period / 4000;
+  for (let t = -period; t < period * 3; t += step) worst = Math.max(worst, Math.abs(coreBreath(t + step, .13) - coreBreath(t, .13)));
+  assert.ok(worst < .004, `max step ${worst}`);
+  // Stagger: grains reach the loose state at different moments (a wave, not a block).
+  assert.notEqual(coreBreath(period * .4, 0), coreBreath(period * .4, .1));
+  // Bloom expands and collapse contracts; zero breath leaves the form untouched.
+  const out = { x: 0, y: 0, z: 0 };
+  breatheCorePoint(out, .3, .1, .05, 0, 1, .6, 2);
+  assert.deepEqual(out, { x: .3, y: .1, z: .05 });
+  breatheCorePoint(out, .3, 0, 0, 1, 1, .6, 2);
+  const bloom = Math.hypot(out.x, out.y);
+  breatheCorePoint(out, .3, 0, 0, -1, 1, .6, 2);
+  assert.ok(bloom > .36 && Math.hypot(out.x, out.y) < .2);
+  // Zoom in on a bloom, out on a collapse, always gentle.
+  assert.ok(coreZoom(period * .6) > 1.05 && coreZoom(period * 1.6) < .95);
+  for (let t = 0; t < period * 2; t += .05) assert.ok(coreZoom(t) > .87 && coreZoom(t) < 1.13);
 });
 
 test('fast strokes affect grains between samples, not distant grains', () => {

@@ -1,3 +1,24 @@
+# Breathing core — 14 November 2026 (site + AI edge shell)
+
+- Owner request: a softer, less static core that breaks apart and re-forms,
+  zooming in and out. The hero sigil and the ringed reactor now breathe on a
+  ~13.75 s cycle (`coreBreath`/`breatheCorePoint`/`coreZoom` in
+  `particle-drift.ts`, pure functions of ambient time, so identical at
+  30/60/120/144 Hz). Cycles alternate a bloom (grains expand on a coherent
+  swirling flow, core zooms in ~10%) and a collapse (grains spiral into a
+  dense heart, core zooms out); each grain has its own stagger, so the form
+  dissolves and re-forms in a wave. C²-continuous: no jumps at cycle edges
+  (unit test). Breath fades in over ~3 s after the entrance; reduced motion
+  keeps the form composed (e2e). Sigil arms turn a little faster and ripple.
+- Performance: grains resting in one chapter compute only that chapter's
+  geometry (previously both). Headless 1440x900, same machine, before/after:
+  hero 10.08/10.15 ms paint, during scroll 10.64/10.18 ms (p95 frame 29.5/15.5
+  ms), after scroll 9.68/9.06 ms; 390x844 after scroll 6.50/6.27 ms.
+- The same breath is in the AI app core (`.AI` web/src/core-breath.ts, WGSL +
+  Canvas fallback); the edge AI shell was resynced with it.
+- Verified: npm test 47/47, e2e 37/37 (new breathing test). Not checked on a
+  physical phone or a real 120/144 Hz display.
+
 # Preview 0.3.40 — 14 November 2026 (PUBLISHED: production bd6996f8, website a14d9fd)
 
 - Windows v0.3.40-preview.1 published and verified on GitHub; public AI shell
