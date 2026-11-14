@@ -686,6 +686,12 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private void handleTelemetryFailure() {
         telemetryInFlight = false;
         telemetryFailures++;
+        // Server o PC persi: dopo pochi tentativi la dashboard (e con essa ogni
+        // comando) lascia il posto al varco, che distingue i due casi.
+        if (telemetryFailures >= 3 && currentScreen == SCREEN_DASHBOARD && foreground) {
+            showOffline(null);
+            return;
+        }
         if (telemetryFailures >= 2 && currentScreen == SCREEN_DASHBOARD && foreground) {
             setState("Riconnessione…", true);
             setTaggedText("health-summary", "  Dati non aggiornati");
@@ -1994,31 +2000,338 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         currentScreen = SCREEN_OFFLINE;
         main.removeCallbacks(reconnect);
         setState("Offline", true);
-        if (enteringOffline) materializeNextContent = true;
-        swapContent(() -> {
-            content.setGravity(Gravity.CENTER);
-            ControlCoreView core = new ControlCoreView(true);
-            core.setContentDescription("PC offline");
-            TextView title = text("OFFLINE", 20, Color.rgb(166, 181, 182));
-            title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
-            title.setLetterSpacing(.18f);
-            title.setGravity(Gravity.CENTER);
-            title.setPadding(0, dp(2), 0, dp(10));
-            TextView detail = text("Riconnessione automatica", 13, Color.rgb(101, 121, 122));
-            detail.setGravity(Gravity.CENTER);
-            detail.setPadding(dp(14), 0, dp(14), dp(26));
-            Button retry = button("Riprova", false, false);
-            decorateButton(retry, "restart", Color.rgb(142, 211, 211));
-            retry.setOnClickListener(v -> { showConnecting(); reconnect.run(); });
-            content.addView(core, new LinearLayout.LayoutParams(-1, dp(180)));
-            content.addView(title);
-            content.addView(detail);
-            LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(dp(176), dp(52));
-            retryParams.gravity = Gravity.CENTER_HORIZONTAL;
-            content.addView(retry, retryParams);
-        });
+        if (enteringOffline && renderedGateKey.isEmpty()) materializeNextContent = true;
+        renderGate();
+        probeGate();
         scheduleReconnect();
     }
+
+    // #region Varco offline: PC spento oppure server spento
+
+    private static final int GATE_PROBING = 0, GATE_PC_OFFLINE = 1, GATE_SERVER_OFFLINE = 2, GATE_SERVER_STARTING = 3;
+    private int gateKind = GATE_PROBING;
+    private boolean gateRescueAvailable;
+    private boolean gateOwnerStopped;
+    private boolean gateProbeInFlight;
+    private boolean rescueStartInFlight;
+    private String renderedGateKey = "";
+    private long lastGateFastReconnectAt;
+    private final Runnable gateProbe = this::probeGate;
+
+    private interface RescueCallback { void accept(int status, JSONObject value); }
+
+    /**
+     * Nessuna funzione resta accessibile finché il server non risponde: il
+     * varco sostituisce l'intero contenuto e nasconde navigazione e dock.
+     * Distingue il PC irraggiungibile (nessuna risposta dal collegamento
+     * privato) dal server spento con PC acceso (risponde il Desktop Bridge).
+     */
+    private void renderGate() {
+        if (destroyed || !foreground) return;
+        String key = gateKind + ":" + gateRescueAvailable + ":" + gateOwnerStopped + ":" + rescueStartInFlight;
+        if (key.equals(renderedGateKey) && content.getChildCount() > 0) return;
+        swapContent(() -> {
+            content.setGravity(Gravity.CENTER);
+            boolean server = gateKind == GATE_SERVER_OFFLINE || gateKind == GATE_SERVER_STARTING;
+            NexusGateView gate = new NexusGateView(gateKind);
+            gate.setContentDescription(gateKind == GATE_PC_OFFLINE ? "PC non raggiungibile"
+                : gateKind == GATE_SERVER_STARTING ? "Server in riaccensione" : server ? "Server spento" : "Verifica del collegamento");
+            content.addView(gate, new LinearLayout.LayoutParams(-1, dp(212)));
+
+            TextView chip = text(gateKind == GATE_PC_OFFLINE ? "NEXUS · OFFLINE"
+                : gateKind == GATE_SERVER_STARTING ? "NEXUS · AVVIO" : server ? "NEXUS · SERVER SPENTO" : "NEXUS · VERIFICA", 11,
+                server ? Color.rgb(246, 205, 160) : Color.rgb(150, 178, 180));
+            chip.setLetterSpacing(.22f);
+            chip.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
+            chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            chip.setBackground(rounded(server ? Color.rgb(28, 20, 12) : Color.rgb(9, 22, 24), 99,
+                server ? Color.argb(70, 246, 190, 128) : Color.argb(40, 132, 190, 192)));
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(-2, -2);
+            chipParams.gravity = Gravity.CENTER_HORIZONTAL;
+            chipParams.bottomMargin = dp(14);
+            content.addView(chip, chipParams);
+
+            TextView title = text(gateKind == GATE_PC_OFFLINE ? "PC non raggiungibile"
+                : gateKind == GATE_SERVER_STARTING ? "Riaccensione in corso"
+                : server ? "Server NexusNXS spento" : "Verifica del collegamento", 23, TEXT);
+            title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
+            title.setGravity(Gravity.CENTER);
+            title.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+            title.setPadding(dp(8), 0, dp(8), dp(10));
+            content.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+            String message;
+            if (gateKind == GATE_PC_OFFLINE) message = "Il computer è spento, in sospensione o fuori dalla rete privata. Control si riconnette da solo appena torna disponibile.";
+            else if (gateKind == GATE_SERVER_STARTING) message = "Il server si sta avviando sul PC. Il primo avvio può richiedere qualche minuto: Control entra da solo appena è pronto.";
+            else if (server && !gateRescueAvailable) message = "Il PC è acceso ma il server non risponde e il collegamento desktop non è attivo. Riaccendi il server dal PC.";
+            else if (server && gateOwnerStopped) message = "Il server è stato spento di proposito. Riaccenderlo lo rimette in funzione e riattiva il riavvio automatico.";
+            else if (server) message = "Il PC è acceso ma il server non risponde. Puoi riaccenderlo da qui.";
+            else message = "Sto controllando se il PC e il server sono raggiungibili.";
+            TextView detail = text(message, 14, MUTED);
+            detail.setGravity(Gravity.CENTER);
+            detail.setLineSpacing(dp(2), 1f);
+            detail.setPadding(dp(18), 0, dp(18), dp(26));
+            content.addView(detail, new LinearLayout.LayoutParams(-1, -2));
+
+            if (server) {
+                boolean starting = gateKind == GATE_SERVER_STARTING || rescueStartInFlight;
+                Button start = button(starting ? "Avvio in corso…" : "Riaccendi il server", true, false);
+                decorateButton(start, "power", Color.rgb(211, 242, 241));
+                start.setEnabled(gateRescueAvailable && !starting);
+                start.setContentDescription(starting ? "Avvio del server in corso" : "Riaccendi il server NexusNXS sul PC");
+                start.setOnClickListener(v -> startServerFromGate());
+                LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, dp(56));
+                startParams.setMargins(dp(26), 0, dp(26), dp(10));
+                content.addView(start, startParams);
+            }
+            Button retry = button("Riprova", false, false);
+            decorateButton(retry, "restart", Color.rgb(142, 211, 211));
+            retry.setOnClickListener(v -> {
+                main.removeCallbacks(reconnect);
+                reconnectAttempt = 0;
+                probeGate();
+                reconnect.run();
+            });
+            LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(server ? -1 : dp(196), dp(50));
+            if (server) retryParams.setMargins(dp(26), 0, dp(26), 0);
+            retryParams.gravity = Gravity.CENTER_HORIZONTAL;
+            content.addView(retry, retryParams);
+
+            TextView lock = text("Le funzioni di Control restano bloccate finché il server non torna online.", 12, Color.rgb(92, 112, 114));
+            lock.setGravity(Gravity.CENTER);
+            lock.setPadding(dp(24), dp(22), dp(24), 0);
+            content.addView(lock, new LinearLayout.LayoutParams(-1, -2));
+        });
+        renderedGateKey = key;
+    }
+
+    private boolean gateOnScreen() {
+        return !renderedGateKey.isEmpty() && foreground && !destroyed;
+    }
+
+    private void probeGate() {
+        main.removeCallbacks(gateProbe);
+        if (gateProbeInFlight || !gateOnScreen()) return;
+        gateProbeInFlight = true;
+        rescueRequest("GET", "/rescue/status", null, (status, result) -> {
+            gateProbeInFlight = false;
+            if (!gateOnScreen()) return;
+            if (status == 200 && result != null && "nexusnxs-rescue".equals(result.optString("service"))) {
+                String core = result.optString("core");
+                gateOwnerStopped = result.optBoolean("ownerStopped");
+                gateRescueAvailable = result.optBoolean("canStart") || "starting".equals(core) || result.optLong("retryAfterMs") > 0;
+                if ("online".equals(core)) {
+                    // Il server è tornato: si rientra subito, senza attendere il backoff
+                    // (al massimo una volta ogni pochi secondi se il Core è lento).
+                    long now = android.os.SystemClock.elapsedRealtime();
+                    if (now - lastGateFastReconnectAt > 5_000L) {
+                        lastGateFastReconnectAt = now;
+                        main.removeCallbacks(reconnect);
+                        reconnectAttempt = 0;
+                        reconnect.run();
+                    }
+                    return;
+                }
+                gateKind = "starting".equals(core) ? GATE_SERVER_STARTING : GATE_SERVER_OFFLINE;
+            } else if (status > 0) {
+                // Il collegamento privato risponde (il PC è acceso) ma non il Desktop Bridge.
+                gateKind = GATE_SERVER_OFFLINE;
+                gateRescueAvailable = false;
+            } else {
+                gateKind = GATE_PC_OFFLINE;
+                gateRescueAvailable = false;
+                gateOwnerStopped = false;
+            }
+            renderGate();
+            long next = gateKind == GATE_SERVER_STARTING ? 2_500L : gateKind == GATE_SERVER_OFFLINE ? 6_000L : 9_000L;
+            main.postDelayed(gateProbe, next);
+        });
+    }
+
+    private void startServerFromGate() {
+        if (rescueStartInFlight || !gateRescueAvailable || gateKind != GATE_SERVER_OFFLINE) return;
+        authenticateThen(() -> {
+            if (!gateOnScreen()) return;
+            rescueStartInFlight = true;
+            renderGate();
+            rescueRequest("POST", "/rescue/challenge", json("purpose", "server-start"), (status, challenge) -> {
+                if (status != 201 || challenge == null) { rescueStartFailed(challenge); return; }
+                JSONObject body = new JSONObject();
+                try {
+                    body.put("deviceProof", new JSONObject()
+                        .put("challengeId", challenge.optString("challengeId"))
+                        .put("signature", deviceIdentityStore.signPayload(challenge.optString("payload"))));
+                } catch (Exception error) { rescueStartFailed(null); return; }
+                rescueRequest("POST", "/rescue/start", body, (startStatus, result) -> {
+                    rescueStartInFlight = false;
+                    if (startStatus == 202 || startStatus == 200) {
+                        performHapticFeedbackCompat();
+                        gateKind = GATE_SERVER_STARTING;
+                        renderGate();
+                        main.removeCallbacks(gateProbe);
+                        main.postDelayed(gateProbe, 2_000L);
+                        return;
+                    }
+                    rescueStartFailed(result);
+                });
+            });
+        });
+    }
+
+    private void performHapticFeedbackCompat() {
+        content.performHapticFeedback(android.os.Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.CONTEXT_CLICK);
+    }
+
+    private void rescueStartFailed(JSONObject result) {
+        rescueStartInFlight = false;
+        String message = result == null ? "" : result.optString("error");
+        android.widget.Toast.makeText(this, message.isEmpty() ? "Riaccensione non riuscita. Riprova tra poco." : message, android.widget.Toast.LENGTH_LONG).show();
+        renderedGateKey = "";
+        renderGate();
+        probeGate();
+    }
+
+    /**
+     * Richiesta al punto di ripristino del Desktop Bridge. A differenza di
+     * request() non porta mai al varco offline né tocca la sessione: riporta
+     * soltanto lo stato HTTP (-1 se nessun ingresso ha risposto).
+     */
+    private void rescueRequest(String method, String path, JSONObject body, RescueCallback done) {
+        if (destroyed || network.isShutdown()) return;
+        final String requestToken = token;
+        try {
+            network.execute(() -> {
+                int lastStatus = -1;
+                JSONObject lastResult = null;
+                for (String candidate : connectionCandidates()) {
+                    HttpURLConnection connection = null;
+                    try {
+                        connection = (HttpURLConnection) new URL(candidate + path).openConnection();
+                        activeConnections.add(connection);
+                        connection.setInstanceFollowRedirects(false);
+                        connection.setRequestMethod(method);
+                        connection.setConnectTimeout(2500);
+                        connection.setReadTimeout(8000);
+                        connection.setRequestProperty("Accept", "application/json");
+                        if (!requestToken.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + requestToken);
+                        if (body != null) {
+                            connection.setDoOutput(true);
+                            connection.setRequestProperty("Content-Type", "application/json");
+                            try (OutputStream output = connection.getOutputStream()) { output.write(body.toString().getBytes(StandardCharsets.UTF_8)); }
+                        }
+                        int status = connection.getResponseCode();
+                        InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+                        StringBuilder text = new StringBuilder();
+                        if (stream != null) try (BufferedReader input = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                            String line; while ((line = input.readLine()) != null && text.length() < 16_384) text.append(line);
+                        }
+                        JSONObject parsed = null;
+                        try { parsed = new JSONObject(text.toString()); } catch (Exception ignored) { }
+                        lastStatus = status;
+                        lastResult = parsed;
+                        if (status >= 200 && status < 300) break;
+                    } catch (Exception ignored) { }
+                    finally {
+                        if (connection != null) {
+                            activeConnections.remove(connection);
+                            connection.disconnect();
+                        }
+                    }
+                }
+                final int status = lastStatus;
+                final JSONObject result = lastResult;
+                postUi(() -> done.accept(status, result));
+            });
+        } catch (RejectedExecutionException ignored) { }
+    }
+
+    /**
+     * Emblema del varco. PC offline: anello eclissato e spento. Server spento:
+     * anello del PC vivo con nucleo freddo che pulsa piano. Avvio: archi che
+     * convergono verso il nucleo che si riaccende. Con animazioni ridotte resta
+     * un'immagine statica equivalente.
+     */
+    private final class NexusGateView extends View {
+        private final int kind;
+        private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF bounds = new RectF();
+        private final long born = android.os.SystemClock.uptimeMillis();
+
+        NexusGateView(int kind) {
+            super(NativeMainActivity.this);
+            this.kind = kind;
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(dp(1));
+            arc.setStyle(Paint.Style.STROKE);
+            arc.setStrokeCap(Paint.Cap.ROUND);
+            arc.setStrokeWidth(dp(2));
+            halo.setStyle(Paint.Style.STROKE);
+            halo.setStrokeCap(Paint.Cap.ROUND);
+            halo.setStrokeWidth(dp(12));
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            boolean moving = animationsEnabled() && isAttachedToWindow();
+            float t = moving ? (android.os.SystemClock.uptimeMillis() - born) / 1000f * (lowMotionBudget ? .6f : 1f) : 0f;
+            float cx = getWidth() / 2f, cy = getHeight() / 2f;
+            float radius = Math.min(getWidth(), getHeight()) * .34f;
+            int cool = Color.rgb(84, 102, 104);
+            int warm = Color.rgb(246, 190, 128);
+            boolean server = kind == GATE_SERVER_OFFLINE || kind == GATE_SERVER_STARTING;
+            int tone = kind == GATE_PC_OFFLINE ? cool : kind == GATE_PROBING ? Color.rgb(120, 170, 172) : ACCENT;
+
+            // Orbite di fondo: tre anelli sottili concentrici.
+            for (int index = 0; index < 3; index++) {
+                float r = radius * (1.18f - index * .26f);
+                ring.setColor(tone);
+                ring.setAlpha(kind == GATE_PC_OFFLINE ? 26 : 34 - index * 6);
+                canvas.drawCircle(cx, cy, r, ring);
+            }
+
+            // Arco principale: eclissato (PC), stabile (server), in corsa (avvio/verifica).
+            bounds.set(cx - radius, cy - radius, cx + radius, cy + radius);
+            float speed = kind == GATE_SERVER_STARTING ? 160f : kind == GATE_PROBING ? 120f : kind == GATE_SERVER_OFFLINE ? 14f : 6f;
+            float sweep = kind == GATE_PC_OFFLINE ? 64f : kind == GATE_SERVER_STARTING ? 210f + (float) Math.sin(t * 2.4f) * 60f : 128f;
+            float start = -90f + t * speed;
+            arc.setColor(tone);
+            arc.setAlpha(kind == GATE_PC_OFFLINE ? 110 : 230);
+            halo.setColor(tone);
+            halo.setAlpha(kind == GATE_PC_OFFLINE ? 10 : 34);
+            canvas.drawArc(bounds, start, sweep, false, halo);
+            canvas.drawArc(bounds, start, sweep, false, arc);
+            if (kind != GATE_PC_OFFLINE) {
+                bounds.inset(radius * .26f, radius * .26f);
+                arc.setAlpha(150);
+                canvas.drawArc(bounds, 90f - t * speed * 1.4f, sweep * .62f, false, arc);
+            }
+
+            // Nucleo: spento (PC), freddo e pulsante (server), acceso (avvio).
+            float pulse = moving ? (float) (.5 + .5 * Math.sin(t * (kind == GATE_SERVER_STARTING ? 5.2 : 1.9))) : .5f;
+            int coreColor = kind == GATE_PC_OFFLINE ? cool : server ? (kind == GATE_SERVER_STARTING ? ACCENT : warm) : tone;
+            dot.setColor(coreColor);
+            dot.setAlpha(kind == GATE_PC_OFFLINE ? 70 : 40 + Math.round(pulse * 50));
+            canvas.drawCircle(cx, cy, dp(14) + pulse * dp(kind == GATE_PC_OFFLINE ? 0 : 6), dot);
+            dot.setAlpha(kind == GATE_PC_OFFLINE ? 120 : 235);
+            canvas.drawCircle(cx, cy, dp(kind == GATE_SERVER_STARTING ? 6 : 5), dot);
+
+            // PC offline: frattura dell'orbita, segno che il collegamento è interrotto.
+            if (kind == GATE_PC_OFFLINE) {
+                arc.setColor(cool);
+                arc.setAlpha(150);
+                float gx = cx + (float) Math.cos(Math.toRadians(-38)) * radius;
+                float gy = cy + (float) Math.sin(Math.toRadians(-38)) * radius;
+                canvas.drawLine(gx - dp(7), gy - dp(7), gx + dp(7), gy + dp(7), arc);
+            }
+            if (moving && kind != GATE_PC_OFFLINE) postInvalidateOnAnimation();
+            else if (moving) postInvalidateDelayed(48);
+        }
+    }
+
+    // #endregion
 
     /** Ripristina una superficie consultiva dopo bootstrap o cambio rete. */
     private void restoreAuthenticatedScreen() {
@@ -2061,6 +2374,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         content.setScaleX(1f);
         content.setScaleY(1f);
         content.removeAllViews();
+        renderedGateKey = "";
         render.run();
         if (currentScreen != SCREEN_DASHBOARD || !dashboardVisible) {
             dashboardNavigation.setVisibility(View.GONE);
@@ -2081,6 +2395,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         content.setTranslationY(materialize ? dp(7) : dp(4));
         content.setTranslationX(materialize ? 0f : reverse ? -dp(NexusMotion.CONTENT_TRAVEL_DP) : dp(NexusMotion.CONTENT_TRAVEL_DP));
         if (materialize && materializationOverlay != null) materializationOverlay.materialize();
+        if (materialize) cascadeChildren(content, generation);
         content.postOnAnimation(() -> {
             if (destroyed || generation != contentSwapGeneration) {
                 content.setAlpha(1f);
@@ -2107,6 +2422,46 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 })
                 .start();
         });
+    }
+
+    /**
+     * Entrata a cascata all'apertura di una schermata: ogni blocco sale di pochi
+     * dp e si accende in sequenza, come i pannelli che si materializzano nel
+     * nucleo Nexus. Solo all'ingresso (non ai refresh della telemetria) e mai
+     * con animazioni ridotte; un nuovo swap riporta subito tutto allo stato finale.
+     */
+    private void cascadeChildren(LinearLayout parent, int generation) {
+        int count = Math.min(parent.getChildCount(), 9);
+        float travel = dp(lowMotionBudget ? NexusMotion.CASCADE_TRAVEL_DP / 2 : NexusMotion.CASCADE_TRAVEL_DP);
+        for (int index = 0; index < count; index++) {
+            View child = parent.getChildAt(index);
+            child.animate().cancel();
+            child.setAlpha(0f);
+            child.setTranslationY(travel);
+            child.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(motionDuration(NexusMotion.PRESS) / 2 + index * motionDuration(NexusMotion.CASCADE_STEP))
+                .setDuration(motionDuration(NexusMotion.CONTENT_SWAP + 60))
+                .setInterpolator(emphasizedInterpolator())
+                .withEndAction(() -> { child.setAlpha(1f); child.setTranslationY(0f); })
+                .start();
+        }
+        for (int index = count; index < parent.getChildCount(); index++) {
+            View child = parent.getChildAt(index);
+            child.setAlpha(1f);
+            child.setTranslationY(0f);
+        }
+        // Rete di sicurezza: anche se un'animazione viene interrotta (vista
+        // riutilizzata da un refresh), nessun blocco resta trasparente.
+        View[] animated = new View[count];
+        for (int index = 0; index < count; index++) animated[index] = parent.getChildAt(index);
+        parent.postDelayed(() -> {
+            for (View child : animated) {
+                if (child.getAlpha() < 1f && child.animate() != null && generation != contentSwapGeneration) child.animate().cancel();
+                if (generation != contentSwapGeneration || child.getAlpha() < 1f) { child.setAlpha(1f); child.setTranslationY(0f); }
+            }
+        }, 1_400L);
     }
 
     private void setState(String value, boolean offline) {
@@ -2379,7 +2734,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         button.setStateListAnimator(null);
         int fill = danger ? Color.rgb(33, 15, 13) : primary ? Color.rgb(7, 35, 36) : Color.rgb(5, 17, 18);
         int stroke = danger ? Color.argb(70, 232, 153, 132) : primary ? Color.argb(60, 101, 221, 218) : Color.argb(26, 132, 190, 192);
-        GradientDrawable surface = rounded(fill, 19, stroke);
+        // Stati contenuti nella forma del pulsante: il focus (tastiera, lettore
+        // di schermo, telecomando) accende il bordo; la pressione resta un'onda
+        // ritagliata sulla stessa forma, mai un riquadro nativo che deborda.
+        android.graphics.drawable.StateListDrawable surface = new android.graphics.drawable.StateListDrawable();
+        GradientDrawable focused = rounded(lighten(fill, 6), 19, danger ? Color.argb(170, 244, 170, 150) : Color.argb(170, 120, 236, 233));
+        focused.setStroke(dp(2), danger ? Color.argb(170, 244, 170, 150) : Color.argb(170, 120, 236, 233));
+        surface.addState(new int[] { android.R.attr.state_focused }, focused);
+        surface.addState(new int[] {}, withEdgeLight(rounded(fill, 19, stroke), 19, primary || danger));
         button.setBackground(new RippleDrawable(ColorStateList.valueOf(danger ? Color.argb(45, 240, 145, 119) : Color.argb(42, 109, 224, 221)), surface, null));
         StateListAnimator feedback = new StateListAnimator();
         ObjectAnimator pressed = ObjectAnimator.ofPropertyValuesHolder(button, PropertyValuesHolder.ofFloat(View.SCALE_X, .97f), PropertyValuesHolder.ofFloat(View.SCALE_Y, .97f));
@@ -2402,6 +2764,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private final class NexusButton extends Button {
         NexusButton() { super(NativeMainActivity.this); }
         @Override public boolean performClick() { performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK); return super.performClick(); }
+        // Disattivato: resta leggibile ma chiaramente spento, senza cambiare forma.
+        @Override public void setEnabled(boolean enabled) { super.setEnabled(enabled); setAlpha(enabled ? 1f : .44f); }
     }
 
     private final class MaterializationView extends View {
@@ -2685,8 +3049,23 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(17), dp(13), dp(17), dp(13));
-        card.setBackground(rounded(SURFACE, 22, Color.argb(30, 75, 231, 233)));
+        card.setBackground(withEdgeLight(rounded(SURFACE, 22, Color.argb(30, 75, 231, 233)), 22, false));
         return card;
+    }
+
+    /**
+     * Filo di luce sul bordo superiore delle superfici: un gradiente orizzontale
+     * che svanisce verso gli angoli, come la luce del nucleo su vetro scuro.
+     */
+    private Drawable withEdgeLight(GradientDrawable base, int radius, boolean strong) {
+        GradientDrawable edge = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[] { Color.TRANSPARENT, Color.argb(strong ? 120 : 64, 120, 236, 233), Color.TRANSPARENT });
+        android.graphics.drawable.LayerDrawable layers = new android.graphics.drawable.LayerDrawable(new Drawable[] { base, edge });
+        layers.setLayerHeight(1, Math.max(1, dp(1)));
+        layers.setLayerGravity(1, Gravity.TOP | Gravity.FILL_HORIZONTAL);
+        layers.setLayerInsetLeft(1, dp(radius));
+        layers.setLayerInsetRight(1, dp(radius));
+        return layers;
     }
 
     /**

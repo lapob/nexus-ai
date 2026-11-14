@@ -15,6 +15,7 @@ const { RENDERER_ENTRY_URL, registerRendererProtocol } = require('../infrastruct
 const { createSafeStorageSecretProtection } = require('../infrastructure/electron/safe-storage-secret');
 const { closeDesktopApplication, desktopApplicationStatus, foregroundDesktopApplication, openDesktopApplication } = require('../infrastructure/windows/desktop-application-catalog');
 const { createLocalPresenceBridgeServer } = require('../remote/local-presence-bridge');
+const { createServerRescueGateway } = require('../remote/server-rescue-gateway');
 const { createWakeWordListener } = require('../infrastructure/windows/wake-word-listener');
 const { createLogger } = require('../services/logger');
 const { createDesktopStatusSampler } = require('./desktop-status-sampler');
@@ -157,6 +158,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
   const bridgeOnly = env.NEXUS_DESKTOP_BRIDGE_ONLY === '1';
   let refreshTrayMenu = () => {};
   let presenceBridge = null;
+  let serverRescue = null;
   let wakeWordListener = null;
   let stateTimer = null;
   let lockWatcher = null;
@@ -239,6 +241,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
     try {
       await wakeWordListener?.stop?.();
       await presenceBridge?.stop?.();
+      await serverRescue?.stop?.();
     } finally {
       manager?.dispose?.();
       tray?.destroy?.();
@@ -355,6 +358,16 @@ async function bootstrapPresence({ env = process.env } = {}) {
     protectSecret: bridgeSecretProtection.protectSecret
   });
   await presenceBridge.start();
+  // Il Desktop Bridge sopravvive al Core: da qui Control può riaccendere il
+  // server spento. Un errore (porta occupata) non deve fermare la presenza.
+  if (env.NEXUS_SERVER_RESCUE !== '0') {
+    try {
+      serverRescue = await createServerRescueGateway({ sharedDataRoot, projectRoot: appRoot, logger }).start();
+    } catch (error) {
+      serverRescue = null;
+      logger.warn('Punto di ripristino server non avviato.', { code: error?.code });
+    }
+  }
   void desktopStatus.refresh();
   if (!bridgeOnly) await wakeWordListener.configure(wakeWordConfiguration());
 

@@ -1,3 +1,94 @@
+## Control 1.23.0: offline gate, server restart from the phone, redesign — 14 November 2026 (verified)
+
+Owner request: block all of Control while the PC is offline; when only the
+server is down, still block everything but offer "Riaccendi il server"; refresh
+graphics, animations and transitions.
+
+How the two states are told apart:
+- Control reaches the PC through Tailscale Serve at nxs-core-01.
+- No answer at all means the PC is unreachable.
+- An HTTP answer without the Core means the PC is on and the server is off.
+
+Restart path:
+- New `src/remote/server-rescue-gateway.js`. It is hosted by the Desktop Bridge
+  (presence-bootstrap.js), which stays alive while the Core is down.
+- It listens on loopback 127.0.0.1:32149 only.
+- Tailscale Serve mount, tailnet only: `/rescue` → 127.0.0.1:32149/rescue
+  (`tailscale serve --bg --set-path /rescue …`).
+- Routes:
+  - `GET /rescue/status`: core online/starting/offline, ownerStopped, canStart.
+  - `POST /rescue/challenge`: purpose `server-start`.
+  - `POST /rescue/start`: device token (Console scope), plus an enrolled
+    hardware key signature, plus a biometric prompt on the phone.
+- The device registry is re-read from `.nexus-data/data/remote-access.json` on
+  every request, so a revocation applies at once.
+- Fails closed: devices without an enrolled key are refused (428). One start
+  per 60 s; a second tap while starting does nothing.
+- The start runs `scripts/manage-headless-server-task.ps1 -Action start`
+  (coordinated manager, not modified), hidden through `conhost --headless`.
+  `start` also removes `server-stopped.flag`; the button says so.
+- Log: `.nexus-data/logs/server-rescue.log`.
+
+Control (NativeMainActivity):
+- Gate screens: verifying, PC unreachable, server off (deliberate stop or
+  not), restart in progress.
+- New `NexusGateView` emblem:
+  - eclipsed ring when the PC is unreachable;
+  - cold pulsing core when the server is off;
+  - converging arcs while it starts.
+- Polls `/rescue/status` and rejoins the dashboard by itself once the Core is
+  online.
+- Redesign:
+  - screens enter as a cascade, only on screen entry, never on telemetry
+    refresh;
+  - button focus state is drawn inside the button shape;
+  - disabled buttons show at 44 % opacity;
+  - a thin light line runs along the top edge of cards and primary buttons.
+- Reduced motion turns all of this off, and the gate is then a static image.
+
+Deployment done:
+- Desktop Bridge restarted through the coordinated lock request. The new PID
+  logs "Punto di ripristino server attivo" on port 32149.
+- Tailscale Serve mount added.
+- APK 1.23.0, versionCode 51, same debug certificate as before, installed on
+  the phone via ADB. Final hash in the verification block below.
+- Checks:
+  - rescue and android-client-contract tests pass 17/17;
+  - full suite `node scripts/run-tests.js`: 1299 tests, 1297 pass, 0 fail.
+
+Verified live on the phone (owner authorised, 14 Nov, SM-S931B):
+1. Server stopped with `manage-headless-server-task.ps1 -Action stop` (flag
+   created). Control showed "Server NexusNXS spento", including the
+   deliberate-stop message.
+2. "Riaccendi il server" → biometric prompt confirmed by the owner →
+   presence.log "Riaccensione server richiesta da Control" (ownerStopped
+   true). The flag was removed, ports 32145/32147 came back, and Control
+   returned to the dashboard by itself.
+3. "PC non raggiungibile": simulated by turning Tailscale Serve off for about
+   15 s and relaunching Control. The PC-offline gate appeared, then the
+   dashboard came back once Serve was restored. The Serve config was restored
+   identical: `/` → 32145, `/rescue` → 32149.
+   - Limit: an already open live stream survives Serve going off. With a real
+     PC shutdown the stream times out (35 s); three telemetry failures then
+     send the dashboard to the gate (new escalation in
+     handleTelemetryFailure).
+4. The Riavvia/Spegni buttons in Control were not touched.
+
+Fixes found during the test:
+- The dashboard only showed "Dati non aggiornati" and never blocked. Now three
+  consecutive failures lead to the gate.
+- `conhost --headless` exits at once with 0. The "starting" state is now
+  cleared only by an exit with an error.
+- Motion durations are now tokens (`NexusMotion.CASCADE_STEP` and
+  `CASCADE_TRAVEL_DP`), as required by the android-client-contract test.
+
+Note: the Desktop Bridge was restarted again at 11:13 (at the server start).
+The running process is newer than the last change to the rescue gateway.
+`request-headless-shutdown` returned "process-offline" against the new lock,
+so it was not needed.
+
+Final APK: 1.23.0, versionCode 51, SHA-256 3A95EF2A…A27D, installed via ADB.
+
 ## Server independent from the desktop app — 13 November 2026 (in progress)
 
 Owner request: closing the desktop app must never stop the server.
