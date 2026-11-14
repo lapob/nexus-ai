@@ -56,7 +56,20 @@
   phone was locked, so frame pacing at 120 Hz is not measured yet.
 - Next: owner looks at the connecting core and a section change on the phone.
 
-## Motion for web app and desktop, in step with the core's breath — 14 November 2026 (committed, release 0.3.41 pending)
+## Motion for web app and desktop, in step with the core's breath — 14 November 2026 (committed c32d24d, release 0.3.41 in progress)
+
+Release 0.3.41 — operation in progress (record before the long steps):
+- Revision: main after 463b387 (Control 1.26.0), working tree clean apart from this file.
+- Gates on that tree: npm test 1304 tests, 1302 pass, 0 fail, 2 skipped; npm run check
+  PASS (bundle 374480 B); check:ui 39/39 + 15/15; build:renderer OK.
+- Flow: bump 0.3.41 → release:public:preview (verify + build:win + verify:installer +
+  sbom, log in .nexus-data/logs/release-0341.log) → release:manifest:refresh →
+  release:verify-bundle → push main → founder:publish → coordinated service restart
+  (maintenance.flag, readyz) → `.SITE` sync-ai-shell + sync-public-release
+  --tag=v0.3.41-preview.1 → release:prepare/promote → push website.
+- Expected: GitHub v0.3.41-preview.1, /updates/preview manifest at 0.3.41, ai.nexusnxs.com
+  serving the new UI. If interrupted: check which artefacts exist in release/ before
+  repeating a step.
 
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk
