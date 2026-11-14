@@ -28,17 +28,17 @@ export default function Home() {
       <div className="cosmic-stage" aria-hidden="true" />
     </section>
     <section className="apps-section narrative-apps" id="apps" data-cosmic-scene="left">
-      <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene="right" data-cosmic-form="ambient">
+      <div className="app-grid">{apps.map((app) => <article className="app-card reveal" key={app.device} data-cosmic-scene="right" data-cosmic-form="stream">
         <div className="narrative-app-copy"><p className="platform">{app.platform}</p><h2>{app.name}</h2><p>{app.description}</p><HardNavigationLink className="text-link" href={app.href}>Esplora NexusNXS per PC <ArrowUpRight size={16} /></HardNavigationLink></div>
         <div className={`app-card-visual ${app.device}`} ><div className="app-card-visual__screen"><DesktopHomePreview /></div></div>
       </article>)}</div>
     </section>
-    <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right" data-cosmic-form="ambient">
+    <section className="presence-system reveal" aria-labelledby="presence-title" data-cosmic-scene="right" data-cosmic-form="stream">
       <div className="presence-copy"><p className="section-label">UN DIALOGO CONTINUO</p><h2 id="presence-title">Vedi cosa sta facendo.</h2><p>Il Core segue ascolto, elaborazione e risposta. Quando consulta il web, trovi le fonti; quando agisce, mantieni il controllo. Puoi fermarlo in qualsiasi momento.</p></div>
       <div className="presence-grid">{presenceStates.map(({Icon,label,detail,state}) => <article key={state} data-state={state}><span><Icon strokeWidth={1.4}/></span><div><strong>{label}</strong><small>{detail}</small></div><i aria-hidden="true"/></article>)}</div>
     </section>
     <section className="astral-interlude narrative-forms" aria-label="Saturno particellare" data-cosmic-scene="center" data-cosmic-form="saturn"><div className="cosmic-stage" aria-hidden="true" /></section>
-    <section className="one-nexus reveal" data-cosmic-scene="left" data-cosmic-form="ambient">
+    <section className="one-nexus reveal" data-cosmic-scene="left" data-cosmic-form="stream">
       <div className="one-nexus-copy"><p className="section-label">PC · WEB</p><h2>Un solo prodotto.<br /><em>Più modi di esserci.</em></h2><p>Le app condividono il servizio NexusNXS. Lavora con l’assistente sul PC, oppure apri il web per iniziare senza installazioni.</p><HardNavigationLink className="text-link" href="https://ai.nexusnxs.com">Provalo nel browser <ArrowUpRight size={16}/></HardNavigationLink></div>
       <div className="nexus-stage"><ProductMockup type="desktop"/></div>
     </section>

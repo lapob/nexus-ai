@@ -1,3 +1,41 @@
+# Continuous narrative + jank-free field — 14 November 2026 (site)
+
+- Owner request: one continuous, fluid story with no lagging frame. Chapters
+  now hand over: sigil → helix → reactor → bridge current → saturn → bridge
+  current → torus → closing galaxy above the footer. Screen/copy chapters use
+  a soft `stream` of stars instead of an empty sky; the footer has a breathing
+  `horizon` galaxy. Between forms the cloud turns as one vortex with depth
+  parallax (`vortexFlight`, 0 at both ends so forms land exactly). Story
+  anchors are pulled inside the reachable scroll range, so the last form lands
+  complete at the very bottom (before, the torus→footer change stalled
+  half-way because the footer top is below max scroll).
+- Text choreography: reading blocks rise in and drift out with the scroll
+  (`chapterChoreo`, reversible, staggered lines, soft blur in transit on
+  desktop only). Written inline on the moving elements only; at rest the
+  inline style is removed (opacity 1, no transform/filter), so reading blur
+  keeps its backdrop. Reduced motion: no choreography (e2e/axe unchanged).
+- Jank root causes found with CDP traces (4x CPU, 390x844 DPR 3): per-grain
+  arc paths + rgba() strings (~46 ms canvas per frame) and `--nxs-scroll`
+  rewritten on <html> every scroll frame (~1 s of style recalc per 4.5 s
+  fling, even as a registered non-inherited property; no CSS uses it). Fixes:
+  pre-rendered round sprites/fillRect, threads batched in 6 opacity strokes,
+  reading halos in viewport coordinates with a cheap reject, typed arrays
+  (no per-grain objects), DPR ≤2 and ≤4 MP backing store, density scaled to
+  screen area (≈55% on a phone), `--nxs-scroll` published only when scrolling
+  rests (140 ms), hero title opacity written on the h1 itself.
+- Measured, reload + immediate fast fling to the bottom and back, 5 runs,
+  headless Chrome, same machine, baseline = production 2475ed7 / new:
+  desktop 1440x900 frame p50/p95/p99 8.4/16.7/20.9 → 4.2/4.3/4.4 ms, >20 ms
+  2.3% → 0.1%; mobile emulated (390x844, DPR 3, 4x CPU) p50/p95/p99
+  54/92/208 → 12.4/16.8/20.9 ms, long tasks 442 (31.4 s) → 0, canvas paint
+  45.8 → 5.9 ms. CONTINUITA method (paint ms hero/during/after): 1440x900
+  ~9.7/8.5/7.3 → 2.4/2.0/2.6; 390x844 ~10.2/8.0/4.1 → 1.4/1.4/1.7.
+  One frame per run can still reach ~50-60 ms right at reload (first draw).
+- Verified: npm test 49/49, e2e 38/38 (app-card form assertion now `stream`).
+  Not checked on a physical phone or a real 120/144 Hz display. Next: check
+  on a real phone; consider OffscreenCanvas in a worker if a device still
+  drops frames.
+
 # Breathing core — 14 November 2026 (PUBLISHED: production 9b73e8d7, website 2475ed7)
 
 - Released from a clean worktree at 2475ed7 (candidate 2ec88a5c: tests

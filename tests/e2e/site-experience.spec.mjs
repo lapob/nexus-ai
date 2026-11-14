@@ -103,10 +103,10 @@ test("the homepage loads real product captures without CSP or runtime errors", a
 
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator(".app-card-visual").first().scrollIntoViewIfNeeded();
-  // The PC client uses its real capture; the ambient field remains shared.
+  // The PC client uses its real capture; the shared field flows behind it as a bridge current.
   await expect(page.locator("a[href='/android']")).toHaveCount(0);
   await expect(page.locator(".app-card-visual.desktop img")).toHaveCount(1);
-  await expect(page.locator(".app-card[data-cosmic-form='ambient']")).toHaveCount(1);
+  await expect(page.locator(".app-card[data-cosmic-form='stream']")).toHaveCount(1);
   const captures = await page.locator(".app-card-visual img").evaluateAll((images) =>
     images.map((image) => ({ width: image.naturalWidth, height: image.naturalHeight })),
   );

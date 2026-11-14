@@ -142,7 +142,6 @@ html { scroll-padding-top: 96px; }
 .astral-hero .hero-actions a span { position:static; transform:none; margin:0; }
 .astral-hero .hero-action-label { font-weight:600; }
 
-.astral-hero .hero-product-name { opacity: var(--hero-label-opacity, 1); }
 
 .narrative-copy { position: relative; max-width: 660px; margin: 0 auto 0 max(var(--page-pad), calc((100vw - 1160px) / 2)); padding: clamp(96px, 13vw, 200px) 0; }
 .narrative-copy--right { margin-left: auto; margin-right: max(var(--page-pad), calc((100vw - 1160px) / 2)); }

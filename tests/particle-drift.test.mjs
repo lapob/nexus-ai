@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceDrift, advanceSand, breatheCorePoint, CORE_BREATH_PERIOD, coreBreath, coreZoom, strokeDistance } from '../app/components/particle-drift.ts';
+import { advanceDrift, advanceSand, breatheCorePoint, chapterChoreo, CORE_BREATH_PERIOD, coreBreath, coreZoom, horizonPoint, streamPoint, strokeDistance, vortexFlight } from '../app/components/particle-drift.ts';
 
 test('inertial drift is independent of display refresh rate', () => {
   const simulate = (hz) => {
@@ -77,6 +77,40 @@ test('the core breathes apart and back together without jumps, alternating bloom
   // Zoom in on a bloom, out on a collapse, always gentle.
   assert.ok(coreZoom(period * .6) > 1.05 && coreZoom(period * 1.6) < .95);
   for (let t = 0; t < period * 2; t += .05) assert.ok(coreZoom(t) > .87 && coreZoom(t) < 1.13);
+});
+
+test('reading blocks enter and leave smoothly, reversibly, and rest fully readable', () => {
+  const h = 900;
+  assert.deepEqual(chapterChoreo(h, h + 300, h), { enter: 0, leave: 0 });
+  assert.deepEqual(chapterChoreo(h * .4, h * .7, h), { enter: 1, leave: 0 });
+  assert.deepEqual(chapterChoreo(-h * .5, -h * .05, h), { enter: 1, leave: 1 });
+  let lastEnter = 0, lastLeave = 0, worst = 0;
+  for (let top = h * 1.2; top > -h; top -= 2) {
+    const { enter, leave } = chapterChoreo(top, top + 260, h);
+    assert.ok(enter >= lastEnter && leave >= lastLeave, 'monotonic while scrolling down');
+    worst = Math.max(worst, enter - lastEnter, leave - lastLeave);
+    lastEnter = enter; lastLeave = leave;
+  }
+  assert.ok(worst < .02, `no jump: ${worst}`);
+});
+
+test('bridge current, closing galaxy and flight vortex stay bounded and continuous', () => {
+  const p = { x: 0, y: 0 };
+  let worst = 0;
+  for (let t = 0; t < 400; t += .05) {
+    streamPoint(p, 37, 1.3, .7, t, 1440, 900, .5);
+    const { x, y } = p;
+    streamPoint(p, 37, 1.3, .7, t + .05, 1440, 900, .5);
+    worst = Math.max(worst, Math.hypot(p.x - x, p.y - y));
+    assert.ok(p.x > -150 && p.x < 1600 && p.y > 0 && p.y < 900);
+  }
+  assert.ok(worst < 2, `stream never wraps: ${worst}`);
+  const g = { x: 0, y: 0, z: 0, reach: 0 };
+  for (let i = 0; i < 2400; i++) { horizonPoint(g, i, i * .37, (i % 13) / 13, 12); assert.ok(Math.hypot(g.x, g.y, g.z) < .58 && g.reach >= 0 && g.reach < 1); }
+  // Resting forms are untouched; mid-flight grains turn around the centre.
+  assert.deepEqual(vortexFlight(p, 300, 200, 100, 100, 0, .7, 1), { x: 300, y: 200 });
+  vortexFlight(p, 300, 100, 100, 100, 1, .7, 1);
+  assert.ok(p.y > 150 && Math.hypot(p.x - 100, p.y - 100) > 200);
 });
 
 test('fast strokes affect grains between samples, not distant grains', () => {

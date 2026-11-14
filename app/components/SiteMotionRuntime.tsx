@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { advanceSand, breatheCorePoint, coreBreath, coreZoom, strokeDistance } from "./particle-drift";
+import { advanceSand, breatheCorePoint, chapterChoreo, coreBreath, coreZoom, horizonPoint, streamPoint, strokeDistance, vortexFlight } from "./particle-drift";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -29,7 +29,17 @@ if (typeof window !== "undefined" && "scrollRestoration" in window.history) wind
 
 const MOTION_TIER_CLASSES =["nxs-motion-lite", "nxs-motion-balanced", "nxs-motion-ultra"];
 // Forms that are a living core (hero sigil, ringed reactor): they breathe apart and back together.
-const CORE_FORMS = new Set<string | undefined>(["sigil", "reactor"]);
+const CORE_FORMS = new Set<string | undefined>(["sigil", "reactor", "horizon"]);
+// Reading blocks of the home narrative: their words enter and leave with the scroll.
+const CHOREO_SELECTOR = ".narrative-copy,.narrative-app-copy,.app-card-visual,.presence-copy,.presence-grid,.one-nexus-copy,.nexus-stage,.footer-callout,.footer-links,.footer-bottom";
+// Blocks that move as one piece (their children own hover transforms).
+const CHOREO_SELF = ".app-card-visual,.nexus-stage,.footer-links,.footer-callout,.presence-grid";
+const documentTop = (element: HTMLElement) => {
+  let top = 0;
+  // offsetTop ignores the choreography's own transforms, so reading never feeds back.
+  for (let node: HTMLElement | null = element; node; node = node.offsetParent as HTMLElement | null) top += node.offsetTop;
+  return top;
+};
 
 function resolveMotionTier(runtime: RuntimeNavigator): MotionTier {
   const cores = runtime.hardwareConcurrency ?? 8;
@@ -101,6 +111,48 @@ export function SiteMotionRuntime() {
     let heroCore: { x: number; y: number; size: number } | null = null;
     let heroLive: { x: number; y: number } | null = null;
     let heroHalos: {left:number;right:number;top:number;bottom:number}[] = [];
+    let maxScroll = 1;
+    let scrollProgress = 0;
+    let scrollPublish = 0;
+    let storyAnchors: number[] = [];
+    const choreoBlocks = quietPage ? [] : Array.from(document.querySelectorAll<HTMLElement>(CHOREO_SELECTOR)).map(element => {
+      // Blocks with their own hover transforms move as one piece; copy blocks stagger their lines.
+      const targets = (element.matches(CHOREO_SELF) ? [element] : Array.from(element.children) as HTMLElement[])
+        .map((target, index) => ({ target, order: Math.min(index, 4), state: "" }));
+      return { element, targets, top: 0, bottom: 0 };
+    });
+    // Words enter and leave with the scroll itself (reversible, no timers). Opacity and
+    // transform are written inline on the moving elements only: no inherited custom
+    // property, so a scroll frame never restyles whole subtrees. At rest the inline
+    // style is removed entirely (opacity 1, no transform, no filter), which also keeps
+    // the feathered reading blur on its real backdrop.
+    const updateChoreo = () => {
+      if (!choreoBlocks.length) return;
+      const active = !reducedMotion.matches;
+      const y = window.scrollY, h = window.innerHeight;
+      // Soft focus in transit on larger screens; phones keep the cheaper fade + glide.
+      const blurScale = tier === "lite" || window.innerWidth < 801 ? 0 : 1;
+      for (const block of choreoBlocks) {
+        // Far away blocks are settled (hidden below or gone above): one write, then skipped.
+        const { enter, leave } = active ? chapterChoreo(block.top - y, block.bottom - y, h) : { enter: 1, leave: 0 };
+        for (const item of block.targets) {
+          const a = Math.min(1, Math.max(0, enter * 1.5 - item.order * .12));
+          const b = Math.min(1, Math.max(0, leave * 1.5 - item.order * .12));
+          let state = "";
+          if (a < 1 || b > 0) {
+            const opacity = Math.min(a, 1 - b);
+            const blur = opacity > .01 ? ((1 - a) * 6 + b * 5) * blurScale : 0;
+            state = `${opacity.toFixed(3)}|translate3d(0,${((1 - a) * 46 - b * 38).toFixed(1)}px,0) scale(${(1 - (1 - a) * .025 - b * .02).toFixed(4)})|${blur > .05 ? `blur(${blur.toFixed(2)}px)` : ""}`;
+          }
+          if (state === item.state) continue;
+          item.state = state;
+          const [opacity = "", transform = "", filter = ""] = state ? state.split("|") : [];
+          item.target.style.opacity = opacity;
+          item.target.style.transform = transform;
+          item.target.style.filter = filter;
+        }
+      }
+    };
     let heroReadScroll = Number.NaN;
     let heroReadTime = 0;
     let travelScroll = window.scrollY;
@@ -154,8 +206,22 @@ export function SiteMotionRuntime() {
       gradient.addColorStop(1,'rgba(120,225,245,0)');
       glowContext.fillStyle = gradient; glowContext.fillRect(0,0,32,32);
     }
+    // Pre-rendered round grains: one drawImage per larger grain instead of building,
+    // tessellating and filling an arc path with a fresh rgba() string every frame.
+    const makeDot = (color: string) => {
+      const dot = document.createElement('canvas');
+      dot.width = dot.height = 16;
+      const context = dot.getContext('2d');
+      if (context) { context.fillStyle = `rgb(${color})`; context.beginPath(); context.arc(8, 8, 7.5, 0, Math.PI * 2); context.fill(); }
+      return dot;
+    };
+    const DOT_BRIGHT = '225,249,255', DOT_CYAN = '125,245,250', DOT_STAR = '185,225,236';
+    const dotBright = makeDot(DOT_BRIGHT), dotCyan = makeDot(DOT_CYAN), dotStar = makeDot(DOT_STAR);
     const particleCount = tier === "ultra" ? 2400 : tier === "balanced" ? 1600 : 720;
-    let activeParticles = particleCount;
+    // Density follows the screen: a phone shows smaller forms and needs fewer grains
+    // for the same look (≈55% at 390x844), a large desktop keeps the full field.
+    const fieldCap = Math.round(particleCount * Math.min(1, Math.max(.55, Math.sqrt(window.innerWidth * window.innerHeight / 1_300_000))));
+    let activeParticles = fieldCap;
     let seed = 0x4e5853;
     const random = () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -184,7 +250,9 @@ export function SiteMotionRuntime() {
 
     const resizeCosmicField = () => {
       if (!cosmicContext) return;
-      const ratio = Math.min(window.devicePixelRatio || 1, tier === "lite" ? 1.5 : 2.5, Math.sqrt(6_000_000 / Math.max(1, innerWidth * innerHeight)));
+      // Grains are points of light: beyond 2x density (and ~4 MP) the extra backing
+      // pixels cost fill rate on phones without a visible gain.
+      const ratio = Math.min(window.devicePixelRatio || 1, tier === "lite" ? 1.5 : 2, Math.sqrt(4_000_000 / Math.max(1, innerWidth * innerHeight)));
       cosmicWidth = Math.max(1, window.innerWidth);
       cosmicHeight = Math.max(1, window.innerHeight);
       const pixelWidth = Math.round(cosmicWidth * ratio), pixelHeight = Math.round(cosmicHeight * ratio);
@@ -198,7 +266,18 @@ export function SiteMotionRuntime() {
       heroReadScroll = Number.NaN;
       sectionAnchors = sections.map(section => section.getBoundingClientRect().top + window.scrollY);
       mobileArtAnchors = sections.map((section, index) => sectionAnchors[index] + section.offsetHeight - cosmicHeight * .32);
-      readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.presence-grid,.inner-page h1,.inner-page h2,.inner-page p,.service-list,.legal-content,.legal-nav,.release-list,.security-summary')).map(element=>{
+      maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      // The last chapters (the footer above all) can start below the deepest reachable
+      // scroll position, which left their form half-composed forever. Story anchors are
+      // pulled inside the reachable range, so the narrative lands complete at the bottom.
+      storyAnchors = sectionAnchors.slice();
+      for (let index = storyAnchors.length - 1, limit = maxScroll; index >= 0; index--) {
+        storyAnchors[index] = Math.min(storyAnchors[index], limit);
+        limit = storyAnchors[index] - cosmicHeight * .25;
+      }
+      for (const block of choreoBlocks) { block.top = documentTop(block.element); block.bottom = block.top + block.element.offsetHeight; }
+      updateChoreo();
+      readingHalos = Array.from(document.querySelectorAll<HTMLElement>('.narrative-copy > h2,.narrative-copy > p,.narrative-app-copy,.presence-copy,.one-nexus-copy,.presence-grid,.inner-page h1,.inner-page h2,.inner-page p,.service-list,.legal-content,.legal-nav,.release-list,.security-summary,.footer-callout,.footer-links,.footer-bottom')).map(element=>{
         const rect=element.getBoundingClientRect();
         return {left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY};
       });
@@ -208,8 +287,22 @@ export function SiteMotionRuntime() {
       }
     };
 
-    let interactivePoints: {x:number;y:number}[] = [];
+    const pointX = new Float32Array(particleCount), pointY = new Float32Array(particleCount), pointVisibility = new Float32Array(particleCount);
+    // Grains that can be grabbed this frame (0 while a bridge current or the sky rests).
+    let interactiveCount = 0;
+    const nearGrain = (x: number, y: number) => {
+      for (let index = 0; index < interactiveCount; index++) if (pointVisibility[index] > .1 && Math.hypot(pointX[index] - x, pointY[index] - y) < 24) return true;
+      return false;
+    };
     const breathPoint = { x: 0, y: 0, z: 0 };
+    const streamPosition = { x: 0, y: 0 };
+    const horizonPosition = { x: 0, y: 0, z: 0, reach: 0 };
+    const flightPosition = { x: 0, y: 0 };
+    const MAX_HALOS = 64;
+    const halos = new Float32Array(MAX_HALOS * 4), haloBounds = new Float32Array(MAX_HALOS * 4);
+    let haloCount = 0;
+    const LINE_LEVELS = 6;
+    const linePaths: number[][] = Array.from({ length: LINE_LEVELS }, () => []);
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const paintStart = performance.now();
@@ -219,7 +312,7 @@ export function SiteMotionRuntime() {
       strainedSeconds = paintMs > 9 || delta > .035 ? strainedSeconds + delta : Math.max(0, strainedSeconds - delta);
       healthySeconds = paintMs < 5 && delta < .022 ? healthySeconds + delta : 0;
       if (strainedSeconds > 2) { activeParticles = Math.max(300, activeParticles - 60); strainedSeconds = 0; }
-      if (healthySeconds > 8) { activeParticles = Math.min(particleCount, activeParticles + 30); healthySeconds = 0; }
+      if (healthySeconds > 8) { activeParticles = Math.min(fieldCap, activeParticles + 30); healthySeconds = 0; }
       const dragging = inspection.id !== -1 && !reduced;
       const omega = dragging ? 14 : 1.8;
       const decay = Math.exp(-omega * delta);
@@ -234,15 +327,16 @@ export function SiteMotionRuntime() {
       if (!reduced) ambientTime += delta * .8;
       const time = reduced ? 0 : ambientTime;
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
-      const scroll = Number(root.style.getPropertyValue("--nxs-scroll")) || 0;
+      const scroll = scrollProgress;
       const viewportAnchor = window.scrollY;
-      let currentSection = Math.max(0, sectionAnchors.findLastIndex(top => top <= viewportAnchor));
+      let currentSection = Math.max(0, storyAnchors.findLastIndex(top => top <= viewportAnchor));
       currentSection = Math.min(currentSection, Math.max(0, sections.length - 1));
-      const sectionStart = sectionAnchors[currentSection] || 0;
-      const sectionEnd = sectionAnchors[currentSection + 1] || sectionStart + cosmicHeight;
+      const sectionStart = storyAnchors[currentSection] || 0;
+      const sectionEnd = storyAnchors[currentSection + 1] || sectionStart + cosmicHeight;
       const fraction = (viewportAnchor - sectionStart) / Math.max(1, sectionEnd - sectionStart);
       const hold = sections[currentSection]?.classList.contains('astral-interlude') ? .65 : .35;
       const destination = currentSection + Math.min(1, Math.max(0, (fraction - hold) / (1 - hold)));
+      const footerIndex = sections.findIndex(section => section.tagName === 'FOOTER');
       // A fast fling must not leave old chapter geometry chasing new copy.
       // Keep slow local inertia, but converge faster when several scenes were crossed.
       const sceneDistance = destination - sceneProgress;
@@ -287,13 +381,16 @@ export function SiteMotionRuntime() {
         const section = sections[shape];
         const form = section?.dataset.cosmicForm;
         const ambient = quietPage || !form || form === 'ambient';
-        if (ambient) return { form, ambient, centerX: cosmicWidth / 2, centerY: cosmicHeight / 2, unit: 0, cosYaw: 1, sinYaw: 0, cosPitch: 1, sinPitch: 0, breath: 0 };
+        if (ambient || form === 'stream') return { shape, form, ambient, centerX: cosmicWidth / 2, centerY: cosmicHeight / 2, unit: 0, cosYaw: 1, sinYaw: 0, cosPitch: 1, sinPitch: 0, breath: 0 };
         const isHero = shape === 0 && heroCore !== null;
         const centerX = isHero ? (heroLive ? heroLive.x : heroCore!.x) : cosmicWidth * responsiveLane(shape);
         const mobileReading = cosmicWidth < 801 && section!.matches('.narrative-copy,.app-card,.presence-system,.one-nexus');
         // On phones the artwork occupies real space after the copy, rather
         // than being clipped offscreen or projected behind readable text.
-        const centerY = isHero ? (heroLive ? heroLive.y : heroCore!.y - window.scrollY) : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
+        // The closing galaxy floats in the open sky above the footer copy.
+        const centerY = isHero ? (heroLive ? heroLive.y : heroCore!.y - window.scrollY)
+          : form === 'horizon' ? Math.min(cosmicHeight * .46, Math.max(cosmicHeight * .26, ((sectionAnchors[shape] || 0) - window.scrollY) * .5))
+          : mobileReading ? mobileArtAnchors[shape] - window.scrollY : cosmicHeight * .5;
         let unit = isHero ? heroCore!.size : Math.min(cosmicWidth, cosmicHeight) * (cosmicWidth < 801 ? .9 : laneFor(shape) === .5 ? .95 : .66);
         // Fit the projected artwork, not only its DOM anchor, inside safe edges.
         const horizontalSpace = Math.max(1, Math.min(centerX - 24, cosmicWidth - 24 - centerX));
@@ -307,7 +404,7 @@ export function SiteMotionRuntime() {
         // on a collapse. The breath fades in only after the opening entrance has landed.
         const breath = CORE_FORMS.has(form) ? breathAmount : 0;
         if (breath) unit *= 1 + (coreZoom(time) - 1) * breath;
-        return { form, ambient, centerX, centerY, unit, cosYaw: Math.cos(yaw), sinYaw: Math.sin(yaw), cosPitch: Math.cos(pitch), sinPitch: Math.sin(pitch), breath };
+        return { shape, form, ambient, centerX, centerY, unit, cosYaw: Math.cos(yaw), sinYaw: Math.sin(yaw), cosPitch: Math.cos(pitch), sinPitch: Math.sin(pitch), breath };
       };
       type ShapeFrame = ReturnType<typeof frameFor>;
       const frameA = frameFor(topologyIndex);
@@ -315,9 +412,14 @@ export function SiteMotionRuntime() {
       const minDimension = Math.min(cosmicWidth, cosmicHeight);
       const flightCenterX = (frameA.centerX + frameB.centerX) / 2;
       const flightCenterY = (frameA.centerY + frameB.centerY) / 2;
-      const topologyPoint = (particle: CosmicParticle, index: number, frame: ShapeFrame): { x: number; y: number; scatter?: number } => {
+      const topologyPoint = (particle: CosmicParticle, index: number, frame: ShapeFrame): { x: number; y: number; scatter?: number; veil?: number } => {
         if (frame.ambient) return { x: particle.x * cosmicWidth, y: particle.y * cosmicHeight };
         const { form, centerX, centerY, unit, cosYaw, sinYaw, cosPitch, sinPitch } = frame;
+        // Bridge chapters: a soft current of stars behind screens and copy, never an empty sky.
+        if (form === 'stream') {
+          streamPoint(streamPosition, index, particle.phase, particle.depth, time, cosmicWidth, cosmicHeight, frame.shape * 1.7);
+          return { x: streamPosition.x, y: streamPosition.y, veil: 1 };
+        }
         const project = (x: number, y: number, z: number) => {
           const rx = x * cosYaw + z * sinYaw;
           const rz = -x * sinYaw + z * cosYaw;
@@ -363,6 +465,10 @@ export function SiteMotionRuntime() {
           const radius = .025 + reach * .42 + Math.sin(particle.phase + time * .12) * width;
           return breathe(Math.cos(turn)*radius, Math.sin(turn)*radius, Math.sin(turn*2)*reach*.12 + Math.cos(particle.phase)*width*2, reach);
         }
+        if (form === 'horizon') {
+          horizonPoint(horizonPosition, index, particle.phase, particle.depth, time);
+          return breathe(horizonPosition.x, horizonPosition.y, horizonPosition.z, horizonPosition.reach);
+        }
         if (form === 'neural') {
           const along = ((index + 1) * .61803398875) % 1;
           const x = (along - .5) * .92;
@@ -375,37 +481,59 @@ export function SiteMotionRuntime() {
       };
       cosmicContext.clearRect(0, 0, cosmicWidth, cosmicHeight);
       cosmicContext.globalCompositeOperation = "lighter";
-      const visibleHalos=readingHalos.filter(rect=>rect.bottom-window.scrollY>-80&&rect.top-window.scrollY<cosmicHeight+80);
+      // Reading halos in viewport coordinates, converted once per frame (not per grain).
+      haloCount = 0;
+      const pushHalo = (rect: { left: number; right: number; top: number; bottom: number }) => {
+        const top = rect.top - window.scrollY, bottom = rect.bottom - window.scrollY;
+        if (bottom < -80 || top > cosmicHeight + 80) return;
+        const base = haloCount * 4;
+        halos[base] = rect.left - 80; halos[base + 1] = rect.right + 80; halos[base + 2] = top - 80; halos[base + 3] = bottom + 80;
+        haloBounds[base] = rect.left; haloBounds[base + 1] = rect.right; haloBounds[base + 2] = top; haloBounds[base + 3] = bottom;
+        haloCount++;
+      };
+      for (const rect of readingHalos) if (haloCount < MAX_HALOS) pushHalo(rect);
       // Sticky hero words, sampled by readHeroLayout (not every frame).
-      visibleHalos.push(...heroHalos);
+      for (const rect of heroHalos) if (haloCount < MAX_HALOS) pushHalo(rect);
       const readingOpacity = (x: number, y: number) => {
         let fade = 0;
-        for (const rect of visibleHalos) {
-          const dx = Math.max(rect.left-x,0,x-rect.right);
-          const dy = Math.max(rect.top-window.scrollY-y,0,y-(rect.bottom-window.scrollY));
-          const weight = Math.max(0,1-Math.hypot(dx,dy)/80);
-          fade = Math.max(fade,weight*weight*(3-2*weight));
+        for (let h = 0; h < haloCount * 4; h += 4) {
+          // Cheap reject first: most grains are nowhere near a line of text.
+          if (x < halos[h] || x > halos[h + 1] || y < halos[h + 2] || y > halos[h + 3]) continue;
+          const dx = Math.max(haloBounds[h] - x, 0, x - haloBounds[h + 1]);
+          const dy = Math.max(haloBounds[h + 2] - y, 0, y - haloBounds[h + 3]);
+          const weight = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / 80);
+          fade = Math.max(fade, weight * weight * (3 - 2 * weight));
         }
-        return 1-.94*fade;
+        return 1 - .94 * fade;
       };
-      cosmicContext.globalAlpha = skyFade * skyFade * (3 - 2 * skyFade);
-      for (const [index, star] of backgroundStars.entries()) {
+      const skyAlpha = skyFade * skyFade * (3 - 2 * skyFade);
+      cosmicContext.fillStyle = `rgb(${DOT_STAR})`;
+      for (let index = 0; index < backgroundStars.length; index++) {
         // These grains are rendered below and travel into the current form.
         if (!quietPage && index % 4 === 0) continue;
+        const star = backgroundStars[index];
         const x = star.x * cosmicWidth + Math.sin(time * .09 + star.phase) * 5;
         const y = ((star.y * cosmicHeight - window.scrollY * (.012 + star.depth * .025)) % cosmicHeight + cosmicHeight) % cosmicHeight;
         const twinkle = .8 + Math.sin(time * .45 + star.phase) * .2;
-        cosmicContext.fillStyle = `rgba(185,225,236,${(.16 + star.depth * .42) * twinkle * readingOpacity(x,y) * (quietPage ? .3 : 1)})`;
-        cosmicContext.beginPath();
-        cosmicContext.arc(x, y, .4 + star.depth ** 4 * 1.1, 0, Math.PI * 2);
-        cosmicContext.fill();
+        const alpha = skyAlpha * (.16 + star.depth * .42) * twinkle * readingOpacity(x,y) * (quietPage ? .3 : 1);
+        if (alpha < .004) continue;
+        cosmicContext.globalAlpha = alpha;
+        const radius = .4 + star.depth ** 4 * 1.1;
+        // Sub-pixel stars are indistinguishable from squares; larger ones use the round sprite.
+        if (radius < .8) cosmicContext.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        else cosmicContext.drawImage(dotStar, x - radius, y - radius, radius * 2, radius * 2);
       }
+      cosmicContext.globalAlpha = skyAlpha;
       let maxDrift = 0;
       let breathPeak = 0;
-      const footerIndex = sections.findIndex(section => section.tagName === 'FOOTER');
       const footerEntry = footerIndex < 0 ? 0 : Math.max(0, Math.min(1, (viewportAnchor - sectionAnchors[footerIndex] + cosmicHeight * .7) / (cosmicHeight * .7)));
-      const footerQuiet = 1 - .88 * footerEntry * footerEntry * (3 - 2 * footerEntry);
-      const points = particles.slice(0, activeParticles).map((particle, index) => {
+      // The home story ends on its closing galaxy, softened rather than switched off.
+      const footerQuiet = 1 - (quietPage ? .88 : .3) * footerEntry * footerEntry * (3 - 2 * footerEntry);
+      // Alternate the vortex direction chapter by chapter; flight is 0 where it flips.
+      const vortexDirection = topologyIndex % 2 ? -1 : 1;
+      // Grain positions go into reused typed arrays: no per-grain objects every frame.
+      const pointCount = activeParticles;
+      const computePoint = (particle: CosmicParticle, index: number) => {
         const sourceStar = !quietPage && index < backgroundStars.length && index % 4 === 0 ? backgroundStars[index] : undefined;
         const baseX = particle.x * cosmicWidth + (sourceStar ? Math.sin(time * .09 + sourceStar.phase) * 5 : 0);
         // Never wrap a grain across the viewport while a form is dissolving.
@@ -431,9 +559,14 @@ export function SiteMotionRuntime() {
         const lift = minDimension * (.14 + particle.depth * .2) * Math.min(1, span / (minDimension * .3));
         const controlX = midX + swirlX * lift, controlY = midY + swirlY * lift;
         const rest = 1 - mix;
-        const targetX = rest * rest * first.x + 2 * rest * mix * controlX + mix * mix * second.x;
-        const targetY = rest * rest * first.y + 2 * rest * mix * controlY + mix * mix * second.y;
         const flight = 4 * mix * rest * Math.min(1, span / (minDimension * .2));
+        // Mid-flight the whole cloud turns as one galaxy around the flight centre, with
+        // depth parallax: a spectacular hand-over that still lands exactly on each form.
+        vortexFlight(flightPosition, rest * rest * first.x + 2 * rest * mix * controlX + mix * mix * second.x,
+          rest * rest * first.y + 2 * rest * mix * controlY + mix * mix * second.y, flightCenterX, flightCenterY, flight, particle.depth, vortexDirection);
+        const targetX = flightPosition.x, targetY = flightPosition.y;
+        // Bridge currents glow softer than the chapter artworks.
+        const veil = (first.veil ?? 0) * rest + (second.veil ?? 0) * mix;
         // Loose grains of a breathing core glow a little softer than the composed form.
         const scatter = (first.scatter ?? 0) * rest + (second.scatter ?? 0) * mix;
         breathPeak = Math.max(breathPeak, scatter);
@@ -484,47 +617,58 @@ export function SiteMotionRuntime() {
         const edge = Math.max(0, Math.min(1, Math.min(px, py, cosmicWidth - px, cosmicHeight - py) / 48));
         // Attenuate the grains themselves, not a black panel over the scene.
         // This also keeps copy clear while CSS reveal creates a backdrop root.
-        let readingFade=0;
-        for(const rect of visibleHalos){
-          const dx=Math.max(rect.left-px,0,px-rect.right);
-          const dy=Math.max(rect.top-window.scrollY-py,0,py-(rect.bottom-window.scrollY));
-          const weight=Math.max(0,1-Math.hypot(dx,dy)/80);
-          readingFade=Math.max(readingFade,weight*weight*(3-2*weight));
+        const visibility = edge * edge * (3 - 2 * edge) * readingOpacity(px, py) * footerQuiet * (1 - .2 * flight) * (1 - .26 * scatter) * (1 - .42 * veil) * (quietPage ? .12 : 1);
+        pointX[index] = px; pointY[index] = py; pointVisibility[index] = visibility;
+      };
+      for (let index = 0; index < pointCount; index++) computePoint(particles[index], index);
+      const restingForm = sections[Math.round(sceneProgress)]?.dataset.cosmicForm;
+      interactiveCount = entranceTime < 1 || restingForm === 'ambient' || restingForm === 'stream' ? 0 : pointCount;
+      // Faint constellation threads, grouped into a few opacity levels: six strokes
+      // per frame instead of one stroke (and one colour string) per thread.
+      for (const path of linePaths) path.length = 0;
+      for (let index = 0; index < pointCount; index += 3) {
+        const visibility = pointVisibility[index];
+        if (visibility < .02) continue;
+        const x = pointX[index], y = pointY[index];
+        let nearest = -1;
+        let nearestSquared = 128 * 128;
+        for (let peer = index + 1; peer < Math.min(pointCount, index + 12); peer += 1) {
+          const dx = x - pointX[peer], dy = y - pointY[peer], squared = dx * dx + dy * dy;
+          if (squared < nearestSquared) { nearest = peer; nearestSquared = squared; }
         }
-
-        const visibility = edge * edge * (3 - 2 * edge) * (1-.94*readingFade) * footerQuiet * (1 - .32 * flight) * (1 - .26 * scatter) * (quietPage ? .12 : 1);
-        return { x: px, y: py, depth: particle.depth, visibility };
-      });
-      interactivePoints = entranceTime < 1 || sections[Math.round(sceneProgress)]?.dataset.cosmicForm === 'ambient' ? [] : points.filter(point=>point.visibility>.1);
+        if (nearest < 0) continue;
+        const strength = visibility * pointVisibility[nearest] * (1 - Math.sqrt(nearestSquared) / 128);
+        if (strength < .04) continue;
+        linePaths[Math.min(LINE_LEVELS - 1, Math.floor(strength * LINE_LEVELS))].push(x, y, pointX[nearest], pointY[nearest]);
+      }
       cosmicContext.lineWidth = .55;
-      for (let index = 0; index < points.length; index += 3) {
-        const point = points[index];
-        let nearest: (typeof points)[number] | undefined;
-        let nearestDistance = 128;
-        for (let peerIndex = index + 1; peerIndex < Math.min(points.length, index + 12); peerIndex += 1) {
-          const peer = points[peerIndex];
-          const distance = Math.hypot(point.x - peer.x, point.y - peer.y);
-          if (distance < nearestDistance) { nearest = peer; nearestDistance = distance; }
-        }
-        if (!nearest) continue;
+      cosmicContext.strokeStyle = 'rgb(86,232,234)';
+      for (let level = 0; level < LINE_LEVELS; level++) {
+        const path = linePaths[level];
+        if (!path.length) continue;
+        cosmicContext.globalAlpha = skyAlpha * .025 * (level + .5) / LINE_LEVELS;
         cosmicContext.beginPath();
-        cosmicContext.strokeStyle = `rgba(86, 232, 234, ${.025 * point.visibility * nearest.visibility * (1 - nearestDistance / 128)})`;
-        cosmicContext.moveTo(point.x, point.y);
-        cosmicContext.lineTo(nearest.x, nearest.y);
+        for (let i = 0; i < path.length; i += 4) { cosmicContext.moveTo(path[i], path[i + 1]); cosmicContext.lineTo(path[i + 2], path[i + 3]); }
         cosmicContext.stroke();
       }
-      for (const point of points) {
-        if (point.depth > .985) {
-          const glowSize = 8 + point.depth ** 12 * 10;
-          cosmicContext.save();
-          cosmicContext.globalAlpha *= point.visibility;
-          cosmicContext.drawImage(glow,point.x-glowSize/2,point.y-glowSize/2,glowSize,glowSize);
-          cosmicContext.restore();
+      // Grains: sub-pixel ones as tiny squares under one fill colour, the bright larger
+      // ones as a pre-rendered round sprite; opacity rides on globalAlpha.
+      cosmicContext.fillStyle = `rgb(${DOT_CYAN})`;
+      for (let index = 0; index < pointCount; index++) {
+        const depth = particles[index].depth, visibility = pointVisibility[index];
+        const alpha = skyAlpha * (.4 + depth * .6) * visibility;
+        if (alpha < .004) continue;
+        const x = pointX[index], y = pointY[index];
+        if (depth > .985) {
+          const glowSize = 8 + depth ** 12 * 10;
+          cosmicContext.globalAlpha = skyAlpha * visibility;
+          cosmicContext.drawImage(glow, x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
         }
-        cosmicContext.beginPath();
-        cosmicContext.fillStyle = `rgba(${point.depth > .8 ? '225,249,255' : '125,245,250'}, ${(.4 + point.depth * .6) * point.visibility})`;
-        cosmicContext.arc(point.x, point.y, .45 + point.depth ** 8 * 1.65, 0, Math.PI * 2);
-        cosmicContext.fill();
+        const radius = .45 + depth ** 8 * 1.65;
+        cosmicContext.globalAlpha = alpha;
+        if (depth > .8) cosmicContext.drawImage(dotBright, x - radius, y - radius, radius * 2, radius * 2);
+        else if (radius < .8) cosmicContext.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        else cosmicContext.drawImage(dotCyan, x - radius, y - radius, radius * 2, radius * 2);
       }
       cosmicContext.globalCompositeOperation = "source-over";
       cosmicContext.globalAlpha = 1;
@@ -575,6 +719,8 @@ export function SiteMotionRuntime() {
     syncVisibility();
     document.addEventListener("visibilitychange", syncVisibility);
     reducedMotion.addEventListener("change", syncVisibility);
+    const syncChoreo = () => updateChoreo();
+    reducedMotion.addEventListener("change", syncChoreo);
 
     const ambientObserver = typeof IntersectionObserver === "function" && !reducedMotion.matches && tier !== "lite"
       ? new IntersectionObserver((entries) => {
@@ -625,19 +771,25 @@ export function SiteMotionRuntime() {
       revealFrame = requestAnimationFrame(() => initiallyVisible.forEach(showTarget));
     }
 
-    const hero = document.querySelector<HTMLElement>(".astral-hero");
+    const heroTitle = document.querySelector<HTMLElement>(".astral-hero .hero-product-name");
+    let heroTitleOpacity = "";
     const updateScroll = () => {
       scrollFrame = 0;
-      const available = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      root.style.setProperty("--nxs-scroll", String(Math.min(1, Math.max(0, window.scrollY / available))));
+      // Cached range (refreshed by layout observation): no forced layout per scroll frame.
+      scrollProgress = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+      // Measured: rewriting a custom property on the root every frame restyled the whole
+      // document (~1 s of style work per 4.5 s fling on a 4x-throttled phone). The field
+      // reads the JS value; the public --nxs-scroll is published once scrolling rests.
+      clearTimeout(scrollPublish);
+      scrollPublish = window.setTimeout(() => root.style.setProperty("--nxs-scroll", scrollProgress.toFixed(4)), 140);
       // The wordmark dissolves with scroll.
       // Keep the particles alive; only the opening labels dissolve.
-      if (hero) {
+      if (heroTitle) {
         const progress = Math.min(1, Math.max(0, (window.scrollY / Math.max(1, window.innerHeight) - .08) / .42));
-        const opacity = 1 - progress * progress * (3 - 2 * progress);
-        hero.style.setProperty("--hero-label-opacity", String(opacity));
-
+        const opacity = (1 - progress * progress * (3 - 2 * progress)).toFixed(3);
+        if (opacity !== heroTitleOpacity) { heroTitleOpacity = opacity; heroTitle.style.opacity = opacity === "1.000" ? "" : opacity; }
       }
+      updateChoreo();
       if (reducedMotion.matches && !document.hidden) drawCosmicField(performance.now());
     };
     const onScroll = () => {
@@ -664,7 +816,7 @@ export function SiteMotionRuntime() {
     const startDrag = (event: PointerEvent) => {
       if (event.button !== 0 || reducedMotion.matches || !(event.target instanceof Element)) return;
       if (event.target.closest('a,button,input,textarea,select,[contenteditable],h1,h2,p,li')) return;
-      if (!interactivePoints.some(point => Math.hypot(point.x-event.clientX,point.y-event.clientY)<24)) return;
+      if (!nearGrain(event.clientX, event.clientY)) return;
       if (event.pointerType === 'touch') return;
       root.classList.add('nxs-field-dragging');
       inspection.id = event.pointerId;
@@ -693,6 +845,7 @@ export function SiteMotionRuntime() {
       layoutObserver.disconnect();
       ambientObserver?.disconnect();
       cancelAnimationFrame(scrollFrame);
+      clearTimeout(scrollPublish);
       cancelAnimationFrame(revealFrame);
       cancelAnimationFrame(cosmicFrame);
       window.removeEventListener("scroll", onScroll);
@@ -704,6 +857,9 @@ export function SiteMotionRuntime() {
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
       document.removeEventListener("visibilitychange", syncVisibility);
       reducedMotion.removeEventListener("change", syncVisibility);
+      reducedMotion.removeEventListener("change", syncChoreo);
+      for (const { targets } of choreoBlocks) for (const { target } of targets) { target.style.opacity = ""; target.style.transform = ""; target.style.filter = ""; }
+      if (heroTitle) heroTitle.style.opacity = "";
       root.removeAttribute("data-motion-paused");
       root.classList.remove("nxs-motion-ready", "nxs-motion-preparing", ...MOTION_TIER_CLASSES);
       delete root.dataset.motionTier;
