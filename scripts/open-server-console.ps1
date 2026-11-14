@@ -45,7 +45,8 @@ function Wait-ConsoleWindow([int]$TimeoutMs) {
 }
 
 # Le variabili del task portatile servono al server e al bridge, non alla console.
-foreach ($name in @('NEXUS_DESKTOP_BRIDGE_ONLY', 'NEXUS_WINDOWS_NONINTERACTIVE')) {
+# NO_COLOR ereditato da strumenti o shell di automazione non vale per la finestra dedicata (resta -NoColor).
+foreach ($name in @('NEXUS_DESKTOP_BRIDGE_ONLY', 'NEXUS_WINDOWS_NONINTERACTIVE', 'NO_COLOR')) {
   Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue
 }
 
@@ -64,12 +65,12 @@ if ([Threading.Mutex]::TryOpenExisting('Local\NexusNXS.ServerConsole', [ref]$exi
 }
 
 $quote = { param($value) if ($value -match '\s') { '"{0}"' -f $value } else { $value } }
-$arguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $console)
+$arguments = @('-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $console, '-Color')
 $style = if ($Normal) { 'Normal' } else { 'Minimized' }
 $terminal = Get-Command wt.exe -ErrorAction SilentlyContinue
 if ($terminal) {
   # Finestra nuova e dedicata, con titolo fisso e dimensione adatta alle due colonne.
-  $wtArguments = @('-w', 'new', '--size', '132,44', 'new-tab', '--title', $title, '--suppressApplicationTitle', $pwsh) + $arguments
+  $wtArguments = @('-w', 'new', '--size', '132,44', 'new-tab', '--title', $title, '--suppressApplicationTitle', '--tabColor', '#0E111A', $pwsh) + $arguments
   Start-Process -FilePath $terminal.Source -ArgumentList ($wtArguments | ForEach-Object { & $quote $_ }) -WindowStyle $style
 } else {
   Start-Process -FilePath $pwsh -ArgumentList ($arguments | ForEach-Object { & $quote $_ }) -WindowStyle $style

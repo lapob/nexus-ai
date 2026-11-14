@@ -43,6 +43,16 @@ test('la console si apre all accesso, una sola istanza, e si rimuove con il serv
   assert.match(manager, /open-server-console\.ps1|\$opener[\s\S]*?-Normal' -f \$pwshPath, \$opener/);
 });
 
+test('grafica: frazioni senza arrotondamenti interi, quadro fermo e sincronizzato', () => {
+  // [Math]::Max(0, 0.55) in PowerShell sceglie Max(int, int): barre sempre piene e sfumature a due toni.
+  assert.doesNotMatch(consoleScript, /\[Math\]::(Max|Min)\((0|1), (\$Amount|\$Fraction|\$percent|\[double\]|\[Math\])/);
+  assert.match(consoleScript, /\[Math\]::Min\(1\.0, \[Math\]::Max\(0\.0, \$Fraction\)\)/);
+  assert.match(consoleScript, /`e\[\?2026h/, 'aggiornamento sincronizzato del terminale');
+  assert.doesNotMatch(consoleScript, /Format-Rule/, 'nessun riflesso che scorre sul pannello');
+  assert.match(consoleScript, /Schedule\.Service/, 'stato dei task via COM, non con i cmdlet lenti');
+  assert.match(opener, /'-Color'/);
+});
+
 test('arresto voluto: il gestore lo segna, il watchdog lo rispetta fino al riavvio del PC', () => {
   assert.match(manager, /server-stopped\.flag/);
   assert.match(manager, /if \(\$Action -eq 'stop'\) \{[\s\S]*?WriteAllText\(\$ownerStopFlag/);

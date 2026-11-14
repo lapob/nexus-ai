@@ -2922,6 +2922,25 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   at 11:11 a start from the Console; ready again at 11:15 (`readyz` 32145/32147). The source of the 11:08 stop
   has been asked of the Control session (rescue gateway work in progress).
 
+## Server Console: grafica corretta, quadro fermo, consumi minimi (14 novembre 2026)
+
+- Bug grafico corretto: `[Math]::Max(0, 0.55)` in PowerShell sceglie l'overload intero e arrotonda, quindi
+  barre sempre piene, sfumature a due soli toni, indicatore che lampeggiava invece di respirare e CPU del server
+  arrotondata a 0. Ora i limiti usano `0.0`/`1.0`; un test di regressione lo verifica.
+- Niente ridisegni continui: nessun riflesso che scorre sul pannello di stato. Il quadro completo si ricostruisce
+  solo quando cambiano dati, dimensioni o avviso; ogni secondo cambiano solo orologio e indicatore. Le righe
+  vengono scritte solo se diverse, dentro un aggiornamento sincronizzato (`ESC[?2026h/l`), quindi senza sfarfallio.
+- Dati più leggeri: stato dei task via COM `Schedule.Service` (~15 ms invece di ~700 ms con i cmdlet), disco via
+  `DriveInfo`, controlli lenti ogni 30 s (60 s da ridotta a icona).
+- La finestra dedicata è sempre a colori (`-Color` passato dall'opener; `NO_COLOR` ereditato da shell di
+  automazione o da Windows Terminal non la spegne più). `-NoColor` resta per i test.
+- Misure reali: 5,9-6% di un core aperta, 1,5% ridotta a icona (prima 5-12%). Screenshot verificato: barre
+  proporzionali, chip di stato con sfondo, colori corretti.
+- Verifiche: `node --test tests/server-console.test.js tests/server-watchdog.test.js
+  tests/headless-server-startup.test.js`: 24/24.
+- Alle 15:39 il watchdog ha fatto un riavvio coordinato dopo 3 controlli falliti (server non pronto dalle 15:35).
+  Era dentro la policy (1/2 l'ora) e il server è tornato pronto alle 15:41. La causa del blocco va analizzata a
+  parte.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
