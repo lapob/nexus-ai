@@ -113,10 +113,20 @@ class DeviceNotificationHub {
     const timer = this.pending.get(ref);
     if (timer !== undefined) { this.clearTimer(timer); this.pending.delete(ref); }
     let changed = timer !== undefined;
+    let withdrawn = false;
     for (const entry of this.events) {
-      if (entry.reference === ref && !entry.resolved) { entry.resolved = true; changed = true; }
+      if (entry.reference === ref && !entry.resolved) { entry.resolved = true; changed = true; withdrawn = true; }
     }
+    // Un evento già consegnato è stato ritirato: le attese si chiudono subito
+    // così il telefono legge `consentActive` e toglie la notifica superata.
+    if (withdrawn) for (const waiter of [...this.waiters]) waiter.done();
     return changed;
+  }
+
+  /** Vero se resta almeno un consenso notificato, non deciso e non scaduto. */
+  consentActive() {
+    const now = this.now();
+    return this.events.some((entry) => entry.kind === 'consent-required' && !entry.resolved && entry.expiresAt > now);
   }
 
   prune() {
@@ -136,7 +146,7 @@ class DeviceNotificationHub {
     // Dopo un riavvio il vecchio cursore non ha significato: si parte da zero.
     const from = baseline ? this.cursor : (sameInstance ? Math.min(parsed, this.cursor) : 0);
     const events = this.events.filter((entry) => entry.cursor > from).map(publicEvent);
-    return { instance: this.instance, cursor: this.cursor, events };
+    return { instance: this.instance, cursor: this.cursor, events, consentActive: this.consentActive() };
   }
 
   wait({ since, instance, timeoutMs = 0, signal } = {}) {

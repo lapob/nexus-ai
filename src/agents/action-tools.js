@@ -28,6 +28,11 @@ const ACTION_SCHEMAS = Object.freeze({
 
 const toolName = (action) => `pc-${action.replace(/_/g, '-')}`;
 const OUTPUT_LIMIT = 6_000;
+// Il timeout dello strumento comprende l'attesa del consenso. Con 30 s il
+// ticket scadeva prima che il proprietario, avvisato da NexusNXS Control dopo
+// la tolleranza di 20 s, potesse tornare al computer. Resta sotto la durata
+// del ticket (5 min) così l'annullamento è pulito e mai un'esecuzione tardiva.
+const ACTION_TOOL_TIMEOUT_MS = 280_000;
 
 // #endregion
 
@@ -112,7 +117,7 @@ function registerActionTools(registry, { actionRuntime, getApprovalMode = () => 
     registry.register({
       name: toolName(action),
       description: `${definition.label}: ${definition.description} Rischio ${definition.risk}; effetto ${definition.effect}, ripristino ${definition.rollback}.`,
-      audience: 'private', risk: definition.risk, timeoutMs: action.startsWith('run_') ? 180_000 : 30_000,
+      audience: 'private', risk: definition.risk, timeoutMs: ACTION_TOOL_TIMEOUT_MS,
       // Il consenso è gestito qui con l'anteprima reale del ticket, non dal
       // consenso generico del ciclo agentico: il dialogo mostra diff e percorsi.
       requiresConsent: false,
@@ -127,7 +132,7 @@ function registerActionTools(registry, { actionRuntime, getApprovalMode = () => 
       registry.register({
         name: id,
         description: `Integrazione ${integration.type.toUpperCase()} «${integration.id}», strumento «${name}». Effetti esterni senza ripristino automatico: richiede sempre il consenso.`,
-        audience: 'private', risk: 'critical', timeoutMs: 40_000, requiresConsent: false,
+        audience: 'private', risk: 'critical', timeoutMs: ACTION_TOOL_TIMEOUT_MS, requiresConsent: false,
         parameters: { type: 'object', required: ['input'], properties: { input: { type: 'object', additionalProperties: true, description: 'Argomenti dello strumento.' } } },
         invoke: ({ input }, { signal } = {}) => executeAction({ actionRuntime, action: 'run_integration', args: { connection: integration.id, tool: name, input }, getApprovalMode, requestApproval, signal, artifacts, receipts, readPaths })
       });
@@ -154,4 +159,4 @@ function createNativeActionApproval({ dialog, getWindow }) {
 
 // #endregion
 
-module.exports = { ACTION_SCHEMAS, approvalRequired, createNativeActionApproval, observation, registerActionTools, toolName };
+module.exports = { ACTION_SCHEMAS, ACTION_TOOL_TIMEOUT_MS, approvalRequired, createNativeActionApproval, observation, registerActionTools, toolName };

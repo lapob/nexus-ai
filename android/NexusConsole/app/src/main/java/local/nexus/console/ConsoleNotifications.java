@@ -92,6 +92,10 @@ final class ConsoleNotifications {
         context.getSystemService(NotificationManager.class).cancel(NOTIFICATION_RESPONSE);
     }
 
+    static void cancelConsent(Context context) {
+        context.getSystemService(NotificationManager.class).cancel(NOTIFICATION_CONSENT);
+    }
+
     static boolean isKnownLink(Uri data) {
         if (data == null) return false;
         String value = data.toString();
@@ -155,6 +159,10 @@ final class ConsoleNotifications {
                 }
             }
         }
+        // Consenso deciso, annullato o scaduto sul computer: la notifica non
+        // deve restare a indicare un'azione che non attende più nessuno.
+        // Server meno recenti non inviano il campo: in quel caso non si tocca nulla.
+        if (!consentShown && result.has("consentActive") && !result.optBoolean("consentActive", true)) cancelConsent(context);
         rememberCursor(context, instance, result.optLong("cursor", -1L));
         return shown;
     }

@@ -413,6 +413,82 @@ NOT delivered to the phone. The server side is fine.
   - The quota is used up by today's many long-poll sessions.
 - Settings restored at the end (agentMode=false, full-access) and the test
   references resolved.
+- Attempt 5 (23:24, with the job quota freed and the battery at 40%):
+  - The UI had closed again and was relaunched.
+  - The agent replied "Non è stato possibile creare il file a causa di un
+    errore nello strumento".
+  - No ticket in action-audit and no "Turno agentico" in the UI log, so no
+    proposal and nothing on the phone.
+  - Stopped to avoid taking window focus while the owner was using the PC.
+  - Settings restored again (agentMode=false, full-access); no test file
+    left behind.
+- Cause of attempt 5: the model was still unloaded ("Servizio AI preparato"
+  arrived a minute after the request). Without known tool capabilities the
+  app silently falls back to ordinary chat, which invented a tool error.
+
+REAL "consenso richiesto" VERIFIED — 13 November, 23:29–23:32:
+- Setup:
+  - qwen3:14b already loaded (Ollama on port 18032).
+  - Temporarily set agentMode=true and dangerous-only.
+  - Phone unlocked by the owner; Control opened and left just before.
+- 23:29:58: the agent request was sent. The agent called pc-write-file, so a
+  real ticket was created and the PC dialog opened. Nobody approved it.
+- 23:30:25: NOTIFICATION_INTERRUPTION on channel nexus_consent_required,
+  about 20 s after the proposal (the grace period).
+  - Heads-up: "Consenso richiesto · Un'azione di NexusNXS…".
+  - Proof: qa-artifacts/control-notifications-real-consent.png.
+- 23:30:35: TOOL_TIMEOUT (30 s) and the ticket was cancelled. No file was
+  written.
+- Settings restored (agentMode=false, full-access).
+
+Bug found: 90 s after the ticket was cancelled, the 3105 notification is
+still on the phone. The withdrawal does not reach the device (or Control does
+not cancel it) until the next tap. Fix it together with the timeout
+alignment in finding 2.
+
+FIX (13–14 November, NOT committed):
+- `src/remote/device-notification-hub.js`:
+  - list/wait responses carry `consentActive`.
+  - resolve() of a consent already delivered closes the waiting long-polls
+    at once.
+  - Resolving during the grace period wakes nobody.
+- Control `ConsoleNotifications.deliver`: when `consentActive=false`, it
+  cancels notification 3105. Older servers without the field: unchanged
+  behaviour.
+- `src/agents/action-tools.js`: ACTION_TOOL_TIMEOUT_MS = 280 s for pc-* and
+  MCP tools, instead of 30/40/180 s. This leaves time to decide after the
+  phone alert and stays under the 5-minute ticket TTL.
+- Tests:
+  - New: device-notification-hub (withdrawal wakes the long-poll) and
+    action-tools (timeout); focused set 23/23.
+  - Full suite: 1274/1280. The 4 failures are outside these files:
+    - 3 in voice-pack.test.js (commit 7a1dc7a);
+    - the window smoke test (another session's uncommitted edits).
+- APK 1.22.0 built and installed on the phone on 13 November at 23:36
+  (SHA256 EFBB3581…).
+- The Core was restarted by the PC reboot on 14 November at 10:33, so it
+  runs the new hub.
+- Live verification on 14 November, 10:43–10:52 (phone unlocked by the
+  owner):
+  - Real agent proposal at 10:43:23; consent active on the phone at
+    10:43:49.
+  - "Rifiuta" on the PC at 10:44:03; audit records cancelled, no file
+    written.
+  - Injected withdrawal through the real relay with a temporary log in
+    Control (`NexusNotifyDbg`, since removed):
+    - the long-poll returns events=0 with consentActive=false;
+    - Control cancels 3105;
+    - 0 active records afterwards (`dumpsys notification | grep
+      NotificationRecord.*local.nexus.console`).
+  - Caution: `grep 'id=3105'` also counts the notification history, so it
+    is not a valid check.
+- New gateway end-to-end test: an open long-poll closes with
+  consentActive=false; focused set 23/23.
+- Clean APK reinstalled; SHA256 identical to the 13 November build.
+- Settings restored (agentMode=false, full-access).
+- Known limit: the in-app consent dialog (`in-app-dialog.js`) does not close
+  when the tool times out. Approving later has no effect because the ticket
+  is already cancelled.
 
 Findings:
 1. With polling through JobService, Android can withhold the job for quota

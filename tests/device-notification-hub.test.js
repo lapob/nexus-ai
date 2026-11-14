@@ -128,6 +128,34 @@ test('il long-poll si sblocca alla pubblicazione, al timeout o all’annullament
   await capped;
 });
 
+test('un consenso già notificato e poi ritirato sblocca il long-poll con consentActive falso', async () => {
+  const clock = manualClock();
+  const notifications = hub(clock);
+  const base = notifications.list({});
+  assert.equal(base.consentActive, false);
+  notifications.publish('consent-required', { reference: 'proposal:5', expiresAt: clock.now() + 600_000 });
+  clock.advance(20_000);
+  const delivered = notifications.list({ since: base.cursor, instance: base.instance });
+  assert.equal(delivered.events.length, 1);
+  assert.equal(delivered.consentActive, true, 'il telefono sa che il consenso attende ancora');
+
+  const waiting = notifications.wait({ since: delivered.cursor, instance: delivered.instance, timeoutMs: 50_000 });
+  assert.equal(notifications.status().waiters, 1);
+  notifications.resolve('proposal:5');
+  const woke = await waiting;
+  assert.equal(woke.events.length, 0, 'nessun nuovo evento da mostrare');
+  assert.equal(woke.consentActive, false, 'ritirato: il telefono toglie la notifica');
+  assert.equal(notifications.status().waiters, 0, 'attesa chiusa subito, non al timeout');
+
+  // Ritirare un consenso ancora in tolleranza non risveglia nessuno.
+  const quiet = notifications.wait({ since: woke.cursor, instance: woke.instance, timeoutMs: 10_000 });
+  notifications.publish('consent-required', { reference: 'proposal:6', expiresAt: clock.now() + 600_000 });
+  notifications.resolve('proposal:6');
+  assert.equal(notifications.status().waiters, 1);
+  clock.advance(10_000);
+  assert.equal((await quiet).events.length, 0);
+});
+
 test('troppi ascoltatori ricevono un invito a ritentare più tardi', async () => {
   const clock = manualClock();
   const notifications = hub(clock, { maxWaiters: 1 });
@@ -289,6 +317,15 @@ test('gateway: long-poll autenticato, solo Console, e push sullo stream esistent
     assert.equal(pushed.notification.kind, 'response-ready');
     assert.equal(pushed.instance, base.instance);
     assert.ok(!frame.includes('privata'));
+
+    // Ritiro: il long-poll in corso si chiude con consentActive=false.
+    const current = gateway.deviceNotifications.list({});
+    assert.equal(current.consentActive, true);
+    const waitingWithdrawal = fetch(`${baseUrl}/api/notifications/events?since=${current.cursor}&instance=${current.instance}&wait=5000`, { headers });
+    setTimeout(() => gateway.deviceNotifications.resolve('proposal:segreto-azione'), 150);
+    const withdrawn = await (await waitingWithdrawal).json();
+    assert.equal(withdrawn.events.length, 0);
+    assert.equal(withdrawn.consentActive, false, 'il telefono riceve il ritiro');
 
     gateway.revokeDevice(consoleDevice.deviceId || gateway.state.devices.find((device) => device.scope === 'console').id);
     assert.equal((await fetch(`${baseUrl}/api/notifications/events`, { headers })).status, 401, 'revocato: nessun evento');

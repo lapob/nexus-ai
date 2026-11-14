@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { ActionRuntime } = require('../src/agents/action-runtime');
 const { TypedToolRegistry } = require('../src/agents/typed-tools');
-const { registerActionTools, approvalRequired, createNativeActionApproval } = require('../src/agents/action-tools');
+const { ACTION_TOOL_TIMEOUT_MS, registerActionTools, approvalRequired, createNativeActionApproval } = require('../src/agents/action-tools');
 const { AgentLoop } = require('../src/agents/agent-loop');
 const { AIRuntime } = require('../src/ai/ai-runtime');
 const { validateChatRequest } = require('../src/ai/ai-provider');
@@ -39,6 +39,15 @@ test('catalogo: ogni azione del motore diventa uno strumento pc-* tipizzato', (t
   assert.equal(names.some((name) => name.includes('integration')), false);
   const openApp = registry.get('pc-open-application');
   assert.ok(openApp.parameters.properties.application.enum.includes('notepad'));
+});
+
+test('il tempo per decidere supera la tolleranza della notifica e resta entro la durata del ticket', (t) => {
+  const { runtime } = workspace(t);
+  const { registry } = tools(runtime);
+  // Control avvisa dopo 20 s; con 30 s il consenso spariva prima di poter tornare al PC.
+  assert.ok(ACTION_TOOL_TIMEOUT_MS >= 120_000, 'almeno due minuti per decidere');
+  assert.ok(ACTION_TOOL_TIMEOUT_MS < 5 * 60_000, 'scade prima del ticket: annullamento pulito');
+  for (const name of ['pc-write-file', 'pc-trash-path', 'pc-run-command']) assert.equal(registry.get(name).timeoutMs, ACTION_TOOL_TIMEOUT_MS, name);
 });
 
 test('lettura a basso rischio: eseguita senza dialogo in modalità Automatico, con ricevuta', async (t) => {
