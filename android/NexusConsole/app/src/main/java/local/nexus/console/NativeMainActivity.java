@@ -1,5 +1,7 @@
 package local.nexus.console;
 
+import android.view.ViewGroup;
+import local.nexus.motion.NexusCoreBreath;
 import local.nexus.motion.NexusMotion;
 import local.nexus.motion.NexusSystemBars;
 
@@ -923,6 +925,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private void selectDashboardSection(String name) {
         boolean changed = !dashboardSection.equals(name);
+        java.util.List<String> order = new java.util.ArrayList<>(dashboardPanels.keySet());
+        int direction = Integer.compare(order.indexOf(name), order.indexOf(dashboardSection));
         if (changed) rememberDashboardPosition();
         dashboardSection = name;
         if (changed) {
@@ -945,7 +949,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             panel.setAlpha(1f);
             panel.setTranslationY(0f);
             panel.setVisibility(selected ? View.VISIBLE : View.GONE);
-            if (selected && changed) animateSectionEntry(panel);
+            if (selected && changed) animateSectionEntry(panel, direction);
             Button tab = dashboardTabs.get(key);
             tab.setSelected(selected);
             tab.setTextColor(selected ? BG : Color.rgb(176, 202, 203));
@@ -989,24 +993,40 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         });
     }
 
-    private void animateSectionEntry(View panel) {
+    /**
+     * Cambio sezione: il pannello entra dal lato della scheda scelta (destra se si
+     * avanza, sinistra se si torna indietro) e le sue schede arrivano a onda.
+     */
+    private void animateSectionEntry(View panel, int direction) {
         if (panel == null) return;
         int generation = ++sectionEntryGeneration;
         sectionEntryGenerations.put(panel, generation);
         panel.animate().cancel();
         panel.setAlpha(1f);
+        panel.setTranslationX(0f);
         panel.setTranslationY(0f);
-        if (!animationsEnabled()) return;
+        if (!animationsEnabled()) {
+            if (panel instanceof ViewGroup) waveChildren((ViewGroup) panel, 0, () -> true);
+            return;
+        }
         panel.setAlpha(0f);
         // Folder contents have a different height. Animate only after their new
         // bounds are laid out, never the stale bounds from the previous folder.
         panel.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
             @Override public boolean onPreDraw() {
                 panel.getViewTreeObserver().removeOnPreDrawListener(this);
-                if (destroyed || !Integer.valueOf(generation).equals(sectionEntryGenerations.get(panel)) || !panel.isShown()) return true;
-                panel.setTranslationY(dp(8));
-                panel.animate().alpha(1f).translationY(0f).setDuration(motionDuration(NexusMotion.ENTER))
-                    .setInterpolator(standardInterpolator()).start();
+                if (destroyed || !Integer.valueOf(generation).equals(sectionEntryGenerations.get(panel)) || !panel.isShown()) {
+                    panel.setAlpha(1f); panel.setTranslationX(0f);
+                    return true;
+                }
+                float travel = dp(lowMotionBudget ? NexusMotion.SECTION_TRAVEL_DP / 2 : NexusMotion.SECTION_TRAVEL_DP);
+                panel.setTranslationX(direction * travel);
+                if (panel instanceof ViewGroup) waveChildren((ViewGroup) panel, 0,
+                    () -> !destroyed && Integer.valueOf(generation).equals(sectionEntryGenerations.get(panel)));
+                panel.animate().alpha(1f).translationX(0f).setDuration(motionDuration(NexusMotion.SECTION_SWAP))
+                    .setInterpolator(emphasizedInterpolator())
+                    .withEndAction(() -> { panel.setAlpha(1f); panel.setTranslationX(0f); })
+                    .start();
                 return true;
             }
         });
@@ -2496,37 +2516,65 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
      * con animazioni ridotte; un nuovo swap riporta subito tutto allo stato finale.
      */
     private void cascadeChildren(LinearLayout parent, int generation) {
-        int count = Math.min(parent.getChildCount(), 9);
+        // Sul cruscotto l'unico figlio visibile e la sezione attiva: l'onda deve
+        // attraversare le sue schede, non il contenitore che le raccoglie.
+        ViewGroup target = parent;
+        int visible = 0;
+        View only = null;
+        for (int index = 0; index < parent.getChildCount(); index++) {
+            View child = parent.getChildAt(index);
+            if (child.getVisibility() == View.VISIBLE) { visible++; only = child; }
+        }
+        if (visible == 1 && only instanceof LinearLayout && ((LinearLayout) only).getChildCount() > 1) target = (LinearLayout) only;
+        waveChildren(target, NexusMotion.PRESS / 2, () -> generation == contentSwapGeneration);
+    }
+
+    /**
+     * Entrata a onda: ogni blocco sale, si posa (scala .965 -> 1) e si accende in
+     * sequenza con un passo che accelera. Con animazioni ridotte tutto e subito
+     * nello stato finale; una rete di sicurezza impedisce blocchi trasparenti.
+     */
+    private void waveChildren(ViewGroup parent, int leadMs, java.util.function.BooleanSupplier current) {
+        int count = Math.min(parent.getChildCount(), NexusMotion.WAVE_LIMIT);
+        boolean moving = animationsEnabled();
         float travel = dp(lowMotionBudget ? NexusMotion.CASCADE_TRAVEL_DP / 2 : NexusMotion.CASCADE_TRAVEL_DP);
-        for (int index = 0; index < count; index++) {
+        float scale = lowMotionBudget ? 1f - (1f - NexusMotion.WAVE_START_SCALE) / 2f : NexusMotion.WAVE_START_SCALE;
+        long step = motionDuration(NexusMotion.CASCADE_STEP) + (lowMotionBudget ? 0 : 18);
+        for (int index = 0; index < parent.getChildCount(); index++) {
             View child = parent.getChildAt(index);
             child.animate().cancel();
+            if (!moving || index >= count) {
+                child.setAlpha(1f); child.setTranslationY(0f); child.setScaleX(1f); child.setScaleY(1f);
+                continue;
+            }
             child.setAlpha(0f);
             child.setTranslationY(travel);
+            child.setScaleX(scale);
+            child.setScaleY(scale);
             child.animate()
                 .alpha(1f)
                 .translationY(0f)
-                .setStartDelay(motionDuration(NexusMotion.PRESS) / 2 + index * motionDuration(NexusMotion.CASCADE_STEP))
-                .setDuration(motionDuration(NexusMotion.CONTENT_SWAP + 60))
+                .scaleX(1f)
+                .scaleY(1f)
+                .setStartDelay(motionDuration(leadMs) + NexusMotion.waveDelay(index, step))
+                .setDuration(motionDuration(NexusMotion.WAVE_ENTER))
                 .setInterpolator(emphasizedInterpolator())
-                .withEndAction(() -> { child.setAlpha(1f); child.setTranslationY(0f); })
+                .withEndAction(() -> { child.setAlpha(1f); child.setTranslationY(0f); child.setScaleX(1f); child.setScaleY(1f); })
                 .start();
         }
-        for (int index = count; index < parent.getChildCount(); index++) {
-            View child = parent.getChildAt(index);
-            child.setAlpha(1f);
-            child.setTranslationY(0f);
-        }
+        if (!moving) return;
         // Rete di sicurezza: anche se un'animazione viene interrotta (vista
         // riutilizzata da un refresh), nessun blocco resta trasparente.
         View[] animated = new View[count];
         for (int index = 0; index < count; index++) animated[index] = parent.getChildAt(index);
         parent.postDelayed(() -> {
             for (View child : animated) {
-                if (child.getAlpha() < 1f && child.animate() != null && generation != contentSwapGeneration) child.animate().cancel();
-                if (generation != contentSwapGeneration || child.getAlpha() < 1f) { child.setAlpha(1f); child.setTranslationY(0f); }
+                if (!current.getAsBoolean() && child.getAlpha() < 1f) child.animate().cancel();
+                if (!current.getAsBoolean() || child.getAlpha() < 1f) {
+                    child.setAlpha(1f); child.setTranslationY(0f); child.setScaleX(1f); child.setScaleY(1f);
+                }
             }
-        }, 1_400L);
+        }, 1_600L);
     }
 
     private void setState(String value, boolean offline) {
@@ -2562,15 +2610,39 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         }).start();
     }
 
+    /**
+     * Respiro dell'indicatore di presenza allineato al nucleo web/desktop: stessa
+     * inspirazione di {@link NexusCoreBreath}, calcolata dal tempo reale (identica a
+     * 60/120 Hz). Si ferma da sola quando la vista esce o le animazioni si spengono.
+     */
     private void breathe(View view) {
+        view.animate().cancel();
+        Object previous = view.getTag(R.id.nexus_breath_animator);
+        if (previous instanceof ValueAnimator) ((ValueAnimator) previous).cancel();
         if (!animationsEnabled()) {
-            view.animate().cancel();
-            view.setAlpha(1f);
+            view.setAlpha(1f); view.setScaleX(1f); view.setScaleY(1f);
             return;
         }
-        view.animate().alpha(.38f).setDuration(motionDuration(NexusMotion.THINKING_PULSE)).setInterpolator(standardInterpolator()).withEndAction(() -> {
-            if (animationsEnabled() && view.isAttachedToWindow()) view.animate().alpha(1f).setDuration(motionDuration(NexusMotion.THINKING_PULSE)).setInterpolator(standardInterpolator()).withEndAction(() -> breathe(view)).start();
-        }).start();
+        long born = android.os.SystemClock.uptimeMillis();
+        ValueAnimator clock = ValueAnimator.ofFloat(0f, 1f);
+        clock.setDuration(NexusCoreBreath.CYCLE_MS);
+        clock.setRepeatCount(ValueAnimator.INFINITE);
+        clock.setInterpolator(new android.view.animation.LinearInterpolator());
+        clock.addUpdateListener(animation -> {
+            if (!animationsEnabled() || !view.isAttachedToWindow()) {
+                animation.cancel();
+                view.setAlpha(1f); view.setScaleX(1f); view.setScaleY(1f);
+                return;
+            }
+            float seconds = (android.os.SystemClock.uptimeMillis() - born) / 1000f;
+            float inhale = NexusCoreBreath.inhale(seconds);
+            float zoom = NexusCoreBreath.zoom(seconds);
+            view.setAlpha(.46f + .54f * inhale);
+            view.setScaleX(zoom * (.94f + .1f * inhale));
+            view.setScaleY(zoom * (.94f + .1f * inhale));
+        });
+        view.setTag(R.id.nexus_breath_animator, clock);
+        clock.start();
     }
 
     private boolean animationsEnabled() {
@@ -2915,13 +2987,37 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         private final Paint particle = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final float[] nodeX = new float[PARTICLE_CAPACITY];
         private final float[] nodeY = new float[PARTICLE_CAPACITY];
+        /** Grani del nucleo che respirano come su web/desktop (sfera di Fibonacci). */
+        private static final int GRAIN_CAPACITY = 96;
+        private final Paint grain = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint heart = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float[] grainX = new float[GRAIN_CAPACITY];
+        private final float[] grainY = new float[GRAIN_CAPACITY];
+        private final float[] grainZ = new float[GRAIN_CAPACITY];
+        private final float[] grainSeed = new float[GRAIN_CAPACITY];
+        private final float[] grainStagger = new float[GRAIN_CAPACITY];
+        private final float[] breathed = new float[3];
         private final RectF outerBounds = new RectF();
         private final RectF innerBounds = new RectF();
-        private float phase;
+        /** Origine temporale: rotazioni e respiro dipendono dal tempo, mai dal numero di frame. */
+        private final long born = android.os.SystemClock.uptimeMillis();
 
         ControlCoreView(boolean offline) {
             super(NativeMainActivity.this);
             this.offline = offline;
+            for (int index = 0; index < GRAIN_CAPACITY; index++) {
+                float y = 1f - 2f * (index + .5f) / GRAIN_CAPACITY;
+                float ring = (float) Math.sqrt(Math.max(0f, 1f - y * y));
+                double turn = index * 2.399963229728653;
+                grainX[index] = (float) Math.cos(turn) * ring;
+                grainY[index] = y;
+                grainZ[index] = (float) Math.sin(turn) * ring;
+                grainSeed[index] = ((index * 73) % 97) / 97f;
+                // Sfasamento a onda dal centro verso il bordo, come i grani del sito.
+                grainStagger[index] = .07f * (float) Math.hypot(grainX[index], grainY[index]) + .025f * grainSeed[index];
+            }
+            grain.setColor(offline ? Color.rgb(92, 108, 109) : Color.rgb(150, 246, 244));
+            heart.setColor(offline ? Color.argb(26, 92, 106, 107) : Color.argb(40, 75, 231, 233));
             int color = offline ? Color.rgb(78, 94, 95) : ACCENT;
             stroke.setColor(color);
             stroke.setStyle(Paint.Style.STROKE);
@@ -2935,8 +3031,30 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
+            boolean moving = !offline && animationsEnabled() && isAttachedToWindow();
+            // Tempo reale: a 120 Hz il nucleo non gira piu veloce che a 60 Hz.
+            // Con animazioni ridotte resta la forma composta, ferma e leggibile.
+            float seconds = moving ? (android.os.SystemClock.uptimeMillis() - born) / 1000f : 0f;
+            float phase = seconds * 75f % 360f;
+            float zoom = moving ? NexusCoreBreath.zoom(seconds) : 1f;
             float cx = getWidth() / 2f, cy = getHeight() / 2f;
-            float radius = Math.min(getWidth(), getHeight()) * .29f;
+            float radius = Math.min(getWidth(), getHeight()) * .29f * zoom;
+            float inhale = moving ? NexusCoreBreath.inhale(seconds) : .5f;
+            canvas.drawCircle(cx, cy, radius * (.42f + inhale * .08f), heart);
+            int grains = offline ? 36 : lowMotionBudget ? 48 : GRAIN_CAPACITY;
+            float spin = seconds * .21f;
+            float spinCos = (float) Math.cos(spin), spinSin = (float) Math.sin(spin);
+            for (int index = 0; index < grains; index++) {
+                int at = grains == GRAIN_CAPACITY ? index : index * GRAIN_CAPACITY / grains;
+                float b = moving ? NexusCoreBreath.breath(seconds, grainStagger[at]) : 0f;
+                NexusCoreBreath.breathePoint(breathed, grainX[at] * .62f, grainY[at] * .62f, grainZ[at] * .62f, b, grainSeed[at], seconds);
+                float x = breathed[0] * spinCos + breathed[2] * spinSin;
+                float z = -breathed[0] * spinSin + breathed[2] * spinCos;
+                float depth = .62f + .38f * (z + 1f) * .5f;
+                float lift = Math.abs(b);
+                grain.setAlpha(Math.max(0, Math.min(255, Math.round((offline ? 70 : 92 + 120 * depth) * (1f - .25f * lift)))));
+                canvas.drawCircle(cx + x * radius, cy + breathed[1] * radius, dp(1) * (.65f + .75f * depth + (b > 0 ? .45f * lift : 0f)), grain);
+            }
             outerBounds.set(cx - radius, cy - radius, cx + radius, cy + radius);
             canvas.save();
             canvas.rotate(offline ? -24f : phase, cx, cy);
@@ -2950,7 +3068,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             int particleCount = lowMotionBudget ? 7 : 14;
             for (int index = 0; index < particleCount; index++) {
                 double angle = Math.toRadians(index * (360d / particleCount) + (offline ? 0 : phase * .55f));
-                float wave = offline ? 0f : (float) Math.sin(Math.toRadians(phase * .8f + index * 47f)) * .055f;
+                float orbitBreath = moving ? NexusCoreBreath.breath(seconds, index * .011f) * .09f : 0f;
+                float wave = offline ? 0f : (float) Math.sin(Math.toRadians(phase * .8f + index * 47f)) * .055f + orbitBreath;
                 float distance = radius * (index % 3 == 0 ? 1.24f + wave : index % 2 == 0 ? 1.03f - wave : .82f + wave);
                 float dot = dp(index % 3 == 0 ? 2 : 1);
                 particle.setAlpha(offline ? 65 : 115 + (index * 13) % 100);
@@ -2969,11 +3088,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 particle.setStyle(Paint.Style.FILL);
             }
             particle.setAlpha(offline ? 80 : 210);
-            canvas.drawCircle(cx, cy, dp(4), particle);
-            if (!offline && animationsEnabled() && isAttachedToWindow()) {
-                phase = (phase + (lowMotionBudget ? .85f : motionScale < .8f ? 1.55f : 1.25f)) % 360f;
-                postInvalidateOnAnimation();
-            }
+            canvas.drawCircle(cx, cy, dp(4) * (.9f + inhale * .2f), particle);
+            if (moving) postInvalidateOnAnimation();
         }
     }
 
@@ -3049,7 +3165,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
                 page.set(10, 4 - lift, 18, 16 - lift); canvas.drawRoundRect(page, 1, 1, stroke);
                 canvas.drawLine(12, 7 - lift, 16, 7 - lift, stroke);
                 canvas.drawLine(12, 10 - lift, 16, 10 - lift, stroke);
-                if (moving) scheduleSelf(nextIconFrame, android.os.SystemClock.uptimeMillis() + 33);
+                if (moving) scheduleSelf(nextIconFrame, android.os.SystemClock.uptimeMillis() + 16);
             }
             if (symbol != null) canvas.drawPath(symbol, fill);
             else {

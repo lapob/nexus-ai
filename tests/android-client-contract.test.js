@@ -239,6 +239,30 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.doesNotMatch(activity, /Runtime\.getRuntime\(\)\.exec|\/bin\/sh|cmd\.exe/);
 });
 
+test('Control respira come il nucleo web/desktop, a tempo e non a frame', () => {
+  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const breath = read('android/shared-motion/src/main/java/local/nexus/motion/NexusCoreBreath.java');
+  const motion = read('android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
+  const web = read('web/src/core-breath.ts');
+  const period = web.match(/CORE_BREATH_PERIOD = ([\d.]+)/)[1];
+  const rate = web.match(/CORE_BREATH_RATE = ([\d.]+)/)[1];
+  assert.match(breath, new RegExp(`PERIOD = ${period}f`), 'stesso periodo del respiro web');
+  assert.match(breath, new RegExp(`RATE = ${rate.replace(/^0/, '')}f`), 'stessa velocità del respiro web');
+  for (const constant of ['.34f) / .22f', '.66f) / .3f', '.44f * s * (.6f + .4f * seed)', '.58f * s * (.55f + .45f * seed)', '.1f * breath(seconds, -.03f)']) {
+    assert.ok(breath.includes(constant), `costante del respiro allineata: ${constant}`);
+  }
+  const core = activity.split('private final class ControlCoreView')[1]?.split('private final class NexusGlyphDrawable')[0] || '';
+  assert.match(core, /SystemClock\.uptimeMillis\(\) - born/, 'il nucleo deve muoversi col tempo reale');
+  assert.match(core, /NexusCoreBreath\.breath\(seconds, grainStagger/, 'ogni grano ha il suo sfasamento');
+  assert.match(core, /NexusCoreBreath\.zoom\(seconds\)/, 'fioritura e collasso con zoom');
+  assert.doesNotMatch(core, /phase = \(phase \+/, 'nessun avanzamento a passo fisso per frame (scatti a 120 Hz)');
+  assert.match(activity, /private void waveChildren\(ViewGroup parent/);
+  assert.match(activity, /NexusMotion\.waveDelay\(index, step\)/);
+  assert.match(activity, /animateSectionEntry\(panel, direction\)/);
+  assert.match(activity, /if \(!moving \|\| index >= count\)/, 'con animazioni ridotte nessun blocco resta nascosto');
+  assert.match(motion, /public static long waveDelay\(int index, long stepMs\)/);
+});
+
 test('Control riduce il budget grafico con isteresi sui frame reali', () => {
   const privateMonitor = read('android/NexusConsole/app/src/main/java/local/nexus/console/FrameBudgetMonitor.java');
   const privateActivity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');

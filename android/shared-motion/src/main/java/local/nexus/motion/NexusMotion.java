@@ -34,6 +34,22 @@ public final class NexusMotion {
     public static final int CASCADE_STEP = 34;
     /** Distanza verticale dell'entrata a cascata (dp). */
     public static final int CASCADE_TRAVEL_DP = 12;
+    /** Entrata a onda: durata di ciascun blocco e scala iniziale (si "posa" sul piano). */
+    public static final int WAVE_ENTER = 420;
+    public static final float WAVE_START_SCALE = .965f;
+    /** Massimo numero di blocchi che partecipano all'onda: oltre, compaiono insieme. */
+    public static final int WAVE_LIMIT = 10;
+    /** Cambio sezione: scorrimento laterale breve nella direzione della scheda scelta. */
+    public static final int SECTION_SWAP = 360;
+    public static final int SECTION_TRAVEL_DP = 22;
+
+    /**
+     * Ritardo del blocco {@code index} nell'onda: il passo si accorcia man mano,
+     * cosi l'onda accelera e una lista lunga non sembra mai lenta.
+     */
+    public static long waveDelay(int index, long stepMs) {
+        return Math.round(stepMs * Math.pow(Math.max(0, index), .82));
+    }
 
     public static final float STANDARD_X1 = .20f;
     public static final float STANDARD_Y1 = 0f;

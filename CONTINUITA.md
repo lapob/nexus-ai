@@ -1,3 +1,29 @@
+## Control 1.25.0: core breath aligned with web/desktop, wave entries, directional sections — 14 November 2026
+
+- `android/shared-motion/.../NexusCoreBreath.java`: exact Java port of
+  `web/src/core-breath.ts` (same PERIOD 11, RATE 0.8 → ~13.75 s cycle, same
+  bloom/collapse constants, per-particle stagger, zoom). A contract test
+  reads the web constants and fails if the two drift apart.
+- `ControlCoreView` (connecting screen) now moves on real elapsed time, not a
+  fixed step per frame: before, at 120 Hz it spun twice as fast as at 60 Hz.
+  New 96-grain Fibonacci sphere (48 on low budget, 36 offline) that blooms
+  and collapses with depth shading; rings and orbit nodes follow the zoom.
+- Presence dot breathes with the same inhale/zoom (time-based ValueAnimator,
+  stops itself when detached or when animations are off).
+- `waveChildren`: wave entry (rise + settle from scale .965, accelerating
+  step `NexusMotion.waveDelay`). On the dashboard the wave runs through the
+  cards of the active section, not the single container. Section change
+  slides in from the side of the chosen tab (forward right, back left).
+- Reduced motion / animator scale 0: every block final immediately, core
+  composed and still. Folder icon frame moved from 33 ms to 16 ms.
+- Checks: npm test 1300 tests, 1298 pass / 0 fail; android-client-contract
+  10/10 with the new breath-alignment test; assemblePreview + lintPreview OK
+  (log qa-artifacts/control-1.25.0-build.log).
+- APK 1.25.0, versionCode 53, SHA-256 73054438…665B, installed via ADB on
+  the phone (wireless); app launched with no crash. Not seen on screen: the
+  phone was locked, so frame pacing at 120 Hz is not measured yet.
+- Next: owner looks at the connecting core and a section change on the phone.
+
 ## Breathing core for web app and desktop — 14 November 2026 (committed, desktop release pending)
 
 - `web/src/core-breath.ts` (+ WGSL twin, compact on purpose: shader text is not
