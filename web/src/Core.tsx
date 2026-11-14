@@ -247,6 +247,8 @@ export function Core({ state, className, level }: { state: CoreState; className?
     const observer = new ResizeObserver(resize);
     const started = performance.now();
     let tick = 0;
+    let breathing: NodeListOf<HTMLElement> | HTMLElement[] = [];
+    let lastPulse = '';
     let last = 0, spent = 0, samples = 0;
     const adapt = (now: number) => {
       if (last && now - last < 250) { spent += now - last; samples += 1; } // salta pause e cambi scheda
@@ -272,7 +274,12 @@ export function Core({ state, className, level }: { state: CoreState; className?
       // impegnata (es. dal modello) si dimezza il ritmo, mai la nitidezza.
       tick += 1;
       if (!(throttle && tick % 2 === 1 && !reduced.matches)) renderer.frame(time, energy, breath);
-      canvas.dataset.breath = (breath * coreBreath(time, 0)).toFixed(3);
+      const pulse = (breath * coreBreath(time, 0)).toFixed(3);
+      canvas.dataset.breath = pulse;
+      // La UI respira con il nucleo: --core-breath solo sugli elementi [data-core-breath] (pochi, ricercati ogni 10 fotogrammi:
+      // un elemento appena montato si aggancia in una frazione di secondo, mentre il respiro è ancora vicino a dove era).
+      if (tick % 10 === 1) { breathing = document.querySelectorAll<HTMLElement>('[data-core-breath]'); lastPulse = ''; }
+      if (pulse !== lastPulse) { lastPulse = pulse; breathing.forEach((element) => element.style.setProperty('--core-breath', pulse)); }
       if (!reduced.matches && document.visibilityState === 'visible') frame = requestAnimationFrame(loop);
     };
     const wake = () => { cancelAnimationFrame(frame); last = 0; if (document.visibilityState === 'visible') frame = requestAnimationFrame(loop); };

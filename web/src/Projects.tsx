@@ -3,6 +3,7 @@
  * @description Progetti come in Claude: cartelle di conversazioni con istruzioni e file propri, usati come contesto di ogni risposta. Tutto resta su questo dispositivo.
  */
 import { AnimatePresence, m } from 'framer-motion';
+import { SHEET, VEIL } from './motion';
 import { useEffect, useRef, useState } from 'react';
 import { acceptedMime, formatSize } from './attachments';
 import { Icon } from './Icon';
@@ -83,9 +84,9 @@ export function ProjectSheet({ projectId, onClose, notify }: { projectId: string
   };
   const patch = (update: Partial<Project>) => updateProject(project.id, () => update);
   return (
-    <m.div className="overlay" role="presentation" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <m.div className="overlay" role="presentation" onMouseDown={onClose} {...VEIL}>
       <m.section className="sheet glass project-sheet" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(event) => event.stopPropagation()}
-        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+        {...SHEET}>
         <header>
           <h2 id="project-title"><Icon name="folder" />Progetto</h2>
           <button type="button" className="icon-button" aria-label="Chiudi" onClick={onClose}><Icon name="close" /></button>

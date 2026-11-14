@@ -2,7 +2,8 @@
  * @module web/App
  * @description Shell della nuova web app NexusNXS AI: conversazioni locali, streaming con fasi, nucleo WebGPU, palette comandi e preferenze.
  */
-import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from 'framer-motion';
+import { AnimatePresence, LazyMotion, MotionConfig, m } from 'framer-motion';
+import { MESSAGE, SHEET, SPRING, VEIL, loadMotionFeatures } from './motion';
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Capabilities, PlanStep, Preferences } from './api';
 import { highlight, lexicalSearch, semanticSearch, type SearchDoc, type SearchHit } from './search';
@@ -557,7 +558,7 @@ export function App() {
   }, [empty, live]);
 
   return (
-    <LazyMotion features={domAnimation} strict><MotionConfig reducedMotion="user">
+    <LazyMotion features={loadMotionFeatures} strict><MotionConfig reducedMotion="user">
       <div className="app" data-sidebar={sidebarOpen ? 'open' : 'closed'} data-collapsed={sidebarHidden} data-live={live} data-panel={Boolean(panelDoc)}>
         <aside className="sidebar glass" aria-label="Conversazioni" aria-hidden={compact && sidebarAway ? true : undefined} inert={compact && sidebarAway ? true : undefined}>
           {/* Desktop con barra chiusa: colonna di icone come in Claude, mai un vuoto. */}
@@ -608,7 +609,7 @@ export function App() {
             {typeof desktopBridge?.windowAction === 'function' && <Suspense fallback={<span className="window-controls" aria-hidden="true" data-placeholder="true" />}><WindowControls /></Suspense>}
           </header>
 
-          <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /><div className="core-hud" aria-hidden="true"><i /><i /><i /></div></div>
+          <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /><div className="core-hud" aria-hidden="true" data-core-breath=""><i /><i /><i /></div></div>
           {dragging && <div className="dropzone" aria-hidden="true"><span className="glass"><Icon name="paperclip" />{Number.isFinite(limitsFor(platform.kind).maxCount) ? 'Rilascia per allegare (max 2 file, 1,5 MB)' : 'Rilascia per allegare'}</span></div>}
 
           <div className="scroll" ref={scrollRef}
@@ -631,7 +632,7 @@ export function App() {
                 <div ref={coreSlotRef} className="core-slot" aria-hidden="true" />
                 {viewedProject && <m.p className="project-eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><Icon name="folder" size={15} />{viewedProject.name}{viewedProject.files.length ? ` · ${viewedProject.files.length} file` : ''}{viewedProject.instructions.trim() ? ' · istruzioni attive' : ''}</m.p>}
                 <m.h2 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}>
-                  {hello} <span className="accent">Cosa creiamo?</span>
+                  {hello} <span className="accent" data-core-breath="">Cosa creiamo?</span>
                 </m.h2>
                 {caps.voiceInput && caps.voiceOutput && !live && (
                   <m.button type="button" className="live-cta" onClick={() => void startLive()}
@@ -659,8 +660,7 @@ export function App() {
               <ol className="thread" aria-live="polite" aria-busy={generating}>
                 <AnimatePresence initial={false}>
                   {conversation!.messages.map((message) => (
-                    <m.li key={message.id} className={`message ${message.role}${message.error ? ' error' : ''}`}
-                      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+                    <m.li key={message.id} className={`message ${message.role}${message.error ? ' error' : ''}`} {...MESSAGE[message.role]}>
                       {message.role === 'user' ? (
                         <UserTurn message={message} disabled={generating} onResend={(text) => {
                           // La conversazione si tronca solo quando il testo modificato parte davvero.
@@ -715,7 +715,7 @@ export function App() {
           </div>
 
           {live ? (
-            <m.section className="live-panel glass" aria-label="Voce live" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}>
+            <m.section className="live-panel glass" aria-label="Voce live" initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={SPRING}>
               <span className="live-state" role="status" aria-live="polite" data-state={coreState}>
                 <i aria-hidden="true" />
                 <span className="live-text">{recording ? 'Ti ascolto…' : transcribing ? 'Comprendo…' : generating ? (phase || 'Penso…') : speakingId ? 'Parlo · parla sopra per interrompermi' : 'In attesa…'}</span>
@@ -726,7 +726,7 @@ export function App() {
               </span>
             </m.section>
           ) : (
-          <form className="composer glass" data-recording={Boolean(recording)} data-offline={offline} data-generating={generating} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
+          <form className="composer glass" data-core-breath="" data-recording={Boolean(recording)} data-offline={offline} data-generating={generating} onSubmit={(event) => { event.preventDefault(); void send(draft); }}>
             <AnimatePresence>
               {showJump && !empty && (
                 <m.button key="jump" type="button" className="jump glass" aria-label="Torna in fondo" onClick={jumpToBottom}
@@ -1092,9 +1092,9 @@ interface Action { id: string; label: string; hint?: string; icon?: IconName; ru
 
 function Shortcuts({ onClose }: { onClose: () => void }) {
   return (
-    <m.div className="overlay" role="presentation" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <m.div className="overlay" role="presentation" onMouseDown={onClose} {...VEIL}>
       <m.section className="sheet glass" role="dialog" aria-modal="true" aria-labelledby="keys-title" onMouseDown={(event) => event.stopPropagation()}
-        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+        {...SHEET}>
         <header><h2 id="keys-title">Scorciatoie da tastiera</h2><button type="button" className="icon-button" aria-label="Chiudi" onClick={onClose}><Icon name="close" /></button></header>
         <dl className="shortcuts">{SHORTCUTS.map(([keys, label]) => <div key={keys}><dt>{label}</dt><dd>{keys.split('+').map((key) => <kbd key={key}>{key}</kbd>)}</dd></div>)}</dl>
       </m.section>
@@ -1109,9 +1109,9 @@ function CommandPalette({ actions, onClose }: { actions: Action[]; onClose: () =
   const filtered = actions.filter((action) => `${action.label} ${action.hint ?? ''}`.toLocaleLowerCase('it').includes(needle));
   const run = (action?: Action) => { if (!action) return; onClose(); action.run(); };
   return (
-    <m.div className="overlay" role="presentation" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <m.div className="overlay" role="presentation" onMouseDown={onClose} {...VEIL}>
       <m.div className="palette glass" role="dialog" aria-modal="true" aria-label="Comandi" onMouseDown={(event) => event.stopPropagation()}
-        initial={{ opacity: 0, scale: 0.987, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.987 }} transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}>
+        initial={{ opacity: 0, scale: 0.975, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.985, transition: { duration: 0.14 } }} transition={{ ...SPRING, stiffness: 520 }}>
         <input autoFocus value={query} placeholder="Cerca un comando o una conversazione…" aria-label="Cerca comandi" role="combobox" aria-expanded="true" aria-controls="palette-list"
           onChange={(event) => { setQuery(event.target.value); setIndex(0); }}
           onKeyDown={(event) => {
@@ -1156,7 +1156,7 @@ function PairingScreen({ onPaired }: { onPaired: () => void }) {
   return (
     <div className="overlay" role="presentation">
       <m.form className="sheet glass" role="dialog" aria-modal="true" aria-labelledby="pair-title" onSubmit={(event) => { event.preventDefault(); void pair(code, name); }}
-        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+        initial={SHEET.initial} animate={SHEET.animate} transition={SHEET.transition}>
         <header><h2 id="pair-title">Collega questo dispositivo al PC</h2></header>
         <p className="muted">Inserisci il codice mostrato sul PC in Centro di controllo → Telefono. Il collegamento è privato e revocabile.</p>
         <label htmlFor="pair-code">Codice</label>
@@ -1202,9 +1202,9 @@ function Settings({ preferences, onClose, onCleared }: { preferences: Preference
     </div>
   );
   return (
-    <m.div className="overlay" role="presentation" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <m.div className="overlay" role="presentation" onMouseDown={onClose} {...VEIL}>
       <m.section className="sheet glass" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={(event) => event.stopPropagation()}
-        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+        {...SHEET}>
         <header><h2 id="settings-title">Impostazioni e preferenze</h2><button type="button" className="icon-button" aria-label="Chiudi" onClick={onClose}><Icon name="close" /></button></header>
         <label>Lunghezza delle risposte</label>
         {option('responseStyle', [['concise', 'Concise'], ['natural', 'Naturali'], ['detailed', 'Dettagliate']])}

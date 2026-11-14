@@ -24,6 +24,39 @@
   phone was locked, so frame pacing at 120 Hz is not measured yet.
 - Next: owner looks at the connecting core and a section change on the phone.
 
+## Motion for web app and desktop, in step with the core's breath — 14 November 2026 (committed, release 0.3.41 pending)
+
+Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
+- Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk
+  (`motion-features.ts`, loaded by `LazyMotion` right after start). Entry bundle
+  409529 → 374480 bytes (limit 409600); lazy chunk 37.3 kB. Web build stays a single
+  inlined bundle.
+- One shared spring. Sheets (settings, shortcuts, pairing, projects, Control Center)
+  rise and settle; the veil fades in longer than it fades out; the side panel slides
+  in from the right; the command palette drops in on a stiffer spring.
+- Messages: the question springs from the composer corner; the answer materialises
+  from blur to sharp, and the filter is removed at the end (`filter: none`).
+- Conversation switch (View Transitions): the outgoing thread dissolves with a blur,
+  the new one rises into place, the title slides up. Never with reduced motion.
+- The thread rises in when it first appears. While an answer streams, a point of
+  light breathes at the end of the text.
+- Composer: soft border/glow transitions; send button lift and press; stop icon
+  turns in.
+- The UI breathes with the core: `Core.tsx` writes `--core-breath` (−1…1) only on
+  `[data-core-breath]` elements (HUD rings, composer, "Cosa creiamo?"). Bloom widens
+  the rings and lights the composer; collapse tightens them. Only scale, opacity and
+  background position. With reduced motion the value stays 0. (The canvas already had
+  `data-breath`, hence the distinct marker name.)
+- Checks: tests/web-motion.test.js 3/3 + core-breath 2/2; npm test 1303 tests, 1301
+  pass, 0 fail, 2 skipped; check:ui 39/39 + matrix 15/15; typecheck; check:knowledge;
+  check:startup. `npm run check` is red only on check:sections for
+  scripts/open-server-console.ps1, another session's uncommitted work.
+- Browser (vite preview): custom View Transition animations confirmed on the
+  thread/title pseudo-elements; the palette spring runs after the lazy features
+  load; measured breath −0.903 → HUD scale 0.955; 375 px wide with no horizontal
+  scroll. Reduced motion was not emulated in a browser: covered by the global CSS
+  rule, MotionConfig and the existing skip in `transition()`.
+
 ## Breathing core for web app and desktop — 14 November 2026 (committed, desktop release pending)
 
 - `web/src/core-breath.ts` (+ WGSL twin, compact on purpose: shader text is not

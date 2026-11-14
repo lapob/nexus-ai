@@ -3,6 +3,7 @@
  * @description Centro di controllo del desktop nella UI unica: modelli e motore, profilo, telefono (associazione QR), memoria, workspace, sistema e dati. Usa soltanto il ponte IPC del preload.
  */
 import { m } from 'framer-motion';
+import { SHEET, VEIL } from './motion';
 import QRCode from 'qrcode';
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon } from './Icon';
@@ -41,9 +42,9 @@ export function ControlCenter({ onClose, notify, initialTab }: { onClose: () => 
   }, [notify]);
 
   return (
-    <m.div className="overlay" role="presentation" onMouseDown={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <m.div className="overlay" role="presentation" onMouseDown={onClose} {...VEIL}>
       <m.section className="sheet control glass" role="dialog" aria-modal="true" aria-labelledby="control-title" onMouseDown={(event) => event.stopPropagation()}
-        initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={{ duration: 0.26, ease: [0.2, 0, 0, 1] }}>
+        {...SHEET}>
         <header><h2 id="control-title">Centro di controllo</h2><button type="button" className="icon-button" aria-label="Chiudi" onClick={onClose}><Icon name="close" /></button></header>
         <div className="tabs" role="tablist" aria-label="Sezioni">
           {TABS.map(([id, label]) => (

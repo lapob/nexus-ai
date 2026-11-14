@@ -3,6 +3,7 @@
  * @description Pannello laterale per codice e documenti delle risposte: anteprime sicure (HTML eseguito solo in sandbox a origine separata), righe numerate, copia e download.
  */
 import { m } from 'framer-motion';
+import { SIDE_PANEL } from './motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from './Icon';
 import { Markdown } from './Markdown';
@@ -99,7 +100,7 @@ export function Panel() {
   const lines = document_.text.split('\n').length;
   return (
     <m.aside className="doc-panel glass" aria-label={`Pannello: ${document_.title}`} key={document_.id}
-      initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 28 }} transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}>
+      {...SIDE_PANEL}>
       <header className="panel-head">
         <span className="panel-title"><Icon name={kind ? KIND_ICON[kind] : 'code'} size={18} /><span title={document_.title}>{document_.title}</span><small>{document_.language} · {lines} {lines === 1 ? 'riga' : 'righe'}</small></span>
         {kind && (

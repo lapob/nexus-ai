@@ -929,7 +929,42 @@
     animation: tip-in .16s var(--ease-emphasized) both;
   }
   .tooltip[data-place='bottom'] { translate: -50% 0; transform-origin: 50% 0; animation-name: tip-in-below; }
+
+  /* Respiro condiviso con il nucleo: Core.tsx scrive --core-breath ∈ [-1, 1] sugli elementi [data-core-breath].
+     Fioritura (> 0): gli anelli si allargano e il composer si accende; collasso (< 0): gli anelli si stringono.
+     Solo opacità e scala (compositor); con movimento ridotto il valore resta 0. */
+  .core-hud[data-core-breath] { scale: calc(1 + .05 * var(--core-breath)); will-change: scale; }
+  .composer[data-core-breath]::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+    box-shadow: 0 0 46px -10px color-mix(in oklch, var(--cyan) 42%, transparent), 0 0 0 1px color-mix(in oklch, var(--cyan) 10%, transparent);
+    opacity: calc(.12 + .5 * max(var(--core-breath), 0)); will-change: opacity; transition: opacity .6s var(--ease-standard); }
+  .composer[data-core-breath]:focus-within::after { opacity: calc(.4 + .45 * max(var(--core-breath), 0)); }
+  .welcome h2 .accent[data-core-breath] { background-size: 190% 100%; background-image: linear-gradient(100deg, var(--cyan), oklch(85% .12 165) 45%, var(--cyan) 90%);
+    background-position: calc(50% - 50% * var(--core-breath)) 0; }
+
+  /* Composer: bordo e alone entrano morbidi; il pulsante d'invio si "carica" quando c'è qualcosa da mandare. */
+  .composer { transition: border-color .3s var(--ease-standard), box-shadow .45s var(--ease-emphasized); }
+  .send { transition: scale .2s var(--ease-emphasized), background .2s, box-shadow .35s var(--ease-emphasized), color .2s; }
+  .send > .icon { transition: translate .22s var(--ease-emphasized), rotate .3s var(--ease-emphasized); }
+  .send:not(:disabled):not(.stop):hover > .icon { translate: 0 -1px; }
+  .send:not(:disabled):active { scale: .92; }
+  .send.stop > .icon { animation: stop-in .3s var(--ease-emphasized); }
+
+  /* Messaggi: la domanda nasce dall'angolo del composer, la risposta dal centro (vedi motion.ts). */
+  .message.user { transform-origin: 100% 100%; }
+  .message.assistant { transform-origin: 50% 0; }
+  /* Il thread compare (dalla schermata iniziale o all'avvio) salendo appena, come il nucleo che si ritira. */
+  .thread { animation: thread-in .5s var(--ease-emphasized) both; }
+  /* Mentre la risposta si scrive, un punto di luce respira in coda al testo. */
+  .thread[aria-busy='true'] > .message.assistant:last-child .markdown > :is(p, h1, h2, h3, h4, blockquote):last-child::after,
+  .thread[aria-busy='true'] > .message.assistant:last-child .markdown > :is(ul, ol):last-child > li:last-child::after {
+    content: ''; display: inline-block; width: .5em; height: .5em; margin-left: .35em; border-radius: 50%; vertical-align: .02em;
+    background: radial-gradient(circle, var(--ice) 0 22%, var(--cyan) 50%, transparent 72%);
+    box-shadow: 0 0 12px color-mix(in oklch, var(--cyan) 65%, transparent);
+    animation: caret-breathe 1.1s var(--ease-standard) infinite alternate; }
 }
+
+/* Valore del respiro del nucleo (ereditato solo dentro i pochi elementi [data-core-breath]). */
+@property --core-breath { syntax: '<number>'; inherits: true; initial-value: 0; }
 
 /* Lunghezze registrate: le sfumature dei bordi si animano lungo la timeline di scroll. */
 @property --aura { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
@@ -952,7 +987,21 @@
   @keyframes tip-in-below { from { opacity: 0; scale: .94; transform: translateY(-4px); } }
   @keyframes breathe { from { opacity: .55; scale: .92; } to { opacity: 1; scale: 1.06; } }
   @keyframes listen { from { box-shadow: 0 0 0 0 color-mix(in oklch, var(--cyan) 45%, transparent); } to { box-shadow: 0 0 0 8px transparent; } }
+  @keyframes thread-in { from { opacity: 0; translate: 0 12px; } }
+  @keyframes caret-breathe { from { opacity: .4; scale: .65; } to { opacity: 1; scale: 1; } }
+  @keyframes stop-in { from { scale: .4; rotate: -90deg; opacity: 0; } }
+  /* Cambio conversazione: il thread uscente si dissolve sfocandosi, il nuovo si ricompone salendo;
+     il titolo scorre verso l'alto. Le View Transitions non partono con movimento ridotto (App.transition). */
+  @keyframes vt-thread-out { to { opacity: 0; scale: .985; filter: blur(6px); } }
+  @keyframes vt-thread-in { from { opacity: 0; translate: 0 16px; filter: blur(8px); } }
+  @keyframes vt-title-out { to { opacity: 0; translate: 0 -8px; } }
+  @keyframes vt-title-in { from { opacity: 0; translate: 0 8px; } }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: var(--ease-emphasized); }
+  ::view-transition-group(thread), ::view-transition-group(conversation-title) { animation-duration: .4s; animation-timing-function: var(--ease-emphasized); }
+  ::view-transition-old(thread) { animation: vt-thread-out .2s cubic-bezier(.4, 0, 1, 1) both; }
+  ::view-transition-new(thread) { animation: vt-thread-in .44s var(--ease-emphasized) .06s both; }
+  ::view-transition-old(conversation-title) { animation: vt-title-out .18s cubic-bezier(.4, 0, 1, 1) both; }
+  ::view-transition-new(conversation-title) { animation: vt-title-in .36s var(--ease-emphasized) .04s both; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
     .core-layer.ambient { transform: none; }
