@@ -7,7 +7,7 @@
 #>
 param([switch]$Normal)
 
-#region Apertura
+#region 01 — Finestra
 $ErrorActionPreference = 'Stop'
 $console = Join-Path $PSScriptRoot 'server-console.ps1'
 $pwsh = (Get-Process -Id $PID).Path
@@ -43,6 +43,9 @@ function Wait-ConsoleWindow([int]$TimeoutMs) {
   } while ([DateTime]::UtcNow -lt $deadline)
   return [IntPtr]::Zero
 }
+#endregion
+
+#region 02 — Avvio
 
 # Le variabili del task portatile servono al server e al bridge, non alla console.
 # NO_COLOR ereditato da strumenti o shell di automazione non vale per la finestra dedicata (resta -NoColor).
