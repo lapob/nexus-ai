@@ -34,7 +34,7 @@ requireHttpsEndpoint("NEXUS_LAN_URL", localNexusUrl, ["", "/"])
 dependencies {
     implementation "androidx.profileinstaller:profileinstaller:1.4.1"
     implementation "androidx.activity:activity:1.10.1"
-    implementation "androidx.core:core:1.16.0"
+    implementation "androidx.core:core:1.19.1"
 }
 
 android {
