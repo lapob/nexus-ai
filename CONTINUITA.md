@@ -1,3 +1,23 @@
+## Breathing core for web app and desktop — 14 November 2026 (committed, desktop release pending)
+
+- `web/src/core-breath.ts` (+ WGSL twin, compact on purpose: shader text is not
+  minified and counts toward the startup budget). Same breath as the site:
+  ~13.75 s cycle alternating bloom (sphere and HUD rings expand into a
+  swirling nebula, zoom in) and collapse (spiral into a dense heart, zoom
+  out), per-particle stagger, C²-continuous. WebGPU and Canvas fallback use it;
+  reduced motion keeps the core composed. The idle 30 fps halving was removed
+  (the core now moves continuously); halving under GPU load stays.
+- Checks: tests/core-breath.test.js 2/2; typecheck; build:renderer; startup
+  budget 409529 bytes (limit 409600, after compacting the shader text);
+  check:ui 39/39 + 15/15; WGSL compiled on the real AMD adapter with no
+  messages and a valid pipeline; WebGPU captures over a full cycle.
+- Not done: desktop installer release. Full gates are red only because of
+  other sessions' uncommitted work (android-client-contract on
+  NativeMainActivity.java, check:sections on scripts/open-server-console.ps1),
+  and main already carries another session's unpushed commit. Next: release
+  0.3.41 once those land; the live ai.nexusnxs.com gateway serves the new core
+  after the next service restart (the edge fallback shell already has it).
+
 ## Control 1.24.0: new style in the inner screens, redundant buttons removed — 14 November 2026
 
 Owner request: the best modern graphics in every inner screen too, and no
