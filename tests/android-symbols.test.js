@@ -10,7 +10,7 @@ const { symbolSvg, symbolLicenseNotice } = require('../src/shared/symbols');
 test('Control and desktop icon consumers are generated from the pinned offline symbol catalog', () => {
   assert.doesNotThrow(() => validateManifest(manifest));
   for (const [file, content] of render(manifest)) assert.equal(fs.readFileSync(file, 'utf8'), content);
-  const control = fs.readFileSync(path.join(root, 'android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java'), 'utf8');
+  const control = fs.readFileSync(path.join(root, 'android/NexusConsole/app/src/main/java/local/nexus/console/ui/NexusGlyphDrawable.java'), 'utf8');
   const mapping = control.split('private String symbolName(String value) {')[1].split('@Override public void draw')[0];
   for (const [, name] of mapping.matchAll(/return "([A-Za-z]+)"/g)) assert.ok(manifest.icons[name], `Unknown Control symbol ${name}`);
 });

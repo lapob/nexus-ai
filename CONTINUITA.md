@@ -1,3 +1,35 @@
+## Control 1.26.0: monolithic Activity split into screens and components — 14 November 2026 (committed, device check pending)
+
+- Base b1acf2d (Control 1.25.0). NativeMainActivity.java has gone from about
+  3,300 lines to about 500 and now only coordinates the other pieces. Native
+  Views are kept, not Compose: Compose would need Kotlin, make the APK heavier
+  and slow the cold start, and the Canvas drawing would have to be rewritten.
+- New classes: ConsoleSession (token, rotation, hardware proof, HTTP without
+  redirects, /rescue), LiveTelemetry (SSE), ConsoleShell (shell, dock,
+  materialization, predictive back), DashboardScreen plus
+  Overview/System/ServicesSection, DesktopApps, PowerConfirmations (biometrics,
+  Riavvia/Spegni, Arresta server), OfflineGate (PC unreachable vs server
+  stopped, Riaccendi), DeviceAuthenticator, OperationalAlerts,
+  SafeActionHistory, Formats. The `ui/` package holds NexusUi (kit, pill tabs,
+  withEdgeLight), Motion (reduced motion, frame budget, waveChildren, breathe)
+  and the Canvas views (NexusGateView, MetricGaugeView, SparklineView,
+  MaterializationView, ControlCoreView, NexusGlyphDrawable) on a shared
+  NexusCanvasView base.
+- Not renamed, on purpose: the NativeMainActivity class and its
+  SharedPreferences "NativeMainActivity", which NotificationWatchJob and
+  SecureTokenStore read.
+- Android tests now read all the sources instead of the single Activity. No
+  security guarantee was removed; the pattern counts (rotate, challenge,
+  rescue, authenticateThen, FLAG_SECURE, no redirects) match the base.
+- Checks: npm test 1304 tests, 1302 pass, 0 fail, 2 skipped. Android
+  contracts 18/18. assemblePreview and lintPreview OK (0 errors, 3
+  pre-existing warnings). Log: qa-artifacts/control-1.26.0-build.log.
+- APK: 1.26.0, versionCode 54, 621,557 B (+1.9 KB), SHA-256 40E016CC…6630.
+- Not done yet: ADB install. No phone was visible to ADB (neither
+  `adb devices` nor mDNS). The owner asked for an AVD emulator that is
+  already installed, then the phone. Screen-by-screen check still to do
+  (Riavvia/Spegni never against the real PC).
+
 ## Control 1.25.0: core breath aligned with web/desktop, wave entries, directional sections — 14 November 2026
 
 - `android/shared-motion/.../NexusCoreBreath.java`: exact Java port of

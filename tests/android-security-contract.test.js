@@ -11,7 +11,11 @@ const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 const consoleManifest = () => read('android/NexusConsole/app/src/main/AndroidManifest.xml');
-const consoleActivity = () => read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+const consoleDir = path.join(root, 'android/NexusConsole/app/src/main/java/local/nexus/console');
+// La Console e divisa in schermate e componenti: il contratto vale per tutti i sorgenti.
+const consoleActivity = () => fs.readdirSync(consoleDir, { recursive: true })
+  .filter((file) => String(file).endsWith('.java')).sort()
+  .map((file) => fs.readFileSync(path.join(consoleDir, String(file)), 'utf8')).join('\n');
 
 test('manifest minimizzano backup, debug e componenti esportati', () => {
   for (const manifest of [consoleManifest()]) {

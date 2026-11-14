@@ -9,6 +9,13 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
+// Control è diviso in schermate e componenti: le garanzie valgono sull'insieme
+// dei sorgenti del pacchetto (Activity, sessione, schermate, pacchetto ui).
+const controlDir = path.join(root, 'android/NexusConsole/app/src/main/java/local/nexus/console');
+const controlFile = (...parts) => fs.readFileSync(path.join(controlDir, ...parts), 'utf8');
+const controlSources = () => fs.readdirSync(controlDir, { recursive: true })
+  .filter((file) => String(file).endsWith('.java')).sort()
+  .map((file) => fs.readFileSync(path.join(controlDir, String(file)), 'utf8')).join('\n');
 
 test('la release separa i due client pubblici dalla Console privata', () => {
   const packageJson = JSON.parse(read('package.json'));
@@ -39,15 +46,15 @@ test('la matrice visuale Android copre telefono font grande landscape e tablet',
 });
 
 test('la conferma privata sopravvive al ritorno biometrico e ai cambi rete', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const activity = controlSources();
   assert.match(activity, /else if \(currentScreen != SCREEN_POWER\) reconnect\.run\(\)/);
   assert.match(activity, /resumeForegroundRefreshes\(\)[\s\S]*if \(currentScreen == SCREEN_POWER\) return/);
   assert.match(activity, /if \(requestCode == REQUEST_DEVICE_CREDENTIAL\)[\s\S]*resultCode == RESULT_OK && action != null/);
 });
 
 test('la telemetria Android disegna lo storico senza allocazioni a ogni frame', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  const sparkline = activity.split('private final class SparklineView')[1]?.split('private LinearLayout card()')[0] || '';
+  const activity = controlSources();
+  const sparkline = controlFile('ui', 'SparklineView.java');
   assert.match(sparkline, /private final float\[\] samples = new float\[SAMPLE_CAPACITY\]/);
   assert.match(sparkline, /System\.arraycopy\(samples, 1, samples, 0, SAMPLE_CAPACITY - 1\)/);
   assert.doesNotMatch(sparkline, /toArray\s*\(/);
@@ -55,8 +62,8 @@ test('la telemetria Android disegna lo storico senza allocazioni a ogni frame', 
 });
 
 test('NexusNXS Control non usa header navbar o footer persistenti', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
-  const shell = activity.split('private void createShell()')[1]?.split('private void showConnecting()')[0] || '';
+  const activity = controlSources();
+  const shell = controlFile('ConsoleShell.java');
   assert.doesNotMatch(shell, /statePill|LinearLayout top|root\.addView\(top\)/);
   assert.doesNotMatch(activity, /Ogni azione richiede la tua conferma\./);
   assert.doesNotMatch(activity, /TextView state(?:Dot)?;/);
@@ -65,10 +72,11 @@ test('NexusNXS Control non usa header navbar o footer persistenti', () => {
 });
 
 test('Console integra i segnali di sicurezza nei dettagli senza una pagina duplicata', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const activity = controlSources();
   const manifest = read('android/NexusConsole/app/src/main/AndroidManifest.xml');
-  assert.match(activity, /if \(token\.isEmpty\(\)\) bootstrapConsole\(\); else restoreAuthenticatedScreen\(\)/);
-  assert.match(activity, /if \(foreground\) restoreAuthenticatedScreen\(\)/);
+  assert.match(activity, /if \(!session\.signedIn\(\)\) session\.bootstrapConsole\(\); else restoreAuthenticatedScreen\(\)/);
+  assert.match(activity, /if \(host\.isForeground\(\)\) host\.onSignedIn\(\)/);
+  assert.match(activity, /void onSignedIn\(\) \{ restoreAuthenticatedScreen\(\); \}/);
   assert.match(activity, /lastSecuritySummary/);
   assert.doesNotMatch(activity, /Centro sicurezza|loadSecurityCenter|SCREEN_SECURITY/);
   assert.match(activity, /appendSecurityOverview\(specifications, lastSecuritySummary\)/);
@@ -84,8 +92,9 @@ test('Console integra i segnali di sicurezza nei dettagli senza una pagina dupli
   assert.match(activity, /reverseContentTransition = true/);
   assert.match(activity, /content\.setTranslationX\(materialize \? 0f : reverse \? -dp\(NexusMotion\.CONTENT_TRAVEL_DP\) : dp\(NexusMotion\.CONTENT_TRAVEL_DP\)\)/);
   assert.match(activity, /materializationOverlay\.materialize\(\)/);
-  assert.match(activity, /class MaterializationView extends View/);
-  assert.match(activity, /cancel\.setOnClickListener\(v -> cancelPowerConfirmation\(\)\)/, 'Annulla deve usare lo stesso ritorno immediato del Back Android');
+  assert.match(activity, /class MaterializationView extends NexusCanvasView/);
+  assert.match(activity, /abstract class NexusCanvasView extends View/);
+  assert.match(activity, /cancel\.setOnClickListener\(v -> host\.cancelPowerConfirmation\(\)\)/, 'Annulla deve usare lo stesso ritorno immediato del Back Android');
   assert.match(activity, /getOnBackPressedDispatcher\(\)\.onBackPressed\(\)/, 'il ritorno alla Home deve restare gestito da Android');
   assert.match(activity, /handleOnBackCancelled\(\)/, 'annullare il gesto deve ripristinare il contenuto');
   assert.match(activity, /boolean materialize = materializeNextContent;/, 'la materializzazione deve valere per ogni cambio superficie');
@@ -93,7 +102,7 @@ test('Console integra i segnali di sicurezza nei dettagli senza una pagina dupli
 
 
 test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell remota', () => {
-  const activity = read('android', 'NexusConsole', 'app', 'src', 'main', 'java', 'local', 'nexus', 'console', 'NativeMainActivity.java');
+  const activity = controlSources();
   const secureStore = read('android', 'NexusConsole', 'app', 'src', 'main', 'java', 'local', 'nexus', 'console', 'SecureTokenStore.java');
   assert.match(activity, /authenticateThen\(\(\) -> executePower/);
   assert.match(activity, /\/api\/system\/power\/plan/);
@@ -106,15 +115,15 @@ test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell rem
   assert.match(activity, /bootstrapInFlight/);
   assert.match(activity, /dashboardLoadInFlight/);
   assert.match(activity, /sessionRotationInFlight/);
-  assert.match(activity, /private boolean rotateSessionIfDue\(\)/);
-  assert.match(activity, /if \(rotateSessionIfDue\(\)\) return;/);
+  assert.match(activity, /boolean rotateSessionIfDue\(Runnable completed\)/);
+  assert.match(activity, /if \(session\.rotateSessionIfDue\(this::resumeForegroundRefreshes\)\) return;/);
   assert.match(activity, /final String requestToken = authenticated \? token : "";/, 'ogni richiesta deve conservare il token realmente inviato');
   assert.match(activity, /if \(!requestToken\.equals\(token\)\) return;/, 'un 401 tardivo non deve cancellare il token ottenuto da una rotazione successiva');
   assert.match(activity, /sessionRotationInFlight && !"\/api\/session\/rotate"\.equals\(path\)/, 'le risposte della vecchia sessione devono attendere la rotazione in corso');
   assert.match(activity, /private void handleTelemetryFailure\(\)/);
   assert.doesNotMatch(activity, /if \(!silentFailure\) showOffline\(null\);[\s\S]{0,260}telemetryInFlight = false/);
   assert.match(activity, /Dati in tempo reale/);
-  assert.match(activity, /service\.addView\(services, wrapBlock\(\)\)/, 'la scheda servizi deve adattarsi a sessioni e font grandi senza tagliare righe');
+  assert.match(activity, /panel\.addView\(services, ui\.wrapBlock\(\)\)/, 'la scheda servizi deve adattarsi a sessioni e font grandi senza tagliare righe');
   assert.doesNotMatch(activity, /content\.addView\(services, block\(dp\(178\)\)\)/, 'la scheda servizi non deve avere un altezza rigida');
   assert.match(activity, /serviceMetric\("SESSIONI"/);
   assert.match(activity, /serviceMetric\("STREAM LIVE"/);
@@ -130,8 +139,8 @@ test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell rem
   assert.match(activity, /getOnBackPressedDispatcher\(\)\.addCallback/);
   assert.match(activity, /handleOnBackPressed\(\)/);
   assert.match(activity, /currentScreen == SCREEN_POWER/);
-  assert.match(activity, /if \(currentScreen != SCREEN_POWER\) return;/, 'una risposta tardiva non deve riaprire la conferma dopo Indietro');
-  assert.match(activity, /if \(currentScreen != SCREEN_POWER \|\| !foreground\) return;/, 'una conferma completata non deve riaprire la schermata dopo Indietro o in background');
+  assert.match(activity, /if \(host\.screen\(\) != SCREEN_POWER\) return;/, 'una risposta tardiva non deve riaprire la conferma dopo Indietro');
+  assert.match(activity, /if \(host\.screen\(\) != SCREEN_POWER \|\| !host\.isForegroundActive\(\)\) return;/, 'una conferma completata non deve riaprire la schermata dopo Indietro o in background');
   assert.doesNotMatch(activity, /SCREEN_SECURITY/);
   assert.match(activity, /contentSwapGeneration/);
   assert.match(activity, /content\.animate\(\)\.cancel\(\)/);
@@ -156,7 +165,7 @@ test('NexusNXS Control espone diagnostica e alimentazione senza voce o shell rem
 });
 
 test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const activity = controlSources();
   const consoleBuild = read('android/NexusConsole/app/build.gradle');
   const sharedMotion = read('android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
   // Lo stato del server si aggiorna da solo: nessun pulsante di verifica manuale.
@@ -185,7 +194,7 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /setContentDescription\(label \+ ", " \+ status[\s\S]*?\+ actionHint\)/);
   assert.doesNotMatch(activity, /Aperta · tocca per chiudere|Chiusa · tocca per aprire/);
   assert.match(activity, /class NexusGlyphDrawable extends Drawable/);
-  assert.match(activity, /class ControlCoreView extends View/);
+  assert.match(activity, /class ControlCoreView extends NexusCanvasView/);
   assert.match(activity, /applicationId/);
   assert.match(activity, /app-tile:/);
   assert.match(activity, /configureMotionProfile\(\)/);
@@ -213,7 +222,7 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(sharedMotion, /public static final int ENTER = 260/);
   assert.match(sharedMotion, /public static final int CONTENT_SWAP = 320/);
   assert.match(sharedMotion, /profileScale\(boolean lowRam, boolean powerSave, float refreshRate\)/);
-  assert.doesNotMatch(activity, /motionDuration\([0-9]/, 'le durate della Console non devono tornare a essere valori sparsi');
+  assert.doesNotMatch(activity, /motion(?:Duration|\.duration)\([0-9]/, 'le durate della Console non devono tornare a essere valori sparsi');
   assert.match(activity, /NexusSymbolPaths\.path\(name\)/, 'le icone devono provenire dal catalogo vettoriale condiviso');
   assert.match(activity, /NXS-CORE-01/);
   assert.match(activity, /corePulseSummary/);
@@ -221,7 +230,7 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /Executors\.newSingleThreadExecutor\(\)/);
   assert.match(activity, /\/api\/system\/telemetry\/stream/);
   assert.match(activity, /stopLiveTelemetry\(\)/);
-  assert.match(activity, /if \(!liveTelemetryActive\) main\.postDelayed\(refresh, LIVE_REFRESH_MS\)/);
+  assert.match(activity, /if \(!live\.isActive\(\)\) main\.postDelayed\(refresh, LIVE_REFRESH_MS\)/);
   assert.match(activity, /launchCommandInFlight/);
   // Nessuna verifica manuale: la telemetria live e il varco offline classificano da soli.
   assert.match(activity, /telemetryFailures >= 3 && currentScreen == SCREEN_DASHBOARD/);
@@ -229,10 +238,13 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /applyDesktopControlState/);
   assert.match(activity, /SAFE_ACTION_HISTORY/);
   assert.match(activity, /Math\.min\(history\.length\(\), 3\)/, 'la cronologia locale deve restare compatta');
-  assert.match(activity, /getTimeFormat\(this\)/, 'gli orari devono seguire il formato del dispositivo');
+  assert.match(activity, /getTimeFormat\(context\)/, 'gli orari devono seguire il formato del dispositivo');
+  const commandProof = controlFile('ConsoleSession.java')
+    .split('void requestCommandWithProof')[1]?.split('void requestWithProof')[0] || '';
+  assert.ok(commandProof.includes('requestWithProof('), 'il comando deve passare dalla prova hardware');
   assert.doesNotMatch(
-    activity.split('private void requestCommandWithProof')[1]?.split('private void requestWithProof')[0] || '',
-    /showOffline/,
+    commandProof,
+    /showOffline|onConnectionLost/,
     'un timeout di apertura non deve trasformarsi in una falsa disconnessione'
   );
   assert.doesNotMatch(activity, /ACTION_VIEW, Uri\.parse\("https:\/\/claude\.com"\)/);
@@ -240,7 +252,7 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
 });
 
 test('Control respira come il nucleo web/desktop, a tempo e non a frame', () => {
-  const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const activity = controlSources();
   const breath = read('android/shared-motion/src/main/java/local/nexus/motion/NexusCoreBreath.java');
   const motion = read('android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
   const web = read('web/src/core-breath.ts');
@@ -251,12 +263,12 @@ test('Control respira come il nucleo web/desktop, a tempo e non a frame', () => 
   for (const constant of ['.34f) / .22f', '.66f) / .3f', '.44f * s * (.6f + .4f * seed)', '.58f * s * (.55f + .45f * seed)', '.1f * breath(seconds, -.03f)']) {
     assert.ok(breath.includes(constant), `costante del respiro allineata: ${constant}`);
   }
-  const core = activity.split('private final class ControlCoreView')[1]?.split('private final class NexusGlyphDrawable')[0] || '';
+  const core = controlFile('ui', 'ControlCoreView.java');
   assert.match(core, /SystemClock\.uptimeMillis\(\) - born/, 'il nucleo deve muoversi col tempo reale');
   assert.match(core, /NexusCoreBreath\.breath\(seconds, grainStagger/, 'ogni grano ha il suo sfasamento');
   assert.match(core, /NexusCoreBreath\.zoom\(seconds\)/, 'fioritura e collasso con zoom');
   assert.doesNotMatch(core, /phase = \(phase \+/, 'nessun avanzamento a passo fisso per frame (scatti a 120 Hz)');
-  assert.match(activity, /private void waveChildren\(ViewGroup parent/);
+  assert.match(activity, /void waveChildren\(ViewGroup parent/);
   assert.match(activity, /NexusMotion\.waveDelay\(index, step\)/);
   assert.match(activity, /animateSectionEntry\(panel, direction\)/);
   assert.match(activity, /if \(!moving \|\| index >= count\)/, 'con animazioni ridotte nessun blocco resta nascosto');
@@ -265,7 +277,7 @@ test('Control respira come il nucleo web/desktop, a tempo e non a frame', () => 
 
 test('Control riduce il budget grafico con isteresi sui frame reali', () => {
   const privateMonitor = read('android/NexusConsole/app/src/main/java/local/nexus/console/FrameBudgetMonitor.java');
-  const privateActivity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
+  const privateActivity = controlSources();
   for (const monitor of [privateMonitor]) {
     assert.match(monitor, /Choreographer\.FrameCallback/);
     assert.match(monitor, /smoothedSlowRatio >= \.12f/);
@@ -279,13 +291,13 @@ test('Control riduce il budget grafico con isteresi sui frame reali', () => {
   assert.match(privateActivity, /private static final int PARTICLE_CAPACITY = 34/);
   assert.match(privateActivity, /private static final int PARTICLE_CAPACITY = 14/);
   assert.doesNotMatch(privateActivity, /setLayerType\(View\.LAYER_TYPE_SOFTWARE/);
-  const materializationDraw = privateActivity.split('private final class MaterializationView')[1]?.split('private final class ControlCoreView')[0] || '';
-  const coreDraw = privateActivity.split('private final class ControlCoreView')[1]?.split('private final class NexusGlyphDrawable')[0] || '';
+  const materializationDraw = controlFile('ui', 'MaterializationView.java');
+  const coreDraw = controlFile('ui', 'ControlCoreView.java');
   assert.doesNotMatch(materializationDraw, /onDraw\([\s\S]*new float\[/);
   assert.doesNotMatch(coreDraw, /onDraw\([\s\S]*new float\[/);
   assert.match(privateActivity, /NotificationChannel\(NOTIFICATION_CHANNEL, "Avvisi operativi"/);
   assert.match(privateActivity, /deleteNotificationChannel\("nexus_console"\)/);
-  assert.match(privateActivity, /setVisibility\(android\.app\.Notification\.VISIBILITY_PRIVATE\)/);
+  assert.match(privateActivity, /setVisibility\(Notification\.VISIBILITY_PRIVATE\)/);
   assert.match(privateActivity, /PendingIntent\.FLAG_UPDATE_CURRENT \| PendingIntent\.FLAG_IMMUTABLE/);
   assert.match(privateActivity, /notify\(notificationId, value\)/);
   assert.doesNotMatch(privateActivity, /notify\(\(int\) \(System\.currentTimeMillis\(\) & 0xfffffff\)/);
