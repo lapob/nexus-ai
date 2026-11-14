@@ -794,7 +794,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
         overview.addView(liveMetrics, wrapBlock());
         LinearLayout memoryCard = card();
-        memoryCard.setBackground(rounded(Color.rgb(20, 38, 40), 24, Color.rgb(45, 69, 71)));
+        memoryCard.setBackground(withEdgeLight(rounded(Color.rgb(20, 38, 40), 24, Color.rgb(45, 69, 71)), 24, true));
         TextView memoryValue = text((memory == null ? 0 : memory.optInt("percent")) + "%", 40, TEXT);
         memoryValue.setTag("metric:RAM"); memoryValue.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         memoryCard.addView(eyebrow("MEMORIA RAM")); memoryCard.addView(memoryValue);
@@ -807,7 +807,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         servicesTitle.setPadding(0, 0, 0, dp(9));
         services.addView(servicesTitle);
         services.addView(infoRow("AI pubblica", aiAvailability(nexusService)));
-        services.addView(infoRow("Controllo privato", "Connesso"));
         JSONObject requests = nexusService == null ? null : nexusService.optJSONObject("requests");
         services.addView(divider());
         LinearLayout activityMetrics = new LinearLayout(this);
@@ -823,7 +822,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         service.addView(services, wrapBlock());
 
         renderApplicationsPanel(apps);
-        service.addView(serverActions());
+        service.addView(serverActions(), wrapBlock());
 
         LinearLayout history = card();
         TextView historyTitle = eyebrow("ULTIME OPERAZIONI");
@@ -896,7 +895,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             }
         }
         specifications.addView(infoRow("Tempo di attività", formatUptime(snapshot.optLong("uptimeSeconds"))));
-        specifications.addView(infoRow("Ultimo controllo", formatUpdated(snapshot.optLong("updatedAt"))));
         if (performance != null && performance.optInt("samples") > 0) {
             specifications.addView(divider());
             specifications.addView(infoRow("Richieste AI misurate", String.valueOf(performance.optInt("samples"))));
@@ -950,12 +948,20 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             if (selected && changed) animateSectionEntry(panel);
             Button tab = dashboardTabs.get(key);
             tab.setSelected(selected);
-            tab.setTextColor(selected ? BG : TEXT);
-            decorateButton(tab, dashboardGlyph(key), selected ? BG : TEXT);
-            tab.setBackground(rounded(selected ? TEXT : SURFACE, 16, Color.TRANSPARENT));
+            tab.setTextColor(selected ? BG : Color.rgb(176, 202, 203));
+            decorateButton(tab, dashboardGlyph(key), selected ? BG : Color.rgb(140, 184, 186));
+            tab.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(42, 109, 224, 221)), selected ? selectedTabSurface() : withEdgeLight(rounded(SURFACE, 16, Color.argb(26, 132, 190, 192)), 16, false), null));
         }
         revealSelectedDashboardTab();
         updateBackNavigation();
+    }
+
+    /** Sezione attiva: pillola luminosa ghiaccio→ciano, come il nucleo acceso. */
+    private Drawable selectedTabSurface() {
+        GradientDrawable pill = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[] { Color.rgb(236, 252, 251), Color.rgb(176, 240, 238) });
+        pill.setCornerRadius(dp(16));
+        return pill;
     }
 
     private String dashboardGlyph(String section) {
@@ -1021,13 +1027,12 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         boolean stacked = getResources().getConfiguration().screenWidthDp < 420
             || getResources().getConfiguration().fontScale >= 1.3f;
         row.setOrientation(stacked ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        Button verify = button("Verifica server", false, false);
-        decorateButton(verify, "pulse", Color.rgb(142, 211, 211));
-        verify.setOnClickListener(v -> verifyServer());
+        // Lo stato del server si aggiorna da solo (telemetria live e varco
+        // offline): resta solo l'azione che cambia davvero qualcosa.
         Button stop = button("Arresta server", false, true);
         decorateButton(stop, "stop", Color.rgb(244, 193, 178));
         stop.setOnClickListener(v -> planServerStop());
-        for (Button action : new Button[]{verify, stop}) {
+        for (Button action : new Button[]{stop}) {
             action.setMinHeight(dp(56));
             action.setPadding(dp(16), dp(12), dp(16), dp(12));
             LinearLayout.LayoutParams params = stacked
@@ -1059,26 +1064,6 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         row.addView(restart, new LinearLayout.LayoutParams(0, dp(58), 1));
         row.addView(shutdown, spaced(1));
         return row;
-    }
-
-    private void verifyServer() {
-        setState("Verifica server…", false);
-        request("GET", "/api/system/service", null, true, result -> {
-            setState("Online", false);
-            recordSafeAction("Server verificato");
-            String message = "PC connesso · AI " + aiAvailability(result).toLowerCase(Locale.ROOT);
-            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show();
-        }, true, () -> {
-            if (!foreground || currentScreen != SCREEN_DASHBOARD) return;
-            // Una singola sonda puo scadere durante un cambio rete senza che il
-            // PC sia realmente offline. La classificazione resta affidata al
-            // ciclo telemetrico, che verifica piu campioni e si riconnette.
-            setState("Riconnessione…", false);
-            recordSafeAction("Verifica server non riuscita");
-            android.widget.Toast.makeText(this, "Verifica non riuscita. La telemetria continua in background.", android.widget.Toast.LENGTH_SHORT).show();
-            main.removeCallbacks(refresh);
-            main.postDelayed(refresh, 750);
-        });
     }
 
     private void openNexusNxs() {
@@ -1411,7 +1396,7 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         tile.setContentDescription(label + ", " + status.toLowerCase(Locale.getDefault()).replace("·", "") + actionHint);
         int fill = Boolean.TRUE.equals(open) ? Color.rgb(6, 31, 32) : SURFACE;
         int stroke = Boolean.TRUE.equals(open) ? Color.argb(92, 101, 220, 216) : Color.argb(25, 128, 188, 190);
-        GradientDrawable surface = rounded(fill, 19, stroke);
+        Drawable surface = withEdgeLight(rounded(fill, 19, stroke), 19, Boolean.TRUE.equals(open));
         tile.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(42, 109, 224, 221)), surface, null));
         tile.setTextColor(Boolean.TRUE.equals(open) ? Color.rgb(226, 247, 246) : Color.rgb(190, 211, 211));
         glow(tile, Boolean.TRUE.equals(open));
@@ -1545,6 +1530,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         setTaggedText("live-updated", "Dati in tempo reale · " + formatUpdated(snapshot.optLong("updatedAt")));
         setTaggedText("metric:CPU", (snapshot.optJSONObject("cpu") == null ? 0 : snapshot.optJSONObject("cpu").optInt("percent")) + "%");
         setTaggedText("metric:GPU", (snapshot.optJSONObject("activity") == null ? 0 : snapshot.optJSONObject("activity").optInt("gpuPercent")) + "%");
+        setGauge("CPU", snapshot.optJSONObject("cpu") == null ? 0 : snapshot.optJSONObject("cpu").optInt("percent"));
+        setGauge("GPU", snapshot.optJSONObject("activity") == null ? 0 : snapshot.optJSONObject("activity").optInt("gpuPercent"));
         setTaggedText("metric:RAM", (snapshot.optJSONObject("memory") == null ? 0 : snapshot.optJSONObject("memory").optInt("percent")) + "%");
         JSONObject nexusService = snapshot.optJSONObject("nexusService");
         setTaggedText("value:AI pubblica", aiAvailability(nexusService));
@@ -1717,7 +1704,83 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         LinearLayout metric = card(); metric.setGravity(Gravity.CENTER);
         TextView name = text(label, 10, MUTED); name.setLetterSpacing(.12f); name.setGravity(Gravity.CENTER);
         TextView number = text(value + "%", 19, value >= 90 ? DANGER : TEXT); number.setTag("metric:" + label); number.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD); number.setGravity(Gravity.CENTER);
-        metric.addView(name); metric.addView(number); return metric;
+        // Anello di carico attorno al valore: si aggiorna da solo con la telemetria.
+        FrameLayout dial = new FrameLayout(this);
+        MetricGaugeView gauge = new MetricGaugeView(value);
+        gauge.setTag("gauge:" + label);
+        gauge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        dial.addView(gauge, new FrameLayout.LayoutParams(dp(96), dp(96), Gravity.CENTER));
+        dial.addView(number, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        metric.addView(name);
+        LinearLayout.LayoutParams dialParams = new LinearLayout.LayoutParams(-1, dp(100));
+        dialParams.topMargin = dp(4);
+        metric.addView(dial, dialParams);
+        return metric;
+    }
+
+    private void setGauge(String label, int value) {
+        View target = content.findViewWithTag("gauge:" + label);
+        if (target instanceof MetricGaugeView) ((MetricGaugeView) target).setValue(value);
+        View number = content.findViewWithTag("metric:" + label);
+        if (number instanceof TextView && !"RAM".equals(label)) ((TextView) number).setTextColor(value >= 90 ? DANGER : TEXT);
+    }
+
+    /** Arco di carico: traccia tenue, arco ciano (rosso oltre il 90 %) che scorre al nuovo valore. */
+    private final class MetricGaugeView extends View {
+        private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint halo = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF bounds = new RectF();
+        private float shown;
+        private float target;
+        private ValueAnimator animator;
+
+        MetricGaugeView(int value) {
+            super(NativeMainActivity.this);
+            track.setStyle(Paint.Style.STROKE); track.setStrokeWidth(dp(4)); track.setStrokeCap(Paint.Cap.ROUND);
+            track.setColor(Color.argb(30, 132, 190, 192));
+            arc.setStyle(Paint.Style.STROKE); arc.setStrokeWidth(dp(4)); arc.setStrokeCap(Paint.Cap.ROUND);
+            halo.setStyle(Paint.Style.STROKE); halo.setStrokeWidth(dp(10)); halo.setStrokeCap(Paint.Cap.ROUND);
+            target = Math.max(0, Math.min(100, value));
+            shown = animationsEnabled() ? 0f : target;
+            if (animationsEnabled()) post(() -> animateTo(target));
+        }
+
+        void setValue(int value) {
+            float next = Math.max(0, Math.min(100, value));
+            if (Math.abs(next - target) < .5f) return;
+            target = next;
+            animateTo(next);
+        }
+
+        private void animateTo(float next) {
+            if (animator != null) animator.cancel();
+            if (!animationsEnabled()) { shown = next; invalidate(); return; }
+            animator = ValueAnimator.ofFloat(shown, next);
+            animator.setDuration(motionDuration(NexusMotion.CURSOR_PULSE));
+            animator.setInterpolator(standardInterpolator());
+            animator.addUpdateListener(animation -> { shown = (float) animation.getAnimatedValue(); invalidate(); });
+            animator.start();
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            if (animator != null) animator.cancel();
+            super.onDetachedFromWindow();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float inset = dp(7);
+            bounds.set(inset, inset, getWidth() - inset, getHeight() - inset);
+            canvas.drawArc(bounds, 135, 270, false, track);
+            int color = target >= 90 ? DANGER : ACCENT;
+            arc.setColor(color);
+            halo.setColor(color);
+            halo.setAlpha(28);
+            float sweep = Math.max(2f, 270f * shown / 100f);
+            canvas.drawArc(bounds, 135, sweep, false, halo);
+            canvas.drawArc(bounds, 135, sweep, false, arc);
+        }
     }
 
     private LinearLayout.LayoutParams spacedMetric() {
@@ -1822,7 +1885,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
     private View divider() {
         View line = new View(this);
-        line.setBackgroundColor(Color.argb(18, 132, 190, 192));
+        // Separatore che sfuma ai lati invece di una riga piena.
+        line.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[] { Color.TRANSPARENT, Color.argb(40, 132, 190, 192), Color.TRANSPARENT }));
         line.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(1)));
         return line;
     }
@@ -1831,7 +1896,10 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         LinearLayout track = new LinearLayout(this);
         track.setBackground(rounded(Color.rgb(9, 29, 30), 999, Color.TRANSPARENT));
         LinearLayout fill = new LinearLayout(this);
-        fill.setBackground(rounded(ACCENT, 999, Color.TRANSPARENT));
+        GradientDrawable beam = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[] { Color.argb(150, 75, 231, 233), ACCENT, Color.rgb(214, 250, 249) });
+        beam.setCornerRadius(dp(999));
+        fill.setBackground(beam);
         track.addView(fill, new LinearLayout.LayoutParams(0, dp(3)));
         LinearLayout holder = new LinearLayout(this);
         holder.setPadding(0, 0, 0, dp(8));
@@ -1888,30 +1956,53 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         });
     }
 
-    private void renderServerStopConfirmation(JSONObject proposal) {
+    /**
+     * Struttura unica per conferme sensibili ed esiti: emblema Nexus animato,
+     * chip di stato, titolo, spiegazione e azioni. Stesso linguaggio del varco.
+     */
+    private void renderEmblemScreen(int emblem, String chip, String titleText, String detailText, Button primary, Button secondary) {
         content.setGravity(Gravity.CENTER);
-        ImageView mark = logo(.55f);
-        TextView eyebrow = eyebrow("CONFERMA RICHIESTA");
-        eyebrow.setTextColor(DANGER);
-        eyebrow.setGravity(Gravity.CENTER);
-        TextView title = text("Arrestare il server?", 29, TEXT);
+        boolean danger = emblem == EMBLEM_CONFIRM;
+        NexusGateView mark = new NexusGateView(emblem);
+        mark.setContentDescription(titleText);
+        content.addView(mark, new LinearLayout.LayoutParams(-1, dp(196)));
+        TextView badge = text(chip, 11, danger ? Color.rgb(244, 193, 178) : Color.rgb(150, 220, 218));
+        badge.setLetterSpacing(.22f);
+        badge.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
+        badge.setPadding(dp(12), dp(6), dp(12), dp(6));
+        badge.setBackground(rounded(danger ? Color.rgb(33, 15, 13) : Color.rgb(7, 30, 31), 99,
+            danger ? Color.argb(70, 232, 153, 132) : Color.argb(60, 101, 221, 218)));
+        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2);
+        badgeParams.gravity = Gravity.CENTER_HORIZONTAL;
+        badgeParams.bottomMargin = dp(14);
+        content.addView(badge, badgeParams);
+        TextView title = text(titleText, 26, TEXT);
         title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, dp(10), 0, dp(13));
-        TextView detail = text("Le connessioni NexusNXS resteranno offline fino al prossimo accesso a Windows o avvio manuale del server.", 15, MUTED);
+        title.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        title.setPadding(dp(8), 0, dp(8), dp(10));
+        content.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        TextView detail = text(detailText, 14, MUTED);
         detail.setGravity(Gravity.CENTER);
-        detail.setLineSpacing(0, 1.18f);
-        detail.setPadding(dp(12), 0, dp(12), dp(26));
+        detail.setLineSpacing(dp(2), 1f);
+        detail.setPadding(dp(18), 0, dp(18), dp(26));
+        content.addView(detail, new LinearLayout.LayoutParams(-1, -2));
+        for (Button action : new Button[] { primary, secondary }) {
+            if (action == null) continue;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(action == primary ? 56 : 50));
+            params.setMargins(dp(26), 0, dp(26), dp(10));
+            content.addView(action, params);
+        }
+    }
+
+    private void renderServerStopConfirmation(JSONObject proposal) {
         Button confirm = button("Arresta server", true, true);
+        decorateButton(confirm, "stop", Color.rgb(244, 193, 178));
         confirm.setOnClickListener(v -> authenticateThen(() -> executeServerStop(proposal.optString("id"))));
         Button cancel = button("Annulla", false, false);
         cancel.setOnClickListener(v -> cancelPowerConfirmation());
-        content.addView(mark, block(dp(126)));
-        content.addView(eyebrow);
-        content.addView(title);
-        content.addView(detail);
-        content.addView(confirm, block(dp(58)));
-        content.addView(cancel, block(dp(52)));
+        renderEmblemScreen(EMBLEM_CONFIRM, "CONFERMA RICHIESTA", "Arrestare il server?",
+            "NexusNXS resterà offline finché non lo riaccendi da qui o dal PC.", confirm, cancel);
     }
 
     private void executeServerStop(String ticket) {
@@ -1928,30 +2019,14 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     }
 
     private void renderConfirmation(String action, JSONObject proposal) {
-        content.setGravity(Gravity.CENTER);
         boolean shutdown = "shutdown".equals(action);
-        ImageView mark = logo(.55f);
-        TextView eyebrow = eyebrow("CONFERMA RICHIESTA");
-        eyebrow.setTextColor(DANGER);
-        eyebrow.setGravity(Gravity.CENTER);
-        TextView title = text(shutdown ? "Spegnere il PC?" : "Riavviare il PC?", 29, TEXT);
-        title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, dp(10), 0, dp(13));
-        TextView detail = text("Salva prima il lavoro aperto. L’azione partirà soltanto dopo la conferma.", 15, MUTED);
-        detail.setGravity(Gravity.CENTER);
-        detail.setLineSpacing(0, 1.18f);
-        detail.setPadding(dp(12), 0, dp(12), dp(26));
         Button confirm = button(shutdown ? "Spegni il computer" : "Riavvia il computer", true, shutdown);
+        decorateButton(confirm, shutdown ? "power" : "restart", shutdown ? Color.rgb(244, 193, 178) : Color.rgb(211, 242, 241));
         confirm.setOnClickListener(v -> authenticateThen(() -> executePower(proposal.optString("id"), shutdown)));
         Button cancel = button("Annulla", false, false);
         cancel.setOnClickListener(v -> cancelPowerConfirmation());
-        content.addView(mark, block(dp(126)));
-        content.addView(eyebrow);
-        content.addView(title);
-        content.addView(detail);
-        content.addView(confirm, block(dp(58)));
-        content.addView(cancel, block(dp(52)));
+        renderEmblemScreen(EMBLEM_CONFIRM, "CONFERMA RICHIESTA", shutdown ? "Spegnere il PC?" : "Riavviare il PC?",
+            "Salva prima il lavoro aperto. L’azione parte soltanto dopo la conferma.", confirm, cancel);
     }
 
     private void executePower(String ticket, boolean shutdown) {
@@ -1968,22 +2043,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     private void showScheduled(boolean shutdown, String message) {
         materializeNextContent = true;
         swapContent(() -> {
-            content.setGravity(Gravity.CENTER);
-            ImageView mark = logo(.62f);
-            TextView title = text(shutdown ? "Spegnimento inviato" : "Riavvio inviato", 27, TEXT);
-            title.setTypeface(getResources().getFont(R.font.inter_variable), Typeface.BOLD);
-            title.setGravity(Gravity.CENTER);
-            title.setPadding(0, dp(18), 0, dp(10));
-            TextView detail = text(message, 15, MUTED);
-            detail.setGravity(Gravity.CENTER);
-            detail.setPadding(dp(12), 0, dp(12), dp(26));
             Button back = button("Torna allo stato", false, false);
             back.setOnClickListener(v -> cancelPowerConfirmation());
-            content.addView(mark, block(dp(145)));
-            content.addView(title);
-            content.addView(detail);
-            content.addView(back, block(dp(54)));
-            pulse(mark);
+            renderEmblemScreen(EMBLEM_SENT, "COMANDO INVIATO", shutdown ? "Spegnimento inviato" : "Riavvio inviato", message, back, null);
         });
         setState("Comando inviato", false);
         main.postDelayed(reconnect, shutdown ? 7000 : 12000);
@@ -2009,6 +2071,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
     // #region Varco offline: PC spento oppure server spento
 
     private static final int GATE_PROBING = 0, GATE_PC_OFFLINE = 1, GATE_SERVER_OFFLINE = 2, GATE_SERVER_STARTING = 3;
+    // Stessi emblemi per le conferme sensibili e per il comando inviato.
+    private static final int EMBLEM_CONFIRM = 4, EMBLEM_SENT = 5;
     private int gateKind = GATE_PROBING;
     private boolean gateRescueAvailable;
     private boolean gateOwnerStopped;
@@ -2281,8 +2345,9 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             float radius = Math.min(getWidth(), getHeight()) * .34f;
             int cool = Color.rgb(84, 102, 104);
             int warm = Color.rgb(246, 190, 128);
-            boolean server = kind == GATE_SERVER_OFFLINE || kind == GATE_SERVER_STARTING;
-            int tone = kind == GATE_PC_OFFLINE ? cool : kind == GATE_PROBING ? Color.rgb(120, 170, 172) : ACCENT;
+            boolean starting = kind == GATE_SERVER_STARTING || kind == EMBLEM_SENT;
+            boolean server = kind == GATE_SERVER_OFFLINE || starting;
+            int tone = kind == GATE_PC_OFFLINE ? cool : kind == GATE_PROBING ? Color.rgb(120, 170, 172) : kind == EMBLEM_CONFIRM ? DANGER : ACCENT;
 
             // Orbite di fondo: tre anelli sottili concentrici.
             for (int index = 0; index < 3; index++) {
@@ -2294,8 +2359,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
 
             // Arco principale: eclissato (PC), stabile (server), in corsa (avvio/verifica).
             bounds.set(cx - radius, cy - radius, cx + radius, cy + radius);
-            float speed = kind == GATE_SERVER_STARTING ? 160f : kind == GATE_PROBING ? 120f : kind == GATE_SERVER_OFFLINE ? 14f : 6f;
-            float sweep = kind == GATE_PC_OFFLINE ? 64f : kind == GATE_SERVER_STARTING ? 210f + (float) Math.sin(t * 2.4f) * 60f : 128f;
+            float speed = starting ? 160f : kind == GATE_PROBING ? 120f : kind == EMBLEM_CONFIRM ? 26f : kind == GATE_SERVER_OFFLINE ? 14f : 6f;
+            float sweep = kind == GATE_PC_OFFLINE ? 64f : starting ? 210f + (float) Math.sin(t * 2.4f) * 60f : 128f;
             float start = -90f + t * speed;
             arc.setColor(tone);
             arc.setAlpha(kind == GATE_PC_OFFLINE ? 110 : 230);
@@ -2310,13 +2375,13 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             }
 
             // Nucleo: spento (PC), freddo e pulsante (server), acceso (avvio).
-            float pulse = moving ? (float) (.5 + .5 * Math.sin(t * (kind == GATE_SERVER_STARTING ? 5.2 : 1.9))) : .5f;
-            int coreColor = kind == GATE_PC_OFFLINE ? cool : server ? (kind == GATE_SERVER_STARTING ? ACCENT : warm) : tone;
+            float pulse = moving ? (float) (.5 + .5 * Math.sin(t * (starting ? 5.2 : 1.9))) : .5f;
+            int coreColor = kind == GATE_PC_OFFLINE ? cool : server ? (starting ? ACCENT : warm) : tone;
             dot.setColor(coreColor);
             dot.setAlpha(kind == GATE_PC_OFFLINE ? 70 : 40 + Math.round(pulse * 50));
             canvas.drawCircle(cx, cy, dp(14) + pulse * dp(kind == GATE_PC_OFFLINE ? 0 : 6), dot);
             dot.setAlpha(kind == GATE_PC_OFFLINE ? 120 : 235);
-            canvas.drawCircle(cx, cy, dp(kind == GATE_SERVER_STARTING ? 6 : 5), dot);
+            canvas.drawCircle(cx, cy, dp(starting ? 6 : 5), dot);
 
             // PC offline: frattura dell'orbita, segno che il collegamento è interrotto.
             if (kind == GATE_PC_OFFLINE) {
@@ -3031,16 +3096,41 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
             invalidate();
         }
 
+        private final Path area = new Path();
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint head = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        @Override protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight);
+            // Area sotto la curva che sfuma nel vetro: profondità senza rumore.
+            fill.setShader(new android.graphics.LinearGradient(0, 0, 0, height,
+                Color.argb(46, 75, 231, 233), Color.TRANSPARENT, android.graphics.Shader.TileMode.CLAMP));
+            head.setColor(ACCENT);
+        }
+
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             if (sampleCount < 2) return;
             float step = getWidth() / (float) (sampleCount - 1);
+            float inset = dp(3);
+            float span = getHeight() - inset * 2;
+            area.reset();
+            area.moveTo(0, getHeight());
+            for (int index = 0; index < sampleCount; index++) area.lineTo(index * step, inset + span - samples[index] / 100f * span);
+            area.lineTo((sampleCount - 1) * step, getHeight());
+            area.close();
+            canvas.drawPath(area, fill);
             for (int index = 1; index < sampleCount; index++) {
-                float x1 = (index - 1) * step, y1 = getHeight() - samples[index - 1] / 100f * getHeight();
-                float x2 = index * step, y2 = getHeight() - samples[index] / 100f * getHeight();
+                float x1 = (index - 1) * step, y1 = inset + span - samples[index - 1] / 100f * span;
+                float x2 = index * step, y2 = inset + span - samples[index] / 100f * span;
                 canvas.drawLine(x1, y1, x2, y2, glow);
                 canvas.drawLine(x1, y1, x2, y2, line);
             }
+            float lastX = (sampleCount - 1) * step, lastY = inset + span - samples[sampleCount - 1] / 100f * span;
+            head.setAlpha(60);
+            canvas.drawCircle(lastX - dp(2), lastY, dp(5), head);
+            head.setAlpha(255);
+            canvas.drawCircle(lastX - dp(2), lastY, dp(2), head);
         }
     }
 

@@ -1,3 +1,46 @@
+## Control 1.24.0: new style in the inner screens, redundant buttons removed — 14 November 2026
+
+Owner request: the best modern graphics in every inner screen too, and no
+useless buttons.
+
+Removed:
+- "Verifica server" in Servizi, plus `verifyServer()`. Status now updates by
+  itself through live telemetry and the offline gate.
+- The "Controllo privato: Connesso" row, which was always true when visible.
+- The "Ultimo controllo" row in Sistema, which repeated the live timestamp.
+
+New style:
+- Section tabs: the active one is an ice→cyan pill; the others are glass
+  with a light line on the top edge.
+- CPU/GPU metrics sit inside a load ring (`MetricGaugeView`, red above
+  90 %) that animates to each new value.
+- Charts have a fading area under the curve and a glowing point on the last
+  value.
+- Dividers fade at the sides; progress bars use a luminous gradient.
+- App tiles and the memory card get the top-edge light line.
+- Confirmations (Arresta server, Riavvia/Spegni) and "comando inviato" share
+  one layout (`renderEmblemScreen`) with the animated gate emblem: a red tone
+  for confirmations, converging arcs for a sent command.
+- Reduced motion is respected everywhere: static images, and values set
+  without animation.
+
+Tests:
+- android-client-contract updated: "Verifica server" must not exist; the
+  offline escalation is checked.
+- Full suite: 1299 tests, 1297 pass, 0 fail.
+
+APK 1.24.0, versionCode 52, SHA-256 5F6B260F…6E4F, installed via ADB.
+
+Checked on the phone:
+- Panoramica, App and Servizi on the first 1.24.0 build. Servizi no longer
+  has "Verifica server".
+- The last build only adds spacing before "Arresta server", larger rings and
+  no shadow on the tabs. It was installed but not seen on screen: the owner
+  was using the phone.
+- Incident: a tap of mine at (664,338) landed on the "Light Circles" banner of
+  another app in the foreground and opened its promo screen. Nothing else was
+  touched. Screenshots with personal data were deleted.
+
 ## Control 1.23.0: offline gate, server restart from the phone, redesign — 14 November 2026 (verified)
 
 Owner request: block all of Control while the PC is offline; when only the

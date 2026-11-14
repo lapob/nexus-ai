@@ -159,7 +159,8 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   const activity = read('android/NexusConsole/app/src/main/java/local/nexus/console/NativeMainActivity.java');
   const consoleBuild = read('android/NexusConsole/app/build.gradle');
   const sharedMotion = read('android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
-  assert.match(activity, /Verifica server/);
+  // Lo stato del server si aggiorna da solo: nessun pulsante di verifica manuale.
+  assert.doesNotMatch(activity, /Verifica server/);
   assert.match(activity, /Arresta server/);
   assert.match(activity, /\/api\/system\/service/);
   assert.match(activity, /controlDesktopApp\("open-full-app"/);
@@ -222,7 +223,8 @@ test('NexusNXS Control offre controlli applicativi e server espliciti e sicuri',
   assert.match(activity, /stopLiveTelemetry\(\)/);
   assert.match(activity, /if \(!liveTelemetryActive\) main\.postDelayed\(refresh, LIVE_REFRESH_MS\)/);
   assert.match(activity, /launchCommandInFlight/);
-  assert.match(activity, /Verifica non riuscita\. La telemetria continua in background\./);
+  // Nessuna verifica manuale: la telemetria live e il varco offline classificano da soli.
+  assert.match(activity, /telemetryFailures >= 3 && currentScreen == SCREEN_DASHBOARD/);
   assert.match(activity, /\/api\/presence\/status/);
   assert.match(activity, /applyDesktopControlState/);
   assert.match(activity, /SAFE_ACTION_HISTORY/);
