@@ -1,3 +1,50 @@
+## Desktop updates itself to every signed Preview — 15 November 2026 (committed, no release yet)
+
+- Goal: the installed desktop app must never stay on an old core. Takes
+  effect from the first Preview published with this code (installs on
+  0.3.42 or older still use the manual "Aggiorna" flow once).
+- `update-manager.js`: the automatic check (12 s after start, then every
+  30 min) downloads straight away in the background. It only starts after
+  the Ed25519 manifest, latest.yml and the rollout policy have been
+  verified. electron-updater checks the installer's SHA-512 and size
+  against the signed data; unsigned or `manual-preview` builds never
+  download. The manual check and "Aggiorna" work as before. Without
+  "Riavvia ora" the update installs at the next close
+  (`autoInstallOnAppQuit`).
+- UI: background states (available/downloading/error) stay invisible. When
+  the update is ready, a small toast "Aggiornamento pronto · Riavvia ora"
+  appears top right under the header (`data-variant="toast"`). Visibility
+  logic is in the pure module `web/src/update-visibility.ts`.
+- Rollback (`update-rollback.js`, reuses `update-health.js` through
+  `onEvent`):
+  - When a version becomes healthy, its NSIS installer
+    (`%LOCALAPPDATA%\nexusnxs-updater\installer.exe`) is copied with its
+    SHA-512 to `nexusnxs-updater\rollback\` as the restore point.
+  - A downloaded version is "on trial" from its first start. Two unclean
+    starts or crashes before it becomes healthy mark it as blocked and
+    rerun the verified restore point silently
+    (`--updated /S --force-run`).
+  - If the restore point is missing or altered, nothing runs.
+  - Only the desktop app counts starts (`bootGuard: !headlessMode`).
+  - Health tracking stays local even with
+    NEXUS_DISABLE_UPDATE_HEALTH=1.
+- Verified:
+  - `tests/update-auto-preview.test.js` (8 tests). End to end with the
+    real electron-updater against a fake Preview feed on loopback, signed
+    with the real release functions. Covers: real download plus digest,
+    toast only when ready, "Riavvia ora", replaced installer refused,
+    another key's signature, unsigned distinct and missing signature
+    refused, cohort deferred, two failed starts leading to rollback and a
+    block. Also unit tests for rollback, health and visibility.
+  - `npm test`: 1324 tests, 0 failed. `tsc --noEmit` OK.
+  - Toast checked visually in the web shell.
+- Not verified: a real install and rollback on the installed app (they need
+  a published Preview). `check:sections` fails only on
+  `scripts/visual/lib/*`, which is the visual-tests session's work in
+  progress; the files from this block pass.
+- Next: publish the next Preview, then check the toast and the restore
+  point on the PC.
+
 ## Android emulator for Control — 15 November 2026
 
 - The owner authorized the download. Into Z:\[AI]\NexusNXS\.toolchains\android-sdk:

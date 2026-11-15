@@ -6,6 +6,7 @@
 import { AnimatePresence, m } from 'framer-motion';
 import type { DesktopUpdate, UpdateState } from './desktopPresence';
 import { Icon } from './Icon';
+import { updateIsToast } from './update-visibility';
 import './update-card.css';
 
 const RING = 2 * Math.PI * 19;
@@ -34,7 +35,9 @@ function copy(state: UpdateState) {
       const speed = state.bytesPerSecond ? ` · ${megabytes(state.bytesPerSecond)} MB/s` : '';
       return { title: `Scarico ${version}`, detail: `${amount}${speed}${eta ? ` · ancora ${eta}` : ''}` };
     }
-    case 'ready': return { title: `${version} è pronto`, detail: 'Verificato. Riavvia per completare: le conversazioni restano dove sono.' };
+    case 'ready': return state.automatic
+      ? { title: 'Aggiornamento pronto', detail: `${version} · si installa alla chiusura` }
+      : { title: `${version} è pronto`, detail: 'Verificato. Riavvia per completare: le conversazioni restano dove sono.' };
     case 'installing': return { title: 'Riavvio in corso…', detail: `Installo ${version}: NexusNXS si riapre da solo tra un attimo.` };
     default: return { title: state.phase === 'install' ? 'Riavvio non riuscito' : 'Download interrotto', detail: 'Nessun problema: la versione attuale continua a funzionare. Puoi riprovare.' };
   }
@@ -71,15 +74,19 @@ export function UpdateCard({ update, hidden = false }: { update: DesktopUpdate; 
   const text = state ? copy(state) : { title: '', detail: '' };
   const status = state?.status ?? '';
   const percent = Math.round(state?.progress || 0);
+  // Aggiornamento arrivato in background: piccolo toast discreto a destra, non la scheda centrale.
+  const toast = updateIsToast(state);
   return (
     <>
       <AnimatePresence>{show && status === 'installing' && (
         <m.div key="veil" className="update-veil" aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} />
       )}</AnimatePresence>
       <AnimatePresence>{show && state && (
-        <m.section key="update-card" className="update-card glass" data-state={status} role="status" aria-live="polite" aria-label="Aggiornamento di NexusNXS"
-          initial={{ opacity: 0, y: -16, scale: 0.96, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, y: -10, scale: 0.97, filter: 'blur(4px)' }} transition={SPRING}>
+        <m.section key={toast ? 'update-toast' : 'update-card'} className="update-card glass" data-state={status} data-variant={toast ? 'toast' : 'card'}
+          role="status" aria-live="polite" aria-label="Aggiornamento di NexusNXS"
+          initial={toast ? { opacity: 0, x: 24, scale: 0.96, filter: 'blur(6px)' } : { opacity: 0, y: -16, scale: 0.96, filter: 'blur(6px)' }}
+          animate={{ opacity: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)' }}
+          exit={toast ? { opacity: 0, x: 16, scale: 0.97, filter: 'blur(4px)' } : { opacity: 0, y: -10, scale: 0.97, filter: 'blur(4px)' }} transition={SPRING}>
           <span className="update-aura" aria-hidden="true" />
           <Orb state={state} />
           <div className="update-body">
@@ -96,7 +103,7 @@ export function UpdateCard({ update, hidden = false }: { update: DesktopUpdate; 
           <div className="update-actions">
             {status === 'downloading' && <span className="update-percent">{percent}<small>%</small></span>}
             {status === 'available' && <button type="button" className="update-primary" onClick={update.download}><Icon name="download" size={16} /><span>Aggiorna</span></button>}
-            {status === 'ready' && <button type="button" className="update-primary" onClick={update.install}><Icon name="retry" size={16} /><span>Riavvia</span></button>}
+            {status === 'ready' && <button type="button" className="update-primary" onClick={update.install}><Icon name="retry" size={16} /><span>{toast ? 'Riavvia ora' : 'Riavvia'}</span></button>}
             {status === 'error' && <button type="button" className="update-primary" onClick={update.download}><Icon name="retry" size={16} /><span>Riprova</span></button>}
             {(status === 'available' || status === 'ready' || status === 'error') && (
               <button type="button" className="icon-button small update-later" aria-label={status === 'ready' ? 'Più tardi: si installa alla chiusura' : 'Più tardi'}

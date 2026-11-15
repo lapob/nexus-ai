@@ -39,15 +39,23 @@ function writeState(statePath, state) {
  * @param {{ statePath: string, version: string, channel: string, endpoint: string, send: (url: string, body: string) => Promise<unknown>,
  *   logger?: any, healthyAfterMs?: number, enabled?: boolean }} options
  */
-function createUpdateHealth({ statePath, version, channel, endpoint, send, logger, healthyAfterMs = 3 * 60_000, enabled = true }) {
+function createUpdateHealth({ statePath, version, channel, endpoint, send, logger, healthyAfterMs = 3 * 60_000, enabled = true, onEvent = null }) {
   let timer = null;
   let state = {};
-  const active = Boolean(enabled && statePath && endpoint && /^\d+\.\d+\.\d+/.test(String(version || '')));
+  // Il tracciamento locale (avvio sano, chiusura non pulita) serve anche al rollback automatico e resta
+  // attivo quando l'invio del segnale anonimo è disattivato: la rete parte solo con `enabled`.
+  const active = Boolean(statePath && /^\d+\.\d+\.\d+/.test(String(version || '')));
+  const sending = Boolean(active && enabled && endpoint);
 
+  const notify = (event) => {
+    try { onEvent?.(event); } catch (error) { logger?.debug?.('Osservatore salute aggiornamento non riuscito.', { error: error?.message }); }
+  };
   const report = (event) => {
     if (!active || !EVENTS.has(event) || state[event]) return false;
     state = { ...state, [event]: Date.now() };
     writeState(statePath, state);
+    notify(event);
+    if (!sending) return true;
     Promise.resolve()
       .then(() => send(endpoint, JSON.stringify({ version, channel, event })))
       .catch((error) => logger?.debug?.('Segnale di salute aggiornamento non inviato.', { error: error?.message }));

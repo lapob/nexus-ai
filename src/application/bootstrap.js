@@ -146,6 +146,8 @@ function bootstrapElectron({ env = process.env } = {}) {
     rolloutSeed: sharedDataRoot,
     trustedRendererUrl: RENDERER_ENTRY_URL,
     healthStatePath: path.join(sharedDataRoot, 'updates', 'health.json'),
+    // Solo l'app desktop è "in prova" dopo un aggiornamento: server e device core non contano gli avvii.
+    bootGuard: !headlessMode,
     logger
   });
   updateManager.setWindowProvider(() => BrowserWindow.getAllWindows()[0] || null);

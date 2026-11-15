@@ -2,8 +2,11 @@
  * @module infrastructure/electron/update-manager
  * @description Aggiornamenti firmati, silenziosi e confinati al processo principale.
  */
+const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { app, ipcMain, net } = require('electron');
 const { createUpdateHealth, isCrashExit } = require('./update-health');
+const { createUpdateRollback } = require('./update-rollback');
 const { NsisUpdater } = require('electron-updater');
 const { Provider } = require('electron-updater/out/providers/Provider');
 const { CHANNELS } = require('../../application/ipc-contracts');
@@ -57,16 +60,38 @@ class VerifiedReleaseProvider extends Provider {
 
 /** Pausa tra lo stato "installing" e la chiusura: lascia vedere l'animazione di riavvio. */
 const INSTALL_DELAY_MS = 1400;
+/** Primo controllo dopo l'avvio e cadenza dei controlli in background. */
+const INITIAL_CHECK_MS = 12_000;
+const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
-function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey = '', manifestKeyId = '', rolloutSeed = '', trustedRendererUrl, logger, healthStatePath = '' }) {
+/** Copia di sé che ogni installer NSIS di electron-builder lascia in %LOCALAPPDATA%\<nome>-updater. */
+function defaultInstallerCopyPath() {
+  const local = process.env.LOCALAPPDATA || path.join(app.getPath?.('appData') || '', '..', 'Local');
+  return path.join(local, 'nexusnxs-updater', 'installer.exe');
+}
+
+/** Reinstallazione silenziosa del punto di ripristino, staccata dal processo che sta per chiudersi. */
+function launchRestoreInstaller(file) {
+  spawn(file, ['--updated', '/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+}
+
+function createUpdateManager({
+  updateUrl, channel = 'stable', manifestPublicKey = '', manifestKeyId = '', rolloutSeed = '', trustedRendererUrl, logger, healthStatePath = '',
+  bootGuard = true, autoDownload = true, installerCopyPath = '', restoreDir = '', rollbackStatePath = '',
+  launchInstaller = launchRestoreInstaller, quit = () => (app.isReady?.() ? app.quit() : app.exit(0)),
+  initialCheckMs = INITIAL_CHECK_MS, checkIntervalMs = CHECK_INTERVAL_MS
+}) {
   channel = ['preview', 'beta', 'stable'].includes(channel) ? channel : 'stable';
   let updater = null;
   let health = null;
+  let rollback = null;
   let initialTimer = null;
   let recurringTimer = null;
-  let state = { status: 'disabled', version: app.getVersion(), currentVersion: app.getVersion(), progress: 0, channel, lastCheckedAt: 0 };
+  let state = { status: 'disabled', version: app.getVersion(), currentVersion: app.getVersion(), progress: 0, channel, lastCheckedAt: 0, automatic: false };
   let installWhenReady = false;
   let installing = false;
+  // Il controllo in corso è automatico (timer) o chiesto dall'utente: solo quello automatico scarica da solo.
+  let automaticCheck = false;
   let windowProvider = () => null;
   const publish = () => {
     const window = windowProvider();
@@ -115,14 +140,20 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     if (state.status === 'downloading' || state.status === 'installing') { installWhenReady = true; return state; }
     if (!['available', 'error'].includes(state.status) || !state.version || state.version === app.getVersion()) return state;
     installWhenReady = true;
-    setState({ status: 'downloading', phase: 'download', progress: 0, transferred: 0, total: state.total || 0, bytesPerSecond: 0 });
-    updater.downloadUpdate().catch((error) => {
-      installWhenReady = false;
-      logger.warn('Download aggiornamento non riuscito.', { error });
-      setState({ status: 'error', phase: 'download', progress: 0 });
-    });
+    startDownload({ automatic: false });
     return state;
   });
+  // Download verificato: electron-updater confronta SHA-512 e dimensione con i dati della distinta firmata.
+  // In background un errore resta discreto (phase "background") e si riprova al controllo successivo.
+  const startDownload = ({ automatic }) => {
+    const phase = automatic ? 'background' : 'download';
+    setState({ status: 'downloading', phase, automatic, progress: 0, transferred: 0, total: state.total || 0, bytesPerSecond: 0 });
+    updater.downloadUpdate().catch((error) => {
+      installWhenReady = false;
+      logger.warn(automatic ? 'Download in background dell’aggiornamento non riuscito; nuovo tentativo al prossimo controllo.' : 'Download aggiornamento non riuscito.', { error });
+      setState({ status: 'error', phase, progress: 0 });
+    });
+  };
 
   if (!app.isPackaged || !updateUrl || process.env.NEXUS_DISABLE_UPDATES === '1') {
     return { start() {}, stop() {}, setWindowProvider(provider) { windowProvider = provider; }, status: () => state };
@@ -134,6 +165,7 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
   const checkTrustedUpdates = async ({ seeker = false } = {}) => {
     // Un download o un riavvio già avviati non vengono interrotti dal controllo periodico.
     if (busy()) return null;
+    automaticCheck = !seeker;
     // Con un aggiornamento già proposto la scheda resta visibile durante il ricontrollo.
     if (state.status !== 'available') setState({ status: 'checking', progress: 0, lastCheckedAt: Date.now() });
     const verifiedFeed = await verifyRemoteReleaseFeed({
@@ -149,15 +181,32 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       });
       return null;
     }
+    // Una versione già ripristinata per crash all'avvio non torna: si attende la successiva firmata.
+    if (rollback?.isBlocked(verifiedFeed.manifest.version)) {
+      setState({ status: 'current', progress: 0, blockedVersion: verifiedFeed.manifest.version, lastCheckedAt: Date.now() });
+      return null;
+    }
     setState({ rollout: { reason: rollout.reason, percentage: rollout.percentage } });
     updater.setFeedURL({ provider: 'custom', updateProvider: VerifiedReleaseProvider, verifiedFeed });
     return updater.checkForUpdates();
   };
+  // Rollback: prima di qualsiasi altra cosa, un avvio fallito della versione in prova riporta a quella sana.
+  rollback = createUpdateRollback({
+    statePath: rollbackStatePath || (healthStatePath ? path.join(path.dirname(healthStatePath), 'rollback.json') : ''),
+    restoreDir: restoreDir || path.join(path.dirname(installerCopyPath || defaultInstallerCopyPath()), 'rollback'),
+    installerCopyPath: installerCopyPath || defaultInstallerCopyPath(),
+    version: app.getVersion(), launchInstaller, quit, logger
+  });
+  if (bootGuard && rollback.boot().action === 'rollback') {
+    state = { ...state, status: 'rolling-back' };
+    return { start() {}, stop() {}, setWindowProvider(provider) { windowProvider = provider; }, status: () => state, reportProcessGone() {} };
+  }
   try {
     cleanUpdateUrl(updateUrl);
     updater = new NsisUpdater({ provider: 'custom', updateProvider: VerifiedReleaseProvider });
     updater.disableWebInstaller = true;
-    // Il download parte solo quando l'utente sceglie "Aggiorna" (updateDownload).
+    // electron-updater non scarica da solo: il download automatico parte qui, solo dopo la verifica della
+    // distinta firmata e della policy di rollout, così ogni byte resta legato alla firma Ed25519.
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = true;
     updater.allowDowngrade = false;
@@ -168,7 +217,10 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     updater.on('update-available', (info) => {
       if (busy()) return;
       const size = Number(info?.files?.[0]?.size) || 0;
-      setState({ status: 'available', phase: '', progress: 0, total: size, lastCheckedAt: Date.now(), ...publicUpdateInfo(info) });
+      const automatic = autoDownload && automaticCheck;
+      setState({ status: 'available', phase: '', automatic, progress: 0, total: size, lastCheckedAt: Date.now(), ...publicUpdateInfo(info) });
+      // Controllo in background: scarica e verifica subito, poi avvisa con discrezione quando è pronto.
+      if (automatic) startDownload({ automatic: true });
     });
     updater.on('download-progress', (progress) => setState({
       status: 'downloading',
@@ -178,6 +230,8 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       bytesPerSecond: Math.max(0, Number(progress.bytesPerSecond) || 0)
     }));
     updater.on('update-downloaded', (info) => {
+      // Dal primo avvio la nuova versione è in prova: un crash all'avvio la ripristina da sola.
+      rollback.arm(String(info?.version || ''));
       setState({ status: 'ready', progress: 100, downloadedAt: Date.now(), ...publicUpdateInfo(info) });
       if (installWhenReady) installNow();
     });
@@ -185,7 +239,7 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       logger.warn('Controllo aggiornamenti non riuscito; NexusNXS continuerà con la versione installata.', { error });
       // Un ricontrollo fallito non nasconde un aggiornamento già proposto o scaricato.
       if (installing || state.status === 'ready' || state.status === 'available') return;
-      const phase = state.status === 'downloading' ? 'download' : 'check';
+      const phase = state.status === 'downloading' ? (state.phase === 'background' ? 'background' : 'download') : 'check';
       installWhenReady = false;
       setState({ status: 'error', phase, progress: 0, lastCheckedAt: Date.now() });
     });
@@ -197,6 +251,8 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
       endpoint: `${cleanUpdateUrl(updateUrl)}/health`,
       enabled: process.env.NEXUS_DISABLE_UPDATE_HEALTH !== '1',
       logger,
+      // Versione sana: chiude la prova e conserva l'installer verificato come punto di ripristino.
+      onEvent: (event) => { if (event === 'healthy') void rollback.confirmHealthy(); },
       send: (url, body) => net.fetch(url, {
         method: 'POST', body, redirect: 'error', credentials: 'omit', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10_000)
@@ -209,22 +265,27 @@ function createUpdateManager({ updateUrl, channel = 'stable', manifestPublicKey 
     setWindowProvider(provider) { windowProvider = provider; },
     status: () => state,
     /** Uscita anomala di un processo dell'app (renderer, GPU): segnale di crash per la versione attuale. */
-    reportProcessGone(details) { if (isCrashExit(details)) health?.crash(); },
+    reportProcessGone(details) {
+      if (!isCrashExit(details)) return;
+      health?.crash();
+      rollback.recordCrash();
+    },
     start() {
       if (initialTimer || recurringTimer) return;
       health?.start();
-      initialTimer = setTimeout(() => checkTrustedUpdates().catch((error) => {
-        logger.warn('Verifica della distinta aggiornamento non riuscita.', { error });
-        setState({ status: 'error', progress: 0, lastCheckedAt: Date.now() });
-      }), 12_000);
+      // Un errore di verifica in background non disturba: resta discreto e si riprova al giro successivo.
+      const failed = (message) => (error) => {
+        logger.warn(message, { error });
+        if (!busy() && state.status !== 'available') setState({ status: 'error', phase: 'check', progress: 0, lastCheckedAt: Date.now() });
+      };
+      initialTimer = setTimeout(() => checkTrustedUpdates().catch(failed('Verifica della distinta aggiornamento non riuscita.')), initialCheckMs);
       initialTimer.unref?.();
-      recurringTimer = setInterval(() => checkTrustedUpdates().catch((error) => {
-        logger.warn('Verifica periodica della distinta aggiornamento non riuscita.', { error });
-        setState({ status: 'error', progress: 0, lastCheckedAt: Date.now() });
-      }), 30 * 60 * 1000); // ogni 30 minuti: una nuova versione arriva in giornata, scaricata in background
+      // Ogni 30 minuti: una nuova Preview arriva in giornata, scaricata e verificata in background.
+      recurringTimer = setInterval(() => checkTrustedUpdates().catch(failed('Verifica periodica della distinta aggiornamento non riuscita.')), checkIntervalMs);
       recurringTimer.unref?.();
     },
     stop() {
+      rollback.cleanExit();
       health?.stop();
       clearTimeout(initialTimer);
       clearInterval(recurringTimer);

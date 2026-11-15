@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CoreState } from './Core';
 import { desktopBridge } from './platform';
+import { updateVisible, type UpdateState } from './update-visibility';
 
 const WAKE_WORD_KEY = 'nxs.wakeword';
 const WAKE_WORD_EVENT = 'nxs-wakeword-change';
@@ -29,14 +30,9 @@ const PROACTIVE_LABELS: Record<string, (metadata: Record<string, string>) => str
   'device.health': () => 'Stato del dispositivo aggiornato'
 };
 
-export interface UpdateState {
-  status: string; phase?: string; version?: string; currentVersion?: string; releaseNotes?: string;
-  progress?: number; transferred?: number; total?: number; bytesPerSecond?: number;
-}
+export type { UpdateState } from './update-visibility';
 
 export interface DesktopUpdate { state: UpdateState | null; visible: boolean; download: () => void; install: () => void; dismiss: () => void }
-
-const UPDATE_VISIBLE = new Set(['available', 'downloading', 'ready', 'installing']);
 
 /**
  * Aggiornamenti del desktop: il main process verifica la distinta firmata e annuncia la nuova versione;
@@ -51,11 +47,7 @@ export function useDesktopUpdate(): DesktopUpdate {
     void Promise.resolve(desktopBridge.updateStatus?.()).then((value: UpdateState) => value && setState(value)).catch(() => {});
     return desktopBridge.onUpdateEvent((value: UpdateState) => setState(value)) as () => void;
   }, []);
-  const status = state?.status ?? '';
-  // Un errore resta visibile solo se interrompe un download o un riavvio chiesti dall'utente.
-  const failedAction = status === 'error' && (state?.phase === 'download' || state?.phase === 'install') && Boolean(state?.version);
-  const inFlight = status === 'downloading' || status === 'installing';
-  const visible = Boolean(state) && (UPDATE_VISIBLE.has(status) || failedAction) && (inFlight || state?.version !== dismissed);
+  const visible = updateVisible(state, dismissed);
   return {
     state,
     visible,
