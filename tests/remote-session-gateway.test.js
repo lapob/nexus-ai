@@ -902,6 +902,36 @@ test('readiness resta negativa quando il provider non espone alcun modello chat'
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('readyz dichiara "warming" durante preload o autoriparazione, così il watchdog attende', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-readiness-phase-'));
+  let phase = { ready: false, status: 'warming' };
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (record) => record },
+    readinessProvider: () => phase,
+    modelProvider: async () => [{ id: 'chat', capabilities: { chat: true } }],
+    onMessage: async ({ conversation }) => ({ ...conversation, turns: [] }),
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    const port = await freePort();
+    await gateway.configure({ enabled: true, allowLan: false, port });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    let response = await fetch(`${baseUrl}/readyz`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { status: 'warming' });
+    phase = { ready: false, status: 'failed' };
+    gateway.invalidateReadiness();
+    response = await fetch(`${baseUrl}/readyz`);
+    assert.deepEqual(await response.json(), { status: 'not_ready' });
+    phase = { ready: true, status: 'ready' };
+    gateway.invalidateReadiness();
+    response = await fetch(`${baseUrl}/readyz`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { status: 'ready' });
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('readiness attende il warm-up reale e i messaggi guest falliscono rapidamente durante il cold-start', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-readiness-warmup-'));
   let runtimeReady = false;

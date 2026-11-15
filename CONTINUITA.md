@@ -3102,6 +3102,28 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - `npm test`: 1310 tests, 1308 pass, 0 fail.
 - Next: coordinated server restart with `maintenance.flag` to load the fix, then check `readyz` and integrity
   from `/internal/observability`.
+## Watchdog: no restart while the server is repairing itself (15 November 2026)
+
+- Cause of the 14/11 stall (15:35–15:41):
+  - the AI runtime (Ollama) went down twice, at 15:34 and 15:37 local time;
+  - the server recovered it automatically both times ("Runtime AI ripristinato automaticamente"), but the model
+    was still warming up;
+  - `/readyz` returned only `not_ready`, so the watchdog counted the warm-up as a failure and ran a coordinated
+    restart at 15:39. That added another 2–3 minutes of warm-up.
+- Fix:
+  - `bootstrap.js` passes the AI phase (`ready` and `status`) to the gateway;
+  - `/readyz` answers 503 `{status:'warming'}` during preload or self-repair (still 503, so clients behave the
+    same);
+  - `server-watchdog.ps1` reads the body even with a 503 and waits for `warming` for up to 15 minutes (persisted
+    in `warmingSince`), then counts it as a failure again. Other statuses are unchanged: 3 failures, a server
+    older than 10 minutes, at most 2 restarts per hour.
+- Checks:
+  - `npm test`: 1312 tests, 1310 pass, 0 fail, including new tests for the gateway phase and the watchdog wait;
+  - `server-watchdog.ps1 -DryRun` against the live server: "Server pronto".
+- Deployment: the watchdog is active at its next check. The gateway and bootstrap parts load at the next
+  coordinated server restart (for example the next release).
+- Open: why Ollama dropped twice on 14/11 at 15:34–15:37. Likely concurrent GPU/VRAM load from the parallel
+  sessions; not confirmed.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

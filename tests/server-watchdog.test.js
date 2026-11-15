@@ -19,6 +19,13 @@ test('riavvio solo dopo 3 controlli falliti, con server avviato da almeno 10 min
   assert.doesNotMatch(watchdog, /Stop-Process|taskkill/i);
 });
 
+test('server in preparazione o autoriparazione: attesa fino a 15 minuti, poi torna a contare', () => {
+  assert.match(watchdog, /-SkipHttpErrorCheck/, 'il corpo di /readyz si legge anche con 503');
+  assert.match(watchdog, /\$readiness -eq 'warming'/);
+  assert.match(watchdog, /TotalMinutes -lt 15/);
+  assert.match(watchdog, /warmingSince = \$\(if \(\$state\.warmingSince\)/, 'l inizio dell attesa sopravvive tra un controllo e l altro');
+});
+
 test('pausa in manutenzione e con un gestore già attivo; DryRun non scrive né riavvia', () => {
   assert.match(watchdog, /maintenance\.flag/);
   assert.match(watchdog, /TotalHours -lt 2/);

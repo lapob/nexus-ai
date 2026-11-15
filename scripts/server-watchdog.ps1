@@ -34,16 +34,20 @@ function Write-WatchdogLog([string]$Level, [string]$Message) {
   [IO.File]::AppendAllText($logPath, $line + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
 }
 
-$state = @{ failures = 0; restarts = @() }
+$state = @{ failures = 0; restarts = @(); warmingSince = $null }
 if (Test-Path -LiteralPath $statePath) {
   try {
     $saved = [IO.File]::ReadAllText($statePath) | ConvertFrom-Json
     $state.failures = [int]$saved.failures
     $state.restarts = @($saved.restarts | ForEach-Object { [DateTime]::Parse([string]$_).ToUniversalTime() })
+    if ($saved.warmingSince) { $state.warmingSince = [DateTime]::Parse([string]$saved.warmingSince).ToUniversalTime() }
   } catch { Write-WatchdogLog 'warn' 'Stato del watchdog illeggibile: ripartito da zero.' }
 }
 function Save-State {
-  $payload = @{ failures = $state.failures; restarts = @($state.restarts | ForEach-Object { $_.ToString('o') }); checkedAt = [DateTime]::UtcNow.ToString('o') }
+  $payload = @{
+    failures = $state.failures; restarts = @($state.restarts | ForEach-Object { $_.ToString('o') }); checkedAt = [DateTime]::UtcNow.ToString('o')
+    warmingSince = $(if ($state.warmingSince) { $state.warmingSince.ToString('o') } else { $null })
+  }
   if (-not $DryRun) { [IO.File]::WriteAllText($statePath, ($payload | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false)) }
 }
 
@@ -70,15 +74,31 @@ $managerBusy = @(Get-CimInstance Win32_Process -Filter "Name='pwsh.exe'" -ErrorA
   Where-Object { [string]$_.CommandLine -like '*manage-headless-server-task.ps1*' -and $_.ProcessId -ne $PID }).Count -gt 0
 if ($managerBusy) { Write-Output 'Gestore del server gia attivo: nessun intervento.'; exit 0 }
 
-$ready = $false
-try { $ready = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/readyz" -TimeoutSec 8).status -eq 'ready' } catch { $ready = $false }
+$readiness = 'unreachable'
+try {
+  $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/readyz" -TimeoutSec 8 -SkipHttpErrorCheck -UseBasicParsing
+  $readiness = [string](($response.Content | ConvertFrom-Json).status)
+} catch { $readiness = 'unreachable' }
+$ready = $readiness -eq 'ready'
 if ($ready) {
   if ($state.failures -gt 0) { Write-WatchdogLog 'info' "Server di nuovo pronto dopo $($state.failures) controlli falliti." }
   $state.failures = 0
+  $state.warmingSince = $null
   Save-State
   Write-Output 'Server pronto.'
   exit 0
 }
+# Il server dichiara "warming": sta caricando il modello o si sta riparando da solo (runtime AI ripristinato).
+# Riavviarlo ora azzererebbe il lavoro: lo si attende fino a 15 minuti, poi torna a contare come guasto.
+if ($readiness -eq 'warming') {
+  if (-not $state.warmingSince) { $state.warmingSince = [DateTime]::UtcNow; Write-WatchdogLog 'info' 'Server in preparazione o in autoriparazione: attesa senza riavvio.' }
+  if (([DateTime]::UtcNow - $state.warmingSince).TotalMinutes -lt 15) {
+    $state.failures = 0
+    Save-State
+    Write-Output 'Server in preparazione: attesa.'
+    exit 0
+  }
+} else { $state.warmingSince = $null }
 
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if (-not $task) { Write-Output 'Servizio server non installato: nessun intervento.'; exit 0 }

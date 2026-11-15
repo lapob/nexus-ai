@@ -830,6 +830,8 @@ class RemoteSessionGateway {
         .then(() => this.readinessProvider ? this.readinessProvider() : true)
         .then(async (runtimeReady) => {
           const ready = runtimeReady === true || runtimeReady?.ready === true;
+          // Fase dichiarata dal runtime ("warming" durante preload o autoriparazione): la legge /readyz.
+          this.readinessPhase = typeof runtimeReady?.status === 'string' ? runtimeReady.status : null;
           if (!ready) return false;
           if (!this.modelProvider) return true;
           const models = await this.modelProvider();
@@ -1984,7 +1986,9 @@ class RemoteSessionGateway {
       if (isReadRequest && url.pathname === '/livez') return this.json(response, 200, { status: 'alive' });
       if (isReadRequest && url.pathname === '/readyz') {
         const ready = await this.isReady();
-        return this.json(response, ready ? 200 : 503, { status: ready ? 'ready' : 'not_ready' });
+        // "warming": il server si sta preparando o riparando da solo; il watchdog lo attende invece di riavviarlo.
+        const status = ready ? 'ready' : this.readinessPhase === 'warming' && !this.stopping ? 'warming' : 'not_ready';
+        return this.json(response, ready ? 200 : 503, { status });
       }
       // Endpoint storico mantenuto per Android e client desktop non ancora
       // aggiornati. Esprime soltanto liveness; i client nuovi usano /readyz.

@@ -687,7 +687,11 @@ function bootstrapElectron({ env = process.env } = {}) {
           && (remoteNeuralSpeech.capabilities().available || remoteExpressiveSpeech.capabilities().available),
         // Il listener headless può accettare health check immediatamente, ma
         // /readyz resta onesto finché il preload del modello rapido non termina.
-        readinessProvider: () => !aiWarmupPolicy.requiresReadiness || ipcServices?.aiReadiness?.().ready === true,
+        readinessProvider: () => {
+          if (!aiWarmupPolicy.requiresReadiness) return true;
+          const readiness = ipcServices?.aiReadiness?.();
+          return readiness ? { ready: readiness.ready === true, status: readiness.status } : false;
+        },
         // Il server puo aprire le due applicazioni autorizzate anche quando la
         // Presence visiva e spenta; se viene avviata manualmente, il bridge
         // autenticato estende il contratto con i controlli del nucleo/display.
