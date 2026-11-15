@@ -3,7 +3,7 @@
  * baseline approvate in qa-artifacts/visual-baselines/site (diff percettivo, rapporto HTML in
  * qa-artifacts/visual-runs/site/report.html). Riusa il motore condiviso di ../.AI/scripts/visual (stesso diff,
  * stesse baseline, stesso tempo deterministico: orologio Playwright fermo e Math.random con seed).
- * Uso: npm run build && npm run qa:visual [-- --update] [--only=prefisso]
+ * Uso: npm run build && npm run qa:visual [-- --update] [--only=prefisso] [--qa-time]
  * Approvazione intenzionale: npm run qa:visual:approve [-- nome | prefisso*]
  */
 import fs from "node:fs";
@@ -22,12 +22,15 @@ if (!fs.existsSync(path.join(root, "dist", "server", "index.js"))) {
   console.error("dist assente: eseguire prima npm run build.");
   process.exit(2);
 }
-const { closeNetwork, freePort, freezeTime, launch, loadPlaywright, settle, stopProcess } = await import(pathToFileURL(path.join(shared, "browser.mjs")).href);
+const { closeNetwork, freePort, freezeTime, launch, loadPlaywright, QA_TIME_PARAM, settle, stopProcess } = await import(pathToFileURL(path.join(shared, "browser.mjs")).href);
 const require = createRequire(import.meta.url);
 const { createSuite } = require(path.join(shared, "baselines.js"));
 
 const argv = process.argv.slice(2);
 const update = argv.includes("--update");
+// L'orologio fermo di Playwright da solo è deterministico al pixel. Con ?nxs-qa-time (bb759c5) due esecuzioni
+// della stessa build differivano dello 0,3–0,7% (home vision/apps desktop), quindi l'aggancio resta opzionale.
+const useQaTime = argv.includes("--qa-time");
 const only = argv.find((arg) => arg.startsWith("--only="))?.slice(7) ?? "";
 
 const VIEWPORTS = [
@@ -47,6 +50,7 @@ const SHOTS = [
   { id: "downloads", path: "/downloads" },
   { id: "security", path: "/security" },
 ];
+const QA_TIME = 4; // secondi di scena: ingresso concluso, forma composta
 const TOLERANCE = { threshold: 0.1, maxDiffRatio: 0.002, maxDiffPixels: 150 };
 
 async function startServer() {
@@ -80,9 +84,14 @@ try {
       // Rete chiusa: solo il server locale; lo stato del servizio è simulato e stabile.
       await closeNetwork(context, server.origin, { "/api/status": { status: "online", checkedAt: "2026-01-15T09:30:00.000Z" } });
       await freezeTime(context, page);
-      await page.goto(`${server.origin}${shot.path}`, { waitUntil: "load" });
+      // --qa-time: aggancio del sito (tempo della scena congelato, ingresso completo, seed fissi).
+      await page.goto(`${server.origin}${shot.path}${useQaTime ? `?${QA_TIME_PARAM}=${QA_TIME}` : ""}`, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
       await settle(page, 4000);
+      const field = page.locator("canvas.nxs-cosmic-field");
+      if (await field.count()) {
+        for (let frame = 0; frame < 40 && await field.first().getAttribute("data-qa") !== "ready"; frame += 1) await settle(page, 50);
+      }
       if (shot.scroll) {
         await page.locator(shot.scroll).first().evaluate((element) => element.scrollIntoView({ block: "start", behavior: "instant" }));
         await settle(page, 2500);
