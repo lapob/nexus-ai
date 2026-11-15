@@ -105,6 +105,40 @@ test('uscita durante health e readiness non conserva una ammissione già revocat
   }
 });
 
+test('runtime vivo ma lento: nessun kill al primo controllo mancato; bloccato davvero: riavvio dopo le conferme', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-runtime-slow-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const executable = path.join(root, 'ollama'); fs.writeFileSync(executable, 'fixture');
+  const warnings = [];
+  let spawns = 0;
+  let terminations = 0;
+  let stdio = null;
+  const runtime = new ManagedOllamaRuntime({ enabled: true, executablePath: executable, userDataPath: root,
+    confirmDelayMs: 0, runtimeSecurityCheck: () => ({ blockingFindings: 0 }),
+    spawnProcess: (_command, _args, options) => { spawns += 1; stdio = options.stdio; const child = new EventEmitter(); child.exitCode = null; child.signalCode = null; return child; },
+    terminateProcess() { terminations += 1; }, logger: { warn: (message) => warnings.push(message), info() {}, error() {} }
+  });
+  let answers = [false, true];
+  runtime.health = async () => (runtime.process ? answers.shift() ?? true : false);
+  assert.equal((await runtime.start()).available, true);
+  assert.equal(spawns, 1);
+  // Il registro di Ollama va su file locale, non più scartato.
+  assert.equal(typeof stdio[2], 'number');
+  assert.match(fs.readFileSync(path.join(root, 'logs', 'ollama-runtime.log'), 'utf8'), /avvio runtime NexusNXS/);
+
+  answers = [false, false, true];
+  assert.equal((await runtime.ensureHealthy()).available, true);
+  assert.equal(terminations, 0, 'un rallentamento non uccide il runtime');
+  assert.ok(warnings.includes('Runtime AI lento ma attivo: nessun riavvio.'));
+
+  answers = Array(8).fill(false);
+  const concurrent = await Promise.all([runtime.ensureHealthy(), runtime.ensureHealthy()]);
+  assert.equal(terminations, 1, 'bloccato davvero: un solo riavvio coordinato');
+  assert.ok(warnings.includes('Runtime AI bloccato dopo conferme ripetute.'));
+  assert.ok(concurrent.some((result) => result.recovered === true || result.reason === 'restart-cooldown'));
+  runtime.shutdown();
+});
+
 test('il launcher riusa la porta effettiva del Core anche con PID grande e riserve Windows', () => {
   const source = fs.readFileSync(path.join(__dirname, '../scripts/start-electron.js'), 'utf8');
   const setup = source.slice(0, source.indexOf('const CHROMIUM_WIDGETHOST_NOISE'));

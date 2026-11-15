@@ -3124,6 +3124,30 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   coordinated server restart (for example the next release).
 - Open: why Ollama dropped twice on 14/11 at 15:34–15:37. Likely concurrent GPU/VRAM load from the parallel
   sessions; not confirmed.
+## AI runtime: the 14/11 Ollama "crashes" were kills by NexusNXS itself (15 November 2026)
+
+- Cause, from the server log of 14/11 (14:34:55 and 14:37:37 UTC):
+  - "Runtime AI non raggiungibile" comes before "Runtime AI NEXUSNXS terminato" (SIGKILL / taskkill), so Ollama
+    was still alive;
+  - `ensureHealthy` runs before every AI request and keep-warm, and called `/api/version` with a 1.5 s timeout;
+  - a single slow answer (Ollama under load: model loading, busy GPU or CPU with parallel sessions) was enough
+    to kill it and reload it, causing minutes of warm-up and then the watchdog restart.
+  - Ollama's output was discarded (`stdio: 'ignore'`), so its own error was impossible to see.
+- Fix in `src/ai/managed-ollama-runtime.js`:
+  - if the process is still alive, it is killed only after 3 confirmations, 2 s apart with a 5 s timeout
+    (~20 s in total);
+  - the confirmation is shared by concurrent requests;
+  - a slow but active process logs "Runtime AI lento ma attivo: nessun riavvio." and stays up;
+  - an exited process restarts immediately as before;
+  - Ollama's stderr is saved to `.nexus-data/logs/ollama-runtime.log` (local only, rotates at 10 MB), with a
+    marker at each start.
+- Checks:
+  - `node --test tests/managed-ollama-runtime.test.js`: 14/14, with a new slow-but-alive versus truly blocked
+    test;
+  - `npm test`: 1313 tests, 1308 pass, 3 fail. The failures are in the web core tests ("nucleo non chiuso in un
+    box", shared breath, visual contracts), from the App web/desktop session's work in progress in
+    `web/src`; they are not in these files.
+- Deployment: coordinated restart with `maintenance.flag` to load this fix and the `/readyz` "warming" fix.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

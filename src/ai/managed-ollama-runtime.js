@@ -120,6 +120,26 @@ class ManagedOllamaRuntime {
     this.lifecycleGeneration = 0;
     this.disposed = false;
     this.startPromise = null;
+    // Un processo vivo ma lento non si uccide al primo controllo mancato: si conferma con attese più lunghe.
+    this.confirmAttempts = Number.isInteger(options.confirmAttempts) ? options.confirmAttempts : 3;
+    this.confirmDelayMs = Number.isFinite(options.confirmDelayMs) ? options.confirmDelayMs : 2_000;
+    this.confirmTimeoutMs = Number.isFinite(options.confirmTimeoutMs) ? options.confirmTimeoutMs : 5_000;
+    this.confirmPromise = null;
+    this.logPath = options.logPath === undefined
+      ? (this.userDataPath ? path.join(this.userDataPath, 'logs', 'ollama-runtime.log') : null)
+      : options.logPath;
+  }
+
+  openRuntimeLog() {
+    // Il registro di Ollama (stderr) resta sul disco locale per capire cadute e lentezze; ruota a 10 MB.
+    if (!this.logPath) return 'ignore';
+    try {
+      fs.mkdirSync(path.dirname(this.logPath), { recursive: true });
+      try { if (fs.statSync(this.logPath).size > 10 * 1024 * 1024) fs.renameSync(this.logPath, `${this.logPath}.1`); } catch { /* primo avvio */ }
+      const fd = fs.openSync(this.logPath, 'a');
+      fs.writeSync(fd, `\n--- ${new Date().toISOString()} avvio runtime NexusNXS ---\n`);
+      return fd;
+    } catch { return 'ignore'; }
   }
 
   get baseUrl() { return `http://${this.host}:${this.port}`; }
@@ -150,9 +170,9 @@ class ManagedOllamaRuntime {
       && this.process.exitCode == null && this.process.signalCode == null);
   }
 
-  async health() {
+  async health(timeoutMs = 1500) {
     try {
-      const response = await fetch(`${this.baseUrl}/api/version`, { signal: AbortSignal.timeout(1500) });
+      const response = await fetch(`${this.baseUrl}/api/version`, { signal: AbortSignal.timeout(timeoutMs) });
       return response.ok;
     } catch {
       return false;
@@ -221,10 +241,11 @@ class ManagedOllamaRuntime {
     if (this.disposed || generation !== this.lifecycleGeneration) {
       return { managed: true, available: false, baseUrl: this.baseUrl, reason: 'runtime-stopped' };
     }
+    const runtimeLog = this.openRuntimeLog();
     const child = this.spawnProcess(this.executablePath, ['serve'], {
       windowsHide: true,
       detached: false,
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', runtimeLog],
       env: {
         ...sanitizedRuntimeEnvironment(),
         OLLAMA_HOST: `${this.host}:${this.port}`,
@@ -243,6 +264,8 @@ class ManagedOllamaRuntime {
         OLLAMA_CONTEXT_LENGTH: String(this.runtimeTuning?.contextTokens || 4096)
       }
     });
+    // Il figlio ha la sua copia del descrittore: quella del server si chiude subito.
+    if (typeof runtimeLog === 'number') { try { fs.closeSync(runtimeLog); } catch { /* già chiuso */ } }
     this.process = child;
     this.ownedProcess = true;
     this.runtimeAdmitted = true;
@@ -281,6 +304,12 @@ class ManagedOllamaRuntime {
     }
     if (this.disposed) return { available: false, recovered: false, reason: 'runtime-stopped' };
     if (!this.enabled) return { available: false, recovered: false, reason: 'external-runtime-offline' };
+    // Processo ancora vivo che non ha risposto in 1,5 s: spesso è solo sotto carico (caricamento modello,
+    // GPU o CPU occupate). Ucciderlo costerebbe minuti di ricarica: prima si conferma che sia davvero bloccato.
+    if (child && child === this.process && this.hasAdmittedProcess()) {
+      if (await this.confirmResponsive(child, generation)) return { available: true, recovered: false };
+      if (this.disposed || generation !== this.lifecycleGeneration) return { available: false, recovered: false, reason: 'runtime-stopped' };
+    }
     const now = Date.now();
     const cooldown = Math.min(30_000, 1_500 * (2 ** this.restartAttempts));
     if (now - this.lastRestartAt < cooldown) return { available: false, recovered: false, reason: 'restart-cooldown' };
@@ -291,6 +320,27 @@ class ManagedOllamaRuntime {
     const result = await this.start();
     if (result.available) this.logger?.info('Runtime AI ripristinato automaticamente.');
     return { available: result.available, recovered: result.available, ...(result.reason ? { reason: result.reason } : {}) };
+  }
+
+  confirmResponsive(child, generation) {
+    // Una sola conferma condivisa: più richieste in arrivo non moltiplicano i controlli.
+    if (this.confirmPromise) return this.confirmPromise;
+    const started = Date.now();
+    const confirm = (async () => {
+      for (let attempt = 1; attempt <= this.confirmAttempts; attempt += 1) {
+        if (this.confirmDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.confirmDelayMs));
+        if (this.disposed || generation !== this.lifecycleGeneration || child !== this.process || !this.hasAdmittedProcess()) return false;
+        if (await this.health(this.confirmTimeoutMs)) {
+          this.logger?.warn('Runtime AI lento ma attivo: nessun riavvio.', { attempt, waitedMs: Date.now() - started });
+          return true;
+        }
+      }
+      this.logger?.warn('Runtime AI bloccato dopo conferme ripetute.', { attempts: this.confirmAttempts, waitedMs: Date.now() - started });
+      return false;
+    })();
+    this.confirmPromise = confirm;
+    confirm.finally(() => { if (this.confirmPromise === confirm) this.confirmPromise = null; });
+    return confirm;
   }
 
   // #endregion
