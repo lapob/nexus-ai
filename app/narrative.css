@@ -221,6 +221,27 @@ html { scroll-padding-top: 96px; }
 /* The native AI mobile client is retired; center the remaining PC showcase. */
 .nexus-stage { justify-content: center; }
 
+/* Polish pass (15 Nov, measured at 390/1440): one column rhythm on every page. */
+/* Closing call to action: the button keeps its own width on wide screens (it was
+   stretched into a 640 px bar by a stray third grid track); phones keep it full width. */
+@media (min-width: 801px) {
+  .premium-footer .footer-callout { grid-template-columns: minmax(0, 1fr) auto; column-gap: clamp(32px, 5vw, 80px); }
+  .premium-footer .footer-callout .primary-button { justify-self: end; width: auto; min-width: 248px; padding-inline: 28px; }
+  /* Product facts align to the page column instead of the viewport edge. */
+  .product-narrative .product-facts, main > .product-facts { padding-inline: max(var(--page-pad), calc((100% - 1240px) / 2)); }
+  .product-facts > div { padding-inline: 0 clamp(24px, 3vw, 48px); }
+}
+/* Feature cards: icon, number and title read as one group, not three floating parts. */
+.feature-grid > article { min-height: 0; }
+.feature-grid > article h3 { margin-top: clamp(28px, 3vw, 44px); }
+/* Four features: one row on wide screens, two by two below, never a lone orphan. */
+@media (min-width: 801px) {
+  .feature-grid:has(> article:nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1180px) {
+  .feature-grid:has(> article:nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .narrative-apps .app-card-visual.desktop .app-card-visual__screen:hover {
     transform: translate3d(0, -5px, 0);

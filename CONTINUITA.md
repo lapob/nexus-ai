@@ -1,3 +1,28 @@
+# Layout polish pass — 15 November 2026 (IN PROGRESS: commit, then release:prepare/promote)
+
+- Reviewed every route (/, desktop, downloads, security, status, privacy,
+  terms, maintenance, 404) at 1440x900 and 390x844 with reduced motion. Light
+  and dark OS preferences render the same single cosmic theme (by design:
+  `color-scheme: dark`). CSS-only fixes in `app/narrative.css`: footer CTA was
+  stretched to 640 px (now auto width ≥248 px, aligned right ≥801 px; full
+  width on phones unchanged); product facts on inner pages now align with the
+  page column (were 72 px vs 100 px at 1440); feature cards lost the 300 px
+  min-height and the 75 px gap above titles (now 28–44 px); four-card grids
+  go 2x2 at 801–1179 px instead of leaving an orphan card.
+- Gates: npm test 49/49, e2e 38/38. Web vitals (median of 3, cold cache,
+  scripted taps/keys/scroll): local build / production e5a35b6c —
+  home desktop LCP 84/208 ms, CLS 0.0007/0.0007, INP 16/16 ms; home phone
+  (4x CPU) LCP 368/472 ms, CLS 0/0, INP 56/56 ms; /desktop desktop LCP
+  120/232 ms, CLS 0.0027/0.0027, INP 16/16; /desktop phone LCP 484/640 ms,
+  CLS 0/0, INP 48/48. Phone load has 3 hydration long tasks (~290 ms total at
+  4x throttle) on both builds, before any interaction. Reload + fast fling, 5
+  runs: desktop 4.2/8.5/17 ms local vs 4.2/4.3/8.3 live, phone 12.6/25.1/33.6
+  vs 12.5/24.9/29.2, 0 long tasks on both; the shift vs 14 Nov affects live
+  too (machine load from other sessions), runtime JS unchanged.
+- Still open (not changed): /security data-flow has an empty left column at
+  wide widths; /downloads icons sit above headings. Next step: decide those
+  with the owner, or a dedicated layout pass.
+
 # Phone check of production e5a35b6c — 15 November 2026 (Galaxy S25, Chrome 157)
 
 - Measured through Chrome remote debugging over ADB, on nexusnxs.com
