@@ -339,6 +339,30 @@ conversation switch; the core looked boxed in because particles vanished at a ha
 - Remaining: sheets and the first send still cost 2–7 frames over 2 vsync (12–17 ms) on the
   core, from the GPU process; next step would be tracing the sheet veil's backdrop blur.
 
+Release 0.3.42 (7b61a51 on main = 38dd378 core + 272c143 runtime health panel + version bump),
+in progress, 15 November evening:
+- Built from a clean git worktree `Z:\[AI]\NexusNXS\.AI-release-0342` (detached at 7b61a51), because
+  other sessions had uncommitted work in `.AI` (desktop auto-update: update-health/manager/rollback,
+  bootGuard in bootstrap.js, UpdateCard and related web files; visual tests: scripts/visual/).
+  Worktree setup: full `npm ci` (no junction), `node node_modules/electron/install.js` (the Electron
+  binary is not installed by npm ci here), robocopy of vendor/whisper, kokoro, python, ollama.
+  The worktree must sit beside `.AI` (brand:check reads ../.site), and needs `npm run build:web`
+  before verify (a gateway test expects web-dist).
+- `release-all.js --public-only --channel=preview` with full verify: PASS (npm test 1316 tests,
+  1313 pass, 0 fail; startup bundle 378649 B; SBOM 331). release:manifest:refresh (5 artefacts),
+  release:verify-bundle PASS, founder:package OK.
+- GitHub v0.3.42-preview.1 published, assets verified server-side.
+- Web: the clean web-dist was mirrored into `.AI/web-dist` (the origin serves /assets per request,
+  including core-worker-D7oTJFFA.js). Service NOT restarted: `.AI` still runs uncommitted code of
+  the auto-update session, and the public "/" comes from the edge shell anyway.
+- Site: sync-ai-shell `--source-root` = the worktree, sync-public-release --tag=v0.3.42-preview.1
+  → `.SITE` 8cbe5d7 (local, not pushed). release:prepare refused: untracked
+  `.SITE/scripts/visual-regression.mjs` from the visual-tests session. Owner chose to wait for the
+  other sessions to commit before continuing.
+- Next: once `.SITE` is clean, release:prepare → release:promote → push website; check
+  nexusnxs.com/updates/preview at 0.3.42 and ai.nexusnxs.com serving the worker. Then remove the
+  worktree (`git worktree remove`) and restart the service when `.AI` has no foreign uncommitted code.
+
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk
   (`motion-features.ts`, loaded by `LazyMotion` right after start). Entry bundle
