@@ -65,20 +65,46 @@
   phone was locked, so frame pacing at 120 Hz is not measured yet.
 - Next: owner looks at the connecting core and a section change on the phone.
 
-## Motion for web app and desktop, in step with the core's breath — 14 November 2026 (committed c32d24d, release 0.3.41 in progress)
+## Motion for web app and desktop, in step with the core's breath — 14–15 November 2026 (Preview 0.3.41 published)
 
-Release 0.3.41 — operation in progress (record before the long steps):
-- Revision: main after 463b387 (Control 1.26.0), working tree clean apart from this file.
+Release 0.3.41 (a66fa5d on main, which includes 463b387 Control 1.26.0 and the Server
+Console commits):
 - Gates on that tree: npm test 1304 tests, 1302 pass, 0 fail, 2 skipped; npm run check
   PASS (bundle 374480 B); check:ui 39/39 + 15/15; build:renderer OK.
-- Flow: bump 0.3.41 → release:public:preview (verify + build:win + verify:installer +
-  sbom, log in .nexus-data/logs/release-0341.log) → release:manifest:refresh →
-  release:verify-bundle → push main → founder:publish → coordinated service restart
-  (maintenance.flag, readyz) → `.SITE` sync-ai-shell + sync-public-release
-  --tag=v0.3.41-preview.1 → release:prepare/promote → push website.
-- Expected: GitHub v0.3.41-preview.1, /updates/preview manifest at 0.3.41, ai.nexusnxs.com
-  serving the new UI. If interrupted: check which artefacts exist in release/ before
-  repeating a step.
+- `release:public:preview` verify passed in full: AI eval gate, voice, Electron smoke,
+  shutdown, soak 250 cycles (0 orphan requests, heap +0.11 MB), audit:runtime.
+  Two environment gotchas: Grype is only found with `Z:\[AI]\NexusNXS\.toolchains` on
+  PATH (otherwise "Scansione Grype Ollama non riuscita"), and build:win needs
+  `NEXUS_SERVICE_URL=https://ai.nexusnxs.com`. Artefacts were then built with
+  `release-all.js --public-only --channel=preview --skip-verify` on the same commit:
+  installer verified (signature still waiting for a publisher certificate), SBOM 331.
+- release:manifest:refresh (5 artefacts), release:verify-bundle PASS, founder:package.
+- main pushed (379f9ec..a66fa5d). GitHub v0.3.41-preview.1: 9 assets verified server-side.
+- Service-only restart with maintenance.flag: ready in 33 s; local 32145/32147, public
+  readyz 200 and healthz 200; the local gateway serves the new UI. Flag removed.
+- Frames measured before publishing the site (`node scripts/measure-ui-motion.mjs`,
+  Chrome headless with WebGPU on the AMD GPU, 240 Hz → vsync 4.2 ms, 1440×900 DPR 1,
+  report in qa-artifacts/ui-motion-frames.json):
+  - core breathing, full 14 s cycle: p50 4.2, p99 4.5, max 8.3 ms, 0 long tasks;
+  - phone 390×844, 8 s: p99 4.4, max 4.4 ms, no frame over 1.5 vsync;
+  - sheets and palette ×5: p99 4.4, max 8.4 ms;
+  - send + 6 s streaming: p99 4.4, max 24.9 ms (one frame at send: welcome → thread
+    and core hero → ambient);
+  - conversation switch ×8 (View Transitions): p99 8.4, max 20.7 ms, about 1.5 long
+    frames per switch, 0 long tasks. These are the frames in which the View Transition
+    freezes the snapshot and React mounts the new conversation; nothing moves on screen
+    then. Removing the blur from the snapshots did not change this (p99 8.3, max 29.2),
+    so the released CSS stays as is and web and desktop remain identical.
+  - Limits: headless measures main-thread rAF intervals, not the OS compositor; the
+    desktop (Electron, same Chromium renderer) was not measured separately.
+- Site: sync-ai-shell + sync-public-release --tag=v0.3.41-preview.1 → `.SITE` c18ceb4
+  (unit 49/49) → release:prepare (e2e 38/38, candidate de09987a) → release:promote
+  (production a7921689, 13 routes verified) → website pushed.
+- Live after promote: ai.nexusnxs.com serves the new UI through the edge;
+  nexusnxs.com/updates/preview release-manifest.json and latest.yml 200 at 0.3.41.
+- Not verified: an installed 0.3.40 updating itself to 0.3.41 on this PC; the
+  installer is still unsigned (publisher certificate pending).
+- Next: optional — measure the desktop in real Electron with the same scenarios.
 
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk
