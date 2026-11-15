@@ -86,11 +86,15 @@
     4.3 GB on disk).
   - Android SDK license accepted only for these packages. Note:
     sdkmanager 23 uses names with slashes.
-- AVD `NexusControl_Pixel9_API36` (pixel_9, 4 GB RAM, gpu host) in
-  ~/.android/avd. Start it with
-  `emulator -avd NexusControl_Pixel9_API36 -gpu host -no-snapshot-save`.
-  WHPX and the RX 9070 XT are used through Vulkan, and it boots in about
-  1 minute.
+- AVD `NexusControl_Pixel9_API36` (pixel_9, 4 GB RAM) in ~/.android/avd.
+  RULE (15 November 2026): never `-gpu host`. With host rendering the
+  emulator held ~10 GB of the RX 9070 XT's VRAM, qwen3:14b no longer fit
+  and the server stayed in "warming". Start it only with software
+  rendering: `scripts\start-android-emulator.ps1` (forces
+  `-gpu swiftshader_indirect`); the AVD config.ini also has
+  `hw.gpu.mode=swiftshader_indirect`. Close it as soon as the checks end
+  (`adb -s emulator-5554 emu kill`). Frame timings under swiftshader are not
+  representative.
 - The emulator is outside the private network and not paired, so
   Control 1.27.0 shows the "PC non raggiungibile" gate. Useful for the gate
   without touching the server.
