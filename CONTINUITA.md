@@ -95,8 +95,23 @@ Console commits):
     freezes the snapshot and React mounts the new conversation; nothing moves on screen
     then. Removing the blur from the snapshots did not change this (p99 8.3, max 29.2),
     so the released CSS stays as is and web and desktop remain identical.
-  - Limits: headless measures main-thread rAF intervals, not the OS compositor; the
-    desktop (Electron, same Chromium renderer) was not measured separately.
+  - Limits: headless measures main-thread rAF intervals, not the OS compositor.
+- Desktop measured in real Electron (15 November, `npx electron
+  scripts/measure-desktop-motion.js` after build:renderer): Electron 43.8.3 / Chromium 150,
+  real renderer-dist on nexus://, real preload, window shown without focus on the 240 Hz
+  monitor (DPR 1), synthetic IPC (service ready, two conversations, the same streamed
+  answer), no server. Two runs, report in qa-artifacts/desktop-motion-frames.json:
+  - core breathing 14 s: p99 4.4, max 4.4–4.5 ms, no frame over 1.5 vsync, 0 long tasks;
+  - narrow window 720×800: p99 4.4–4.5, max 4.6–8.4 ms;
+  - sheets and palette ×5: p99 4.4, max 12.5–16.6 ms;
+  - send + streaming: p99 4.4–4.5, max 29–33 ms (send moment);
+  - conversation switch ×8: p99 12.4, max 29–42 ms, about 2 long frames per switch,
+    0 long tasks. Same pattern as Chrome: the frame in which the View Transition
+    captures and React mounts the new 14-paragraph conversation. During it the core
+    stops for 30–40 ms, once per switch. Possible follow-up: a performance trace of the
+    switch (Markdown render vs snapshot capture).
+  - Gotcha: destroying the last window quits Electron, so the script keeps the app alive
+    with an empty `window-all-closed` handler.
 - Site: sync-ai-shell + sync-public-release --tag=v0.3.41-preview.1 → `.SITE` c18ceb4
   (unit 49/49) → release:prepare (e2e 38/38, candidate de09987a) → release:promote
   (production a7921689, 13 routes verified) → website pushed.
@@ -104,7 +119,7 @@ Console commits):
   nexusnxs.com/updates/preview release-manifest.json and latest.yml 200 at 0.3.41.
 - Not verified: an installed 0.3.40 updating itself to 0.3.41 on this PC; the
   installer is still unsigned (publisher certificate pending).
-- Next: optional — measure the desktop in real Electron with the same scenarios.
+- Next: optional — trace the conversation-switch frame and shorten it.
 
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk
