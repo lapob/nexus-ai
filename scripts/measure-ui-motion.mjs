@@ -111,17 +111,27 @@ async function measure(name, { viewport = { width: 1440, height: 900 }, state = 
   await page.waitForSelector('.composer, .live-panel');
   await page.waitForTimeout(settle); // avvio, chunk pigri e rampa del respiro (~4 s)
   const vsync = await page.evaluate(() => new Promise((resolve) => { const t = []; const f = (n) => { t.push(n); if (t.length < 61) requestAnimationFrame(f); else resolve((t[60] - t[0]) / 60); }; requestAnimationFrame(f); }));
+  // Intervalli del nucleo nel thread dove disegna davvero (worker o pagina), dall'ultima richiesta.
+  const coreStats = () => page.evaluate(() => new Promise((resolve) => { const canvas = document.querySelector('canvas.core'); if (!canvas) return resolve([]);
+    const timer = setTimeout(() => resolve([]), 2000);
+    canvas.addEventListener('nxs-core-stats', (event) => { clearTimeout(timer); resolve(event.detail); }, { once: true });
+    canvas.dispatchEvent(new Event('nxs-core-stats-request')); }));
+  await coreStats();
   await page.evaluate(() => window.__frames.start());
   await run(page);
   const raw = await page.evaluate(() => window.__frames.stop());
+  const core = [...await coreStats()].sort((a, b) => a - b);
+  const round = (value) => Math.round(value * 10) / 10;
   const backend = await page.evaluate(() => document.querySelector('.core canvas, canvas')?.dataset.backend || 'nessuno');
-  results.push({ ...summarize(name, raw, vsync), backend, viewport: `${viewport.width}×${viewport.height}` });
+  const thread = await page.evaluate(() => document.querySelector('canvas.core')?.dataset.thread || '?');
+  results.push({ ...summarize(name, raw, vsync), backend, thread, viewport: `${viewport.width}×${viewport.height}`,
+    coreFrames: core.length, coreP99: round(core[Math.min(core.length - 1, Math.floor(0.99 * core.length))] || 0), coreMax: round(core.at(-1) || 0), coreOver2Vsync: core.filter((v) => v > vsync * 2).length });
   await context.close();
 }
 
 await measure('nucleo a riposo, respiro completo (14 s)', { run: (page) => page.waitForTimeout(14_000) });
 await measure('nucleo su telefono 390×844 (8 s)', { viewport: { width: 390, height: 844 }, run: (page) => page.waitForTimeout(8_000) });
-await measure('cambio conversazione ×8 (View Transitions)', { state: seeded, run: async (page) => {
+await measure('cambio conversazione ×8', { state: seeded, run: async (page) => {
   for (let i = 0; i < 8; i += 1) { await page.click(`.conversation > button:has-text("${i % 2 ? 'Misura A' : 'Misura B'}")`); await page.waitForTimeout(700); }
 } });
 await measure('fogli e palette ×5 (apri/chiudi)', { state: seeded, run: async (page) => {
@@ -146,7 +156,7 @@ server.close();
 const report = { measuredAt: new Date().toISOString(), engine: 'Chrome (Playwright, headless, WebGPU)', note: 'Intervalli rAF del thread principale; headless non misura il compositor del sistema operativo.', results };
 fs.mkdirSync(path.join(root, 'qa-artifacts'), { recursive: true });
 fs.writeFileSync(path.join(root, 'qa-artifacts', 'ui-motion-frames.json'), `${JSON.stringify(report, null, 2)}\n`);
-console.table(results.map(({ scenario, backend, frames, vsyncMs, p50, p95, p99, max, over1_5Vsync, over2Vsync, longTasks, loafMaxBlockingMs }) =>
-  ({ scenario, backend, frames, vsyncMs, p50, p95, p99, max, '>1.5v': over1_5Vsync, '>2v': over2Vsync, longTasks, loafBlock: loafMaxBlockingMs })));
+console.table(results.map(({ scenario, backend, thread, p99, max, over2Vsync, longTasks, coreFrames, coreP99, coreMax, coreOver2Vsync }) =>
+  ({ scenario, backend, thread, 'pagina p99': p99, 'pagina max': max, 'pagina >2v': over2Vsync, longTasks, 'nucleo fotogrammi': coreFrames, 'nucleo p99': coreP99, 'nucleo max': coreMax, 'nucleo >2v': coreOver2Vsync })));
 
 // #endregion

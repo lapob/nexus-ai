@@ -10,6 +10,9 @@ export default defineConfig({
   root: resolve(__dirname),
   base: '/',
   plugins: [react()],
+  // Worker del nucleo (core-worker.ts): file a sé in /assets (CSP worker-src 'self'); se non si carica,
+  // per esempio dal guscio offline dell'edge, il nucleo disegna sul thread principale.
+  worker: { format: 'es' },
   // Solo sviluppo/anteprima locale: le API vanno al servizio reale. In
   // produzione la web app è servita dallo stesso gateway (stessa origine).
   preview: {

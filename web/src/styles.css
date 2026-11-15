@@ -95,7 +95,7 @@
   /* La barra e l'intestazione laterale trascinano la finestra; i controlli restano cliccabili. */
   .topbar, .sidebar-head { -webkit-app-region: drag; app-region: drag; }
   :is(.topbar, .sidebar-head) :is(button, a, input, select, textarea, [role='button'], [role='switch'], [tabindex]) { -webkit-app-region: no-drag; app-region: no-drag; }
-  .title { flex: 1; min-width: 0; margin: 0; font-size: .95rem; font-weight: 550; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; view-transition-name: conversation-title; }
+  .title { flex: 1; min-width: 0; margin: 0; font-size: .95rem; font-weight: 550; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* overflow-anchor: mentre la risposta cresce, la parte che si sta leggendo resta ferma. */
   .scroll { overflow-y: auto; overscroll-behavior: contain; overflow-anchor: auto; padding: 8px 16px 24px; z-index: 2; }
   .composer { width: min(var(--content), calc(100% - 32px)); margin: 0 auto max(16px, env(safe-area-inset-bottom)); border-radius: 22px; padding: 10px 10px 8px 16px; z-index: 6; container-type: inline-size; }
@@ -190,7 +190,9 @@
   .status[data-status='preparing'] i { background: var(--attention); }
 
   .core-layer { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 1; transition: opacity .6s var(--ease-emphasized), transform .6s var(--ease-emphasized); }
-  .core-layer .core { width: min(80vmin, 760px); aspect-ratio: 1; grid-area: 1 / 1; }
+  /* Il canvas è il doppio del nucleo (SPREAD in Core.tsx), centrato e senza ritaglio: le particelle che
+     escono nella fioritura sfumano a vuoto nello shader invece di sparire contro il bordo del canvas. */
+  .core-layer .core { position: absolute; left: 50%; top: 50%; width: calc(min(80vmin, 760px) * 2); aspect-ratio: 1; translate: -50% -50%; }
   /* HUD stile Jarvis: tre anelli sottili con tacche, velocità e colore seguono lo stato. */
   .core-hud { grid-area: 1 / 1; width: min(80vmin, 760px); aspect-ratio: 1; position: relative; --hud: var(--cyan); --spin: 60s; }
   .core-hud i { position: absolute; border-radius: 50%; animation: hud-spin var(--spin) linear infinite; }
@@ -954,6 +956,11 @@
   .message.assistant { transform-origin: 50% 0; }
   /* Il thread compare (dalla schermata iniziale o all'avvio) salendo appena, come il nucleo che si ritira. */
   .thread { animation: thread-in .5s var(--ease-emphasized) both; }
+  .topbar .title { animation: title-in .36s var(--ease-emphasized) both; }
+  /* Riscaldamento GPU (App.GpuWarmup): 2 px quasi trasparenti, solo per i primi fotogrammi dopo l'avvio.
+     Le repliche partono tutte dall'angolo, così Skia le disegna davvero (fuori dal ritaglio verrebbero scartate). */
+  .gpu-warmup { position: fixed; left: 0; top: 0; width: 2px; height: 2px; overflow: hidden; opacity: .01; pointer-events: none; z-index: 0; contain: strict; }
+  .gpu-warmup > * { position: absolute; left: 0; top: 0; margin: 0; min-width: 120px; min-height: 40px; }
   /* Mentre la risposta si scrive, un punto di luce respira in coda al testo. */
   .thread[aria-busy='true'] > .message.assistant:last-child .markdown > :is(p, h1, h2, h3, h4, blockquote):last-child::after,
   .thread[aria-busy='true'] > .message.assistant:last-child .markdown > :is(ul, ol):last-child > li:last-child::after {
@@ -990,23 +997,9 @@
   @keyframes thread-in { from { opacity: 0; translate: 0 12px; } }
   @keyframes caret-breathe { from { opacity: .4; scale: .65; } to { opacity: 1; scale: 1; } }
   @keyframes stop-in { from { scale: .4; rotate: -90deg; opacity: 0; } }
-  /* Cambio conversazione: il thread uscente si dissolve sfocandosi, il nuovo si ricompone salendo;
-     il titolo scorre verso l'alto. Le View Transitions non partono con movimento ridotto (App.transition). */
-  /* Senza filter sugli snapshot: la sfocatura raddoppiava i render pass GPU della transizione (misurato). */
-  @keyframes vt-thread-out { to { opacity: 0; scale: .985; } }
-  @keyframes vt-thread-in { from { opacity: 0; translate: 0 16px; scale: .99; } }
-  @keyframes vt-title-out { to { opacity: 0; translate: 0 -8px; } }
-  @keyframes vt-title-in { from { opacity: 0; translate: 0 8px; } }
-  /* Solo la conversazione (lo scroller, ritagliato dal proprio overflow) e il titolo entrano nella transizione:
-     niente snapshot a tutto schermo della radice. Misurato: la dissolvenza della pagina intera costava fino a
-     17 ms di GPU per fotogramma e congelava il nucleo; così il nucleo resta vivo durante il cambio. */
-  :root { view-transition-name: none; }
-  .scroll { view-transition-name: thread; }
-  ::view-transition-group(thread), ::view-transition-group(conversation-title) { animation-duration: .4s; animation-timing-function: var(--ease-emphasized); }
-  ::view-transition-old(thread) { animation: vt-thread-out .2s cubic-bezier(.4, 0, 1, 1) both; }
-  ::view-transition-new(thread) { animation: vt-thread-in .44s var(--ease-emphasized) .06s both; }
-  ::view-transition-old(conversation-title) { animation: vt-title-out .18s cubic-bezier(.4, 0, 1, 1) both; }
-  ::view-transition-new(conversation-title) { animation: vt-title-in .36s var(--ease-emphasized) .04s both; }
+  /* Cambio conversazione senza View Transitions (la cattura fermava i fotogrammi, nucleo compreso):
+     il thread e il titolo, con chiave sulla conversazione, entrano con animazioni sul compositor. */
+  @keyframes title-in { from { opacity: 0; translate: 0 8px; } }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
     .core-layer.ambient { transform: none; }

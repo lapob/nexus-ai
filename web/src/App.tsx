@@ -84,12 +84,12 @@ function exportConversation(conversation: { title: string; messages: Message[] }
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-/** Le View Transitions rendono continui i cambi di contesto, dove supportate. */
-function transition(update: () => void) {
-  const doc = document as Document & { startViewTransition?: (callback: () => void) => unknown };
-  if (doc.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) doc.startViewTransition(update);
-  else update();
-}
+/**
+ * Cambi di contesto senza View Transitions: la cattura sospende i fotogrammi della pagina (il nucleo
+ * si fermava 30–40 ms al primo cambio in Electron). Il nuovo contenuto entra con animazioni CSS sul
+ * compositor (.thread, .title), quindi il nucleo non perde mai un fotogramma.
+ */
+function transition(update: () => void) { update(); }
 
 function useMedia(query: string) {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
@@ -541,7 +541,7 @@ export function App() {
       if (!slot?.isConnected) { for (const name of ['--hero-x', '--hero-y', '--hero-scale']) layer.style.removeProperty(name); return; }
       const area = stage.getBoundingClientRect();
       const target = slot.getBoundingClientRect();
-      // La sfera occupa circa il 60% del canvas, largo min(80vmin, 760px).
+      // La sfera occupa circa il 60% del riquadro del nucleo, largo min(80vmin, 760px) (il canvas è il doppio).
       const sphere = Math.min(Math.min(window.innerWidth, window.innerHeight) * 0.8, 760) * 0.6;
       layer.style.setProperty('--hero-x', `${Math.round(target.left + target.width / 2 - (area.left + area.width / 2))}px`);
       layer.style.setProperty('--hero-y', `${Math.round(target.top + target.height / 2 - (area.top + area.height / 2))}px`);
@@ -657,11 +657,11 @@ export function App() {
                 </div>
               </section>
             ) : (
-              <ol className="thread" aria-live="polite" aria-busy={generating}>
-                {/* Chiave sulla conversazione: cambiandola i messaggi non rientrano uno a uno (lo fa la View Transition);
-                    entrano con la loro animazione solo quelli nuovi della conversazione aperta. Misurato: il rientro
-                    sfocato di una risposta lunga costava fotogrammi GPU da 12–25 ms a ogni cambio. */}
-                <AnimatePresence initial={false} key={conversation!.id}>
+              <ol className="thread" key={conversation!.id} aria-live="polite" aria-busy={generating}>
+                {/* Chiave sulla conversazione: cambiandola la lista entra intera con thread-in (solo opacità e
+                    spostamento); i messaggi non rientrano uno a uno, si animano solo quelli nuovi. Misurato: il
+                    rientro sfocato di una risposta lunga costava fotogrammi GPU da 12–25 ms a ogni cambio. */}
+                <AnimatePresence initial={false}>
                   {conversation!.messages.map((message) => (
                     <m.li key={message.id} className={`message ${message.role}${message.error ? ' error' : ''}`} {...MESSAGE[message.role]}>
                       {message.role === 'user' ? (
@@ -820,6 +820,7 @@ export function App() {
           {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Collegato al tuo PC.'); }} />}
         </AnimatePresence>
 
+        <GpuWarmup />
         <Tooltips />
         <Confirmations />
         <UpdateCard update={update} hidden={Boolean(toast) && update.state?.status !== 'installing'} />
@@ -833,6 +834,26 @@ export function App() {
         <AnimatePresence>{toast && <m.div className="toast glass" role="alert" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>{toast}</m.div>}</AnimatePresence>
       </div>
     </MotionConfig></LazyMotion>
+  );
+}
+
+/**
+ * Riscaldamento GPU all'avvio: per pochi fotogrammi disegna, in 2 px quasi trasparenti, gli effetti che compaiono
+ * solo mentre NexusNXS genera (aura e alone del composer, scia del ragionamento, testo scintillante, cursore).
+ * Senza, Skia li compilava al primo invio di ogni avvio (3 programmi, ~30 ms nel processo GPU, misurato) e in quel
+ * tempo nessun fotogramma usciva, nucleo compreso. La cache degli shader su disco non li conserva tra gli avvii.
+ */
+function GpuWarmup() {
+  const [on, setOn] = useState(true);
+  useEffect(() => { const timer = window.setTimeout(() => setOn(false), 900); return () => window.clearTimeout(timer); }, []);
+  if (!on) return null;
+  return (
+    <div className="gpu-warmup" aria-hidden="true" inert>
+      <div className="agent-trail" data-live="true"><span className="trail-toggle"><Icon name="sparkles" size={15} /><span className="shimmer">NexusNXS</span></span></div>
+      <p className="thinking"><span className="dots"><i /><i /><i /></span>NexusNXS</p>
+      <div className="composer" data-generating="true" />
+      <ol className="thread" aria-busy="true"><li className="message assistant"><div className="markdown"><p>NexusNXS</p></div></li></ol>
+    </div>
   );
 }
 

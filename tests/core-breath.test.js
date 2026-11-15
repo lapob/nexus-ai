@@ -25,8 +25,8 @@ test('il nucleo respira: si scompone e si ricompone senza salti, alternando fior
 });
 
 test('WebGPU e Canvas usano lo stesso respiro, spento con movimento ridotto', () => {
-  const core = fs.readFileSync(path.join(__dirname, '../web/src/Core.tsx'), 'utf8');
+  const core = fs.readFileSync(path.join(__dirname, '../web/src/core-render.ts'), 'utf8');
   assert.match(core, /\$\{CORE_BREATH_WGSL\}/);
   assert.match(core, /breatheCorePoint\(point,/);
-  assert.match(core, /const ramp = reduced\.matches \? 0/);
+  assert.match(core, /const ramp = reduced \? 0/);
 });

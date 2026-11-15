@@ -43,8 +43,8 @@ export const MESSAGE = {
     transition: { ...SPRING, stiffness: 480, damping: 34 }
   },
   assistant: {
-    initial: { opacity: 0, y: 14, filter: 'blur(6px)' },
-    animate: { opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none' } },
+    initial: { opacity: 0, y: 14, scale: 0.985 },
+    animate: { opacity: 1, y: 0, scale: 1 },
     transition: { duration: 0.46, ease: EMPHASIZED }
   }
 };

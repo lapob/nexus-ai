@@ -10,6 +10,8 @@ export default defineConfig({
   root: resolve(__dirname, 'web'),
   base: './',
   plugins: [react()],
+  // Worker del nucleo (web/src/core-worker.ts): un file a sé in assets/, caricato da nexus://app.
+  worker: { format: 'es' },
   build: {
     outDir: resolve(__dirname, 'renderer-dist'),
     emptyOutDir: true,

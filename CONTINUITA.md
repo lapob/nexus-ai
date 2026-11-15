@@ -178,7 +178,54 @@ Console commits):
     and composer are untouched, the core is live.
   - Gates: npm test 1302/0 (2 skipped), check PASS (bundle 374485 B), check:ui 39/39 +
     15/15, build:renderer OK, web-motion 3/3 with new assertions.
-- Next: ship it in Preview 0.3.42 (same flow as 0.3.41), so web and desktop change together.
+- Superseded the same day by the 0.3.42 work below (no View Transitions at all).
+
+### Preview 0.3.42 — the core never stops, and is no longer "closed in a box" (15 November 2026)
+
+Owner requests (relayed by the Core and NEXUSNXS sessions): remove the 30–40 ms core pause on
+conversation switch; the core looked boxed in because particles vanished at a hard edge.
+- Core in a worker: `web/src/core-render.ts` (shader, WebGPU/Canvas renderers, adaptive engine,
+  no DOM), `web/src/core-worker.ts` (OffscreenCanvas), `web/src/Core.tsx` (host: sizes, visible
+  area, reduced motion, visibility, UI breath). The canvas is transferred only after the worker
+  module has loaded; if it fails (no OffscreenCanvas, or /assets unreachable from the edge's
+  offline shell) the same engine runs on the main thread. Worker file: assets/core-worker-*.js
+  (8.9 kB), served by nexus://app (script-src 'self') and by the gateway /assets (worker-src
+  'self'); Vite `worker: { format: 'es' }` in both configs. Breath stays aligned: host and
+  worker use the same absolute start time (timeOrigin + now).
+- Diagnosis: 0 long tasks on the main thread; the stalls were in the pipeline (View Transition
+  capture, raster). A main-thread rAF core waits for them, a worker core does not.
+- Conversation switch without View Transitions: the keyed thread and title enter with
+  compositor animations (thread-in, title-in). Assistant entry without blur (opacity, y, scale).
+- First send of every launch: trace showed 3 Skia programs compiled cold in the GPU process
+  (cache_miss, driver link ~26 ms; the on-disk shader cache does not keep them between launches,
+  verified with a persistent profile and a clean quit). During that time no frame leaves the
+  GPU process, worker included. `GpuWarmup` (App.tsx) paints those generating-state effects in
+  2 px at 1% opacity for 900 ms at startup, so they compile with the rest of the startup.
+- Not boxed: canvas = 2× the core box (SPREAD), centred, the core keeps its size. Particles fade
+  in light and size from 0.56 to 0.97 of the canvas radius and within 64 px of the clipping
+  container's visible edges (`u.clip`, measured every 10 frames); same fade in the Canvas
+  fallback. Bitmap sized for the ambient scale (1.25) and reassigned only when it really
+  changes: no surface reallocation on hero → ambient.
+- Measured in real Electron (240 Hz, DPR 1, `npx electron scripts/measure-desktop-motion.js`,
+  two runs; the script now also reports the core's own frame intervals from the worker):
+  - core at rest 14 s: core p99 4.4–4.5, max 4.4–4.6 ms, 0 frames over 2 vsync;
+  - narrow 720×800: core max 4.4–4.5 ms, 0 over 2 vsync;
+  - conversation switch ×8: core max 5.0–5.1 ms, 0 over 2 vsync (before: 29–42 ms once per
+    switch); page max 16.7 ms, 1–2 frames, 0 long tasks;
+  - sheets and palette ×5: core max 12.5 ms, 2 frames over 2 vsync;
+  - send + streaming: core max 12.6–16.6 ms (before 29–37), 4–7 frames over 2 vsync.
+  - A live wallpaper process uses the GPU on this PC: isolated 8–30 ms frames in idle
+    scenarios come and go between runs.
+- Chrome headless (WebGPU, `node scripts/measure-ui-motion.mjs`): worker in use; core at rest
+  and phone 390×844 0 frames over 2 vsync; switch core max 8.4 ms (1 frame); sheets 12.5 ms
+  (3); streaming 12.5 ms (2).
+- Screenshots at full bloom (desktop, worker): qa-artifacts/core-wide-home.png,
+  core-narrow-home.png, core-wide-chat.png, core-phone-home.png: particles dissolve into the
+  background, no hard edge.
+- Gates: npm test 1314 tests, 1312 pass, 0 fail, 2 skipped; npm run check PASS; check:startup
+  378649 B (limit 409600); check:ui 39/39 + 15/15; build:renderer OK.
+- Remaining: sheets and the first send still cost 2–7 frames over 2 vsync (12–17 ms) on the
+  core, from the GPU process; next step would be tracing the sheet veil's backdrop blur.
 
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk

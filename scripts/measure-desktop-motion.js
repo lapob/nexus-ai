@@ -13,7 +13,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { app, BrowserWindow, ipcMain, protocol, screen } = require('electron');
 const root = path.resolve(__dirname, '..');
-app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'nxs-motion-')));
+// Profilo nuovo a ogni esecuzione = cache degli shader GPU vuota (caso peggiore: primo avvio in assoluto).
+// NXS_MOTION_PROFILE=<cartella> riusa un profilo, come l'app vera che conserva la cache tra un avvio e l'altro.
+app.setPath('userData', process.env.NXS_MOTION_PROFILE ? fs.mkdirSync(process.env.NXS_MOTION_PROFILE, { recursive: true }) || process.env.NXS_MOTION_PROFILE : fs.mkdtempSync(path.join(os.tmpdir(), 'nxs-motion-')));
 process.on('uncaughtException', (error) => { console.error(error.stack); app.exit(1); });
 protocol.registerSchemesAsPrivileged([{ scheme: 'nexus', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const { registerRendererProtocol, RENDERER_ENTRY_URL } = require(path.join(root, 'src/infrastructure/electron/renderer-protocol'));
@@ -65,8 +67,18 @@ const RECORDER = `(() => {
   return true;
 })()`;
 const VSYNC = `new Promise((resolve) => { const t = []; const f = (n) => { t.push(n); if (t.length < 121) requestAnimationFrame(f); else resolve((t[120] - t[0]) / 120); }; requestAnimationFrame(f); })`;
+// Intervalli tra i fotogrammi del nucleo nel thread dove disegna (worker o pagina), dall'ultima richiesta.
+const CORE_STATS = `new Promise((resolve) => { const canvas = document.querySelector('canvas.core'); if (!canvas) return resolve([]);
+  const timer = setTimeout(() => resolve([]), 2000);
+  canvas.addEventListener('nxs-core-stats', (event) => { clearTimeout(timer); resolve(event.detail); }, { once: true });
+  canvas.dispatchEvent(new Event('nxs-core-stats-request')); })`;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const round = (value) => Math.round(value * 10) / 10;
+function coreSummary(intervals, vsync) {
+  const sorted = [...intervals].sort((a, b) => a - b);
+  return { coreFrames: intervals.length, coreP99: round(sorted[Math.min(sorted.length - 1, Math.floor(0.99 * sorted.length))] || 0), coreMax: round(sorted.at(-1) || 0),
+    coreOver2Vsync: intervals.filter((v) => v > vsync * 2).length };
+}
 
 function summarize(scenario, { frames, longTasks, loaf }, vsync, extra) {
   const sorted = [...frames].sort((a, b) => a - b);
@@ -102,12 +114,15 @@ app.whenReady().then(async () => {
     }
     await js(RECORDER);
     const vsync = await js(VSYNC);
+    await js(CORE_STATS);
     await js('window.__frames.start()');
     await run(js, win);
     const raw = await js('window.__frames.stop()');
+    const core = coreSummary(await js(CORE_STATS), vsync);
     const backend = await js(`document.querySelector('canvas')?.dataset.backend || 'nessuno'`);
+    const thread = await js(`document.querySelector('canvas')?.dataset.thread || '?'`);
     const display = screen.getDisplayMatching(win.getBounds());
-    results.push(summarize(scenario, raw, vsync, { backend, window: `${width}×${height}`, dpr: display.scaleFactor, displayHz: display.displayFrequency }));
+    results.push({ ...summarize(scenario, raw, vsync, { backend, thread, window: `${width}×${height}`, dpr: display.scaleFactor, displayHz: display.displayFrequency }), ...core });
     win.destroy();
   }
   const key = (win, keyCode, modifiers = []) => { win.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers }); win.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers }); };
@@ -115,7 +130,7 @@ app.whenReady().then(async () => {
 
   await measure('nucleo a riposo, respiro completo (14 s)', { run: () => wait(14_000) });
   await measure('finestra stretta 720×800 (8 s)', { width: 720, height: 800, run: () => wait(8_000) });
-  await measure('cambio conversazione ×8 (View Transitions)', { run: async (js) => {
+  await measure('cambio conversazione ×8', { run: async (js) => {
     for (let i = 0; i < 8; i += 1) { await clickText(js, i % 2 ? 'Misura B' : 'Misura A'); await wait(700); }
   } });
   await measure('fogli e palette ×5 (apri/chiudi)', { run: async (js, win) => {
@@ -140,8 +155,8 @@ app.whenReady().then(async () => {
   fs.mkdirSync(path.join(root, 'qa-artifacts'), { recursive: true });
   fs.writeFileSync(path.join(root, 'qa-artifacts', 'desktop-motion-frames.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(report.engine);
-  console.table(results.map(({ scenario, backend, dpr, displayHz, frames, vsyncMs, p50, p95, p99, max, over1_5Vsync, over2Vsync, longTasks, loafMaxBlockingMs }) =>
-    ({ scenario, backend, dpr, hz: displayHz, frames, vsyncMs, p50, p95, p99, max, '>1.5v': over1_5Vsync, '>2v': over2Vsync, longTasks, loafBlock: loafMaxBlockingMs })));
+  console.table(results.map(({ scenario, backend, thread, displayHz, p99, max, over2Vsync, longTasks, coreFrames, coreP99, coreMax, coreOver2Vsync }) =>
+    ({ scenario, backend, thread, hz: displayHz, 'pagina p99': p99, 'pagina max': max, 'pagina >2v': over2Vsync, longTasks, 'nucleo fotogrammi': coreFrames, 'nucleo p99': coreP99, 'nucleo max': coreMax, 'nucleo >2v': coreOver2Vsync })));
   app.exit(0);
 }).catch((error) => { console.error(error.stack || error); app.exit(1); });
 process.on('unhandledRejection', (error) => { console.error('rejection', error?.stack || error); });
