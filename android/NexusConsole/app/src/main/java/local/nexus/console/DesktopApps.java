@@ -123,7 +123,8 @@ final class DesktopApps {
         tile.setMinHeight(ui.dp(80));
         tile.setTextSize(14);
         // Nome + stato: lo stato di Supremo ("Aperta · UAC limitato") va a capo invece di troncarsi.
-        tile.setMaxLines(3);
+        // Con il font al 200% lo stato può occupare due righe sotto il nome.
+        tile.setMaxLines(ui.context().getResources().getConfiguration().fontScale >= 1.5f ? 5 : 3);
         tile.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tile.setCompoundDrawablePadding(ui.dp(12));
         tile.setContentDescription(label + ", stato in verifica");

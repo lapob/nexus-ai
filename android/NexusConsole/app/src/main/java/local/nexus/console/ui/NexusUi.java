@@ -94,6 +94,9 @@ public final class NexusUi {
         button.setTextColor(danger ? DANGER_TEXT : primary ? Color.rgb(211, 242, 241) : Color.rgb(153, 188, 189));
         button.setTransformationMethod(null);
         button.setAllCaps(false);
+        // Bersaglio tattile minimo 48 dp anche se il tema o il font cambiano.
+        button.setMinHeight(dp(48));
+        button.setMinimumHeight(dp(48));
         button.setStateListAnimator(null);
         int fill = danger ? Color.rgb(33, 15, 13) : primary ? Color.rgb(7, 35, 36) : Color.rgb(5, 17, 18);
         int stroke = danger ? Color.argb(70, 232, 153, 132) : primary ? Color.argb(60, 101, 221, 218) : Color.argb(26, 132, 190, 192);
@@ -253,6 +256,8 @@ public final class NexusUi {
         TextView name = text(label, 13, MUTED);
         TextView statusValue = text(value, 13, TEXT);
         statusValue.setTag("value:" + label);
+        // TalkBack legge etichetta e valore come un'unica voce, nell'ordine visivo.
+        if (android.os.Build.VERSION.SDK_INT >= 28) row.setScreenReaderFocusable(true);
         if (context.getResources().getConfiguration().fontScale >= 1.5f) {
             row.setOrientation(LinearLayout.VERTICAL);
             row.addView(name, new LinearLayout.LayoutParams(-1, -2));

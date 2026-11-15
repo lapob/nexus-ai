@@ -231,6 +231,9 @@ final class DashboardScreen {
             if (selected && changed) animateSectionEntry(panel, direction);
             Button tab = dashboardTabs.get(key);
             tab.setSelected(selected);
+            // TalkBack: "Sezione Sistema, 2 di 4, selezionata".
+            tab.setContentDescription("Sezione " + key + ", " + (order.indexOf(key) + 1) + " di " + order.size());
+            if (android.os.Build.VERSION.SDK_INT >= 30) tab.setStateDescription(selected ? "selezionata" : null);
             tab.setTextColor(selected ? NexusUi.BG : Color.rgb(176, 202, 203));
             ui.decorateButton(tab, dashboardGlyph(key), selected ? NexusUi.BG : Color.rgb(140, 184, 186));
             // Il focus resta visibile anche sulla scheda appena ridisegnata.

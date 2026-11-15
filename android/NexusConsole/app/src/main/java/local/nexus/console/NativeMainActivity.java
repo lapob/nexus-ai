@@ -339,6 +339,8 @@ public final class NativeMainActivity extends androidx.activity.ComponentActivit
         shell.swapContent(() -> {
             shell.content.setGravity(Gravity.CENTER);
             ControlCoreView core = new ControlCoreView(this, motion, false);
+            // Connessione in corso: stessa energia dello stato "thinking" del core web.
+            core.setEnergy(ControlCoreView.ENERGY_THINKING);
             core.setContentDescription("Connessione privata in corso");
             shell.content.addView(core, new LinearLayout.LayoutParams(-1, ui.dp(190)));
         });

@@ -104,6 +104,16 @@ final class SystemSection {
             }
         }
 
+        JSONObject runtime = snapshot.optJSONObject("runtime");
+        if (runtime != null) {
+            LinearLayout health = group(system, "RUNTIME AI");
+            health.setTag("runtime-health");
+            health.addView(ui.infoRow("Salute", runtimeHealth(runtime)));
+            health.addView(ui.infoRow("VRAM", runtimeVram(runtime)));
+            health.addView(ui.infoRow("Modelli in memoria", runtimeModels(runtime)));
+            styleRuntimeWarning(health, runtime);
+        }
+
         if (performance != null && performance.optInt("samples") > 0) {
             LinearLayout ai = group(system, "PRESTAZIONI AI");
             ai.addView(ui.infoRow("Richieste AI misurate", String.valueOf(performance.optInt("samples"))));
@@ -150,7 +160,75 @@ final class SystemSection {
             dashboard.setTaggedText("value:Verifica P95", performance.optInt("verifyP95Ms") + " ms");
         }
         dashboard.setTaggedText("value:Rete", Formats.networkSummary(snapshot.optJSONObject("network")));
+        JSONObject runtime = snapshot.optJSONObject("runtime");
+        if (runtime != null) {
+            dashboard.setTaggedText("value:Salute", runtimeHealth(runtime));
+            dashboard.setTaggedText("value:VRAM", runtimeVram(runtime));
+            dashboard.setTaggedText("value:Modelli in memoria", runtimeModels(runtime));
+            android.view.View card = dashboard.findTagged("runtime-health");
+            if (card instanceof LinearLayout) styleRuntimeWarning((LinearLayout) card, runtime);
+        }
     }
+
+    // #region Salute del runtime AI
+
+    /** Fase del runtime e conteggi delle ultime 24 ore; mai prompt, percorsi o indirizzi. */
+    static String runtimeHealth(JSONObject runtime) {
+        String phase = runtime.optString("phase");
+        String label = "ready".equals(phase) ? "Pronto" : "warming".equals(phase) ? "In preparazione" : "Non pronto";
+        JSONObject day = runtime.optJSONObject("last24h");
+        if (day == null) return label;
+        int slow = Math.max(0, day.optInt("slow"));
+        int recovered = Math.max(0, day.optInt("recovered"));
+        StringBuilder text = new StringBuilder(label).append(" · 24 h: ")
+                .append(slow).append(slow == 1 ? " rallentamento, " : " rallentamenti, ")
+                .append(recovered).append(recovered == 1 ? " recupero" : " recuperi");
+        int blocked = Math.max(0, day.optInt("blocked"));
+        int failed = Math.max(0, day.optInt("recoveryFailed"));
+        if (blocked > 0 || failed > 0) {
+            text.append(" · attenzione:");
+            if (blocked > 0) text.append(' ').append(blocked).append(blocked == 1 ? " blocco" : " blocchi");
+            if (blocked > 0 && failed > 0) text.append(',');
+            if (failed > 0) text.append(' ').append(failed).append(failed == 1 ? " recupero fallito" : " recuperi falliti");
+        }
+        return text.toString();
+    }
+
+    static boolean runtimeWarning(JSONObject runtime) {
+        JSONObject day = runtime.optJSONObject("last24h");
+        return day != null && (day.optInt("blocked") > 0 || day.optInt("recoveryFailed") > 0);
+    }
+
+    static String runtimeVram(JSONObject runtime) {
+        if (!runtime.has("vramBytes")) return "Non disponibile";
+        if (runtime.has("reachable") && !runtime.optBoolean("reachable")) return "Runtime non raggiungibile";
+        JSONArray models = runtime.optJSONArray("models");
+        int count = models == null ? 0 : models.length();
+        if (count == 0) return "Libera · nessun modello caricato";
+        return formatBytes(runtime.optLong("vramBytes")) + " · " + count + (count == 1 ? " modello" : " modelli");
+    }
+
+    static String runtimeModels(JSONObject runtime) {
+        JSONArray models = runtime.optJSONArray("models");
+        if (models == null || models.length() == 0) return "Nessuno";
+        StringBuilder names = new StringBuilder();
+        for (int index = 0; index < models.length(); index++) {
+            JSONObject model = models.optJSONObject(index);
+            String name = model == null ? "" : model.optString("name");
+            if (name.isEmpty()) continue;
+            if (names.length() > 0) names.append(", ");
+            names.append(name);
+        }
+        return names.length() == 0 ? "Nessuno" : names.toString();
+    }
+
+    /** L'avviso resta testuale ("attenzione: …") e in più cambia colore, mai solo colore. */
+    private void styleRuntimeWarning(LinearLayout card, JSONObject runtime) {
+        android.view.View value = card.findViewWithTag("value:Salute");
+        if (value instanceof TextView) ((TextView) value).setTextColor(runtimeWarning(runtime) ? NexusUi.DANGER_TEXT : NexusUi.TEXT);
+    }
+
+    // #endregion
 
     // #region Sicurezza nel pannello tecnico
 

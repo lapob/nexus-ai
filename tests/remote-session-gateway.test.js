@@ -961,6 +961,54 @@ test('osservabilità locale: sezione runtime con fase, recuperi e VRAM; un forni
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('telemetria privata di Control: salute runtime ridotta a fase, conteggi e nomi dei modelli', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-telemetry-runtime-'));
+  let calls = 0;
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (record) => record },
+    readinessProvider: () => ({ ready: true, status: 'ready' }),
+    runtimeHealthProvider: async () => {
+      calls += 1;
+      return {
+        managed: true, reachable: true,
+        last24h: { slow: 3, blocked: 1, recovered: 2, recoveryFailed: 0, prompt: 'segreto' },
+        lastRecoveryAt: 1_700_000_000_000,
+        models: [{ name: 'nexus-balanced:latest', sizeBytes: 9e9, vramBytes: 8e9, digest: 'sha256:abc', path: 'C:\\modelli' }],
+        vramBytes: 8e9,
+        watchdog: { failures: 0, restartsLastHour: 1, checkedAt: 1_700_000_100_000, log: 'C:\\log' },
+        baseUrl: 'http://127.0.0.1:11434'
+      };
+    },
+    systemSnapshotProvider: async () => ({}),
+    modelProvider: async () => [{ id: 'chat', capabilities: { chat: true } }],
+    onMessage: async ({ conversation }) => ({ ...conversation, turns: [] }),
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    const port = await freePort();
+    await gateway.configure({ enabled: true, allowLan: false, port });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    assert.equal((await fetch(`${baseUrl}/api/system/telemetry`)).status, 401);
+    const consolePaired = await pair(baseUrl, gateway.createPairingCode({ scope: 'console' }).code, 'console');
+    const headers = { Authorization: `Bearer ${consolePaired.token}` };
+    const telemetry = await (await fetch(`${baseUrl}/api/system/telemetry`, { headers })).json();
+    assert.deepEqual(telemetry.runtime, {
+      phase: 'ready', managed: true, reachable: true,
+      last24h: { slow: 3, blocked: 1, recovered: 2, recoveryFailed: 0 },
+      lastRecoveryAt: 1_700_000_000_000,
+      models: [{ name: 'nexus-balanced:latest', sizeBytes: 9e9, vramBytes: 8e9 }],
+      vramBytes: 8e9,
+      watchdog: { failures: 0, restartsLastHour: 1, checkedAt: 1_700_000_100_000 }
+    });
+    assert.doesNotMatch(JSON.stringify(telemetry), /segreto|sha256|11434|modelli|C:\\\\log/);
+    // La salute del runtime ha una cache propria: lo stream a 1 s non interroga il runtime a ogni frame.
+    gateway.telemetryCache = { value: null, expiresAt: 0 };
+    await (await fetch(`${baseUrl}/api/system/telemetry`, { headers })).json();
+    assert.equal(calls, 1);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('readiness attende il warm-up reale e i messaggi guest falliscono rapidamente durante il cold-start', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-readiness-warmup-'));
   let runtimeReady = false;

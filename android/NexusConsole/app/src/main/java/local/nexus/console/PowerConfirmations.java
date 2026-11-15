@@ -53,8 +53,10 @@ final class PowerConfirmations {
         restart.setOnClickListener(v -> planPower("restart"));
         Button shutdown = ui.action("Spegni", "power", NexusUi.DANGER_TEXT, false, true);
         shutdown.setOnClickListener(v -> planPower("shutdown"));
-        row.addView(restart, new LinearLayout.LayoutParams(0, ui.dp(58), 1));
-        row.addView(shutdown, ui.spaced(0, ui.dp(58), 1, 8));
+        restart.setMinHeight(ui.dp(58));
+        shutdown.setMinHeight(ui.dp(58));
+        row.addView(restart, new LinearLayout.LayoutParams(0, -2, 1));
+        row.addView(shutdown, ui.spaced(0, -2, 1, 8));
         return row;
     }
 
@@ -112,7 +114,8 @@ final class PowerConfirmations {
         content.addView(detail, new LinearLayout.LayoutParams(-1, -2));
         for (Button action : new Button[] { primary, secondary }) {
             if (action == null) continue;
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, ui.dp(action == primary ? 56 : 50));
+            action.setMinHeight(ui.dp(action == primary ? 56 : 50));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
             params.setMargins(ui.dp(26), 0, ui.dp(26), ui.dp(10));
             content.addView(action, params);
         }

@@ -1,3 +1,35 @@
+## Control 1.28.0: runtime health, accessibility, core aligned — 15 November 2026 (committed)
+
+- Gateway: `telemetrySnapshot()` now carries `runtime` (phase, managed,
+  reachable, last24h counts, lastRecoveryAt, model names/bytes, vramBytes,
+  watchdog counts) through `sanitizeRuntimeHealth`, with its own 5 s cache;
+  `/internal/observability` uses the same sanitizer, still fresh per call.
+  Only reaches Control after the next coordinated server restart.
+- Control Sistema: new "RUNTIME AI" card with Salute (phase + slowdowns and
+  recoveries in 24 h, textual and coloured warning when blocked or
+  recoveryFailed > 0), VRAM and models in memory, updated live.
+- Accessibility: buttons min 48 dp; button heights elastic (min height, no
+  fixed LayoutParams) in gate, dock and confirmations; info rows read as one
+  TalkBack item; tabs announce "Sezione X, n di 4, selezionata"; gate lock
+  text contrast 3.5:1 -> AA; app tiles allow 5 lines at font >= 150%.
+- Core: ControlCoreView uses the web phases (stagger seed*.16+.04+(1-y)*.07),
+  breath ramp after 1.2 s, the web ENERGY table with time-based convergence,
+  energy-driven spin/shell wave, radial fade to zero at the view edge.
+  Voice state is not in Control's channel (presence contract exposes only
+  app states): follow-up.
+- Verified: build + lint OK (APK SHA-256 99453AB0…1BB2, versionCode 56);
+  `npm test` 1326 tests, 1324 pass / 0 fail / 2 skipped; gateway file 78/78;
+  Android contracts 20/20. Emulator: gate at font 200% without cuts, Riprova
+  196x50 dp, reduced motion 6 frames in 5 s. Phone (installed 1.28.0):
+  connecting core with no edge cuts, dashboard and Sistema OK, tabs 48 dp
+  with "Sezione X, n di 4", dock 58 dp. Screenshots in
+  `qa-artifacts/control-emulator/1.28/`.
+- Not verified yet: the RUNTIME AI card on a real snapshot (needs the
+  coordinated server restart); dashboard at font 200% (emulator is not
+  paired, the phone's font setting belongs to the owner).
+- Next: after the server restart open Sistema on the phone and check Salute,
+  VRAM, models; voice state for the core needs a presence-contract field.
+
 ## Desktop updates itself to every signed Preview — 15 November 2026 (committed, no release yet)
 
 - Goal: the installed desktop app must never stay on an old core. Takes
@@ -3135,6 +3167,7 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 - Live agent chip: the icon pulse drew a square box-shadow around the SVG; replaced by a breathing sparkle with soft glow and a conic light travelling around the pill (reduced motion respected). Phones: browser tap highlight removed; `press.ts` (lazy) gives a contained spring press via Web Animations without touching component transitions.
 - Server independence verified: NexusNXS Server, Desktop Bridge and Watchdog run from this source checkout and `.nexus-data`; nothing depends on the installed app under AppData\Local\Programs, so uninstalling it leaves server, phone control and notifications running.
 - Gates: npm test 1279 pass / 0 fail, check:ui 39/39 + 15/15, startup bundle 408907 bytes, real Electron smoke pass, overlay QA pass.
+
 
 - Release 0.3.40: release:public:preview passed (verify, smoke, SBOM 331 components), manifest refreshed, bundle verified (5 artefacts), Founder Preview prepared. Next: push main, publish-github-preview, coordinated server restart with maintenance.flag, readyz and live checks.
 

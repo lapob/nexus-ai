@@ -331,3 +331,36 @@ test('Control 1.27: vetro, respiro e tessere non sprecano GPU e restano accessib
   const history = controlFile('SafeActionHistory.java');
   assert.match(history, /DateUtils\.isToday\(at\)/);
 });
+
+test('Control 1.28: salute del runtime, accessibilità e nucleo allineato al core web', () => {
+  const system = controlFile('SystemSection.java');
+  // Salute e VRAM arrivano dalla telemetria privata e si aggiornano dal vivo.
+  assert.match(system, /group\(system, "RUNTIME AI"\)/);
+  assert.match(system, /ui\.infoRow\("Salute", runtimeHealth\(runtime\)\)/);
+  assert.match(system, /ui\.infoRow\("VRAM", runtimeVram\(runtime\)\)/);
+  assert.match(system, /dashboard\.setTaggedText\("value:Salute", runtimeHealth\(runtime\)\)/);
+  // L'avviso è testuale oltre che cromatico.
+  assert.match(system, /text\.append\(" · attenzione:"\)/);
+  assert.match(system, /day\.optInt\("blocked"\) > 0 \|\| day\.optInt\("recoveryFailed"\) > 0/);
+  const ui = controlFile('ui', 'NexusUi.java');
+  assert.match(ui, /button\.setMinHeight\(dp\(48\)\)/, 'bersagli tattili di almeno 48 dp');
+  assert.match(ui, /row\.setScreenReaderFocusable\(true\)/, 'etichetta e valore letti insieme da TalkBack');
+  const dashboard = controlFile('DashboardScreen.java');
+  assert.match(dashboard, /tab\.setContentDescription\("Sezione " \+ key/);
+  assert.match(dashboard, /tab\.setStateDescription\(selected \? "selezionata" : null\)/);
+  // Pulsanti con altezza minima ma elastica: nessun taglio con il font al 200%.
+  for (const file of ['OfflineGate.java', 'PowerConfirmations.java']) {
+    assert.doesNotMatch(controlFile(file), /LayoutParams\([^)]*ui\.dp\((?:50|56|58)\)/, `${file}: nessuna altezza fissa sui pulsanti`);
+  }
+  assert.doesNotMatch(controlFile('OfflineGate.java'), /Color\.rgb\(92, 112, 114\)/, 'testo del varco sotto il contrasto AA');
+  const core = controlFile('ui', 'ControlCoreView.java');
+  const web = read('web/src/core-render.ts');
+  for (const [state, value] of Object.entries({ IDLE: 0.15, LISTENING: 0.4, THINKING: 0.6, RESPONDING: 1, SPEAKING: 0.85, ERROR: 0.35 })) {
+    assert.match(web, new RegExp(`${state.toLowerCase()}: ${value}`), `energia web ${state}`);
+    assert.match(core, new RegExp(`ENERGY_${state} = ${String(value).replace(/^0/, '')}f`), `energia Control ${state}`);
+  }
+  assert.match(core, /grainSeed\[index\] \* \.16f \+ \.04f \+ \(1f - y\) \* \.07f/, 'stesse fasi dei grani del core web');
+  assert.match(core, /float ramp = moving \? Math\.min\(1f, Math\.max\(0f, \(seconds - 1\.2f\) \/ 3f\)\) : 0f;/);
+  assert.match(core, /\(1f - \.26f \* lift\) \* fade/, 'dissolvenza radiale invece del taglio sul bordo');
+  assert.match(core, /Math\.exp\(-2\.45f \* dt\)/, 'energia che converge col tempo reale');
+});

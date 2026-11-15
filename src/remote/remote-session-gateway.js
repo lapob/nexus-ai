@@ -642,6 +642,39 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 
 // #region Gateway e API
 
+function sanitizeRuntimeHealth(phase, raw) {
+  const runtime = { phase };
+  if (!raw || typeof raw !== 'object') return runtime;
+  const count = (value) => Math.max(0, Math.floor(Number(value) || 0));
+  const bytes = (value) => Math.max(0, Number(value) || 0);
+  const time = (value) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null);
+  if (typeof raw.managed === 'boolean') runtime.managed = raw.managed;
+  if (typeof raw.reachable === 'boolean') runtime.reachable = raw.reachable;
+  if (raw.last24h && typeof raw.last24h === 'object') {
+    runtime.last24h = {
+      slow: count(raw.last24h.slow),
+      blocked: count(raw.last24h.blocked),
+      recovered: count(raw.last24h.recovered),
+      recoveryFailed: count(raw.last24h.recoveryFailed)
+    };
+  }
+  if ('lastRecoveryAt' in raw) runtime.lastRecoveryAt = time(raw.lastRecoveryAt);
+  if (Array.isArray(raw.models)) {
+    runtime.models = raw.models.slice(0, 8).map((entry) => ({
+      name: String(entry?.name || '').replace(/[^\w.:/+-]/g, '').slice(0, 80),
+      sizeBytes: bytes(entry?.sizeBytes),
+      vramBytes: bytes(entry?.vramBytes)
+    }));
+  }
+  if ('vramBytes' in raw) runtime.vramBytes = bytes(raw.vramBytes);
+  if ('watchdog' in raw) {
+    runtime.watchdog = raw.watchdog && typeof raw.watchdog === 'object'
+      ? { failures: count(raw.watchdog.failures), restartsLastHour: count(raw.watchdog.restartsLastHour), checkedAt: time(raw.watchdog.checkedAt) }
+      : null;
+  }
+  return runtime;
+}
+
 class RemoteSessionGateway {
   constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, webImageSearch = null, modelProvider = null, readinessProvider = null, runtimeHealthProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS, deviceNotificationHub = null } = {}) {
     this.statePath = statePath;
@@ -742,6 +775,7 @@ class RemoteSessionGateway {
     this.telemetryStreams = new Set();
     this.telemetryCache = { expiresAt: 0, value: null };
     this.telemetryProbe = null;
+    this.runtimeHealthCache = null;
     // Notifiche opache per NexusNXS Control: viaggiano sugli stream Console già
     // aperti e, con l'app in background, su un long-poll autenticato.
     this.deviceNotifications = deviceNotificationHub || new DeviceNotificationHub();
@@ -1429,6 +1463,23 @@ class RemoteSessionGateway {
     stream.heartbeat.unref?.();
   }
 
+  // Salute del runtime AI ridotta ai soli conteggi e nomi dei modelli: e l'unica
+  // forma che lascia il PC, sia verso /internal/observability sia verso Control.
+  runtimePhase(aiReady) {
+    return aiReady ? 'ready' : this.readinessPhase === 'warming' ? 'warming' : 'not_ready';
+  }
+
+  async runtimeHealth(phase, { fresh = false } = {}) {
+    const now = Date.now();
+    let raw = null;
+    if (!fresh && this.runtimeHealthCache && this.runtimeHealthCache.expiresAt > now) raw = this.runtimeHealthCache.value;
+    else {
+      try { raw = this.runtimeHealthProvider ? await this.runtimeHealthProvider() : null; } catch { raw = null; }
+      this.runtimeHealthCache = { expiresAt: Date.now() + 5_000, value: raw };
+    }
+    return sanitizeRuntimeHealth(phase, raw);
+  }
+
   async telemetrySnapshot() {
     const now = Date.now();
     if (this.telemetryCache.value && this.telemetryCache.expiresAt > now) return this.telemetryCache.value;
@@ -1446,6 +1497,7 @@ class RemoteSessionGateway {
           anonymousSessions: this.guestSessions.size,
           connectedStreams: this.eventStreams.size + this.telemetryStreams.size
         },
+        runtime: await this.runtimeHealth(this.runtimePhase(aiReady)),
         performance: this.performanceStore?.summary?.() || null
       };
       this.telemetryCache = { expiresAt: Date.now() + 1_000, value };
@@ -1658,6 +1710,7 @@ class RemoteSessionGateway {
     if (final) this.deviceNotifications.close();
     this.telemetryCache = { expiresAt: 0, value: null };
     this.telemetryProbe = null;
+    this.runtimeHealthCache = null;
     for (const queued of this.guestQueue.splice(0)) {
       clearTimeout(queued.timer);
       queued.signal?.removeEventListener('abort', queued.onAbort);
@@ -2008,12 +2061,9 @@ class RemoteSessionGateway {
             client: pseudonymousAccessId(event.address, this.observabilitySecret)
           }));
         // Salute del runtime AI: fase attuale, recuperi recenti e VRAM. Un errore del fornitore non rompe l'endpoint.
-        let runtimeHealth = null;
-        try { runtimeHealth = this.runtimeHealthProvider ? await this.runtimeHealthProvider() : null; } catch { runtimeHealth = null; }
-        const aiReady = telemetry.nexusService?.aiReady === true;
-        const phase = aiReady ? 'ready' : this.readinessPhase === 'warming' ? 'warming' : 'not_ready';
+        const runtime = await this.runtimeHealth(this.runtimePhase(telemetry.nexusService?.aiReady === true), { fresh: true });
         return this.json(response, 200, {
-          runtime: { phase, ...(runtimeHealth && typeof runtimeHealth === 'object' ? runtimeHealth : {}) },
+          runtime,
           generatedAt: Date.now(),
           requests: this.guestCapacity(),
           performance: telemetry.performance,

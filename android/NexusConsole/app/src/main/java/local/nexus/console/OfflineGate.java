@@ -128,7 +128,8 @@ final class OfflineGate {
             start.setEnabled(!starting);
             start.setContentDescription(starting ? "Avvio del server in corso" : "Riaccendi il server NexusNXS sul PC");
             start.setOnClickListener(v -> startServerFromGate());
-            LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, ui.dp(56));
+            start.setMinHeight(ui.dp(56));
+            LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, -2);
             startParams.setMargins(ui.dp(26), 0, ui.dp(26), ui.dp(10));
             content.addView(start, startParams);
         }
@@ -137,12 +138,15 @@ final class OfflineGate {
             probeGate();
             host.reconnectNow();
         });
-        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(server ? -1 : ui.dp(196), ui.dp(50));
+        // Altezza minima fissa, ma il pulsante cresce con il font fino al 200%.
+        retry.setMinHeight(ui.dp(50));
+        retry.setMinWidth(ui.dp(196));
+        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(server ? -1 : -2, -2);
         if (server) retryParams.setMargins(ui.dp(26), 0, ui.dp(26), 0);
         retryParams.gravity = Gravity.CENTER_HORIZONTAL;
         content.addView(retry, retryParams);
 
-        TextView lock = ui.text("Le funzioni di Control restano bloccate finché il server non torna online.", 12, Color.rgb(92, 112, 114));
+        TextView lock = ui.text("Le funzioni di Control restano bloccate finché il server non torna online.", 12, Color.rgb(134, 158, 160));
         lock.setGravity(Gravity.CENTER);
         lock.setPadding(ui.dp(24), ui.dp(22), ui.dp(24), 0);
         content.addView(lock, new LinearLayout.LayoutParams(-1, -2));
