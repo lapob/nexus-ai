@@ -28,6 +28,15 @@
   `?nxs-qa-time=2` gives data-qa="ready", arrival 1.000, pixel-identical twice
   (1440 + 390); /downloads links the 0.3.42 setup, GitHub asset HEAD 200.
   Rollback target: a8371d0e. Next: 0.3.43 release data from its own session.
+- OPEN (not started, PC shutdown): the visual-regression session measured
+  `?nxs-qa-time=4` + frozen Playwright clock as not repeatable on the same
+  build: home-apps-desktop 0.72% (mockup image shifts/scales sub-pixel),
+  home-vision-desktop 0.337% (a few grains); clock alone is 0.000%. Suspect:
+  in still mode a parallax/zoom or the choreo/scene state depends on when the
+  instant scroll lands relative to the single frozen frame (no redraw at
+  rest). `scripts/visual-regression.mjs` defaults to clock-only; check a fix
+  with `--qa-time --update --only=home-apps-desktop`, then the same without
+  `--update` several times (must be 0.000%).
 
 # QA time hook alias — 15 November 2026 (source bb759c5, deployed with 8b8ce04d)
 
