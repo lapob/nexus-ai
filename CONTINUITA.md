@@ -1,4 +1,4 @@
-## Control 1.26.0: monolithic Activity split into screens and components — 14 November 2026 (committed, device check pending)
+## Control 1.26.0: monolithic Activity split into screens and components — 14 November 2026 (committed, installed on phone)
 
 - Base b1acf2d (Control 1.25.0). NativeMainActivity.java has gone from about
   3,300 lines to about 500 and now only coordinates the other pieces. Native
@@ -25,10 +25,19 @@
   contracts 18/18. assemblePreview and lintPreview OK (0 errors, 3
   pre-existing warnings). Log: qa-artifacts/control-1.26.0-build.log.
 - APK: 1.26.0, versionCode 54, 621,557 B (+1.9 KB), SHA-256 40E016CC…6630.
-- Not done yet: ADB install. No phone was visible to ADB (neither
-  `adb devices` nor mDNS). The owner asked for an AVD emulator that is
-  already installed, then the phone. Screen-by-screen check still to do
-  (Riavvia/Spegni never against the real PC).
+- No AVD emulator on the PC: ~/.android/avd is empty and there is no
+  system image. Nothing has been downloaded.
+- 15/11: the owner turned wireless debugging back on. 1.26.0 is installed
+  via ADB (versionCode 54) and cold start took 79 ms. Panoramica (live
+  data, gauges, charts), Sistema (specs, tab row reveal), App (6 tiles with
+  status, close foreground app) and Servizi (counters, Arresta server, last
+  operations) checked, with restore of the last section. 0 crashes and no
+  app errors in logcat. Screenshots in qa-artifacts/control-1.26.0-device/.
+- Not tested on the device, on purpose: Riavvia/Spegni/Arresta server and
+  their confirmations (never against the real PC/server), the offline gate
+  (it would need the server stopped) and reduced motion (it would mean
+  changing the phone's system settings). These stay covered by the contract
+  tests.
 
 ## Control 1.25.0: core breath aligned with web/desktop, wave entries, directional sections — 14 November 2026
 
