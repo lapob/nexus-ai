@@ -18,6 +18,22 @@
 - Not part of `npm test` or of CI: it needs the sibling `.AI` checkout.
 - `?nxs-still` is compatible but not required.
 
+# QA time hook alias — 15 November 2026 (source bb759c5, NOT deployed)
+
+- `?nxs-qa-time=<seconds>` is an alias of `?nxs-still=<seconds>` (name agreed
+  with the visual-regression session); after the first frozen frame the field
+  canvas gets `data-qa="ready"`, `data-arrival="1.000"`. The scene has no
+  `Math.random`: seeded LCG 0x4e5853 (field) and java.util.Random 73
+  (presence). npm test 49/49, e2e 40/40.
+- Shared core: the app engine (`.AI/web/src/core-render.ts`, main 38dd378)
+  draws one core in its own canvas with a radial falloff on min(w,h)/2. The
+  site's field is a full-viewport sky with its own chapter forms, so the
+  exact formula would black out the sky's sides; the site keeps linear
+  feathers + radial corner falloff (published a8371d0e). Adopting the
+  versioned module is planned after app Preview 0.3.42, when it ships.
+- Not released: `website` also carries 8cbe5d7 (Preview 0.3.42 AI shell, other
+  session); release only once that commit is cleared for production.
+
 # Accessibility, stable visual-test mode, radial field falloff — 15 November 2026 (PUBLISHED: production a8371d0e, source e3bb8c9)
 
 - release:prepare candidate 4e905a16 from e3bb8c9. The first two promote
