@@ -3333,6 +3333,16 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - console parser: 0 errors;
   - `check:sections` reports only `scripts/visual/lib/*`, which belong to the visual-tests session in progress.
 - Deployment: loads at the next coordinated server restart (`maintenance.flag`).
+## Server: coordinated restart to load the health panel (15 November 2026)
+
+- Operation: restart requested by the owner, run through `manage-headless-server-task.ps1 restart` with
+  `maintenance.flag` set.
+- Revision: `main` at `3801bd8`, plus the Control session's uncommitted gateway change that sends runtime health to
+  Control. Its gateway, runtime and watchdog tests pass on this tree (96/96).
+- Expected check:
+  - `/readyz` ready;
+  - the `runtime` section appears in `/internal/observability`;
+  - the "Salute" and "VRAM" rows appear in the console.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
