@@ -1,4 +1,12 @@
-# Accessibility, stable visual-test mode, radial field falloff — 15 November 2026 (IN PROGRESS: release)
+# Accessibility, stable visual-test mode, radial field falloff — 15 November 2026 (PUBLISHED: production a8371d0e, source e3bb8c9)
+
+- release:prepare candidate 4e905a16 from e3bb8c9. The first two promote
+  attempts stopped at the AI gate (ai.nexusnxs.com/readyz 503 "warming",
+  backend restarting elsewhere); production stayed on 27cd5494. Promoted once
+  readyz was "ready": 13 routes, navbar, headers, AI health verified. Live:
+  `?nxs-still` passes pixel-identical twice (1440 + 390, 14 stops), axe 0
+  violations on 9 routes × desktop/phone × reduced/no-preference. Rollback
+  target: 27cd5494.
 
 - Visual-test contract: `?nxs-still[=seconds]` (or `html[data-nxs-still]`) adds
   `html.nxs-still`, renders the seeded field (seed 0x4e5853, presence seed 73)
