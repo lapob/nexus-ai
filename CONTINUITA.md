@@ -1,3 +1,13 @@
+# /security and /downloads layout — 15 November 2026 (IN PROGRESS: release)
+
+- /security data flow (≥821 px): statement and checks now share the first
+  row, the flow line closes beneath (before: empty right cell beside the title
+  and empty left cell beside the checks). /downloads: "Come verificare" icon
+  gets the accent colour and 28 px gap like "Cronologia release" (was glued
+  to the title); release card on phones (≤560 px) stacks icon above title, so
+  the title uses the full card width (was squeezed into 224 px).
+- Screenshots checked at 1440/1000/390. npm test 49/49, e2e 38/38. CSS only.
+
 # Layout polish pass — 15 November 2026 (PUBLISHED: production da27beb0, source f7377f3)
 
 - release:prepare candidate a21a900a (full gate) from f7377f3; promote

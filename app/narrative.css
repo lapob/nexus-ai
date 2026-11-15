@@ -241,6 +241,20 @@ html { scroll-padding-top: 96px; }
 @media (min-width: 1180px) {
   .feature-grid:has(> article:nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+/* /security data flow: statement and checks share the first row, the flow line closes beneath. */
+@media (min-width: 821px) {
+  .data-flow > div:first-child { grid-area: 1 / 1; }
+  .data-flow ul { grid-area: 1 / 2; align-self: end; }
+  .data-flow .flow-line { grid-row: 2; margin-top: clamp(8px, 1.5vw, 24px); }
+}
+/* /downloads: section icons get the same accent and breathing room everywhere. */
+.verify-guide > div:first-child > svg { margin-bottom: 28px; color: rgb(82, 238, 240); }
+@media (max-width: 560px) {
+  .release-list article {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "icon" "title" "facts" "requirements" "hash" "actions";
+  }
+}
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .narrative-apps .app-card-visual.desktop .app-card-visual__screen:hover {
