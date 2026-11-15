@@ -1,3 +1,32 @@
+## Android emulator for Control — 15 November 2026
+
+- The owner authorized the download. Into Z:\[AI]\NexusNXS\.toolchains\android-sdk:
+  - cmdline-tools 23.0 (commandlinetools-win-16111833, SHA-1 verified
+    57d04f2d…5e9d) in cmdline-tools\latest;
+  - system-images/android-36.1/google_apis/x86_64 r04 (1.8 GB download,
+    4.3 GB on disk).
+  - Android SDK license accepted only for these packages. Note:
+    sdkmanager 23 uses names with slashes.
+- AVD `NexusControl_Pixel9_API36` (pixel_9, 4 GB RAM, gpu host) in
+  ~/.android/avd. Start it with
+  `emulator -avd NexusControl_Pixel9_API36 -gpu host -no-snapshot-save`.
+  WHPX and the RX 9070 XT are used through Vulkan, and it boots in about
+  1 minute.
+- The emulator is outside the private network and not paired, so
+  Control 1.27.0 shows the "PC non raggiungibile" gate. Useful for the gate
+  without touching the server.
+  - Checked: the "Riprova" wave stays inside the button.
+  - With the system animations at 0: 0 frames drawn at rest, the arc
+    stays still.
+  - 340 dp width (density 508) and font at 130%: everything wraps
+    without cuts.
+  - Screenshots in qa-artifacts/control-emulator/. The emulator settings
+    were restored afterwards.
+- Frame timing on the emulator does not count (virtual 60 Hz display, jank
+  inflated); the phone measurements remain authoritative. Not testable on
+  the emulator: the dashboard (it needs device pairing) and "Server spento"
+  (it needs /rescue/status reachable).
+
 ## Control 1.27.0: refinements and frame budget — 15 November 2026 (committed, installed on phone)
 
 - Base e2dda4c. Measured with gfxinfo on a Galaxy S25 (SM-S931B,
