@@ -1,4 +1,10 @@
-# Continuous narrative + jank-free field — 14 November 2026 (site)
+# Continuous narrative + jank-free field — 14 November 2026 (PUBLISHED: production e5a35b6c, website 5658eb9)
+
+- release:prepare candidate 9e087e7d (full gate: security, tests 49/49, e2e
+  38/38, dry-run); promote verified 13 routes, navbar, headers and
+  ai.nexusnxs.com/healthz. Live on nexusnxs.com, reload + fast fling, 3 runs:
+  desktop p50/p95/p99 4.2/4.3/8.3 ms, 0 long tasks; mobile emulated 4x
+  12.4/20.8/25.2 ms, 0 long tasks. Rollback target: 9b73e8d7.
 
 - Owner request: one continuous, fluid story with no lagging frame. Chapters
   now hand over: sigil → helix → reactor → bridge current → saturn → bridge
