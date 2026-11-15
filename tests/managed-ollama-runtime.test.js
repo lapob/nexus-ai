@@ -136,6 +136,14 @@ test('runtime vivo ma lento: nessun kill al primo controllo mancato; bloccato da
   assert.equal(terminations, 1, 'bloccato davvero: un solo riavvio coordinato');
   assert.ok(warnings.includes('Runtime AI bloccato dopo conferme ripetute.'));
   assert.ok(concurrent.some((result) => result.recovered === true || result.reason === 'restart-cooldown'));
+  // Il pannello salute conta rallentamenti e blocchi delle ultime 24 ore; i vecchi eventi escono dal conteggio.
+  runtime.recordHealthEvent('slow', Date.now() - 2 * 86_400_000);
+  const report = await runtime.healthReport({ timeoutMs: 50 });
+  assert.equal(report.last24h.slow, 1);
+  assert.equal(report.last24h.blocked, 1);
+  assert.equal(report.last24h.recovered + report.last24h.recoveryFailed, 1);
+  assert.equal(report.reachable, false, 'nessun Ollama reale nel test: VRAM non disponibile, senza errori');
+  assert.deepEqual(report.models, []);
   runtime.shutdown();
 });
 

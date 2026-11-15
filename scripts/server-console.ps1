@@ -581,6 +581,24 @@ function Get-Sections {
     $system = $observability.system
     $ai.rows += , @('Risposta', (V "P50 $([Math]::Round($performance.p50Ms / 1000, 1)) s" 'text') + (V " · P95 $([Math]::Round($performance.p95Ms / 1000, 1)) s" 'muted'))
     $ai.rows += , @('Coda', (V "$($requests.active)/$($requests.concurrency) attive" 'text') + (V " · $($requests.queued)/$($requests.queueLimit) in attesa" 'muted'))
+    # Salute del runtime: fase, rallentamenti tollerati e recuperi nelle ultime 24 ore, modelli in VRAM.
+    $runtime = $observability.runtime
+    if ($runtime) {
+      $phaseLabel = switch ([string]$runtime.phase) { 'ready' { V '● pronto' 'ok' } 'warming' { V '● in preparazione' 'warn' } default { V '● non pronto' 'err' } }
+      $day = $runtime.last24h
+      $healthLine = $phaseLabel
+      if ($day) {
+        $incidents = [int]$day.blocked + [int]$day.recoveryFailed
+        $healthLine += V " · $([int]$day.slow) lenti · $([int]$day.recovered) recuperi" $(if ($incidents) { 'warn' } else { 'muted' })
+        if ($incidents) { $healthLine += V " · $incidents blocchi" 'warn' }
+        $healthLine += V ' in 24 h' 'muted'
+      }
+      $ai.rows += , @('Salute', $healthLine)
+      if ($runtime.reachable) {
+        $resident = @($runtime.models)
+        $ai.rows += , @('VRAM', $(if ($resident.Count) { (V (Format-Bytes ([double]$runtime.vramBytes)) 'text') + (V " · $($resident.Count) modell$(if ($resident.Count -eq 1) { 'o' } else { 'i' }) caricat$(if ($resident.Count -eq 1) { 'o' } else { 'i' })" 'muted') } else { V 'nessun modello residente' 'muted' }))
+      }
+    }
     foreach ($meter in @(@('CPU', 'cpu', $system.cpuPercent, 'accent'), @('RAM', 'memory', $system.memoryPercent, 'violet'), @('GPU', 'gpu', $system.gpuPercent, 'cyan'))) {
       $percent = [double]$meter[2]
       $tone = if ($percent -ge 90) { 'err' } elseif ($percent -ge 75) { 'warn' } else { $meter[3] }

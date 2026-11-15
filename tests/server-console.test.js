@@ -43,6 +43,13 @@ test('la console si apre all accesso, una sola istanza, e si rimuove con il serv
   assert.match(manager, /open-server-console\.ps1|\$opener[\s\S]*?-Normal' -f \$pwshPath, \$opener/);
 });
 
+test('il motore AI mostra la salute del runtime: fase, recuperi in 24 h e VRAM', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'server-console.ps1'), 'utf8');
+  assert.match(source, /\$runtime = \$observability\.runtime/);
+  assert.match(source, /@\('Salute', \$healthLine\)/);
+  assert.match(source, /@\('VRAM',/);
+});
+
 test('grafica: frazioni senza arrotondamenti interi, quadro fermo e sincronizzato', () => {
   // [Math]::Max(0, 0.55) in PowerShell sceglie Max(int, int): barre sempre piene e sfumature a due toni.
   assert.doesNotMatch(consoleScript, /\[Math\]::(Max|Min)\((0|1), (\$Amount|\$Fraction|\$percent|\[double\]|\[Math\])/);

@@ -932,6 +932,35 @@ test('readyz dichiara "warming" durante preload o autoriparazione, così il watc
   } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('osservabilità locale: sezione runtime con fase, recuperi e VRAM; un fornitore guasto non rompe la risposta', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-runtime-health-'));
+  let provider = async () => ({ last24h: { slow: 2, blocked: 0, recovered: 1, recoveryFailed: 0 }, vramBytes: 5_000_000_000, watchdog: { failures: 0, restartsLastHour: 0 } });
+  const gateway = new RemoteSessionGateway({
+    statePath: path.join(root, 'remote-access.json'),
+    conversationStore: { list: () => [], save: (record) => record },
+    readinessProvider: () => ({ ready: false, status: 'warming' }),
+    runtimeHealthProvider: () => provider(),
+    systemSnapshotProvider: async () => ({}),
+    modelProvider: async () => [{ id: 'chat', capabilities: { chat: true } }],
+    onMessage: async ({ conversation }) => ({ ...conversation, turns: [] }),
+    logger: { info() {}, warn() {} }
+  });
+  try {
+    const port = await freePort();
+    await gateway.configure({ enabled: true, allowLan: false, port });
+    const url = `http://127.0.0.1:${port}/internal/observability`;
+    let body = await (await fetch(url)).json();
+    assert.equal(body.runtime.phase, 'warming');
+    assert.equal(body.runtime.last24h.slow, 2);
+    assert.equal(body.runtime.vramBytes, 5_000_000_000);
+    provider = async () => { throw new Error('ollama assente'); };
+    gateway.telemetryCache = { value: null, expiresAt: 0 };
+    body = await (await fetch(url)).json();
+    assert.equal(body.runtime.phase, 'warming');
+    assert.equal(body.runtime.last24h, undefined);
+  } finally { await gateway.stop(); fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('readiness attende il warm-up reale e i messaggi guest falliscono rapidamente durante il cold-start', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-remote-readiness-warmup-'));
   let runtimeReady = false;

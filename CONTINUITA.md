@@ -3234,6 +3234,29 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
     box", shared breath, visual contracts), from the App web/desktop session's work in progress in
     `web/src`; they are not in these files.
 - Deployment: coordinated restart with `maintenance.flag` to load this fix and the `/readyz` "warming" fix.
+## Server: AI runtime health panel (15 November 2026)
+
+- `ManagedOllamaRuntime` keeps a short history of missed health checks (type and time only, at most 200 entries):
+  - `slow`: slow but alive, not restarted;
+  - `blocked`: blocked after the confirmations;
+  - `recovered` and `recovery-failed`: outcome of an automatic recovery.
+- `healthReport()` returns the 24-hour counts, the last recovery and the models resident in VRAM. The models come
+  from Ollama `/api/ps`: name, size and VRAM only, no prompts.
+- `/internal/observability` (loopback only, never through the public ingress) has a new `runtime` section:
+  - `phase`: `ready`, `warming` or `not_ready`;
+  - the counts above, `vramBytes` and `models`;
+  - the watchdog state: failures, restarts in the last hour and last check.
+  A failing provider leaves only `phase` and does not break the response.
+- The server console's "MOTORE AI" card has new "Salute" and "VRAM" rows.
+- GPU guard (`OLLAMA_GPU_OVERHEAD`) not applied:
+  - on 16 GB it would push part of the model to the CPU and make every answer slower;
+  - first collect data from the panel (VRAM and slowdowns), then decide with numbers.
+- Checks:
+  - focused tests: runtime and gateway 91/91, console 10/10;
+  - `npm test`: 1316 tests, 1314 pass, 0 fail;
+  - console parser: 0 errors;
+  - `check:sections` reports only `scripts/visual/lib/*`, which belong to the visual-tests session in progress.
+- Deployment: loads at the next coordinated server restart (`maintenance.flag`).
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

@@ -125,6 +125,8 @@ class ManagedOllamaRuntime {
     this.confirmDelayMs = Number.isFinite(options.confirmDelayMs) ? options.confirmDelayMs : 2_000;
     this.confirmTimeoutMs = Number.isFinite(options.confirmTimeoutMs) ? options.confirmTimeoutMs : 5_000;
     this.confirmPromise = null;
+    // Cronologia breve dei controlli mancati, per il pannello salute: solo tipo e ora, nessun contenuto.
+    this.healthEvents = [];
     this.logPath = options.logPath === undefined
       ? (this.userDataPath ? path.join(this.userDataPath, 'logs', 'ollama-runtime.log') : null)
       : options.logPath;
@@ -318,6 +320,7 @@ class ManagedOllamaRuntime {
     this.stop();
     this.logger?.warn('Runtime AI non raggiungibile; avvio recupero controllato.', { attempt: this.restartAttempts });
     const result = await this.start();
+    this.recordHealthEvent(result.available ? 'recovered' : 'recovery-failed');
     if (result.available) this.logger?.info('Runtime AI ripristinato automaticamente.');
     return { available: result.available, recovered: result.available, ...(result.reason ? { reason: result.reason } : {}) };
   }
@@ -332,15 +335,50 @@ class ManagedOllamaRuntime {
         if (this.disposed || generation !== this.lifecycleGeneration || child !== this.process || !this.hasAdmittedProcess()) return false;
         if (await this.health(this.confirmTimeoutMs)) {
           this.logger?.warn('Runtime AI lento ma attivo: nessun riavvio.', { attempt, waitedMs: Date.now() - started });
+          this.recordHealthEvent('slow');
           return true;
         }
       }
+      this.recordHealthEvent('blocked');
       this.logger?.warn('Runtime AI bloccato dopo conferme ripetute.', { attempts: this.confirmAttempts, waitedMs: Date.now() - started });
       return false;
     })();
     this.confirmPromise = confirm;
     confirm.finally(() => { if (this.confirmPromise === confirm) this.confirmPromise = null; });
     return confirm;
+  }
+
+  recordHealthEvent(kind, at = Date.now()) {
+    this.healthEvents.push({ kind, at });
+    if (this.healthEvents.length > 200) this.healthEvents.splice(0, this.healthEvents.length - 200);
+  }
+
+  // Salute del runtime nelle ultime 24 ore e modelli residenti in VRAM (da /api/ps, senza prompt né contenuti).
+  async healthReport({ now = Date.now(), timeoutMs = 1500 } = {}) {
+    const since = now - 86_400_000;
+    const recent = this.healthEvents.filter((event) => event.at >= since);
+    const count = (kind) => recent.filter((event) => event.kind === kind).length;
+    const lastRecovery = [...this.healthEvents].reverse().find((event) => event.kind === 'recovered');
+    let models = null;
+    try {
+      const response = await fetch(`${this.baseUrl}/api/ps`, { signal: AbortSignal.timeout(timeoutMs) });
+      if (response.ok) {
+        const body = await response.json();
+        models = (Array.isArray(body?.models) ? body.models : []).slice(0, 8).map((entry) => ({
+          name: String(entry?.name || entry?.model || '').slice(0, 80),
+          sizeBytes: Number(entry?.size) || 0,
+          vramBytes: Number(entry?.size_vram) || 0
+        }));
+      }
+    } catch { models = null; }
+    return {
+      managed: this.enabled,
+      reachable: models !== null,
+      last24h: { slow: count('slow'), blocked: count('blocked'), recovered: count('recovered'), recoveryFailed: count('recovery-failed') },
+      lastRecoveryAt: lastRecovery?.at ?? null,
+      models: models || [],
+      vramBytes: (models || []).reduce((total, entry) => total + entry.vramBytes, 0)
+    };
   }
 
   // #endregion

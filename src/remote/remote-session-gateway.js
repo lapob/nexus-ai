@@ -643,7 +643,7 @@ const CONSOLE_STREAM_HTML = CONSOLE_HTML.replace('</body>', `${CONSOLE_STREAM_BR
 // #region Gateway e API
 
 class RemoteSessionGateway {
-  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, webImageSearch = null, modelProvider = null, readinessProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS, deviceNotificationHub = null } = {}) {
+  constructor({ statePath, conversationStore, performanceStore = null, telemetry = null, communityFeedbackStore = null, securityEventStore = null, requestLedger = null, deviceChallengeStore = null, receiptSigner = null, logger = console, onMessage = null, onActionPlan = null, onActionExecute = null, onWorkflowCreate = null, onWorkflowNext = null, onWorkflowDecide = null, onWorkflowCancel = null, onWorkflowStatus = null, voiceTranscriber = null, voiceSynthesizer = null, voiceCapabilityProvider = null, voiceInputCapabilityProvider = null, imageGenerationService = null, webImageSearch = null, modelProvider = null, readinessProvider = null, runtimeHealthProvider = null, researchAvailable = false, researchCapabilityProvider = null, imageCapabilityProvider = null, systemSnapshotProvider = systemSnapshot, processProvider = windowsProcesses, powerExecutor = executePowerAction, serviceControlExecutor = null, presenceStatusProvider = null, presenceActionExecutor = null, publicPort = 0, guestConcurrency, qaSecret = process.env.NEXUS_QA_SECRET, readinessProbeTimeoutMs = READINESS_PROBE_TIMEOUT_MS, streamHeartbeatMs = STREAM_HEARTBEAT_MS, deviceNotificationHub = null } = {}) {
     this.statePath = statePath;
     this.conversationStore = conversationStore;
     this.logger = logger;
@@ -680,6 +680,7 @@ class RemoteSessionGateway {
       : null;
     this.modelProvider = modelProvider;
     this.readinessProvider = typeof readinessProvider === 'function' ? readinessProvider : null;
+    this.runtimeHealthProvider = typeof runtimeHealthProvider === 'function' ? runtimeHealthProvider : null;
     this.webImageSearch = typeof webImageSearch === 'function' ? webImageSearch : null;
     this.activeWebImageRequests = new Map();
     this.researchAvailable = researchAvailable === true;
@@ -2006,7 +2007,13 @@ class RemoteSessionGateway {
             severity: event.severity,
             client: pseudonymousAccessId(event.address, this.observabilitySecret)
           }));
+        // Salute del runtime AI: fase attuale, recuperi recenti e VRAM. Un errore del fornitore non rompe l'endpoint.
+        let runtimeHealth = null;
+        try { runtimeHealth = this.runtimeHealthProvider ? await this.runtimeHealthProvider() : null; } catch { runtimeHealth = null; }
+        const aiReady = telemetry.nexusService?.aiReady === true;
+        const phase = aiReady ? 'ready' : this.readinessPhase === 'warming' ? 'warming' : 'not_ready';
         return this.json(response, 200, {
+          runtime: { phase, ...(runtimeHealth && typeof runtimeHealth === 'object' ? runtimeHealth : {}) },
           generatedAt: Date.now(),
           requests: this.guestCapacity(),
           performance: telemetry.performance,

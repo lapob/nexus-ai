@@ -692,6 +692,21 @@ function bootstrapElectron({ env = process.env } = {}) {
           const readiness = ipcServices?.aiReadiness?.();
           return readiness ? { ready: readiness.ready === true, status: readiness.status } : false;
         },
+        // Pannello salute: recuperi e VRAM dal runtime, più lo stato del watchdog esterno (se presente).
+        runtimeHealthProvider: async () => {
+          const report = await managedRuntime.healthReport();
+          let watchdog = null;
+          try {
+            const saved = JSON.parse(fs.readFileSync(path.join(sharedDataRoot, 'metrics', 'watchdog-state.json'), 'utf8'));
+            const hourAgo = Date.now() - 3_600_000;
+            watchdog = {
+              failures: Number(saved.failures) || 0,
+              restartsLastHour: (Array.isArray(saved.restarts) ? saved.restarts : []).filter((at) => Date.parse(at) > hourAgo).length,
+              checkedAt: Date.parse(saved.checkedAt) || null
+            };
+          } catch { watchdog = null; }
+          return { ...report, watchdog };
+        },
         // Il server puo aprire le due applicazioni autorizzate anche quando la
         // Presence visiva e spenta; se viene avviata manualmente, il bridge
         // autenticato estende il contratto con i controlli del nucleo/display.
