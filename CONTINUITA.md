@@ -3547,6 +3547,20 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - Control build 1.29.0 (versionCode 57), SHA-256 E53DA8DB…DCE9A, installed on the phone via ADB.
 - Deployment: active after the coordinated restart of the server and the Desktop Bridge, and after the console is
   reopened (it must write the PID).
+## PC shutdown requested by the owner (15 November 2026, evening)
+
+- State before shutdown:
+  - `.AI` main at `ff962b3` and `.SITE` website at `77b3fcf`, both clean and pushed;
+  - no release running;
+  - all secondary sessions archived.
+- Open at the next start:
+  - Preview 0.3.43 not published; resume steps in the 0.3.43 section (`4002816`);
+  - delete the `Z:\[AI]\NexusNXS\.AI-release-0342` folder, now that its Ollama is stopped;
+  - `?nxs-qa-time` sub-pixel repeatability on the site (`.SITE/CONTINUITA.md`);
+  - check from the phone the Control 1.29.0 "Console server" tile, once the server and bridge are back on the new
+    code and the console has written its PID at logon.
+- Procedure: the server is stopped through the manager (`stop`), then Windows shuts down.
+  - At the next start the "NexusNXS Server" task starts the server; the owner-stop flag expires at the PC restart.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
