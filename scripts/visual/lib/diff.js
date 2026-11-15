@@ -7,6 +7,8 @@
  */
 const { blank } = require('./png');
 
+// #region 01 — Distanza di colore percettiva
+
 const MAX_YIQ_DELTA = 35215; // differenza YIQ massima possibile (nero ↔ bianco), come in pixelmatch
 
 /** Defaults: `threshold` è la sensibilità di colore (0..1), `maxDiffRatio` la quota di pixel cambiati ammessa. */
@@ -42,6 +44,9 @@ function closest(a, b, width, height, x, y, radius) {
   }
   return best;
 }
+
+// #endregion
+// #region 02 — Confronto tra immagini
 
 /**
  * Confronta `actual` con `expected` (stesse dimensioni). Restituisce conteggio, quota e immagine delle differenze
@@ -81,5 +86,7 @@ function compareImages(expected, actual, options = {}) {
   return { sizeMismatch: false, diffPixels, diffRatio, box, image: out,
     pass: diffRatio <= settings.maxDiffRatio && diffPixels <= settings.maxDiffPixels };
 }
+
+// #endregion
 
 module.exports = { DEFAULTS, compareImages, yiqDelta };

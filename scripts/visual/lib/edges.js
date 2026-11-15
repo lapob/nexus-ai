@@ -8,6 +8,8 @@
  * Pura e senza browser: i test unitari la verificano su immagini sintetiche.
  */
 
+// #region 01 — Geometria e strisce di bordo
+
 /** Soglie predefinite (alpha 0..255). */
 const EDGE_DEFAULTS = Object.freeze({ depth: 2, maxAlpha: 12, maxLitPixels: 3, minTotalAlpha: 20_000 });
 
@@ -49,6 +51,9 @@ function totalAlpha(image, rect) {
   return sum;
 }
 
+// #endregion
+// #region 02 — Analisi della cattura del Core
+
 /**
  * Analizza una cattura. `geometry` in pixel dell'immagine: `canvas` (riquadro del canvas), `clip` (contenitore che
  * ritaglia, opzionale), `viewport`. Restituisce i problemi trovati (vuoto = nessun taglio) e i dettagli per lato.
@@ -78,5 +83,7 @@ function analyzeCoreEdges(image, geometry, options = {}) {
   if (total < settings.minTotalAlpha) problems.push(`Core quasi invisibile (alpha totale ${total})`);
   return { problems, sides, total, visible, canvas };
 }
+
+// #endregion
 
 module.exports = { EDGE_DEFAULTS, analyzeCoreEdges, bandStats, innerRect, intersect };

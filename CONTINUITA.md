@@ -1,5 +1,15 @@
 ## Automatic visual regression (15 November 2026, source only)
 
+- Follow-up:
+  - `scripts/visual/lib/{baselines,diff,edges}.js` now have two `#region`s each, and `check:sections`
+    passes;
+  - the 10 visual unit tests pass.
+- Site 171af14:
+  - baselines re-approved on build bb759c5;
+  - `?nxs-qa-time` is opt-in (`--qa-time`) because it was not repeatable: 0.3–0.7% between two runs. The
+    frozen clock alone gives 0.000%.
+- Stopped here at the owner's request (PC shutdown); no new blocks.
+
 - Commands, from `docs/VISUAL-REGRESSION.md`:
   - `npm run qa:visual`: web app and particle core, with web-dist served by vite preview with the network
     closed and the APIs mocked;

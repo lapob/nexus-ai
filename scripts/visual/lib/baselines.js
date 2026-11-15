@@ -10,6 +10,8 @@ const path = require('node:path');
 const { compareImages } = require('./diff');
 const { decode, encode } = require('./png');
 
+// #region 01 — Percorsi e suite di confronto
+
 const SAFE_NAME = /^[a-z0-9][a-z0-9._-]{0,120}$/;
 
 function paths(root, suite, runName = suite) {
@@ -71,6 +73,9 @@ function createSuite({ root, suite, runName = suite, update = false, defaults = 
   };
 }
 
+// #endregion
+// #region 02 — Rapporto HTML e approvazione
+
 function renderReport({ suite, startedAt, update, meta, results }) {
   const order = { fail: 0, missing: 1, pass: 2, approved: 3 };
   const rows = [...results].sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name));
@@ -118,5 +123,7 @@ function approve({ root, suite, only = [] }) {
   for (const name of names) fs.copyFileSync(path.join(dirs.actual, `${name}.png`), path.join(dirs.baselines, `${name}.png`));
   return names;
 }
+
+// #endregion
 
 module.exports = { approve, createSuite, escapeHtml, paths, renderReport };
