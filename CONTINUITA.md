@@ -3078,6 +3078,30 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - `npm run check:sections` ok;
   - schermate rese in modalità scriptata e quadro dal vivo con screenshot (v0.3.41, ×14 visibile);
   - CPU 6,5% di un core con la finestra aperta.
+## Security log: concurrent writers, benign forks and integrity (15 November 2026)
+
+- Diagnosis of "Sicurezza: da verificare" (integrity false):
+  - `security-audit.jsonl` had 7 breaks in its hash chain.
+  - All of them are benign forks. Every line has an intact hash, and every orphan `previousHash` points to an
+    existing event 2–3 lines earlier.
+  - Cause: more than one process (headless server, installed desktop app) wrote the same file, each chaining
+    from its own last hash in memory. No line was altered or removed.
+- The 5 "critical" events in the last 24 h are all `availability.degraded` (a public ingress unavailable during
+  restarts). They are not intrusions.
+- Fix in `src/security/security-event-store.js`:
+  - an exclusive cross-process lock (`.lock`, stale after 5 s) around load and append;
+  - `syncFromDisk` before every append and summary, so the chain stays single and the summary includes the
+    other processes' events;
+  - at load, benign forks are repaired: the original is kept as `*.fork-repaired.<stamp>.jsonl`, the chain is
+    rebuilt and a `journal.repaired` event is recorded;
+  - a modified or removed line is never repaired and keeps integrity false;
+  - integrity tolerates forks written by older code still running.
+- Dry run on a copy of the real log: 7 forks repaired, integrity true, original kept.
+- Checks:
+  - `node --test tests/security-event-store.test.js tests/wake-relay.test.js`: 16/16.
+  - `npm test`: 1310 tests, 1308 pass, 0 fail.
+- Next: coordinated server restart with `maintenance.flag` to load the fix, then check `readyz` and integrity
+  from `/internal/observability`.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

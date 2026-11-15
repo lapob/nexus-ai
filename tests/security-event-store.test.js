@@ -45,6 +45,86 @@ test('registro sicurezza non ricostruisce una catena manomessa durante la retent
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('due processi sullo stesso registro mantengono una catena unica', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-security-writers-'));
+  try {
+    const filePath = path.join(root, 'security-audit.jsonl');
+    const server = new SecurityEventStore({ filePath });
+    const bridge = new SecurityEventStore({ filePath });
+    server.append('guest.session.created', { deviceId: 'a' });
+    bridge.append('presence.executed', { deviceId: 'b' });
+    server.append('authentication.denied', { severity: 'warning', deviceId: 'c' });
+    bridge.append('action.cancelled', { severity: 'warning', deviceId: 'd' });
+    assert.equal(server.verifyIntegrity(), true);
+    assert.equal(bridge.summary().integrity, true);
+    assert.equal(server.summary().counts.last24Hours, 4, 'la sintesi include gli eventi dell altro processo');
+    assert.equal(new SecurityEventStore({ filePath }).verifyIntegrity(), true);
+    assert.equal(fs.existsSync(`${filePath}.lock`), false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+function forkedJournal(filePath) {
+  // Riproduce il vecchio difetto: due istanze che concatenano dal proprio ultimo hash in memoria.
+  const first = new SecurityEventStore({ filePath });
+  first.append('guest.session.created', { deviceId: 'a' });
+  const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+  const crypto = require('node:crypto');
+  const make = (previousHash, deviceId) => {
+    const base = { id: crypto.randomUUID(), at: Date.now(), type: 'presence.executed', severity: 'info', address: '', deviceId, deviceName: '', detail: '', previousHash };
+    return { ...base, hash: crypto.createHash('sha256').update(JSON.stringify(base)).digest('hex') };
+  };
+  const second = make(lines[0].hash, 'b');
+  const fork = make(lines[0].hash, 'c');
+  fs.appendFileSync(filePath, `${JSON.stringify(second)}\n${JSON.stringify(fork)}\n`);
+  return [...lines, second, fork];
+}
+
+test('biforcazioni innocue: catena riparata, originale conservato, evento registrato', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-security-fork-'));
+  try {
+    const filePath = path.join(root, 'security-audit.jsonl');
+    forkedJournal(filePath);
+    const store = new SecurityEventStore({ filePath });
+    assert.equal(store.verifyIntegrity(), true);
+    assert.equal(store.repaired, 1);
+    assert.ok(fs.readdirSync(root).some((name) => name.startsWith('security-audit.fork-repaired.')));
+    assert.equal(store.summary().events[0].type, 'journal.repaired');
+    assert.equal(new SecurityEventStore({ filePath }).verifyIntegrity(), true);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('un processo con codice precedente che biforca non rende il registro "da verificare"', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-security-legacy-'));
+  try {
+    const filePath = path.join(root, 'security-audit.jsonl');
+    const server = new SecurityEventStore({ filePath });
+    server.append('guest.session.created', { deviceId: 'a' });
+    // Scrittore vecchio: aggiunge una riga concatenata a un hash precedente, senza blocco.
+    const crypto = require('node:crypto');
+    const base = { id: crypto.randomUUID(), at: Date.now(), type: 'presence.executed', severity: 'info', address: '', deviceId: 'old', deviceName: '', detail: '', previousHash: '0'.repeat(64) };
+    fs.appendFileSync(filePath, `${JSON.stringify({ ...base, hash: crypto.createHash('sha256').update(JSON.stringify(base)).digest('hex') })}\n`);
+    assert.equal(server.summary().integrity, true);
+    server.append('authentication.denied', { severity: 'warning', deviceId: 'c' });
+    assert.equal(server.verifyIntegrity(), true);
+    assert.equal(server.summary().counts.last24Hours, 3);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('una riga modificata o rimossa non viene mai riparata', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-security-fork-tamper-'));
+  try {
+    const filePath = path.join(root, 'security-audit.jsonl');
+    const events = forkedJournal(filePath);
+    events[1].detail = 'altered';
+    fs.writeFileSync(filePath, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`);
+    assert.equal(new SecurityEventStore({ filePath }).verifyIntegrity(), false);
+    const removed = forkedJournal(path.join(root, 'removed.jsonl'));
+    fs.writeFileSync(path.join(root, 'removed.jsonl'), `${[removed[1], removed[2]].map((event) => JSON.stringify(event)).join('\n')}\n`);
+    assert.equal(new SecurityEventStore({ filePath: path.join(root, 'removed.jsonl') }).verifyIntegrity(), false);
+    assert.equal(fs.readdirSync(root).some((name) => name.includes('fork-repaired')), false);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('la rotazione a 10000 eventi conserva integrita e ripristino del registro', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-security-rotation-'));
   try {
