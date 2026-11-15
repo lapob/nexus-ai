@@ -1,3 +1,23 @@
+# Visual regression baselines — 15 November 2026 (source only, no deploy)
+
+- `npm run build && npm run qa:visual` serves `dist` locally with the network
+  closed. It captures 10 shots × desktop 1440 and phone 390:
+  - home hero, vision, interlude, apps, presence, saturn, security;
+  - /desktop, /downloads, /security.
+- Shots are compared with the approved PNGs in
+  `qa-artifacts/visual-baselines/site`. The perceptual YIQ diff tolerates
+  ±1 px and fails above 0.2% or 150 px. The HTML report is written to
+  `qa-artifacts/visual-runs/site/report.html`.
+- Time is deterministic: the Playwright clock is frozen and `Math.random`
+  is seeded. Two consecutive runs gave 0.000% on all 20 shots.
+- The shared engine lives in `../.AI/scripts/visual`; see
+  `.AI/docs/VISUAL-REGRESSION.md`.
+- Intentional approval: `npm run qa:visual:approve -- <name | prefix*>`.
+- `qa-artifacts/` is excluded locally, so baselines are added with
+  `git add -f`. The runs stay untracked.
+- Not part of `npm test` or of CI: it needs the sibling `.AI` checkout.
+- `?nxs-still` is compatible but not required.
+
 # Accessibility, stable visual-test mode, radial field falloff — 15 November 2026 (PUBLISHED: production a8371d0e, source e3bb8c9)
 
 - release:prepare candidate 4e905a16 from e3bb8c9. The first two promote

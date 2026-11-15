@@ -13,6 +13,8 @@
     "check": "npm run typecheck",
     "test": "npm run lint && npm run typecheck && npm run build && npm run verify:performance && node --test tests/*.test.mjs",
     "test:e2e": "node scripts/run-playwright.mjs",
+    "qa:visual": "node scripts/visual-regression.mjs",
+    "qa:visual:approve": "node ../.AI/scripts/visual/approve.js --root=. site",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .wrangler",
     "typecheck": "tsc --noEmit --incremental false",
     "verify:security": "npm audit signatures && node scripts/audit-dependencies.mjs",
