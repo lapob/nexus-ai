@@ -12,11 +12,10 @@
   10 ms. This is a browser/OS policy that a web page cannot override. The
   runtime itself is frame-rate independent: the 120/144 Hz tests are the
   paced-rAF ones on desktop. Battery saver was off.
-- Finding: the adaptive budget left 880 particles of the 1600 of the
-  balanced tier. Recovery requires 8 s of consecutive frames with paint < 5 ms,
-  and the phone sits around 4.6 ms, so the budget rarely recovers even though
-  the frame budget (16.7 ms) has room. Next step: base recovery on the
-  measured frame interval rather than a fixed 5 ms.
+- 880 particles on the phone is the intended density cap (`fieldCap`:
+  balanced 1600 × 0.55 on screens this small), not a stuck adaptive budget:
+  the budget starts and stays at the cap. An earlier note here claiming a
+  recovery bug was wrong and has been corrected; nothing was changed in code.
 
 # Continuous narrative + jank-free field — 14 November 2026 (PUBLISHED: production e5a35b6c, website 5658eb9)
 
