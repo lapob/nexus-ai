@@ -421,9 +421,23 @@ in progress, 15 November evening:
   → `.SITE` 8cbe5d7 (local, not pushed). release:prepare refused: untracked
   `.SITE/scripts/visual-regression.mjs` from the visual-tests session. Owner chose to wait for the
   other sessions to commit before continuing.
-- Next: once `.SITE` is clean, release:prepare → release:promote → push website; check
-  nexusnxs.com/updates/preview at 0.3.42 and ai.nexusnxs.com serving the worker. Then remove the
-  worktree (`git worktree remove`) and restart the service when `.AI` has no foreign uncommitted code.
+- Site, later: my 8cbe5d7 reached origin/website (pushed along with 64e5e48). release:prepare
+  from e4f8460 passed (e2e 40/40, candidate aa59071e), but release:promote was refused because the
+  visual-tests session rewrote scripts/visual-regression.mjs and 20 site baselines (22:47,
+  uncommitted). Not promoted: the auto-update session is releasing 0.3.43 and will promote the
+  site; do not overlap. So nexusnxs.com/updates/preview never served 0.3.42; 0.3.42 exists only
+  as the GitHub release.
+- Worktree: unregistered from git (`git worktree remove --force` + prune), but the folder
+  `Z:\[AI]\NexusNXS\.AI-release-0342` is still on disk: an Ollama started there by the release
+  verify (ollama.exe serve, 127.0.0.1:11435, since 18:06) was still serving the live service (it
+  loaded a model at 22:49), so I did not stop it. After the next reboot delete the folder
+  (`rmdir /s /q`); it holds only generated outputs and a copy of vendor/.
+- Service not restarted in this block (see above).
+- Next (new session): the four blocks requested by NEXUSNXS — shared versioned core module (the
+  site already uses the same falloff and `?nxs-qa-time`), reactive core (voice, thinking,
+  pointer, server state), web code-splitting (main chunk 478 KB → < 250 KB with LCP/INP), and
+  accessibility with axe. Add the `?nxs-qa-time` hook in Core.tsx/core-render.ts as agreed with
+  the visual-tests session.
 
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk
