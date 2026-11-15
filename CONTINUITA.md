@@ -3056,6 +3056,28 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 - Alle 15:39 il watchdog ha fatto un riavvio coordinato dopo 3 controlli falliti (server non pronto dalle 15:35).
   Era dentro la policy (1/2 l'ora) e il server è tornato pronto alle 15:41. La causa del blocco va analizzata a
   parte.
+## Server Console: schermate secondarie al livello del quadro (15 novembre 2026)
+
+- Registro (L):
+  - stesso motore del quadro: scrittura delle sole righe cambiate, sincronizzata, invece di cancellare e
+    ridisegnare tutto ogni 2 s;
+  - le voci si decodificano solo quando il file cambia;
+  - scheda con ore, glifi ✕ ▲ • e ripetizioni consecutive raggruppate (×N);
+  - tasti a pillola E/S/Esc.
+- Eventi recenti nel quadro: ripetizioni consecutive raggruppate (×N). Si leggono le ultime 40 voci, così le
+  8 righe mostrate restano varie.
+- Guida (H): scheda con testo a capo per parole, niente frasi troncate.
+- Alimentazione (P):
+  - scheda "SCEGLI" con tasti a pillola e conferma scritta indicata;
+  - stesso flusso protetto: parola esatta, arresto del server, 60 s per annullare.
+- Conferme (S/N) e ritorno alla console con tasti a pillola. La testata di ogni schermata ha marchio, orologio e
+  titolo con barra d'accento.
+- Verifiche:
+  - `node --test tests/server-console.test.js tests/server-watchdog.test.js tests/headless-server-startup.test.js`:
+    24/24;
+  - `npm run check:sections` ok;
+  - schermate rese in modalità scriptata e quadro dal vivo con screenshot (v0.3.41, ×14 visibile);
+  - CPU 6,5% di un core con la finestra aperta.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

@@ -320,7 +320,8 @@ function Update-Events {
   }
   $parsed = @($parsed)
   $script:snap.errorsLastHour = @($parsed | Where-Object { $_.level -eq 'error' -and $_.at -gt $hourAgo }).Count
-  $script:snap.events = @($parsed | Select-Object -Last 12)
+  # Ne servono più di quelli mostrati: le ripetizioni consecutive si raggruppano in una riga.
+  $script:snap.events = @($parsed | Select-Object -Last 40)
 }
 
 function Update-Processes {
@@ -714,6 +715,18 @@ function Get-KeyHints {
   )
 }
 
+function Get-CollapsedEvents($Events) {
+  # Eventi uguali e consecutivi diventano una riga sola con il conteggio (×4), all'ora dell'ultimo.
+  $collapsed = [Collections.Generic.List[object]]::new()
+  foreach ($event in @($Events)) {
+    if (-not $event) { continue }
+    $last = if ($collapsed.Count) { $collapsed[$collapsed.Count - 1] } else { $null }
+    if ($last -and $last.message -ceq [string]$event.message -and $last.level -eq $event.level) { $last.count += 1; $last.at = $event.at; continue }
+    $collapsed.Add([pscustomobject]@{ at = $event.at; level = $event.level; message = [string]$event.message; count = 1 })
+  }
+  return $collapsed.ToArray()
+}
+
 function Get-StackHeight($Cards) { return ($Cards | ForEach-Object { $_.rows.Count + 2 } | Measure-Object -Sum).Sum }
 
 function Build-Frame {
@@ -761,11 +774,12 @@ function Build-Frame {
 
   $footerHeight = 3
   $room = [Math]::Max(1, $size.height - $lines.Count - $footerHeight - 2)
-  $events = @($snap.events | Select-Object -Last $(if ($interactive) { [Math]::Min($room, 8) } else { 8 }))
+  $events = @(Get-CollapsedEvents $snap.events | Select-Object -Last $(if ($interactive) { [Math]::Min($room, 8) } else { 8 }))
   $eventRows = if ($events.Count) {
     @($events | ForEach-Object {
       $glyph, $tone = switch ($_.level) { 'error' { '✕', 'err' } 'warn' { '▲', 'warn' } default { '•', 'dim' } }
-      , @((Format-Clock $_.at.ToLocalTime()), ((V $glyph $tone) + '  ' + (V $_.message $(if ($_.level -eq 'error') { 'err' } else { 'text' }))))
+      $repeat = if ($_.count -gt 1) { V "  ×$($_.count)" 'dim' } else { '' }
+      , @((Format-Clock $_.at.ToLocalTime()), ((V $glyph $tone) + '  ' + (V $_.message $(if ($_.level -eq 'error') { 'err' } else { 'text' })) + $repeat))
     })
   } else { @(, @('', (V 'Nessun evento registrato.' 'muted'))) }
   foreach ($line in (Format-Card @{ title = 'EVENTI RECENTI'; rows = $eventRows } $full 0 11)) { $lines.Add('  ' + $line) }
@@ -860,17 +874,26 @@ function Open-Screen([string]$Title, [string]$Subtitle) {
   # La schermata di un'operazione copre il quadro: al ritorno va ridisegnato per intero.
   $script:lastSize = $null
   if ($interactive) { [Console]::Out.Write("`e[H`e[J") } else { Write-Out '' }
-  Write-Out ('  ' + (Get-Gradient '◆ NEXUSNXS' $palette.violet $palette.cyan) + (V '   Server Console' 'muted'))
-  Write-Out ''
-  Write-Out ('  ' + "$($T.bold)$(V $Title 'text')")
-  if ($Subtitle) { Write-Out ('  ' + (V $Subtitle 'muted')) }
-  Write-Out ''
+  foreach ($line in (Get-ScreenHead $Title $Subtitle)) { Write-Out $line }
+}
+
+function Get-ScreenHead([string]$Title, [string]$Subtitle) {
+  # Testata comune delle schermate: marchio e orologio come nel quadro, titolo con barra d'accento.
+  $width = (Get-Size).width - 1
+  $lines = @((Format-Header $width (Get-Date)), '', ('  ' + (V '▍' 'accent') + ' ' + $T.bold + (V $Title 'text')))
+  if ($Subtitle) { $lines += '    ' + (V $Subtitle 'muted') }
+  return $lines + @('')
+}
+
+function Format-Keys([object[]]$Pairs) {
+  # Riga di tasti a pillola: @(@('S', 'sì'), @('N', 'no')).
+  return '  ' + (($Pairs | ForEach-Object { (Format-Key $_[0]) + ' ' + (V $_[1] 'muted') }) -join '   ')
 }
 
 function Close-Screen {
   Write-Out ''
   if ($interactive) {
-    Write-Out ('  ' + (V 'Premi un tasto per tornare alla console.' 'dim'))
+    Write-Out (Format-Keys @(, @('↵', 'torna alla console')))
     [void](Read-ConsoleKey)
     $script:lastSize = $null
   }
@@ -878,7 +901,9 @@ function Close-Screen {
 }
 
 function Confirm-Step([string]$Question) {
-  Write-Out ('  ' + (V $Question 'text') + '  ' + (V '[S] sì   [N] no' 'muted'))
+  Write-Out ('  ' + (V $Question 'text'))
+  Write-Out ''
+  Write-Out (Format-Keys @(@('S', 'sì'), @('N', 'no')))
   $answer = Read-ConsoleKey
   return $answer -in @('s', 'y')
 }
@@ -936,34 +961,62 @@ function Switch-Maintenance {
   Update-Snapshot -Force
 }
 
+function Build-LogFrame([string]$Source, [bool]$ErrorsOnly) {
+  $size = Get-Size
+  $full = $size.width - 3
+  $path = if ($Source -eq 'server') { $paths.log } else { $paths.watchdogLog }
+  # Le voci si decodificano solo quando il file cambia; l'orologio della testata no.
+  $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
+  $key = "$path|$($item.Length)|$($item.LastWriteTimeUtc.Ticks)"
+  if (-not $script:logCache -or $script:logCache.key -ne $key) {
+    $raw = if ($item) { @(Get-Content -LiteralPath $path -Tail 600 -ErrorAction SilentlyContinue) } else { @() }
+    $parsed = foreach ($line in $raw) {
+      try { $entry = $line | ConvertFrom-Json } catch { continue }
+      $at = try { ([DateTime]$entry.timestamp).ToUniversalTime() } catch { continue }
+      [pscustomobject]@{ at = $at; level = [string]$entry.level; message = ([string]$entry.message -replace '\s+', ' ').Trim() }
+    }
+    $script:logCache = @{ key = $key; entries = @($parsed) }
+  }
+  $entries = @($script:logCache.entries | Where-Object { -not $ErrorsOnly -or $_.level -in @('error', 'warn') })
+  $title = if ($Source -eq 'server') { 'Registro del server' } else { 'Registro del watchdog' }
+  $lines = [Collections.Generic.List[string]]::new()
+  foreach ($line in (Get-ScreenHead $title ("$path" + $(if ($ErrorsOnly) { ' · solo avvisi ed errori' } else { '' })))) { $lines.Add($line) }
+  $room = [Math]::Max(3, $size.height - $lines.Count - 4)
+  $shown = @(Get-CollapsedEvents @($entries) | Select-Object -Last $room)
+  $rows = if ($shown.Count) {
+    @($shown | ForEach-Object {
+      $glyph, $tone = switch ($_.level) { 'error' { '✕', 'err' } 'warn' { '▲', 'warn' } default { '•', 'dim' } }
+      $repeat = if ($_.count -gt 1) { V "  ×$($_.count)" 'dim' } else { '' }
+      , @((Format-Clock $_.at.ToLocalTime()), ((V $glyph $tone) + '  ' + (V $_.message $(if ($_.level -eq 'error') { 'err' } else { 'text' })) + $repeat))
+    })
+  } else { @(, @('', (V 'Nessuna voce.' 'muted'))) }
+  $label = if ($Source -eq 'server') { 'SERVER' } else { 'WATCHDOG' }
+  foreach ($line in (Format-Card @{ title = $label; rows = $rows } $full ($room) 13)) { $lines.Add('  ' + $line) }
+  while ($interactive -and $lines.Count -lt $size.height - 1) { $lines.Add('') }
+  $lines.Add((Format-Keys @(@('E', $(if ($ErrorsOnly) { 'tutte le voci' } else { 'solo errori' })), @('S', $(if ($Source -eq 'server') { 'watchdog' } else { 'server' })), @('Esc', 'indietro'))))
+  return $lines.ToArray()
+}
+
 function Show-Log {
+  # Stesso motore del quadro: si riscrivono solo le righe cambiate, e solo quando il registro cambia.
   $errorsOnly = $false
   $source = 'server'
+  $script:lastSize = $null
+  $signature = $null
   while ($true) {
-    $size = Get-Size
     $path = if ($source -eq 'server') { $paths.log } else { $paths.watchdogLog }
-    $raw = if (Test-Path -LiteralPath $path) { @(Get-Content -LiteralPath $path -Tail 600 -ErrorAction SilentlyContinue) } else { @() }
-    $entries = foreach ($line in $raw) {
-      try { $entry = $line | ConvertFrom-Json } catch { continue }
-      if ($errorsOnly -and $entry.level -notin @('error', 'warn')) { continue }
-      $entry
+    $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
+    $size = Get-Size
+    $current = "$source|$errorsOnly|$($item.Length)|$($item.LastWriteTimeUtc.Ticks)|$($size.width)x$($size.height)|$((Get-Date).ToString('HHmmss'))"
+    if ($current -ne $signature) {
+      if (-not $interactive) { Write-Out ''; Write-Frame (Build-LogFrame $source $errorsOnly); return }
+      Write-Frame (Build-LogFrame $source $errorsOnly)
+      $signature = $current
     }
-    $entries = @($entries | Select-Object -Last ([Math]::Max(5, $size.height - 9)))
-    $title = if ($source -eq 'server') { 'Registro del server' } else { 'Registro del watchdog' }
-    Open-Screen $title ("$path" + $(if ($errorsOnly) { ' · solo avvisi ed errori' } else { '' }))
-    if (-not $entries.Count) { Write-Out ('  ' + (V 'Nessuna voce.' 'muted')) }
-    foreach ($entry in $entries) {
-      $tone = switch ($entry.level) { 'error' { 'err' } 'warn' { 'warn' } default { 'dim' } }
-      $when = try { Format-Clock (([DateTime]$entry.timestamp).ToLocalTime()) } catch { '-' }
-      Write-Out (Format-Fit ('  ' + (V $when 'muted') + '  ' + (V '●' $tone) + '  ' + (V (([string]$entry.message) -replace '\s+', ' ') 'text')) ($size.width - 1))
-    }
-    Write-Out ''
-    Write-Out ('  ' + (V 'E' 'accent') + (V ' solo errori    ' 'muted') + (V 'S' 'accent') + (V ' server/watchdog    ' 'muted') + (V 'Esc' 'accent') + (V ' indietro' 'muted'))
-    if (-not $interactive) { return }
-    $deadline = (Get-Date).AddSeconds(2)
     $key = $null
-    while ((Get-Date) -lt $deadline -and -not $key) {
-      if ([Console]::KeyAvailable) { $key = Read-ConsoleKey } else { Start-Sleep -Milliseconds 50 }
+    $deadline = [DateTime]::UtcNow.AddMilliseconds(1000)
+    while ([DateTime]::UtcNow -lt $deadline -and -not $key) {
+      if ([Console]::KeyAvailable) { $key = Read-ConsoleKey } else { Start-Sleep -Milliseconds 40 }
     }
     if ($key -in @('esc', 'q', 'l')) { $script:lastSize = $null; return }
     if ($key -eq 'e') { $errorsOnly = -not $errorsOnly }
@@ -979,6 +1032,7 @@ function Show-Diagnostics {
 
 function Show-Help {
   Open-Screen 'Come funziona' 'Il server e la console sono separati, come un servizio e il suo pannello.'
+  $width = (Get-Size).width - 3
   $help = @(
     @('Server', "Task NexusNXS Server: parte all'accensione del PC, anche senza accesso, e si riavvia se termina."),
     @('Watchdog', 'Ogni 2 minuti verifica /readyz; dopo 3 controlli falliti riavvia in modo coordinato, max 2 volte l''ora.'),
@@ -989,16 +1043,34 @@ function Show-Help {
     @('P  spegni PC', 'Chiede di scrivere SPEGNI o RIAVVIA, ferma prima il server, poi 60 s per annullare.'),
     @('Dati', 'Tutto resta nella cartella dati sull''SSD; i backup cifrati sono in backups, i registri in logs.')
   )
-  foreach ($item in $help) { Write-Out ('  ' + (V $item[0].PadRight(18) 'accent') + (V $item[1] 'text')) }
+  # Testo a capo per parole dentro la scheda: niente frasi troncate con i puntini.
+  $room = [Math]::Max(20, $width - 4 - 1 - 19)
+  $rows = [Collections.Generic.List[object]]::new()
+  foreach ($item in $help) {
+    $label = $item[0]
+    $current = ''
+    foreach ($word in ($item[1] -split ' ')) {
+      if ($current -and ($current.Length + 1 + $word.Length) -gt $room) { $rows.Add(@($label, (V $current 'text'))); $label = ''; $current = $word }
+      else { $current = if ($current) { "$current $word" } else { $word } }
+    }
+    if ($current) { $rows.Add(@($label, (V $current 'text'))) }
+  }
+  $rows = $rows.ToArray()
+  foreach ($line in (Format-Card @{ title = 'GUIDA'; rows = $rows } $width 0 19)) { Write-Out ('  ' + $line) }
   Close-Screen
 }
 
 function Invoke-PowerMenu {
   Open-Screen 'Alimentazione del PC' 'Il server viene arrestato in modo pulito prima di spegnere o riavviare.'
-  Write-Out ('  ' + (V '1' 'accent') + (V '  Spegni il PC' 'text'))
-  Write-Out ('  ' + (V '2' 'accent') + (V '  Riavvia il PC' 'text'))
-  Write-Out ('  ' + (V '3' 'accent') + (V '  Annulla uno spegnimento programmato' 'text'))
-  Write-Out ('  ' + (V 'Esc' 'accent') + (V ' indietro' 'muted'))
+  $width = [Math]::Min(72, (Get-Size).width - 3)
+  $rows = @(
+    @('', (Format-Key '1') + '  ' + (V 'Spegni il PC' 'text') + (V '  ·  conferma scritta SPEGNI' 'muted')),
+    @('', (Format-Key '2') + '  ' + (V 'Riavvia il PC' 'text') + (V '  ·  conferma scritta RIAVVIA' 'muted')),
+    @('', (Format-Key '3') + '  ' + (V 'Annulla uno spegnimento programmato' 'text'))
+  )
+  foreach ($line in (Format-Card @{ title = 'SCEGLI'; rows = $rows } $width 0 0)) { Write-Out ('  ' + $line) }
+  Write-Out ''
+  Write-Out (Format-Keys @(, @('Esc', 'indietro')))
   Write-Out ''
   $choice = Read-ConsoleKey
   if ($choice -eq '3') {
