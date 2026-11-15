@@ -1,4 +1,8 @@
-# /security and /downloads layout — 15 November 2026 (IN PROGRESS: release)
+# /security and /downloads layout — 15 November 2026 (PUBLISHED: production 27cd5494, source 0ab2d44)
+
+- release:prepare candidate 6acf2db8 from 0ab2d44; promote verified 13
+  routes, navbar, headers and ai.nexusnxs.com/healthz. Live computed styles
+  match the local build. Rollback target: da27beb0.
 
 - /security data flow (≥821 px): statement and checks now share the first
   row, the flow line closes beneath (before: empty right cell beside the title
