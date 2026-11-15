@@ -1,3 +1,49 @@
+## Automatic visual regression (15 November 2026, source only)
+
+- Commands, from `docs/VISUAL-REGRESSION.md`:
+  - `npm run qa:visual`: web app and particle core, with web-dist served by vite preview with the network
+    closed and the APIs mocked;
+  - `qa:visual:core`;
+  - `qa:visual:android` (emulator, or `--phone` read-only);
+  - `qa:visual:selftest`;
+  - `qa:visual:approve -- <suite> [names]`;
+  - in `.SITE`: `npm run qa:visual` (commit 64e5e48 on website).
+- Baselines live in `qa-artifacts/visual-baselines/`; this is the only versioned content of qa-artifacts.
+  - web: 24, covering home/conversation/panel/settings × 1440/1024/390 × dark/light;
+  - core: 18;
+  - android: 3, emulator offline screens;
+  - site: 20.
+- HTML reports: `qa-artifacts/visual-runs/<suite>/report.html`.
+- Core check: on the canvas alone (transparent background, the stage still clipping), alpha must stay ≈0 in a
+  2 px band along the edges of the visible area (canvas ∩ stage ∩ viewport). Covered:
+  - phases: entrance, composed, bloom, max zoom, recomposition, collapse;
+  - poses: hero and ambient;
+  - widths: 1440, 1024 and 390;
+  - backends: WebGPU (system Chrome) and Canvas 2D (pinned Chromium).
+  - Result: 90/90 clean.
+- Determinism:
+  - frozen Playwright clock and core on the main thread;
+  - seeded `Math.random`.
+  - Two consecutive runs gave 0.000% on web, core and site.
+- Proven against real regressions:
+  - The selftest sabotages a copy of the compiled build, restoring SPREAD 1 and removing the fades. Cut
+    particles were detected on the 390 px edges (alpha peaks 80–98 vs a limit of 12).
+  - A composer shifted by 6 px fails the web suite.
+  - The sabotaged build is deleted afterwards; the sources were never touched.
+- Agreed contract: `?nxs-qa-time=<s>` (frozen core time, `canvas.dataset.qa='ready'`). The web/desktop session
+  accepted it for the next core block; until then the worker path is not captured.
+- Android:
+  - emulator-5554 was closed by another session (VRAM); restart it only with
+    `scripts/start-android-emulator.ps1` and kill it afterwards;
+  - the swiftshader rendering may require re-approving the 3 baselines (captured with GPU host);
+  - the phone is supported read-only with `--phone`. It was locked, so it correctly refused and nothing was
+    captured.
+  - Possible leftover state: the emulator was killed during my second run. Its restore may have been skipped,
+    so at the next boot check animation scales, font_scale and demo mode.
+- Next:
+  - when `?nxs-qa-time` lands, add the worker capture;
+  - add `qa:visual` to the pre-release gates.
+
 ## Release 0.3.43 — desktop self-updating Preview (15 November 2026, in progress)
 
 - Owner request: publish the new Preview. It ships 3801bd8 (automatic signed updates, the

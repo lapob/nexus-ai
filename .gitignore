@@ -8,7 +8,9 @@ out/
 release*/
 artifacts/
 .artifacts/
-qa-artifacts/
+qa-artifacts/*
+# Baseline visive approvate (docs/VISUAL-REGRESSION.md): unico contenuto versionato di qa-artifacts.
+!qa-artifacts/visual-baselines/
 developer-artifacts/
 *.log
 .env
