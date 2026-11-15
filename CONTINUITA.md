@@ -3380,6 +3380,18 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - `/readyz` ready;
   - the `runtime` section appears in `/internal/observability`;
   - the "Salute" and "VRAM" rows appear in the console.
+## Server restart result and GPU lesson (15 November 2026)
+
+- Result:
+  - restart at 18:04 local time; server ready only at 18:12 instead of about 1 minute, so the manager hit its
+    360 s timeout;
+  - the `runtime` section is live in `/internal/observability`: `ready`, with `qwen3:14b` fully in VRAM (14.4 GB).
+- Cause of the delay: the Android emulator (qemu, Control session) held 10 GB of VRAM. Ollama loaded the model on the
+  CPU only (`size_vram: 0` in `/api/ps`) and the warm-up timed out until the emulator was closed.
+- Rules:
+  - on this PC (16 GB GPU) the Android emulator runs with `-gpu swiftshader_indirect` (software rendering);
+  - otherwise it runs only when the server is in maintenance;
+  - the health panel's VRAM row shows the problem at once (`vramBytes` 0 while a model is resident).
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
