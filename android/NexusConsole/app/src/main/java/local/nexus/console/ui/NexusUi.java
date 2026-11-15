@@ -97,16 +97,7 @@ public final class NexusUi {
         button.setStateListAnimator(null);
         int fill = danger ? Color.rgb(33, 15, 13) : primary ? Color.rgb(7, 35, 36) : Color.rgb(5, 17, 18);
         int stroke = danger ? Color.argb(70, 232, 153, 132) : primary ? Color.argb(60, 101, 221, 218) : Color.argb(26, 132, 190, 192);
-        // Stati contenuti nella forma del pulsante: il focus (tastiera, lettore
-        // di schermo, telecomando) accende il bordo; la pressione resta un'onda
-        // ritagliata sulla stessa forma, mai un riquadro nativo che deborda.
-        StateListDrawable surface = new StateListDrawable();
-        int focusStroke = danger ? Color.argb(170, 244, 170, 150) : Color.argb(170, 120, 236, 233);
-        GradientDrawable focused = rounded(lighten(fill, 6), 19, focusStroke);
-        focused.setStroke(dp(2), focusStroke);
-        surface.addState(new int[] { android.R.attr.state_focused }, focused);
-        surface.addState(new int[] {}, withEdgeLight(rounded(fill, 19, stroke), 19, primary || danger));
-        button.setBackground(new RippleDrawable(ColorStateList.valueOf(danger ? Color.argb(45, 240, 145, 119) : RIPPLE), surface, null));
+        button.setBackground(pressableSurface(fill, stroke, primary || danger, danger));
         StateListAnimator feedback = new StateListAnimator();
         ObjectAnimator pressed = ObjectAnimator.ofPropertyValuesHolder(button, PropertyValuesHolder.ofFloat(View.SCALE_X, .97f), PropertyValuesHolder.ofFloat(View.SCALE_Y, .97f));
         pressed.setDuration(motion.duration(NexusMotion.PRESS));
@@ -116,6 +107,26 @@ public final class NexusUi {
         feedback.addState(new int[] {}, released);
         if (ValueAnimator.areAnimatorsEnabled()) button.setStateListAnimator(feedback);
         return button;
+    }
+
+    /**
+     * Superficie premibile con stati contenuti nella forma: il focus (tastiera,
+     * lettore di schermo, telecomando) accende il bordo; la pressione resta
+     * un'onda ritagliata sulla stessa forma, mai un riquadro nativo che deborda.
+     */
+    public Drawable pressableSurface(int fill, int stroke, boolean strongEdge, boolean danger) {
+        return pressable(withEdgeLight(rounded(fill, 19, stroke), 19, strongEdge), lighten(fill, 6), 19, danger);
+    }
+
+    /** Come {@link #pressableSurface}, per una superficie a riposo già costruita (schede, pillole). */
+    public Drawable pressable(Drawable rest, int focusFill, int radius, boolean danger) {
+        StateListDrawable surface = new StateListDrawable();
+        int focusStroke = danger ? Color.argb(170, 244, 170, 150) : Color.argb(170, 120, 236, 233);
+        GradientDrawable focused = rounded(focusFill, radius, focusStroke);
+        focused.setStroke(dp(2), focusStroke);
+        surface.addState(new int[] { android.R.attr.state_focused }, focused);
+        surface.addState(new int[] {}, rest);
+        return new RippleDrawable(ColorStateList.valueOf(danger ? Color.argb(45, 240, 145, 119) : RIPPLE), surface, null);
     }
 
     public void decorateButton(Button button, String glyph, int color) {
@@ -130,10 +141,6 @@ public final class NexusUi {
         Button button = button(label, primary, danger);
         decorateButton(button, glyph, iconColor);
         return button;
-    }
-
-    public Drawable ripple(Drawable surface) {
-        return new RippleDrawable(ColorStateList.valueOf(RIPPLE), surface, null);
     }
 
     public LinearLayout card() {

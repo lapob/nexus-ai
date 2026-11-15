@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="nexus_breath_animator" type="id" />
+    <item name="nexus_tile_active" type="id" />
 </resources>

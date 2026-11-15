@@ -87,7 +87,7 @@ final class ConsoleShell {
         navigation.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
             new int[]{veil, veil, veil, veil, veil, veil, veil, Color.TRANSPARENT}));
         viewport.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
-        backdrop = new ControlBackdropView(activity, scroll);
+        backdrop = new ControlBackdropView(activity, scroll, ui.cosmicBackground());
         viewport.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
         viewport.addView(navigation, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
         navigation.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {

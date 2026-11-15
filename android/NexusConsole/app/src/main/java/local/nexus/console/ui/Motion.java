@@ -7,6 +7,7 @@ import local.nexus.motion.NexusMotion;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.os.Build;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.view.View;
@@ -27,6 +28,9 @@ import java.util.function.BooleanSupplier;
 public final class Motion {
     /** Vero finché l'Activity è viva e in primo piano. */
     public interface Presence { boolean active(); }
+
+    private static final float BREATH_FRAME_RATE = 30f;
+    private static final long BREATH_FRAME_MS = 32L;
 
     private final Presence presence;
     private float scale = 1f;
@@ -144,6 +148,11 @@ public final class Motion {
             return;
         }
         long born = SystemClock.uptimeMillis();
+        long[] lastApplied = { 0L };
+        // Un respiro di ~14 s su un punto di pochi dp non ha bisogno di 120 Hz:
+        // a riposo la dashboard ridisegnava 120 frame al secondo solo per lui.
+        // Su Android 15+ il sistema può anche abbassare la frequenza dello schermo.
+        if (Build.VERSION.SDK_INT >= 35) view.setRequestedFrameRate(BREATH_FRAME_RATE);
         ValueAnimator clock = ValueAnimator.ofFloat(0f, 1f);
         clock.setDuration(NexusCoreBreath.CYCLE_MS);
         clock.setRepeatCount(ValueAnimator.INFINITE);
@@ -154,7 +163,10 @@ public final class Motion {
                 view.setAlpha(1f); view.setScaleX(1f); view.setScaleY(1f);
                 return;
             }
-            float seconds = (SystemClock.uptimeMillis() - born) / 1000f;
+            long now = SystemClock.uptimeMillis();
+            if (now - lastApplied[0] < BREATH_FRAME_MS) return;
+            lastApplied[0] = now;
+            float seconds = (now - born) / 1000f;
             float inhale = NexusCoreBreath.inhale(seconds);
             float zoom = NexusCoreBreath.zoom(seconds);
             view.setAlpha(.46f + .54f * inhale);

@@ -233,8 +233,10 @@ final class DashboardScreen {
             tab.setSelected(selected);
             tab.setTextColor(selected ? NexusUi.BG : Color.rgb(176, 202, 203));
             ui.decorateButton(tab, dashboardGlyph(key), selected ? NexusUi.BG : Color.rgb(140, 184, 186));
-            tab.setBackground(ui.ripple(selected ? selectedTabSurface()
-                : ui.withEdgeLight(ui.rounded(NexusUi.SURFACE, 16, Color.argb(26, 132, 190, 192)), 16, false)));
+            // Il focus resta visibile anche sulla scheda appena ridisegnata.
+            tab.setBackground(ui.pressable(selected ? selectedTabSurface()
+                : ui.withEdgeLight(ui.rounded(NexusUi.SURFACE, 16, Color.argb(26, 132, 190, 192)), 16, false),
+                selected ? Color.rgb(206, 246, 244) : NexusUi.lighten(NexusUi.SURFACE, 6), 16, false));
         }
         revealSelectedDashboardTab();
         host.onSectionChanged();

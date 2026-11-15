@@ -79,7 +79,7 @@ test('Console integra i segnali di sicurezza nei dettagli senza una pagina dupli
   assert.match(activity, /void onSignedIn\(\) \{ restoreAuthenticatedScreen\(\); \}/);
   assert.match(activity, /lastSecuritySummary/);
   assert.doesNotMatch(activity, /Centro sicurezza|loadSecurityCenter|SCREEN_SECURITY/);
-  assert.match(activity, /appendSecurityOverview\(specifications, lastSecuritySummary\)/);
+  assert.match(activity, /appendSecurityOverview\(security, lastSecuritySummary\)/);
   assert.match(activity, /infoRow\("Protezione"/);
   assert.match(activity, /infoRow\("Dispositivi autorizzati"/);
   assert.match(activity, /infoRow\("Avvisi 24 ore"/);
@@ -301,4 +301,33 @@ test('Control riduce il budget grafico con isteresi sui frame reali', () => {
   assert.match(privateActivity, /PendingIntent\.FLAG_UPDATE_CURRENT \| PendingIntent\.FLAG_IMMUTABLE/);
   assert.match(privateActivity, /notify\(notificationId, value\)/);
   assert.doesNotMatch(privateActivity, /notify\(\(int\) \(System\.currentTimeMillis\(\) & 0xfffffff\)/);
+});
+
+test('Control 1.27: vetro, respiro e tessere non sprecano GPU e restano accessibili', () => {
+  const backdrop = controlFile('ControlBackdropView.java');
+  // La banda sfocata registra solo la fascia sotto le barre, non l'intera pagina.
+  assert.match(backdrop, /recording\.clipRect\(0, start, width, end\);/);
+  // Sotto il titolo il fondale copre il testo nitido; maschera e fondale stanno nel
+  // nodo gia sfocato, senza saveLayer per banda (4-6% di frame persi su Panoramica).
+  assert.match(backdrop, /base\.draw\(recording\);\s*\n\s*\}\s*\n\s*source\.draw\(recording\);\s*\n\s*recording\.drawRect\(0, start, width, end, mask\);/);
+  assert.doesNotMatch(backdrop, /saveLayer\(/);
+  assert.match(controlFile('SystemSection.java'), /group\(system, \"SICUREZZA\"\)/);
+  const motion = controlFile('ui', 'Motion.java');
+  assert.match(motion, /setRequestedFrameRate\(BREATH_FRAME_RATE\)/);
+  assert.match(motion, /if \(now - lastApplied\[0\] < BREATH_FRAME_MS\) return;/);
+  const ui = controlFile('ui', 'NexusUi.java');
+  assert.match(ui, /addState\(new int\[\] \{ android\.R\.attr\.state_focused \}, focused\)/);
+  const apps = controlFile('DesktopApps.java');
+  const dashboard = controlFile('DashboardScreen.java');
+  // Tessere e schede ridisegnate non perdono lo stato di focus.
+  assert.match(apps, /tile\.setBackground\(ui\.pressableSurface\(/);
+  assert.match(dashboard, /tab\.setBackground\(ui\.pressable\(/);
+  assert.doesNotMatch(ui, /public Drawable ripple\(/);
+  const gate = controlFile('OfflineGate.java');
+  // Nessun pulsante "Riaccendi" morto senza punto di ripristino; la guardia resta.
+  assert.match(gate, /if \(server && \(gateRescueAvailable \|\| starting\)\)/);
+  assert.match(gate, /if \(rescueStartInFlight \|\| !gateRescueAvailable \|\| gateKind != SERVER_OFFLINE\) return;/);
+  assert.match(gate, /authenticator\.authenticateThen\(/);
+  const history = controlFile('SafeActionHistory.java');
+  assert.match(history, /DateUtils\.isToday\(at\)/);
 });

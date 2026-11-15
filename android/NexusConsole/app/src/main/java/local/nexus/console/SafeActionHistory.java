@@ -53,10 +53,21 @@ final class SafeActionHistory {
             JSONObject entry = history.optJSONObject(index);
             if (entry == null) continue;
             if (text.length() > 0) text.append('\n');
-            // Gli orari seguono il formato 12/24 h del dispositivo.
-            String time = android.text.format.DateFormat.getTimeFormat(context).format(new Date(entry.optLong("at")));
-            text.append(entry.optString("label", "Operazione")).append("  ·  ").append(time);
+            text.append(entry.optString("label", "Operazione")).append("  ·  ").append(when(entry.optLong("at")));
         }
         return text.length() == 0 ? "Nessuna operazione recente" : text.toString();
+    }
+
+    /**
+     * Orario nel formato 12/24 h del dispositivo; per le voci di altri giorni
+     * anche "ieri" o la data, così "11:22" di ieri non sembra successivo a "10:46" di oggi.
+     */
+    private String when(long at) {
+        String time = android.text.format.DateFormat.getTimeFormat(context).format(new Date(at));
+        if (android.text.format.DateUtils.isToday(at)) return time;
+        if (android.text.format.DateUtils.isToday(at + android.text.format.DateUtils.DAY_IN_MILLIS)) return "ieri " + time;
+        String day = android.text.format.DateUtils.formatDateTime(context, at,
+            android.text.format.DateUtils.FORMAT_SHOW_DATE | android.text.format.DateUtils.FORMAT_NO_YEAR | android.text.format.DateUtils.FORMAT_ABBREV_MONTH);
+        return day + " " + time;
     }
 }

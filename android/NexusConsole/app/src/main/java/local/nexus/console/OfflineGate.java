@@ -120,10 +120,12 @@ final class OfflineGate {
         detail.setPadding(ui.dp(18), 0, ui.dp(18), ui.dp(26));
         content.addView(detail, new LinearLayout.LayoutParams(-1, -2));
 
-        if (server) {
-            boolean starting = gateKind == SERVER_STARTING || rescueStartInFlight;
+        boolean starting = gateKind == SERVER_STARTING || rescueStartInFlight;
+        // Senza punto di ripristino sul PC il pulsante non potrebbe mai funzionare:
+        // resta solo il messaggio che indica di riaccendere il server dal PC.
+        if (server && (gateRescueAvailable || starting)) {
             Button start = ui.action(starting ? "Avvio in corso…" : "Riaccendi il server", "power", Color.rgb(211, 242, 241), true, false);
-            start.setEnabled(gateRescueAvailable && !starting);
+            start.setEnabled(!starting);
             start.setContentDescription(starting ? "Avvio del server in corso" : "Riaccendi il server NexusNXS sul PC");
             start.setOnClickListener(v -> startServerFromGate());
             LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, ui.dp(56));

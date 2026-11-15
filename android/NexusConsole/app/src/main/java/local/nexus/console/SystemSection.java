@@ -38,77 +38,94 @@ final class SystemSection {
         JSONObject connection = snapshot.optJSONObject("network");
         JSONObject performance = snapshot.optJSONObject("performance");
 
-        TextView technical = ui.eyebrow("DATI TECNICI");
-        technical.setPadding(0, ui.dp(16), 0, ui.dp(9));
-        system.addView(technical);
-
-        LinearLayout specifications = ui.card();
-        specifications.setTag("technical-details");
+        // Una scheda per argomento invece di un unico blocco lungo tre schermate:
+        // gerarchia leggibile a colpo d'occhio e nodi di disegno più piccoli
+        // (la scheda unica costava 13-14 ms di GPU a ogni frame di scorrimento).
+        LinearLayout workstation = group(system, "WORKSTATION");
+        workstation.setTag("technical-details");
         JSONObject windows = snapshot.optJSONObject("windows");
         String systemName = windows != null && !windows.optString("caption").isEmpty() ? windows.optString("caption") : Formats.platformName(snapshot.optString("platform"));
-        specifications.addView(ui.infoRow("Sistema", systemName));
-        if (windows != null) specifications.addView(ui.infoRow("Versione", windows.optString("version", snapshot.optString("release")) + " · build " + windows.optString("build", "—")));
-        specifications.addView(ui.infoRow("Architettura", snapshot.optString("architecture", "—").toUpperCase(Locale.ROOT)));
-        specifications.addView(ui.divider());
-        specifications.addView(ui.infoRow("CPU", cpu == null ? "Non rilevata" : cpu.optString("model", "CPU")));
-        specifications.addView(ui.infoRow("Core logici", cpu == null ? "—" : String.valueOf(cpu.optInt("logicalCores"))));
-        if (cpu != null && cpu.optInt("speedMhz") > 0) specifications.addView(ui.infoRow("Frequenza", cpu.optInt("speedMhz") + " MHz"));
-        if (cpu != null) specifications.addView(ui.infoRow("Utilizzo CPU", cpu.optInt("percent") + "%"));
-        specifications.addView(ui.divider());
+        workstation.addView(ui.infoRow("Sistema", systemName));
+        if (windows != null) workstation.addView(ui.infoRow("Versione", windows.optString("version", snapshot.optString("release")) + " · build " + windows.optString("build", "—")));
+        workstation.addView(ui.infoRow("Architettura", snapshot.optString("architecture", "—").toUpperCase(Locale.ROOT)));
+        workstation.addView(ui.infoRow("Tempo di attività", formatUptime(snapshot.optLong("uptimeSeconds"))));
+
+        LinearLayout processing = group(system, "PROCESSORE E GRAFICA");
+        processing.addView(ui.infoRow("CPU", cpu == null ? "Non rilevata" : cpu.optString("model", "CPU")));
+        processing.addView(ui.infoRow("Core logici", cpu == null ? "—" : String.valueOf(cpu.optInt("logicalCores"))));
+        if (cpu != null && cpu.optInt("speedMhz") > 0) processing.addView(ui.infoRow("Frequenza", cpu.optInt("speedMhz") + " MHz"));
+        if (cpu != null) processing.addView(ui.infoRow("Utilizzo CPU", cpu.optInt("percent") + "%"));
+        processing.addView(ui.divider());
         JSONArray gpus = snapshot.optJSONArray("gpus");
         if (gpus != null && gpus.length() > 0) {
             for (int index = 0; index < gpus.length(); index++) {
                 JSONObject item = gpus.optJSONObject(index);
                 if (item == null) continue;
                 String suffix = item.optLong("memoryBytes") > 0 ? " · " + formatBytes(item.optLong("memoryBytes")) : "";
-                specifications.addView(ui.infoRow("GPU " + (index + 1), item.optString("name", "GPU") + suffix));
-                if (!item.optString("driverVersion").isEmpty()) specifications.addView(ui.infoRow("Driver GPU " + (index + 1), item.optString("driverVersion")));
+                processing.addView(ui.infoRow("GPU " + (index + 1), item.optString("name", "GPU") + suffix));
+                if (!item.optString("driverVersion").isEmpty()) processing.addView(ui.infoRow("Driver GPU " + (index + 1), item.optString("driverVersion")));
             }
         } else {
-            specifications.addView(ui.infoRow("GPU", gpu != null && gpu.optBoolean("available") ? gpu.optString("name", "Disponibile") : "Non rilevata"));
+            processing.addView(ui.infoRow("GPU", gpu != null && gpu.optBoolean("available") ? gpu.optString("name", "Disponibile") : "Non rilevata"));
         }
-        if (activity != null) specifications.addView(ui.infoRow("Utilizzo GPU", activity.optInt("gpuPercent") + "%"));
-        specifications.addView(ui.divider());
-        specifications.addView(ui.infoRow("RAM", memory == null ? "Non rilevata" : formatBytes(memory.optLong("usedBytes")) + " / " + formatBytes(memory.optLong("totalBytes"))));
-        if (memory != null) specifications.addView(ui.infoRow("RAM disponibile", formatBytes(memory.optLong("freeBytes"))));
-        if (memory != null) specifications.addView(ui.infoRow("Utilizzo RAM", memory.optInt("percent") + "%"));
-        if (memory != null) specifications.addView(ui.progress(memory.optInt("percent")));
-        specifications.addView(ui.divider());
-        specifications.addView(ui.infoRow("Rete", Formats.networkSummary(connection)));
-        if (connection != null && connection.optJSONArray("addresses") != null) specifications.addView(ui.infoRow("Indirizzi locali", Formats.join(connection.optJSONArray("addresses"))));
-        if (activity != null) specifications.addView(ui.infoRow("Traffico rete", formatRate(activity.optLong("networkBytesPerSecond"))));
+        if (activity != null) processing.addView(ui.infoRow("Utilizzo GPU", activity.optInt("gpuPercent") + "%"));
+
+        LinearLayout memoryGroup = group(system, "MEMORIA");
+        memoryGroup.addView(ui.infoRow("RAM", memory == null ? "Non rilevata" : formatBytes(memory.optLong("usedBytes")) + " / " + formatBytes(memory.optLong("totalBytes"))));
+        if (memory != null) memoryGroup.addView(ui.infoRow("RAM disponibile", formatBytes(memory.optLong("freeBytes"))));
+        if (memory != null) memoryGroup.addView(ui.infoRow("Utilizzo RAM", memory.optInt("percent") + "%"));
+        if (memory != null) memoryGroup.addView(ui.progress(memory.optInt("percent")));
+
+        LinearLayout network = group(system, "RETE");
+        network.addView(ui.infoRow("Rete", Formats.networkSummary(connection)));
+        if (connection != null && connection.optJSONArray("addresses") != null) network.addView(ui.infoRow("Indirizzi locali", Formats.join(connection.optJSONArray("addresses"))));
+        if (activity != null) network.addView(ui.infoRow("Traffico rete", formatRate(activity.optLong("networkBytesPerSecond"))));
+
         JSONArray disks = snapshot.optJSONArray("storage");
-        if (disks != null && disks.length() > 0) {
-            specifications.addView(ui.divider());
-            for (int index = 0; index < disks.length(); index++) {
+        JSONArray physicalDisks = snapshot.optJSONArray("physicalDisks");
+        boolean hasDisks = disks != null && disks.length() > 0;
+        boolean hasPhysical = physicalDisks != null && physicalDisks.length() > 0;
+        if (hasDisks || hasPhysical || activity != null) {
+            LinearLayout storage = group(system, "ARCHIVIAZIONE");
+            if (hasDisks) for (int index = 0; index < disks.length(); index++) {
                 JSONObject disk = disks.optJSONObject(index);
                 if (disk == null) continue;
-                specifications.addView(ui.infoRow("Unità " + disk.optString("name"), formatBytes(disk.optLong("freeBytes")) + " liberi / " + formatBytes(disk.optLong("totalBytes"))));
+                storage.addView(ui.infoRow("Unità " + disk.optString("name"), formatBytes(disk.optLong("freeBytes")) + " liberi / " + formatBytes(disk.optLong("totalBytes"))));
+            }
+            if (activity != null) storage.addView(ui.infoRow("Attività dischi", activity.optInt("diskPercent") + "%"));
+            if (hasPhysical) {
+                storage.addView(ui.divider());
+                for (int index = 0; index < physicalDisks.length(); index++) {
+                    JSONObject disk = physicalDisks.optJSONObject(index);
+                    if (disk == null) continue;
+                    String temperature = disk.isNull("temperatureCelsius") ? "" : " · " + disk.optInt("temperatureCelsius") + " °C";
+                    storage.addView(ui.infoRow("Disco fisico " + (index + 1), disk.optString("name") + " · " + Formats.translateHealth(disk.optString("health")) + temperature));
+                }
             }
         }
-        if (activity != null) specifications.addView(ui.infoRow("Attività dischi", activity.optInt("diskPercent") + "%"));
-        JSONArray physicalDisks = snapshot.optJSONArray("physicalDisks");
-        if (physicalDisks != null && physicalDisks.length() > 0) {
-            specifications.addView(ui.divider());
-            for (int index = 0; index < physicalDisks.length(); index++) {
-                JSONObject disk = physicalDisks.optJSONObject(index);
-                if (disk == null) continue;
-                String temperature = disk.isNull("temperatureCelsius") ? "" : " · " + disk.optInt("temperatureCelsius") + " °C";
-                specifications.addView(ui.infoRow("Disco fisico " + (index + 1), disk.optString("name") + " · " + Formats.translateHealth(disk.optString("health")) + temperature));
-            }
-        }
-        specifications.addView(ui.infoRow("Tempo di attività", formatUptime(snapshot.optLong("uptimeSeconds"))));
+
         if (performance != null && performance.optInt("samples") > 0) {
-            specifications.addView(ui.divider());
-            specifications.addView(ui.infoRow("Richieste AI misurate", String.valueOf(performance.optInt("samples"))));
-            specifications.addView(ui.infoRow("Preparazione P95", performance.optInt("prepareP95Ms") + " ms"));
-            specifications.addView(ui.infoRow("Primo output P95", performance.optInt("firstTokenP95Ms") + " ms"));
-            specifications.addView(ui.infoRow("Inferenza P95", performance.optInt("inferenceP95Ms") + " ms"));
-            specifications.addView(ui.infoRow("Verifica P95", performance.optInt("verifyP95Ms") + " ms"));
+            LinearLayout ai = group(system, "PRESTAZIONI AI");
+            ai.addView(ui.infoRow("Richieste AI misurate", String.valueOf(performance.optInt("samples"))));
+            ai.addView(ui.infoRow("Preparazione P95", performance.optInt("prepareP95Ms") + " ms"));
+            ai.addView(ui.infoRow("Primo output P95", performance.optInt("firstTokenP95Ms") + " ms"));
+            ai.addView(ui.infoRow("Inferenza P95", performance.optInt("inferenceP95Ms") + " ms"));
+            ai.addView(ui.infoRow("Verifica P95", performance.optInt("verifyP95Ms") + " ms"));
         }
-        specifications.addView(ui.divider());
-        appendSecurityOverview(specifications, lastSecuritySummary);
-        system.addView(specifications);
+
+        LinearLayout security = group(system, "SICUREZZA");
+        appendSecurityOverview(security, lastSecuritySummary);
+    }
+
+    /** Titoletto e scheda di un gruppo tecnico; restituisce la scheda da riempire. */
+    private LinearLayout group(LinearLayout system, String title) {
+        TextView heading = ui.eyebrow(title);
+        heading.setPadding(0, ui.dp(system.getChildCount() == 0 ? 16 : 20), 0, ui.dp(9));
+        if (android.os.Build.VERSION.SDK_INT >= 28) heading.setAccessibilityHeading(true);
+        system.addView(heading);
+        LinearLayout card = ui.card();
+        system.addView(card, new LinearLayout.LayoutParams(-1, -2));
+        return card;
     }
 
     void update(JSONObject snapshot) {

@@ -1,3 +1,42 @@
+## Control 1.27.0: refinements and frame budget — 15 November 2026 (committed, installed on phone)
+
+- Base e2dda4c. Measured with gfxinfo on a Galaxy S25 (SM-S931B,
+  Android 17, 120 Hz) by scrolling and switching sections, never touching
+  the dock. Scripts and output are in qa-artifacts/control-frames/. All
+  numbers are the deadline-based jank metric.
+- Bar glass (ControlBackdropView): it was the main source of jank. Each
+  band did 2 offscreen passes (blurred node plus saveLayer with a DST_IN
+  mask), and the recording took in the whole page.
+  - Now: one pass per band. Base, content and mask are recorded inside the
+    blurred node, and the recording is clipped to the band. The cosmic base
+    covers the sharp text under the title, which used to show through.
+  - Diagnostic proof: Panoramica scroll is 1.7% janky without glass and was
+    3.8–5.7% with the old glass; the new glass is at 2.9–3.2%.
+- Sistema: the single card three screens long (GPU 13–14 ms per scroll
+  frame) is now split into groups: Workstation, Processore e grafica,
+  Memoria, Rete, Archiviazione, Prestazioni AI, Sicurezza. After the split:
+  GPU P90 7 ms, frame P90 19→14 ms, jank 0.35%.
+- Presence-dot breath: capped at 30 updates/s, with setRequestedFrameRate
+  on API 35+. Idle Panoramica went from 475 to 216 frames in 4 s, same
+  visible cycle.
+- Section switches App↔Servizi: P90 6 ms, Panoramica↔Sistema: P90 9 ms.
+  Tab row: P90 6 ms. Cold start: 77–85 ms.
+- Focus: app tiles and tabs keep the focus ring after re-rendering (shared
+  surface NexusUi.pressable), and tiles rebuild only when their state
+  changes. Tile status wraps to 3 lines ("Aperta · UAC limitato" no longer
+  truncated). History shows "ieri"/the date for older entries.
+- Offline gate: without a recovery point on the PC there is no longer a
+  disabled "Riaccendi il server" button. The guard in startServerFromGate
+  and the biometrics are unchanged.
+- Checks: npm test 1314, 1312 pass, 0 fail, 2 skipped; android contracts
+  19/19 (new 1.27 test). Build + lint Preview OK, 0 errors, the 3 usual
+  warnings (log qa-artifacts/control-1.27.0-build.log).
+- APK: 1.27.0 / 55, SHA-256 D0D21AB1…6652, installed via ADB. No AVD on
+  the PC (nothing downloaded).
+- Not tested on device: reduced motion (the owner has to turn on "Rimuovi
+  animazioni"), the offline gate and the power confirmations (never against
+  the real PC/server). The ADB link dropped at the end of the measurements.
+
 ## Control 1.26.0: monolithic Activity split into screens and components — 14 November 2026 (committed, installed on phone)
 
 - Base b1acf2d (Control 1.25.0). NativeMainActivity.java has gone from about

@@ -122,7 +122,8 @@ final class DesktopApps {
         tile.setPadding(ui.dp(16), ui.dp(10), ui.dp(12), ui.dp(10));
         tile.setMinHeight(ui.dp(80));
         tile.setTextSize(14);
-        tile.setMaxLines(2);
+        // Nome + stato: lo stato di Supremo ("Aperta · UAC limitato") va a capo invece di troncarsi.
+        tile.setMaxLines(3);
         tile.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tile.setCompoundDrawablePadding(ui.dp(12));
         tile.setContentDescription(label + ", stato in verifica");
@@ -171,13 +172,18 @@ final class DesktopApps {
         String actionHint = enabled && !pending && open != null ? (open ? ", tocca per chiudere" : ", tocca per aprire") : "";
         tile.setContentDescription(label + ", " + status.toLowerCase(Locale.getDefault()).replace("·", "") + actionHint);
         boolean active = Boolean.TRUE.equals(open);
-        int fill = active ? Color.rgb(6, 31, 32) : NexusUi.SURFACE;
-        int stroke = active ? Color.argb(92, 101, 220, 216) : Color.argb(25, 128, 188, 190);
-        tile.setBackground(ui.ripple(ui.withEdgeLight(ui.rounded(fill, 19, stroke), 19, active)));
-        tile.setTextColor(active ? Color.rgb(226, 247, 246) : Color.rgb(190, 211, 211));
-        ui.glow(tile, active);
-        Drawable icon = new NexusGlyphDrawable(ui.motion(), applicationGlyph(id), active ? NexusUi.ACCENT : Color.rgb(151, 190, 191), ui.dp(24));
-        tile.setCompoundDrawables(icon, null, null, null);
+        // La telemetria aggiorna le tessere ogni secondo: superficie e icona si
+        // ricostruiscono solo quando cambia lo stato, con il focus sempre visibile.
+        if (!Boolean.valueOf(active).equals(tile.getTag(R.id.nexus_tile_active))) {
+            tile.setTag(R.id.nexus_tile_active, active);
+            int fill = active ? Color.rgb(6, 31, 32) : NexusUi.SURFACE;
+            int stroke = active ? Color.argb(92, 101, 220, 216) : Color.argb(25, 128, 188, 190);
+            tile.setBackground(ui.pressableSurface(fill, stroke, active, false));
+            tile.setTextColor(active ? Color.rgb(226, 247, 246) : Color.rgb(190, 211, 211));
+            ui.glow(tile, active);
+            Drawable icon = new NexusGlyphDrawable(ui.motion(), applicationGlyph(id), active ? NexusUi.ACCENT : Color.rgb(151, 190, 191), ui.dp(24));
+            tile.setCompoundDrawables(icon, null, null, null);
+        }
         if (pending && ui.motion().enabled()) tile.animate().alpha(.58f).setDuration(ui.motion().duration(NexusMotion.STATUS_PULSE)).withEndAction(() -> {
             if (launchCommandInFlight && id.equals(pendingApplicationId) && tile.isAttachedToWindow()) tile.animate().alpha(1f).setDuration(ui.motion().duration(NexusMotion.STATUS_PULSE)).start();
         }).start();
