@@ -44,7 +44,30 @@
   - when `?nxs-qa-time` lands, add the worker capture;
   - add `qa:visual` to the pre-release gates.
 
-## Release 0.3.43 — desktop self-updating Preview (15 November 2026, in progress)
+## Release 0.3.43 — desktop self-updating Preview (15 November 2026, OPEN: not published)
+
+Outcome, 15 November evening (the PC is shutting down at the owner's request):
+- Nothing has been published for 0.3.43: no GitHub release, the site was not touched, and the
+  service was not restarted. The live feed stays on the previous Preview.
+- `main` holds the bump 0.3.43 (4949c30) and the two fixes that unblocked the gate:
+  - b48bb9c: `@module` header in `scripts/start-android-emulator.ps1`;
+  - fa870f6: `managed-ollama-runtime` test on a free port; it used to hit the real Ollama on 11435
+    and failed while the server was running.
+- Third run of `release-all.js --public-only --channel=preview` on fa870f6: check PASS, npm test
+  1326 tests, 1323 pass, 0 fail. It stopped at `ai:evaluate:gate` with ENOENT on `package.json`,
+  because the worktree `.AI-release-0342` had been removed during the build by the 0.3.42 closing
+  block (d35a2ca). The leftover folder (qa-artifacts, vendor, web, web-dist) remains to delete.
+- The `.SITE-release-0343` worktree was removed, clean and without commits.
+- To resume:
+  - create a new clean worktree on main, then `npm ci`, `node node_modules/electron/install.js`,
+    robocopy vendor and `npm run build:web`;
+  - run `release-all.js` with `.toolchains` on PATH and `NEXUS_SERVICE_URL`;
+  - then manifest refresh, verify-bundle, founder:package and publish-github-preview;
+  - site: sync-ai-shell `--source-root`, then sync-public-release `--tag=v0.3.43-preview.1`,
+    commit, release:prepare, release:promote, push website;
+  - coordinated restart, then verify the live feed with `verifyRemoteReleaseFeed`.
+
+Original plan:
 
 - Owner request: publish the new Preview. It ships 3801bd8 (automatic signed updates, the
   "Aggiornamento pronto" toast, rollback) on top of 0.3.42 (core in a worker), whose site promotion
