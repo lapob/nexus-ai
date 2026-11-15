@@ -93,8 +93,8 @@
   rendering: `scripts\start-android-emulator.ps1` (forces
   `-gpu swiftshader_indirect`); the AVD config.ini also has
   `hw.gpu.mode=swiftshader_indirect`. Close it as soon as the checks end
-  (`adb -s emulator-5554 emu kill`). Frame timings under swiftshader are not
-  representative.
+  (`adb -s emulator-5554 emu kill`). The emulator is for functional checks
+  only; frame measurements (gfxinfo) are done on the real phone over ADB.
 - The emulator is outside the private network and not paired, so
   Control 1.27.0 shows the "PC non raggiungibile" gate. Useful for the gate
   without touching the server.
