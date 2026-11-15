@@ -113,7 +113,9 @@ test('runtime vivo ma lento: nessun kill al primo controllo mancato; bloccato da
   let spawns = 0;
   let terminations = 0;
   let stdio = null;
-  const runtime = new ManagedOllamaRuntime({ enabled: true, executablePath: executable, userDataPath: root,
+  // Porta libera: sulla workstation l'Ollama vero del server risponde sulla 11435 predefinita.
+  const freePort = await new Promise((resolve) => { const probe = require('node:net').createServer().listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)); }); });
+  const runtime = new ManagedOllamaRuntime({ enabled: true, executablePath: executable, userDataPath: root, port: freePort,
     confirmDelayMs: 0, runtimeSecurityCheck: () => ({ blockingFindings: 0 }),
     spawnProcess: (_command, _args, options) => { spawns += 1; stdio = options.stdio; const child = new EventEmitter(); child.exitCode = null; child.signalCode = null; return child; },
     terminateProcess() { terminations += 1; }, logger: { warn: (message) => warnings.push(message), info() {}, error() {} }
