@@ -1,4 +1,10 @@
-# Layout polish pass — 15 November 2026 (IN PROGRESS: commit, then release:prepare/promote)
+# Layout polish pass — 15 November 2026 (PUBLISHED: production da27beb0, source f7377f3)
+
+- release:prepare candidate a21a900a (full gate) from f7377f3; promote
+  verified 13 routes, navbar, headers and ai.nexusnxs.com/healthz. Live
+  check on nexusnxs.com/desktop: 4 columns at 1440, 2x2 at 1000, 1 at 390;
+  card title gap 43/30/28 px; footer CTA 248 px right-aligned, full width on
+  phone. Rollback target: e5a35b6c.
 
 - Reviewed every route (/, desktop, downloads, security, status, privacy,
   terms, maintenance, 404) at 1440x900 and 390x844 with reduced motion. Light
