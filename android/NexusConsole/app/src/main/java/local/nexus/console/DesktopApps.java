@@ -46,8 +46,11 @@ final class DesktopApps {
     private static final String[][] CATALOG = new String[][] {
         { "nexusnxs", "NexusNXS" }, { "claude", "Claude" },
         { "brave", "Brave" }, { "terminal", "Terminale" },
-        { "supremo", "Supremo" }, { "notepad", "Note" }
+        { "supremo", "Supremo" }, { "notepad", "Note" },
+        { "server-console", "Console server" }
     };
+    /** La console del server si apre o torna in primo piano: il tocco non la chiude mai (resta il server). */
+    private static final String SERVER_CONSOLE = "server-console";
 
     private final NexusUi ui;
     private final ConsoleSession session;
@@ -133,6 +136,11 @@ final class DesktopApps {
             Boolean open = knownState(id);
             if ("nexusnxs".equals(id)) { if (Boolean.TRUE.equals(open)) closeNexusNxs(); else openNexusNxs(); return; }
             if ("claude".equals(id)) { if (Boolean.TRUE.equals(open)) closeClaude(); else openClaude(); return; }
+            if (SERVER_CONSOLE.equals(id)) {
+                controlDesktopApp("open-application", id, "Apro la console del server…",
+                    "Console del server già in primo piano", "Console del server aperta sul PC");
+                return;
+            }
             controlCatalogApplication(id, label);
         });
         updateApplicationTile(tile, id, label, knownState(id), knownAvailability(id));
@@ -156,9 +164,10 @@ final class DesktopApps {
         boolean pending = launchCommandInFlight && id.equals(pendingApplicationId);
         boolean enabled = !Boolean.FALSE.equals(available) && !launchCommandInFlight;
         boolean supremo = "supremo".equals(id);
+        boolean serverConsole = SERVER_CONSOLE.equals(id);
         boolean adminReady = Boolean.TRUE.equals(applicationAdminReady.get(id));
         String status = pending ? (pendingApplicationOpening ? "Apertura…" : "Chiusura…")
-            : Boolean.TRUE.equals(open) ? (supremo ? (adminReady ? "Aperta · UAC pronto" : "Aperta · UAC limitato") : "Aperta")
+            : Boolean.TRUE.equals(open) ? (supremo ? (adminReady ? "Aperta · UAC pronto" : "Aperta · UAC limitato") : serverConsole ? "Aperta · tocca per portarla davanti" : "Aperta")
             : Boolean.FALSE.equals(open) ? (supremo && !adminReady ? "Chiusa · configura UAC sul PC" : "Chiusa") : "Stato in verifica…";
         String next = label + "\n" + status;
         if (!next.contentEquals(tile.getText())) {
@@ -170,7 +179,8 @@ final class DesktopApps {
         }
         tile.setEnabled(enabled);
         tile.setAlpha(enabled ? 1f : .42f);
-        String actionHint = enabled && !pending && open != null ? (open ? ", tocca per chiudere" : ", tocca per aprire") : "";
+        String actionHint = enabled && !pending && open != null
+            ? (serverConsole ? (open ? "" : ", tocca per aprire") : open ? ", tocca per chiudere" : ", tocca per aprire") : "";
         tile.setContentDescription(label + ", " + status.toLowerCase(Locale.getDefault()).replace("·", "") + actionHint);
         boolean active = Boolean.TRUE.equals(open);
         // La telemetria aggiorna le tessere ogni secondo: superficie e icona si
@@ -197,6 +207,7 @@ final class DesktopApps {
             case "brave": return "browser";
             case "notepad": return "note";
             case "terminal": case "supremo": return id;
+            case SERVER_CONSOLE: return "system";
             default: return "apps";
         }
     }

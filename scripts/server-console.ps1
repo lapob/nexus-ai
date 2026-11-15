@@ -1189,6 +1189,9 @@ if ($scripted) {
 $created = $false
 $mutex = [Threading.Mutex]::new($false, 'Local\NexusNXS.ServerConsole', [ref]$created)
 if (-not $mutex.WaitOne(0)) { Write-Output 'NexusNXS Server Console è già aperta.'; exit 0 }
+# PID per NexusNXS Control: dice "aperta" e permette di chiudere soltanto questa finestra.
+$consolePidPath = Join-Path $DataRoot 'runtime\server-console.pid'
+try { [IO.Directory]::CreateDirectory((Split-Path $consolePidPath)) | Out-Null; [IO.File]::WriteAllText($consolePidPath, [string]$PID) } catch {}
 
 $Host.UI.RawUI.WindowTitle = 'NexusNXS Server Console'
 $dataVersion = 0
@@ -1280,6 +1283,7 @@ try {
   [Console]::Out.Write("`e[?25h`e[?1049l")
   if ($useColor) { [Console]::Out.Write("`e]111`e\") }
   [Console]::TreatControlCAsInput = $false
+  try { if ((Test-Path -LiteralPath $consolePidPath) -and ([IO.File]::ReadAllText($consolePidPath).Trim() -eq [string]$PID)) { Remove-Item -LiteralPath $consolePidPath -Force } } catch {}
   $mutex.ReleaseMutex()
   $mutex.Dispose()
 }

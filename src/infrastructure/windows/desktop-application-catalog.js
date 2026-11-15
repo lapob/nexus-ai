@@ -50,9 +50,40 @@ const DESKTOP_APPLICATIONS = Object.freeze([
   // vengono mai terminati: la console puo chiudere la finestra senza spezzare
   // la disponibilita remota configurata dall'utente.
   Object.freeze({ id: 'supremo', label: 'Supremo', icon: 'supremo', processes: ['Supremo.exe'] }),
-  Object.freeze({ id: 'notepad', label: 'Note', icon: 'note', processes: ['Notepad.exe', 'notepad.exe'] })
+  Object.freeze({ id: 'notepad', label: 'Note', icon: 'note', processes: ['Notepad.exe', 'notepad.exe'] }),
+  // La console del server non ha un eseguibile proprio: si apre con l'opener del progetto (una sola
+  // istanza, in primo piano) e si riconosce dal PID che lei stessa scrive. Chiuderla non ferma il server.
+  Object.freeze({ id: 'server-console', label: 'Console server', icon: 'console', processes: [] })
 ]);
 const APPLICATION_BY_ID = new Map(DESKTOP_APPLICATIONS.map((entry) => [entry.id, entry]));
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
+const CONSOLE_PROCESSES = new Set(['pwsh.exe', 'powershell.exe']);
+
+function serverConsoleOpener() { return path.join(PROJECT_ROOT, 'scripts', 'open-server-console.ps1'); }
+
+function serverConsolePidPath(env = process.env) {
+  const root = String(env.NEXUS_SHARED_DATA_ROOT || '');
+  return root ? path.join(root, 'runtime', 'server-console.pid') : '';
+}
+
+function readServerConsolePid(env = process.env, read = fs.readFileSync) {
+  const file = serverConsolePidPath(env);
+  if (!file) return 0;
+  try {
+    const pid = Number.parseInt(String(read(file, 'utf8')).trim(), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : 0;
+  } catch { return 0; }
+}
+
+/** PID → nome immagine da tasklist CSV ("nome","pid",...). */
+function parseTaskListPids(value) {
+  const pids = new Map();
+  for (const line of String(value || '').split(/\r?\n/)) {
+    const match = line.match(/^"([^"]+)","(\d+)"/);
+    if (match) pids.set(Number(match[2]), match[1].toLowerCase());
+  }
+  return pids;
+}
 
 function executableCandidates(id, env = process.env) {
   const local = String(env.LOCALAPPDATA || '');
@@ -78,10 +109,13 @@ function executableCandidates(id, env = process.env) {
     path.join(local, 'Microsoft', 'WindowsApps', 'notepad.exe'),
     path.join(windows, 'System32', 'notepad.exe')
   ];
+  // Disponibile solo se esistono l'opener del progetto e PowerShell 7 (la console lo richiede).
+  if (id === 'server-console') return [path.join(programFiles, 'PowerShell', '7', 'pwsh.exe')];
   return [];
 }
 
 function resolveExecutable(id, { env = process.env, exists = fs.existsSync } = {}) {
+  if (id === 'server-console' && !exists(serverConsoleOpener())) return '';
   return executableCandidates(id, env).find((candidate) => candidate && exists(candidate)) || '';
 }
 
@@ -203,15 +237,20 @@ async function foregroundDesktopApplication({ platform = process.platform, env =
   }
 }
 
-async function desktopApplicationStatus({ platform = process.platform, listProcesses = execFileAsync, listVisibleWindows = visibleWindowProcessNames, env = process.env, exists, supremoWindow = controlSupremoWindow, supremoPrivilege = supremoPrivilegeReady } = {}) {
+async function desktopApplicationStatus({ platform = process.platform, listProcesses = execFileAsync, listVisibleWindows = visibleWindowProcessNames, env = process.env, exists, supremoWindow = controlSupremoWindow, supremoPrivilege = supremoPrivilegeReady, readFile } = {}) {
   if (platform !== 'win32') return DESKTOP_APPLICATIONS.map(({ id, label, icon }) => ({ id, label, icon, available: false, open: false, canClose: false }));
   let running = new Set();
+  let pids = new Map();
   try {
     const { stdout = '' } = await listProcesses('tasklist.exe', ['/FO', 'CSV', '/NH'], {
       windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024
     });
     running = parseTaskList(stdout);
+    pids = parseTaskListPids(stdout);
   } catch {}
+  // Aperta solo se il PID scritto dalla console appartiene ancora a un PowerShell (niente PID riciclati).
+  const consolePid = readServerConsolePid(env, readFile);
+  const consoleOpen = Boolean(consolePid && CONSOLE_PROCESSES.has(pids.get(consolePid)));
   let visible = running;
   try { visible = await listVisibleWindows({ env }); } catch {}
   const supremoRunning = running.has('supremo.exe');
@@ -228,8 +267,10 @@ async function desktopApplicationStatus({ platform = process.platform, listProce
     available: Boolean(resolveExecutable(entry.id, { env, exists })),
     // Per le app interattive "aperta" significa finestra realmente visibile:
     // i processi Chromium residenti non devono trasformare il tap Apri in Chiudi.
-    open: entry.id === 'supremo' ? supremoVisible : entry.processes.some((name) => visible.has(name.toLowerCase())),
-    canClose: entry.processes.length > 0,
+    open: entry.id === 'supremo' ? supremoVisible
+      : entry.id === 'server-console' ? consoleOpen
+        : entry.processes.some((name) => visible.has(name.toLowerCase())),
+    canClose: entry.processes.length > 0 || entry.id === 'server-console',
     ...(entry.id === 'supremo' ? { adminReady: supremoAdminReady } : {})
   }));
 }
@@ -255,11 +296,14 @@ async function openDesktopApplication(id, { platform = process.platform, env = p
   }
   const executable = resolveExecutable(application.id, { env, exists });
   if (!executable) throw Object.assign(new Error('Applicazione non installata.'), { code: 'DESKTOP_APP_UNAVAILABLE' });
-  const args = application.id === 'brave' ? ['--new-window'] : [];
+  const serverConsole = application.id === 'server-console';
+  // Console: l'opener (nascosto) apre la finestra dedicata in primo piano o riporta davanti quella già aperta.
+  const args = application.id === 'brave' ? ['--new-window']
+    : serverConsole ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', serverConsoleOpener(), '-Normal'] : [];
   await new Promise((resolve, reject) => {
     // windowsHide viene usato per i processi tecnici, non per una UI richiesta
     // esplicitamente: su Chromium può creare un processo senza finestra visibile.
-    const child = spawnProcess(executable, args, { detached: true, stdio: 'ignore', windowsHide: false });
+    const child = spawnProcess(executable, args, { detached: true, stdio: 'ignore', windowsHide: serverConsole });
     child.once('spawn', resolve);
     child.once('error', reject);
     child.unref?.();
@@ -268,7 +312,7 @@ async function openDesktopApplication(id, { platform = process.platform, env = p
   return Object.freeze({ id: application.id, launched: true });
 }
 
-async function closeDesktopApplication(id, { platform = process.platform, env = process.env, terminateProcess = execFileAsync, listProcesses = execFileAsync, supremoClose = closeSupremoPrivileged } = {}) {
+async function closeDesktopApplication(id, { platform = process.platform, env = process.env, terminateProcess = execFileAsync, listProcesses = execFileAsync, supremoClose = closeSupremoPrivileged, readFile } = {}) {
   const application = APPLICATION_BY_ID.get(String(id || ''));
   if (!application) throw Object.assign(new Error('Applicazione non consentita.'), { code: 'DESKTOP_APP_NOT_ALLOWED' });
   if (platform !== 'win32') throw Object.assign(new Error('Applicazione disponibile solo su Windows.'), { code: 'DESKTOP_APP_UNSUPPORTED' });
@@ -290,6 +334,22 @@ async function closeDesktopApplication(id, { platform = process.platform, env = 
       catch { await terminateProcess('taskkill.exe', ['/IM', 'Supremo.exe', '/T', '/F'], { windowsHide: true, timeout: 5_000, encoding: 'utf8' }); }
       supremoRequestedVisible = false;
     }
+    return Object.freeze({ id: application.id, closed: true, alreadyClosed: false });
+  }
+  if (application.id === 'server-console') {
+    // Solo il PID scritto dalla console, e solo se è ancora un PowerShell: mai il server né altri terminali.
+    const pid = readServerConsolePid(env, readFile);
+    let image = '';
+    if (pid) {
+      try {
+        const { stdout = '' } = await listProcesses('tasklist.exe', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
+          windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 64 * 1024
+        });
+        image = parseTaskListPids(stdout).get(pid) || '';
+      } catch {}
+    }
+    if (!CONSOLE_PROCESSES.has(image)) return Object.freeze({ id: application.id, closed: false, alreadyClosed: true });
+    await terminateProcess('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, timeout: 5_000, encoding: 'utf8' });
     return Object.freeze({ id: application.id, closed: true, alreadyClosed: false });
   }
   let matched = false;
@@ -330,6 +390,8 @@ module.exports = {
   openSupremoPrivileged,
   parseVisibleProcessNames,
   parseTaskList,
+  parseTaskListPids,
+  serverConsolePidPath,
   resolveExecutable,
   supremoPrivilegeReady,
   supremoProcessRunning,

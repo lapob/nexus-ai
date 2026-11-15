@@ -303,3 +303,13 @@ test('il contratto accetta solo app del catalogo: niente giochi né identificato
     assert.throws(() => normalizePresenceAction({action: 'open-application', applicationId}));
   }
 });
+
+test('console del server: "Apri" la riporta in primo piano anche se già aperta (ridotta a icona all accesso)', () => {
+  const status = normalizeDesktopPresenceStatus({ available: true, allowedActions: ['open-application', 'close-application'], applications: [
+    { id: 'server-console', label: 'Console server', available: true, open: true, canClose: true },
+    { id: 'notepad', available: true, open: true, canClose: true }
+  ] });
+  const open = (applicationId) => normalizePresenceAction({ action: 'open-application', applicationId });
+  assert.equal(presenceActionChangesState(status, open('server-console')), true);
+  assert.equal(presenceActionChangesState(status, open('notepad')), false);
+});

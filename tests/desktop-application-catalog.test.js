@@ -220,6 +220,53 @@ test('i broker elevati sono confinati al solo eseguibile Supremo firmato', () =>
 });
 
 
+test('console del server: aperta solo dal PID scritto da lei, apertura in primo piano, chiusura confinata a quel PID', async () => {
+  const env = { NEXUS_SHARED_DATA_ROOT: 'C:\\Data', ProgramFiles: 'C:\\Programs', WINDIR: 'C:\\Windows' };
+  const pidFile = 'C:\\Data\\runtime\\server-console.pid';
+  const status = async (taskList, pid = '4242') => (await desktopApplicationStatus({
+    platform: 'win32', env, exists: () => true,
+    listProcesses: async () => ({ stdout: taskList }),
+    listVisibleWindows: async () => new Set(),
+    supremoWindow: async () => ({ found: false, visible: false }),
+    supremoPrivilege: async () => false,
+    readFile: (file) => { assert.equal(file, pidFile); return pid; }
+  })).find((entry) => entry.id === 'server-console');
+  const open = await status('"pwsh.exe","4242","Console","1","90.000 K"');
+  assert.equal(open.open, true);
+  assert.equal(open.available, true);
+  assert.equal(open.canClose, true);
+  // PID riciclato da un altro processo o file assente: chiusa.
+  assert.equal((await status('"notepad.exe","4242","Console","1","9.000 K"')).open, false);
+  assert.equal((await status('"pwsh.exe","4242","Console","1","90.000 K"', '')).open, false);
+
+  const launched = [];
+  await openDesktopApplication('server-console', {
+    platform: 'win32', env, exists: () => true,
+    spawnProcess: (file, args, options) => {
+      launched.push({ file, args, options });
+      return { once: (name, done) => { if (name === 'spawn') queueMicrotask(done); }, unref() {} };
+    }
+  });
+  assert.equal(launched[0].file, 'C:\\Programs\\PowerShell\\7\\pwsh.exe');
+  assert.match(launched[0].args.join(' '), /-File \S+open-server-console\.ps1 -Normal$/);
+  assert.equal(launched[0].options.windowsHide, true);
+
+  const calls = [];
+  const closed = await closeDesktopApplication('server-console', {
+    platform: 'win32', env, readFile: () => '4242',
+    listProcesses: async (file, args) => { assert.deepEqual(args.slice(0, 2), ['/FI', 'PID eq 4242']); return { stdout: '"pwsh.exe","4242","Console","1","90.000 K"' }; },
+    terminateProcess: async (file, args) => calls.push([file, args])
+  });
+  assert.equal(closed.closed, true);
+  assert.deepEqual(calls, [['taskkill.exe', ['/PID', '4242', '/T', '/F']]]);
+  const refused = await closeDesktopApplication('server-console', {
+    platform: 'win32', env, readFile: () => '4242',
+    listProcesses: async () => ({ stdout: '"electron.exe","4242","Console","1","90.000 K"' }),
+    terminateProcess: async () => { throw new Error('non deve terminare un processo non console'); }
+  });
+  assert.equal(refused.alreadyClosed, true);
+});
+
 test('i launcher giochi sono rimossi: nessun eseguibile fuori catalogo e nessun comando remoto', () => {
   const env = { ProgramFiles: 'C:\\Programs', 'ProgramFiles(x86)': 'C:\\Programs x86' };
   for (const id of ['steam', 'epic', 'steam; shutdown /s', 'brave; shutdown /s']) assert.equal(resolveExecutable(id, { env, exists: () => true }), '');

@@ -3478,6 +3478,28 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - on this PC (16 GB GPU) the Android emulator runs with `-gpu swiftshader_indirect` (software rendering);
   - otherwise it runs only when the server is in maintenance;
   - the health panel's VRAM row shows the problem at once (`vramBytes` 0 while a model is resident).
+## Control 1.29.0: "Console server" button (15 November 2026)
+
+- What changed:
+  - The "Le tue app" section of Control has a new "Console server" tile.
+  - Tapping it opens the server console on the PC, or brings it to the front; it never closes it.
+  - Closing the console never stops the server.
+- Server (`desktop-application-catalog.js`):
+  - the `server-console` entry starts `pwsh` hidden with `open-server-console.ps1 -Normal` (single instance,
+    foreground);
+  - it is "open" only if the PID in `.nexus-data/runtime/server-console.pid` still belongs to a `pwsh` or
+    `powershell` process;
+  - closing (API only) is limited to that PID.
+  - The console writes the PID at start and removes it on exit.
+  - The contract accepts `server-console`, and "Apri" is always a change for it, so it works even when the console
+    is minimized after logon.
+- Checks:
+  - catalog, contract, headless and bridge tests: 42/42;
+  - `npm test`: 1338 tests, 1335 pass, 1 fail, from the runtime test fixed in parallel by `fa870f6`, which then
+    passes;
+  - Control build 1.29.0 (versionCode 57), SHA-256 E53DA8DB…DCE9A, installed on the phone via ADB.
+- Deployment: active after the coordinated restart of the server and the Desktop Bridge, and after the console is
+  reopened (it must write the PID).
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

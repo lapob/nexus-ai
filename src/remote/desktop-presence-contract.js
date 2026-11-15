@@ -22,7 +22,9 @@ const PRESENCE_ACTIONS = Object.freeze([
 ]);
 const PRESENCE_ACTION_SET = new Set(PRESENCE_ACTIONS);
 const LOGICAL_DISPLAY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const APPLICATION_ID = /^(?:brave|terminal|supremo|notepad)$/;
+const APPLICATION_ID = /^(?:brave|terminal|supremo|notepad|server-console)$/;
+// Applicazioni che "Apri" riporta comunque in primo piano anche se già aperte (es. la console ridotta a icona).
+const FOCUSABLE_APPLICATIONS = new Set(['server-console']);
 
 // #region 01 — Normalizzazione metadata-only
 
@@ -162,6 +164,7 @@ function presenceActionChangesState(status, request) {
   if (request.action === 'open-claude') return status.claude !== 'open';
   if (request.action === 'close-claude') return status.claude !== 'closed';
   if (request.action === 'open-application') {
+    if (FOCUSABLE_APPLICATIONS.has(request.applicationId)) return true;
     return status.applications.find((entry) => entry.id === request.applicationId)?.state !== 'open';
   }
   if (request.action === 'close-application') {
