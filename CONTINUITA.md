@@ -1,3 +1,19 @@
+## Release 0.3.43 — desktop self-updating Preview (15 November 2026, in progress)
+
+- Owner request: publish the new Preview. It ships 3801bd8 (automatic signed updates, the
+  "Aggiornamento pronto" toast, rollback) on top of 0.3.42 (core in a worker), whose site promotion
+  was still pending.
+- Operation:
+  - bump 0.3.43 on main;
+  - build in the clean worktree `Z:\[AI]\NexusNXS\.AI-release-0342`, moved to the bump commit
+    (`.AI` and `.SITE` still hold other sessions' uncommitted work);
+  - `release-all.js --public-only --channel=preview` with full verify, then manifest refresh and
+    verify-bundle;
+  - publish-github-preview → v0.3.43-preview.1;
+  - coordinated service restart (maintenance.flag);
+  - site from a clean `.SITE` worktree: sync, prepare, promote, push website.
+- Expected check: nexusnxs.com/updates/preview serves a signed manifest at 0.3.43 that verifies
+  with the app's Preview key.
 ## Control 1.28.0: runtime health, accessibility, core aligned — 15 November 2026 (committed)
 
 - Gateway: `telemetrySnapshot()` now carries `runtime` (phase, managed,
