@@ -1,4 +1,7 @@
-# Avvia l'emulatore Android di prova per NexusNXS Control.
+<#
+  @module scripts/start-android-emulator
+  @description Avvia l'emulatore Android di prova per NexusNXS Control.
+#>
 # Regola: solo rendering software (swiftshader), mai -gpu host. Con il rendering
 # sulla GPU l'emulatore occupava ~10 GB di VRAM e il modello del server non
 # entrava piu nella RX 9070 XT (warm-up in timeout). Chiuderlo a fine prove:
