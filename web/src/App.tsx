@@ -658,7 +658,10 @@ export function App() {
               </section>
             ) : (
               <ol className="thread" aria-live="polite" aria-busy={generating}>
-                <AnimatePresence initial={false}>
+                {/* Chiave sulla conversazione: cambiandola i messaggi non rientrano uno a uno (lo fa la View Transition);
+                    entrano con la loro animazione solo quelli nuovi della conversazione aperta. Misurato: il rientro
+                    sfocato di una risposta lunga costava fotogrammi GPU da 12–25 ms a ogni cambio. */}
+                <AnimatePresence initial={false} key={conversation!.id}>
                   {conversation!.messages.map((message) => (
                     <m.li key={message.id} className={`message ${message.role}${message.error ? ' error' : ''}`} {...MESSAGE[message.role]}>
                       {message.role === 'user' ? (

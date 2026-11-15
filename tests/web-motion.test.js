@@ -29,6 +29,12 @@ test('la UI respira con il nucleo solo dove marcato, e si ferma con movimento ri
   const css = read('styles.css');
   assert.match(css, /@property --core-breath \{ syntax: '<number>'/);
   assert.match(css, /::view-transition-new\(thread\) \{ animation: vt-thread-in/);
+  // Cambio conversazione leggero: niente snapshot della pagina intera, niente filter sugli snapshot,
+  // e i messaggi della conversazione aperta non rientrano uno a uno.
+  assert.match(css, /:root \{ view-transition-name: none; \}/);
+  assert.match(css, /\.scroll \{ view-transition-name: thread; \}/);
+  assert.doesNotMatch(css, /@keyframes vt-thread-(?:in|out) \{[^}]*filter/);
+  assert.match(read('App.tsx'), /<AnimatePresence initial=\{false\} key=\{conversation!\.id\}>/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\*, \*::before, \*::after \{ animation-duration: \.001ms !important/);
   assert.match(read('App.tsx'), /startViewTransition && !window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches/);
 });

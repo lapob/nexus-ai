@@ -119,7 +119,27 @@ Console commits):
   nexusnxs.com/updates/preview release-manifest.json and latest.yml 200 at 0.3.41.
 - Not verified: an installed 0.3.40 updating itself to 0.3.41 on this PC; the
   installer is still unsigned (publisher certificate pending).
-- Next: optional — trace the conversation-switch frame and shorten it.
+- Conversation-switch frame shortened (15 November, on main, NOT yet in a release:
+  0.3.41 still has the old version, web and desktop identical):
+  - Diagnosis (trace + timing): React mounts the new conversation in ~3 ms and the main
+    thread never exceeds 4.6 ms. The GPU was the bottleneck (FinishPaintRenderPass up to
+    17 ms). With View Transitions off the first switch was just as heavy: on every switch
+    AnimatePresence replayed every message's entry animation, including the blur of a
+    tall answer, on top of the full-page root snapshot and the blurred snapshots.
+  - Fix: `AnimatePresence key={conversation.id}` (the open conversation's messages do not
+    re-enter one by one; new messages still animate); `:root { view-transition-name: none }`
+    with the name on `.scroll` (snapshot clipped by the scroller, so the core keeps moving
+    during the switch); no filter on the snapshots (opacity, translate, scale).
+  - Without View Transitions there are now zero long frames, even on the first switch.
+    With them: one 8.3 ms frame per switch for the capture, under one vsync at 60 Hz.
+  - Chrome, switch ×8: p99 8.4 → 4.4 ms, frames over 2 vsync 14 → 4, max 20.7 → 16.6 ms.
+  - Electron (two runs): p99 12.4 → 4.4 ms, frames over 2 vsync 16–17 → 5–6. A single
+    29–33 ms frame remains on the first, cold View Transition only.
+  - Checked mid-transition: the crossfade stays inside the conversation area, the top bar
+    and composer are untouched, the core is live.
+  - Gates: npm test 1302/0 (2 skipped), check PASS (bundle 374485 B), check:ui 39/39 +
+    15/15, build:renderer OK, web-motion 3/3 with new assertions.
+- Next: ship it in Preview 0.3.42 (same flow as 0.3.41), so web and desktop change together.
 
 Same UI for web and desktop (`web/src`). One motion language in `web/src/motion.ts`:
 - Startup budget: framer-motion's `domAnimation` features moved to a lazy chunk

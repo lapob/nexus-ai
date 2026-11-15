@@ -261,7 +261,7 @@
     .suggestions .chip { scroll-snap-align: start; }
   }
 
-  .thread { list-style: none; margin: 0 auto; padding: 8px 0 0; width: min(var(--content), 100%); display: grid; gap: 22px; view-transition-name: thread; }
+  .thread { list-style: none; margin: 0 auto; padding: 8px 0 0; width: min(var(--content), 100%); display: grid; gap: 22px; }
   /* min-width: 0 su ogni elemento grid/flex: codice lungo scorre dentro il suo blocco, la pagina mai. */
   .message, .answer, .markdown { min-width: 0; }
   .message.user { justify-self: end; max-width: min(78%, 620px); }
@@ -992,11 +992,16 @@
   @keyframes stop-in { from { scale: .4; rotate: -90deg; opacity: 0; } }
   /* Cambio conversazione: il thread uscente si dissolve sfocandosi, il nuovo si ricompone salendo;
      il titolo scorre verso l'alto. Le View Transitions non partono con movimento ridotto (App.transition). */
-  @keyframes vt-thread-out { to { opacity: 0; scale: .985; filter: blur(6px); } }
-  @keyframes vt-thread-in { from { opacity: 0; translate: 0 16px; filter: blur(8px); } }
+  /* Senza filter sugli snapshot: la sfocatura raddoppiava i render pass GPU della transizione (misurato). */
+  @keyframes vt-thread-out { to { opacity: 0; scale: .985; } }
+  @keyframes vt-thread-in { from { opacity: 0; translate: 0 16px; scale: .99; } }
   @keyframes vt-title-out { to { opacity: 0; translate: 0 -8px; } }
   @keyframes vt-title-in { from { opacity: 0; translate: 0 8px; } }
-  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: var(--ease-emphasized); }
+  /* Solo la conversazione (lo scroller, ritagliato dal proprio overflow) e il titolo entrano nella transizione:
+     niente snapshot a tutto schermo della radice. Misurato: la dissolvenza della pagina intera costava fino a
+     17 ms di GPU per fotogramma e congelava il nucleo; così il nucleo resta vivo durante il cambio. */
+  :root { view-transition-name: none; }
+  .scroll { view-transition-name: thread; }
   ::view-transition-group(thread), ::view-transition-group(conversation-title) { animation-duration: .4s; animation-timing-function: var(--ease-emphasized); }
   ::view-transition-old(thread) { animation: vt-thread-out .2s cubic-bezier(.4, 0, 1, 1) both; }
   ::view-transition-new(thread) { animation: vt-thread-in .44s var(--ease-emphasized) .06s both; }
