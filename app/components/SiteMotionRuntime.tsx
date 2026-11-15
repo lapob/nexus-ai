@@ -95,11 +95,13 @@ export function SiteMotionRuntime() {
     const revealTargets = Array.from(document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
     const ambientTargets = Array.from(document.querySelectorAll<HTMLElement>(AMBIENT_SELECTOR));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    // Visual regression: ?nxs-still[=seconds] (or html[data-nxs-still]) renders one fixed,
-    // deterministic state: seeded field, entrance complete, clock frozen, CSS motion off.
-    const stillValue = new URLSearchParams(window.location.search).get("nxs-still") ?? root.dataset.nxsStill;
+    // Visual regression: ?nxs-still[=seconds] / ?nxs-qa-time=<seconds> (or html[data-nxs-still])
+    // renders one fixed, deterministic state: seeded field, entrance complete, clock frozen,
+    // CSS motion off; the canvas gets data-qa="ready" once that frame is painted.
+    const query = new URLSearchParams(window.location.search);
+    const stillValue = query.get("nxs-qa-time") ?? query.get("nxs-still") ?? root.dataset.nxsStill;
     const still = stillValue != null;
-    const stillTime = Number(stillValue) || 0;
+    const stillTime = Math.max(0, Number(stillValue) || 0);
     if (still) root.classList.add("nxs-still");
     const calm = () => still || reducedMotion.matches;
     let scrollFrame = 0;
@@ -697,6 +699,7 @@ export function SiteMotionRuntime() {
       cosmicCanvas.dataset.particles = String(activeParticles);
       cosmicCanvas.dataset.backgroundParticles = String(backgroundStars.length);
       cosmicCanvas.dataset.rotation = `${inspection.x.toFixed(3)},${inspection.y.toFixed(3)}`;
+      if (still) cosmicCanvas.dataset.qa = "ready";
       if (!reduced && !document.hidden) cosmicFrame = requestAnimationFrame(drawCosmicField);
     };
 

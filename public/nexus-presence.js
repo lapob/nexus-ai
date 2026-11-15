@@ -57,7 +57,8 @@
 
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     // Visual tests: ?nxs-still[=seconds] (or html[data-nxs-still]) freezes the field at a fixed time.
-    const stillValue = new URLSearchParams(location.search).get("nxs-still") ?? document.documentElement.dataset.nxsStill;
+    const query = new URLSearchParams(location.search);
+    const stillValue = query.get("nxs-qa-time") ?? query.get("nxs-still") ?? document.documentElement.dataset.nxsStill;
     const still = stillValue != null;
     const stillTime = Number(stillValue) || 0;
     const constrainedDevice = (navigator.deviceMemory || 8) <= 2;

@@ -728,9 +728,10 @@ test("?nxs-still renders one deterministic, frozen frame for visual tests", asyn
   for (let pass = 0; pass < 2; pass++) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
-    await page.goto("/?nxs-still=2", { waitUntil: "networkidle" });
+    await page.goto(pass ? "/?nxs-qa-time=2" : "/?nxs-still=2", { waitUntil: "networkidle" });
     await expect(page.locator("html")).toHaveClass(/nxs-still/);
     const field = page.locator(".nxs-cosmic-field");
+    await expect(field).toHaveAttribute("data-qa", "ready");
     await expect(field).toHaveAttribute("data-arrival", "1.000");
     await page.evaluate(() => scrollTo(0, innerHeight * 1.4));
     await page.waitForTimeout(400);
