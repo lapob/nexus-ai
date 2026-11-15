@@ -1,3 +1,23 @@
+# Phone check of production e5a35b6c — 15 November 2026 (Galaxy S25, Chrome 157)
+
+- Measured through Chrome remote debugging over ADB, on nexusnxs.com
+  (360x673, DPR 3, tier balanced). Hero: rAF 60.0 fps, p95 16.7 ms, paint
+  4.6 ms. Reload + immediate scroll: max arrival speed 0.66/s, no instant
+  composition. Real touch swipes (adb input swipe): 61.7 fps, p95 16.8 ms,
+  1 frame over 20 ms out of 371, paint 3.5 ms.
+- 120 Hz: the display switches to 120 Hz, but Android gives Chrome's
+  animations the "normal" frame-rate category, which is 60 Hz on this phone
+  (frameRateCategoryRate normal=60, high=90; app vsync 16.67 ms). A nearly
+  empty page in the same tab also runs at exactly 60 fps, with 0 frames under
+  10 ms. This is a browser/OS policy that a web page cannot override. The
+  runtime itself is frame-rate independent: the 120/144 Hz tests are the
+  paced-rAF ones on desktop. Battery saver was off.
+- Finding: the adaptive budget left 880 particles of the 1600 of the
+  balanced tier. Recovery requires 8 s of consecutive frames with paint < 5 ms,
+  and the phone sits around 4.6 ms, so the budget rarely recovers even though
+  the frame budget (16.7 ms) has room. Next step: base recovery on the
+  measured frame interval rather than a fixed 5 ms.
+
 # Continuous narrative + jank-free field — 14 November 2026 (PUBLISHED: production e5a35b6c, website 5658eb9)
 
 - release:prepare candidate 9e087e7d (full gate: security, tests 49/49, e2e
