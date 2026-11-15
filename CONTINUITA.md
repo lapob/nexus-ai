@@ -18,7 +18,18 @@
 - Not part of `npm test` or of CI: it needs the sibling `.AI` checkout.
 - `?nxs-still` is compatible but not required.
 
-# QA time hook alias — 15 November 2026 (source bb759c5, NOT deployed)
+# Release 15 November 2026 — PUBLISHED: production 8b8ce04d, source 171af14
+
+- Owner approved publishing ("Sì, pubblica"). No 0.3.43 site data on
+  `website`, so per the coordination rule the site went out on its own:
+  release:prepare candidate 411c53a0 from 171af14 (adds Preview 0.3.42 AI
+  shell + download data 8cbe5d7, `?nxs-qa-time` bb759c5, visual baselines),
+  promote verified 13 routes, navbar, headers and AI health. Live:
+  `?nxs-qa-time=2` gives data-qa="ready", arrival 1.000, pixel-identical twice
+  (1440 + 390); /downloads links the 0.3.42 setup, GitHub asset HEAD 200.
+  Rollback target: a8371d0e. Next: 0.3.43 release data from its own session.
+
+# QA time hook alias — 15 November 2026 (source bb759c5, deployed with 8b8ce04d)
 
 - `?nxs-qa-time=<seconds>` is an alias of `?nxs-still=<seconds>` (name agreed
   with the visual-regression session); after the first frozen frame the field
