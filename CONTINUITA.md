@@ -1,3 +1,30 @@
+# Accessibility, stable visual-test mode, radial field falloff — 15 November 2026 (IN PROGRESS: release)
+
+- Visual-test contract: `?nxs-still[=seconds]` (or `html[data-nxs-still]`) adds
+  `html.nxs-still`, renders the seeded field (seed 0x4e5853, presence seed 73)
+  with the entrance complete and the clock frozen at the given seconds (0 by
+  default), redraws only on scroll/resize, and freezes CSS animations,
+  transitions and carets. Two fresh loads give pixel-identical screenshots
+  (home, 14 scroll stops incl. half-way dispersed phases, 1440 and 390). New
+  e2e test pins it. Fix found on the way: in reduced motion / still mode the
+  sparse redraws were counted as strain and shrank the particle budget after
+  a few scrolls; the adaptive budget now runs only while animating.
+- Field edge: third mask layer, radial falloff toward the corners (like the
+  app core), on top of the linear feathers. Dispersed phases checked on
+  screenshots: no hard cut at any canvas edge. The shared core module from
+  the app session (local_9ac248d4) is not available yet: when it lands, vendor
+  it into app/components and replace the local copy (next step).
+- Accessibility: axe WCAG 2.2 AA + best-practice on 9 routes × desktop/phone ×
+  reduced/no-preference: 0 serious/critical; the only finding (moderate
+  `region`, phone brand link outside landmarks) fixed with a `nav` landmark.
+  Keyboard walk: every Tab stop has a visible ring and is not hidden under
+  the nav (skip link sits above it, z-index 9999). New e2e test: phone axe
+  with best-practice. Reduced motion stays the calm narration: composed
+  forms, no ambient drift, chapter change only on scroll.
+- Gates: npm test 49/49, e2e 40/40. Reload + fast fling, 5 runs, local vs
+  live: desktop p95 8.1/4.5 ms (noise band seen before), phone 4x 25.0/24.8
+  ms, p99 29.4/29.2, 0 long tasks on both.
+
 # /security and /downloads layout — 15 November 2026 (PUBLISHED: production 27cd5494, source 0ab2d44)
 
 - release:prepare candidate 6acf2db8 from 0ab2d44; promote verified 13

@@ -95,6 +95,13 @@ export function SiteMotionRuntime() {
     const revealTargets = Array.from(document.querySelectorAll<HTMLElement>(REVEAL_SELECTOR));
     const ambientTargets = Array.from(document.querySelectorAll<HTMLElement>(AMBIENT_SELECTOR));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // Visual regression: ?nxs-still[=seconds] (or html[data-nxs-still]) renders one fixed,
+    // deterministic state: seeded field, entrance complete, clock frozen, CSS motion off.
+    const stillValue = new URLSearchParams(window.location.search).get("nxs-still") ?? root.dataset.nxsStill;
+    const still = stillValue != null;
+    const stillTime = Number(stillValue) || 0;
+    if (still) root.classList.add("nxs-still");
+    const calm = () => still || reducedMotion.matches;
     let scrollFrame = 0;
     let revealFrame = 0;
     let cosmicFrame = 0;
@@ -128,7 +135,7 @@ export function SiteMotionRuntime() {
     // the feathered reading blur on its real backdrop.
     const updateChoreo = () => {
       if (!choreoBlocks.length) return;
-      const active = !reducedMotion.matches;
+      const active = !calm();
       const y = window.scrollY, h = window.innerHeight;
       // Soft focus in transit on larger screens; phones keep the cheaper fade + glide.
       const blurScale = tier === "lite" || window.innerWidth < 801 ? 0 : 1;
@@ -281,7 +288,7 @@ export function SiteMotionRuntime() {
         const rect=element.getBoundingClientRect();
         return {left:rect.left,right:rect.right,top:rect.top+window.scrollY,bottom:rect.bottom+window.scrollY};
       });
-      if (reducedMotion.matches && !document.hidden) {
+      if (calm() && !document.hidden) {
         cancelAnimationFrame(cosmicFrame);
         cosmicFrame = requestAnimationFrame(drawCosmicField);
       }
@@ -306,11 +313,15 @@ export function SiteMotionRuntime() {
     const drawCosmicField = (now: number) => {
       if (!cosmicContext || !cosmicCanvas.isConnected) return;
       const paintStart = performance.now();
-      const reduced = reducedMotion.matches;
+      const reduced = calm();
       const delta = Math.min(.25, Math.max(.001, (now - cosmicLastFrame) / 1000));
       cosmicLastFrame = now;
-      strainedSeconds = paintMs > 9 || delta > .035 ? strainedSeconds + delta : Math.max(0, strainedSeconds - delta);
-      healthySeconds = paintMs < 5 && delta < .022 ? healthySeconds + delta : 0;
+      // Calm mode only redraws on scroll/resize: the long gaps between those frames are
+      // not strain, so the density budget must not shrink (and stays deterministic).
+      if (!reduced) {
+        strainedSeconds = paintMs > 9 || delta > .035 ? strainedSeconds + delta : Math.max(0, strainedSeconds - delta);
+        healthySeconds = paintMs < 5 && delta < .022 ? healthySeconds + delta : 0;
+      }
       if (strainedSeconds > 2) { activeParticles = Math.max(300, activeParticles - 60); strainedSeconds = 0; }
       if (healthySeconds > 8) { activeParticles = Math.min(fieldCap, activeParticles + 30); healthySeconds = 0; }
       const dragging = inspection.id !== -1 && !reduced;
@@ -325,7 +336,7 @@ export function SiteMotionRuntime() {
         inspection[velocity] = (inspection[velocity] - omega * acceleration * delta) * decay;
       }
       if (!reduced) ambientTime += delta * .8;
-      const time = reduced ? 0 : ambientTime;
+      const time = still ? stillTime : reduced ? 0 : ambientTime;
       if (now - pointer.time > 80) { pointer.vx *= Math.exp(-delta * 5); pointer.vy *= Math.exp(-delta * 5); }
       const scroll = scrollProgress;
       const viewportAnchor = window.scrollY;
@@ -722,7 +733,7 @@ export function SiteMotionRuntime() {
     const syncChoreo = () => updateChoreo();
     reducedMotion.addEventListener("change", syncChoreo);
 
-    const ambientObserver = typeof IntersectionObserver === "function" && !reducedMotion.matches && tier !== "lite"
+    const ambientObserver = typeof IntersectionObserver === "function" && !calm() && tier !== "lite"
       ? new IntersectionObserver((entries) => {
         for (const entry of entries) {
           entry.target.classList.toggle("nxs-ambient-active", entry.isIntersecting);
@@ -731,13 +742,13 @@ export function SiteMotionRuntime() {
       : null;
     ambientTargets.forEach((target) => {
       if (ambientObserver) ambientObserver.observe(target);
-      else target.classList.toggle("nxs-ambient-active", !reducedMotion.matches && tier !== "lite");
+      else target.classList.toggle("nxs-ambient-active", !calm() && tier !== "lite");
     });
 
     const showTarget = (target: HTMLElement) => {
       target.classList.add("nxs-in-view");
     };
-    const revealObserver = typeof IntersectionObserver === "function" && !reducedMotion.matches
+    const revealObserver = typeof IntersectionObserver === "function" && !calm()
       ? new IntersectionObserver((entries, observer) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
@@ -790,7 +801,7 @@ export function SiteMotionRuntime() {
         if (opacity !== heroTitleOpacity) { heroTitleOpacity = opacity; heroTitle.style.opacity = opacity === "1.000" ? "" : opacity; }
       }
       updateChoreo();
-      if (reducedMotion.matches && !document.hidden) drawCosmicField(performance.now());
+      if (calm() && !document.hidden) drawCosmicField(performance.now());
     };
     const onScroll = () => {
       if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll);
@@ -802,7 +813,7 @@ export function SiteMotionRuntime() {
         inspection.targetX = Math.max(-.8, Math.min(.8, dy / Math.min(cosmicWidth, cosmicHeight) * 5));
         inspection.targetY = Math.max(-1.2, Math.min(1.2, dx / Math.min(cosmicWidth, cosmicHeight) * 6));
       }
-      if (event.pointerType === "touch" || reducedMotion.matches) return;
+      if (event.pointerType === "touch" || calm()) return;
       const now = performance.now(), seconds = Math.max(.008, (now - pointer.time) / 1000);
       pointer.vx = pointer.active ? Math.max(-650, Math.min(650, (event.clientX - pointer.x) / seconds)) : 0;
       pointer.vy = pointer.active ? Math.max(-650, Math.min(650, (event.clientY - pointer.y) / seconds)) : 0;
@@ -814,7 +825,7 @@ export function SiteMotionRuntime() {
     };
     const releaseDrag = () => { inspection.id = -1; root.classList.remove('nxs-field-dragging'); };
     const startDrag = (event: PointerEvent) => {
-      if (event.button !== 0 || reducedMotion.matches || !(event.target instanceof Element)) return;
+      if (event.button !== 0 || calm() || !(event.target instanceof Element)) return;
       if (event.target.closest('a,button,input,textarea,select,[contenteditable],h1,h2,p,li')) return;
       if (!nearGrain(event.clientX, event.clientY)) return;
       if (event.pointerType === 'touch') return;
@@ -855,6 +866,7 @@ export function SiteMotionRuntime() {
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
       revealTargets.forEach((target) => target.classList.remove("nxs-motion-candidate", "nxs-in-view"));
       ambientTargets.forEach((target) => target.classList.remove("nxs-ambient-active"));
+      root.classList.remove("nxs-still");
       document.removeEventListener("visibilitychange", syncVisibility);
       reducedMotion.removeEventListener("change", syncVisibility);
       reducedMotion.removeEventListener("change", syncChoreo);

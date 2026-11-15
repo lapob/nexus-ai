@@ -261,3 +261,11 @@ html { scroll-padding-top: 96px; }
     transform: translate3d(0, -5px, 0);
   }
 }
+
+/* Visual regression (?nxs-still): one fixed frame. CSS motion and carets are frozen
+   at their resting state; the particle field is frozen by the runtime. */
+.nxs-still *, .nxs-still *::before, .nxs-still *::after {
+  animation: none !important;
+  transition: none !important;
+  caret-color: transparent !important;
+}

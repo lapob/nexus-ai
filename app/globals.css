@@ -612,9 +612,12 @@ body { isolation: isolate; }
 .nxs-cosmic-field {
   --nxs-feather-x: clamp(28px, 7vw, 120px);
   --nxs-feather-y: clamp(36px, 9vh, 110px);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--nxs-feather-x), #000 calc(100% - var(--nxs-feather-x)), transparent), linear-gradient(180deg, transparent, #000 var(--nxs-feather-y), #000 calc(100% - var(--nxs-feather-y)), transparent);
+  /* Third layer: radial falloff like the app core (smooth toward the corners, so the
+     four linear feathers never meet in a square corner). */
+  --nxs-feather-r: radial-gradient(farthest-side, #000 85%, rgb(0 0 0 / .55) 112%, transparent 141%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--nxs-feather-x), #000 calc(100% - var(--nxs-feather-x)), transparent), linear-gradient(180deg, transparent, #000 var(--nxs-feather-y), #000 calc(100% - var(--nxs-feather-y)), transparent), var(--nxs-feather-r);
   -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(90deg, transparent, #000 var(--nxs-feather-x), #000 calc(100% - var(--nxs-feather-x)), transparent), linear-gradient(180deg, transparent, #000 var(--nxs-feather-y), #000 calc(100% - var(--nxs-feather-y)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--nxs-feather-x), #000 calc(100% - var(--nxs-feather-x)), transparent), linear-gradient(180deg, transparent, #000 var(--nxs-feather-y), #000 calc(100% - var(--nxs-feather-y)), transparent), var(--nxs-feather-r);
   mask-composite: intersect;
 }
 /* Progressive optical blur at the viewport edges: copy and imagery soften into

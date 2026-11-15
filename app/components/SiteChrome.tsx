@@ -130,9 +130,12 @@ export function SiteHeader({ pathname = "/" }: { pathname?: string }) {
         {navigationItems.filter(({href}) => href !== "/").map(({href, label}) => <HardNavigationLink href={href} key={href} aria-current={pathname === href ? "page" : undefined}>{label}</HardNavigationLink>)}
       </nav>
     </header>
-    <HardNavigationLink className="nxs-floating-brand" data-awake={open || chromeAwake} href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
-      <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
-    </HardNavigationLink>
+    {/* Landmark for the phone brand link (fixed child: the wrapper takes no space). */}
+    <nav aria-label="Homepage">
+      <HardNavigationLink className="nxs-floating-brand" data-awake={open || chromeAwake} href="/" aria-label="NexusNXS, homepage" onClick={() => open && setNavigating(true)}>
+        <Image className="nxs-brand__icon" src="/nexus-icon.png" alt="" width={48} height={48} priority unoptimized />
+      </HardNavigationLink>
+    </nav>
     <button
       ref={toggleRef}
       className="nxs-menu-toggle"

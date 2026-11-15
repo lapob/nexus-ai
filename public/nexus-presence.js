@@ -56,6 +56,10 @@
     root.dataset.nexusMounted = "true";
 
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // Visual tests: ?nxs-still[=seconds] (or html[data-nxs-still]) freezes the field at a fixed time.
+    const stillValue = new URLSearchParams(location.search).get("nxs-still") ?? document.documentElement.dataset.nxsStill;
+    const still = stillValue != null;
+    const stillTime = Number(stillValue) || 0;
     const constrainedDevice = (navigator.deviceMemory || 8) <= 2;
     let width = 1;
     let height = 1;
@@ -86,7 +90,7 @@
         : constrainedDevice
           ? PRESSURE_PARTICLE_COUNT
           : PARTICLE_COUNT;
-      const time = reducedMotion ? 0 : (now % 1800000) / 14000;
+      const time = reducedMotion ? 0 : still ? stillTime / 14 : (now % 1800000) / 14000;
       const centerY = height * 0.44;
       const bandHeight = height * (root.dataset.state === "maintenance" ? 0.28 : 0.23);
       const points = particles.map((particle) => {
@@ -141,7 +145,7 @@
       context.fillStyle = glow;
       context.fillRect(0, 0, width, height);
 
-      if (!reducedMotion && !document.hidden) {
+      if (!reducedMotion && !still && !document.hidden) {
         frame = requestAnimationFrame(draw);
       }
     };

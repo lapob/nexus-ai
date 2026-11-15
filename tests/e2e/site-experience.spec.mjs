@@ -722,3 +722,38 @@ test("reloading and scrolling at once never composes the form in a single frame"
   // Before the fix the entrance jumped to 1 in one frame (~60/s); now it hurries smoothly (≈0.6/s).
   expect(fastest).toBeLessThan(4);
 });
+
+test("?nxs-still renders one deterministic, frozen frame for visual tests", async ({ browser }) => {
+  const frames = [];
+  for (let pass = 0; pass < 2; pass++) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+    await page.goto("/?nxs-still=2", { waitUntil: "networkidle" });
+    await expect(page.locator("html")).toHaveClass(/nxs-still/);
+    const field = page.locator(".nxs-cosmic-field");
+    await expect(field).toHaveAttribute("data-arrival", "1.000");
+    await page.evaluate(() => scrollTo(0, innerHeight * 1.4));
+    await page.waitForTimeout(400);
+    const draws = await field.getAttribute("data-draws");
+    await page.waitForTimeout(600);
+    // At rest nothing redraws: the clock is frozen.
+    expect(await field.getAttribute("data-draws")).toBe(draws);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector(".primary-button")).transitionDuration)).toBe("0s");
+    frames.push(await page.evaluate(() => document.querySelector(".nxs-cosmic-field").toDataURL()));
+    await context.close();
+  }
+  expect(frames[0] === frames[1]).toBe(true);
+});
+
+test("every route passes WCAG 2.2 AA and best-practice checks on a phone, with motion on", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  for (const route of publicRoutes) {
+    await page.goto(route, { waitUntil: "load" });
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
+      .analyze();
+    expect(results.violations, `${route}: ${results.violations.map((violation) => violation.id).join(", ")}`).toEqual([]);
+  }
+  await context.close();
+});
