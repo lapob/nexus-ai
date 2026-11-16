@@ -1,4 +1,4 @@
-# Edge shell resync, release-safe chunks, dev audit fixed — 16 November 2026 (release in progress)
+# Edge shell resync, release-safe chunks, dev audit fixed — 16 November 2026 (released, 5dcdb280)
 
 - AI source:
   - a8950a8: neutral copy, guest error filtering, public 404s;
@@ -12,10 +12,11 @@
   - e2e 40/40;
   - audit and OSV;
   - Cloudflare dry-run.
-- Next steps:
-  1. `release:prepare`.
-  2. `release:promote`.
-  3. Live check.
+- Released as 5dcdb280:
+  - production deployment verified (13 routes, healthz);
+  - ai.nexusnxs.com serves `index-Baqub-eQ.js` with an immutable cache;
+  - `/wp-admin` and `/.env` return a neutral 404;
+  - the live page is Online with 0 console errors.
 
 # AI web app code-splitting on the edge — 16 November 2026 (released, 856c6536)
 
