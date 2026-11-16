@@ -1,4 +1,8 @@
-## Shared versioned core, reactive core, `?nxs-qa-time` — 16 November 2026 (publishing)
+## Shared versioned core, reactive core, `?nxs-qa-time` — 16 November 2026 (published: Server restarted, edge 109c26b5)
+
+- Live check: core 1.1.0 (WebGPU, worker), Online, 0 console errors.
+- The desktop UI was reopened on the new Core runtime.
+- The PC was then shut down at the owner's explicit request.
 
 - `web/src/nexus-core.ts` (`NEXUS_CORE_VERSION` 1.1.0, no dependencies) is the single source for:
   - breath, zoom and bloom/collapse;
