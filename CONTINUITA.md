@@ -3651,6 +3651,39 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - typecheck ok; `npm test` 1337 pass, 0 fail;
   - `qa:visual` web 24/24 e core 90/90.
 
+## Code-splitting della web app (16 novembre 2026)
+
+- Prima: un solo bundle da 478 kB, incorporato nel documento a ogni richiesta (mai in cache).
+- Ora:
+  - Il CSS resta incorporato.
+  - Il modulo d'ingresso (360 kB, gzip 117 kB) è `/assets/index-<hash>.js`:
+    - porta il nonce;
+    - è in cache permanente tra una visita e l'altra.
+  - Su richiesta arrivano: Centro di controllo 46 kB, motion-features 37 kB, Panel, UpdateCard, Select, ConfirmDialog, WindowControls e press.
+  - L'ingresso non può restare incorporato: i chunk lo importano per URL, e una copia inline verrebbe eseguita due volte.
+  - CSP del gateway e dell'edge: `script-src 'nonce-…' 'strict-dynamic'`.
+- 250 kB non è raggiungibile restando su React: react-dom pesa da solo circa 180 kB minificati.
+  - Servirebbe passare a Preact, che non è autorizzato.
+  - Il budget dell'ingresso è < 380 kB (test `public-web-app` e budget del sito).
+- Conversazione: resta agganciata al fondo anche quando l'altezza cresce dopo il montaggio (ResizeObserver).
+  - Prima, su telefono, le azioni dell'ultimo messaggio finivano sotto la barra di scrittura.
+  - Riapprovate le baseline web conversation-390-dark/light.
+  - `run-web.mjs` attende `networkidle`.
+- Verifiche:
+  - `npm test` 1337 pass, 0 fail; `check:ui` 39/39 e 15/15 con axe completo;
+  - `qa:visual` web 24/24 e core 90/90, due esecuzioni consecutive;
+  - pagina reale del gateway con la CSP vera in Chrome: chunk dell'avvio e ConfirmDialog su richiesta caricati, 0 violazioni CSP.
+- Edge (`.SITE`):
+  - `sync-ai-shell` copia la build in `public/ai-assets`, sostituendo quella precedente;
+  - il worker serve `/assets/<nome>` da lì con cache immutabile, e i nomi sconosciuti vanno ancora al PC;
+  - pagina e codice restano coerenti anche con il PC su un'altra build o offline;
+  - test 50/50, e2e 40/40 (app avviata dall'edge con il PC offline).
+- Operazione in corso:
+  1. commit;
+  2. riavvio coordinato del server con `maintenance.flag` (`manage-headless-server-task.ps1 -Action restart`);
+  3. `release:prepare`/`release:promote` del sito.
+  - L'ordine è sicuro: la vecchia pagina dell'edge è autonoma.
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

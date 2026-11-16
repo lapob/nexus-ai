@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
-const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed } = require('../src/remote/remote-session-gateway');
+const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed, PUBLIC_AI_BUILT } = require('../src/remote/remote-session-gateway');
 
 
 test('l osservabilità privata riconosce soltanto loopback e pseudonimizza gli accessi', () => {
@@ -1818,8 +1818,14 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
     // Stesso bundle, ma la modalità associata si attiva solo con il segnale dell'ingresso privato.
     assert.doesNotMatch(publicHtml, /<meta name="nxs-ingress"/);
     for (const tag of publicHtml.match(/<(?:script|style)(?=[\s>])[^>]*>/g) || []) assert.ok(tag.includes(`nonce="${nonce}"`), tag);
-    const publicScripts = [...publicHtml.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1]);
-    assert.ok(publicScripts.length > 0);
+    // Il modulo d'ingresso è in /assets (cache permanente, chunk su richiesta) ed è servito dallo stesso gateway.
+    const entry = /<script nonce="[^"]+" type="module" src="(\/assets\/[^"]+\.js)"><\/script>/.exec(publicHtml)?.[1];
+    if (PUBLIC_AI_BUILT) {
+      assert.ok(entry, 'modulo d\'ingresso con nonce');
+      const entryResponse = await fetch(`${baseUrl}${entry}`);
+      assert.equal(entryResponse.status, 200);
+      assert.match(entryResponse.headers.get('content-type'), /javascript/);
+    }
     assert.equal((await fetch(`${baseUrl}/next/`, { redirect: 'manual' })).headers.get('location'), '/');
     const publicStatus = await (await fetch(`${baseUrl}/api/status`)).json();
     assert.deepEqual(publicStatus, { product: 'NexusNXS', anonymousAvailable: true, imageGeneration: false });

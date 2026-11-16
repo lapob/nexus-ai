@@ -8,7 +8,6 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import type { Capabilities, PlanStep, Preferences } from './api';
 import { highlight, lexicalSearch, semanticSearch, type SearchDoc, type SearchHit } from './search';
 import { useDesktopPresence, useDesktopUpdate } from './desktopPresence';
-import { UpdateCard } from './UpdateCard';
 import { desktopBridge, platform } from './platform';
 import { pairDevice, pairedToken } from './paired';
 import brandIcon from './assets/nexus-mark-ui.png';
@@ -26,7 +25,9 @@ import { useSwipeGestures } from './gestures';
 import { mergeStep } from './steps';
 import { activeConversation, appendMessage, assignProject, createProject, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, openProject, projectContext, projectFor, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
 import { ProjectNav, ProjectSheet } from './Projects';
-import { Panel } from './Panel';
+// Fuori dal primo caricamento: il pannello documenti si apre su richiesta, la scheda di aggiornamento esiste solo sul desktop.
+const Panel = lazy(() => import('./Panel').then((module) => ({ default: module.Panel })));
+const UpdateCard = lazy(() => import('./UpdateCard').then((module) => ({ default: module.UpdateCard })));
 import { closePanel, openPanel, usePanel } from './panelStore';
 
 // Centro di controllo solo desktop (protocollo nexus://, script-src 'self'): caricato alla prima apertura, fuori dal bundle iniziale.
@@ -515,6 +516,16 @@ export function App() {
     if (!conversation?.messages.length) { element.scrollTop = 0; return; }
     if (stickToBottom.current) element.scrollTop = element.scrollHeight;
   }, [conversation?.messages]);
+  // L'altezza può crescere anche dopo il cambio dei messaggi (font, tabelle, azioni, parti caricate su richiesta):
+  // se l'utente è agganciato al fondo ci resta, invece di fermarsi qualche pixel sopra.
+  useEffect(() => {
+    const element = scrollRef.current;
+    const thread = element?.querySelector('.thread');
+    if (!element || !thread || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => { if (stickToBottom.current) element.scrollTop = element.scrollHeight; });
+    observer.observe(thread);
+    return () => observer.disconnect();
+  }, [conversation?.id, Boolean(conversation?.messages.length)]);
 
   const onComposerKey = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     // Menu dei comandi «/»: frecce per scegliere, Invio o Tab per applicare, Esc per chiudere.
@@ -789,7 +800,7 @@ export function App() {
           )}
         </main>
 
-        <AnimatePresence>{panelDoc && <Panel key="panel" />}</AnimatePresence>
+        <AnimatePresence>{panelDoc && <Suspense key="panel" fallback={null}><Panel /></Suspense>}</AnimatePresence>
 
         <AnimatePresence>
           {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} actions={[
@@ -823,7 +834,7 @@ export function App() {
         <GpuWarmup />
         <Tooltips />
         <Confirmations />
-        <UpdateCard update={update} hidden={Boolean(toast) && update.state?.status !== 'installing'} />
+        {update.state && <Suspense fallback={null}><UpdateCard update={update} hidden={Boolean(toast) && update.state?.status !== 'installing'} /></Suspense>}
         <AnimatePresence>{memoryReview > 0 && !update.visible && !toast && !controlOpen && (
           <m.div className="update-pill glass" role="status" initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.98 }} transition={{ type: 'spring', stiffness: 420, damping: 32 }}>
             <Icon name="memory" size={16} /><span>{memoryReview === 1 ? '1 ricordo della settimana da rivedere' : `${memoryReview} ricordi della settimana da rivedere`}</span>

@@ -32,15 +32,16 @@ async function serve(root, pathname, method = 'GET') {
   return { handled, ...response.state };
 }
 
-test('documento unico: bundle incorporato, chiusure di tag neutralizzate, font ancora come URL', (t) => {
+test('documento: CSS incorporato, modulo d\'ingresso in /assets (i chunk lo importano per URL), font come URL', (t) => {
   const html = loadPublicWebApp(site(t));
-  assert.doesNotMatch(html, /src="\/assets\/[^"]+\.js"|href="\/assets\/[^"]+\.css"/);
-  assert.match(html, /<script type="module">const tag = "<\\\/script><\\!--"/);
-  assert.match(html, /<style>@font-face\{src:url\(\/assets\/inter-abc\.woff2\)\}/);
-  // Lo script incorporato resta JavaScript valido dopo l'escape.
-  const script = /<script type="module">([\s\S]*?)<\/script>/.exec(html)[1];
-  assert.doesNotThrow(() => new vm.Script(script));
-  assert.throws(() => inlineWebApp('<html><body></body></html>', () => ''), /un solo bundle/);
+  assert.match(html, /<script type="module" src="\/assets\/index-abc\.js"><\/script>/);
+  assert.doesNotMatch(html, /crossorigin|href="\/assets\/[^"]+\.css"|rel="modulepreload"/);
+  assert.match(html, /<style>@font-face\{src:url\(\/assets\/inter-abc\.woff2\)\}body\{color:red\}<\/style>/);
+  // Una chiusura di tag nel CSS non può uscire dall'elemento <style>.
+  assert.equal(inlineWebApp(INDEX, (file) => (file.endsWith('.css') ? 'a{content:"</style>"}' : '')).includes('<\\/style>'), true);
+  assert.equal(new vm.Script('1').runInNewContext(), 1);
+  assert.throws(() => inlineWebApp('<html><body></body></html>', () => ''), /attesi un modulo d'ingresso e un CSS/);
+  assert.throws(() => inlineWebApp(INDEX.replace('</head>', '<script type="module" src="/assets/extra.js"></script></head>'), () => ''), /attesi un modulo/);
   assert.equal(loadPublicWebApp(path.join(os.tmpdir(), 'nexus-web-assente')), null);
 });
 
@@ -48,7 +49,7 @@ test('nonce su ogni script e stile, CSP senza inline generico né origini estern
   const html = withNonce('<style>a{}</style><script type="module">x()</script><script>y()</script>', 'n0nce');
   assert.equal(html, '<style nonce="n0nce">a{}</style><script nonce="n0nce" type="module">x()</script><script nonce="n0nce">y()</script>');
   const csp = webAppCsp('n0nce');
-  assert.match(csp, /script-src 'nonce-n0nce'/);
+  assert.match(csp, /script-src 'nonce-n0nce' 'strict-dynamic'/);
   assert.match(csp, /style-src-attr 'none'/);
   assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval|https?:|data:/);
 });
@@ -108,7 +109,13 @@ test('la build attuale è la pagina pubblica: nessuna interfaccia classica', () 
   assert.doesNotMatch(PUBLIC_AI_HTML, /NexusNXS agisce|coreCanvas|nexusCosmicMetrics/);
   if (!PUBLIC_AI_BUILT) return; // Ambiente senza build web: resta la pagina di aggiornamento.
   assert.match(PUBLIC_AI_HTML, /<div id="root"><\/div>/);
-  assert.match(PUBLIC_AI_HTML, /<script type="module">/);
+  assert.match(PUBLIC_AI_HTML, /<script type="module" src="\/assets\/index-[A-Za-z0-9_-]+\.js"><\/script>/);
   assert.doesNotMatch(PUBLIC_AI_HTML, /\sstyle="/);
-  assert.ok(PUBLIC_AI_HTML.length < 1_000_000, 'documento entro 1 MB');
+  // Il documento porta solo il CSS: il JavaScript è in /assets, in cache permanente tra una visita e l'altra.
+  assert.ok(PUBLIC_AI_HTML.length < 200_000, 'documento entro 200 kB');
+  // Budget del modulo d'ingresso (prima 478 kB unico): le parti su richiesta restano fuori.
+  const entry = /src="\/(assets\/index-[A-Za-z0-9_-]+\.js)"/.exec(PUBLIC_AI_HTML)[1];
+  const size = fs.statSync(path.join(__dirname, '..', 'web-dist', entry)).size;
+  assert.ok(size < 380_000, `modulo d'ingresso ${size} byte`);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '..', 'web-dist', entry), 'utf8'), /control-title/);
 });

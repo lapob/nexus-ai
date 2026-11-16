@@ -22,7 +22,8 @@ const COMMON = Object.freeze({
 /** CSP del documento: solo script e stili con il nonce della risposta, nessuna origine esterna. */
 function webAppCsp(nonce) {
   return [
-    "default-src 'none'", `script-src 'nonce-${nonce}'`, "script-src-attr 'none'", `style-src 'nonce-${nonce}'`, "style-src-attr 'none'",
+    // 'strict-dynamic': il modulo d'ingresso con nonce può caricare i propri chunk di /assets (import statici e import()).
+    "default-src 'none'", `script-src 'nonce-${nonce}' 'strict-dynamic'`, "script-src-attr 'none'", `style-src 'nonce-${nonce}'`, "style-src-attr 'none'",
     "font-src 'self'", "img-src 'self' blob:", "connect-src 'self'", "worker-src 'self'", "manifest-src 'self'", "media-src 'self' blob:",
     "base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'", "object-src 'none'"
   ].join('; ');
@@ -38,19 +39,26 @@ function rawText(source, tag) {
 }
 
 /**
- * Sostituisce i riferimenti al bundle con il suo contenuto. Font e immagini restano
- * URL /assets/…: la CSP non ammette data: e così il documento resta leggero.
+ * Incorpora il CSS unico (primo disegno senza richieste) e lascia il modulo d'ingresso in /assets, con un
+ * nonce aggiunto da withNonce: i chunk su richiesta lo importano per URL, quindi deve avere un URL suo.
+ * Font e immagini restano URL /assets/…: la CSP non ammette data:.
  */
 function inlineWebApp(indexHtml, readAsset) {
   let scripts = 0;
+  let styles = 0;
   const html = String(indexHtml)
     .replace(/<link rel="modulepreload"[^>]*>/g, '')
-    .replace(/<link rel="stylesheet"[^>]*href="\/(assets\/[A-Za-z0-9._-]+\.css)"[^>]*>/g, (_, file) => `<style>${rawText(readAsset(file), 'style')}</style>`)
+    .replace(/<link rel="stylesheet"[^>]*href="\/(assets\/[A-Za-z0-9._-]+\.css)"[^>]*>/g, (_, file) => {
+      styles += 1;
+      return `<style>${rawText(readAsset(file), 'style')}</style>`;
+    })
     .replace(/<script type="module"[^>]*src="\/(assets\/[A-Za-z0-9._-]+\.js)"[^>]*><\/script>/g, (_, file) => {
       scripts += 1;
-      return `<script type="module">${rawText(readAsset(file), 'script')}</script>`;
+      readAsset(file); // Il modulo d'ingresso deve esistere nella build servita.
+      return `<script type="module" src="/${file}"></script>`;
     });
-  if (scripts !== 1 || /\s(?:src|href)="\/assets\/[^"]+\.(?:js|css)"/.test(html)) throw new Error('Build web non incorporabile: atteso un solo bundle JS e CSS.');
+  const stray = html.replace(/<script type="module" src="\/assets\/[A-Za-z0-9._-]+\.js"><\/script>/g, '');
+  if (scripts !== 1 || styles !== 1 || /\s(?:src|href)="\/assets\/[^"]+\.(?:js|css)"/.test(stray)) throw new Error('Build web non servibile: attesi un modulo d\'ingresso e un CSS.');
   return html;
 }
 

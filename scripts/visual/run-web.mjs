@@ -106,6 +106,9 @@ async function openPage(browser, origin, { width, height, theme = 'dark', state,
   await page.goto(`${origin}/`, { waitUntil: 'load' });
   await page.waitForSelector('canvas.core[data-backend]', { timeout: 20_000 });
   await page.evaluate(() => document.fonts.ready);
+  // I chunk dell'avvio (motion-features, press) arrivano in tempo reale, mentre l'orologio finto corre in pochi
+  // millisecondi: senza attesa lo scatto a volte precedeva le animazioni (conversazione 390 spostata di ~26 px).
+  await page.waitForLoadState('networkidle');
   return { context, page, errors };
 }
 
