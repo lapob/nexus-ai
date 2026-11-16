@@ -1,3 +1,25 @@
+# Visual regression: `?nxs-qa-time` now repeatable and the default — 16 November 2026 (source only, no deploy)
+
+- Closes the OPEN point below. There were two real-time causes in the script, not in the site:
+  - lazy images (`loading="lazy"`, `decoding="async"`) arrived after the
+    instant scroll and moved or blacked out the mockup;
+  - the browser `scroll` event arrived after the frozen frame, so the scene
+    sometimes stayed drawn at scroll 0.
+- Fix in `scripts/visual-regression.mjs`:
+  - all images are made eager and decoded before scrolling;
+  - the scroll dispatches `scroll` immediately and is repeated just before the
+    shot;
+  - `NXS_VISUAL_DIAG=1` prints the scene state per shot.
+- Default is now frozen clock + `?nxs-qa-time`; `--clock-only` is kept for
+  diagnosis.
+- Measured:
+  - qa-time: 5 consecutive runs, 20/20 at 0 px;
+  - clock-only: up to 70 px of grain (0.005%).
+- Baselines re-approved under the new mode (all 20 change: images loaded, scene
+  at the shot position).
+- `cloud:check` passes 49/49. No site source changed, so nothing needs
+  deploying.
+
 # Visual regression baselines — 15 November 2026 (source only, no deploy)
 
 - `npm run build && npm run qa:visual` serves `dist` locally with the network
