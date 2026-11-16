@@ -1,4 +1,4 @@
-## Neutral copy, guest hardening, desktop runtime — 16 November 2026 (in progress)
+## Neutral copy, guest hardening, desktop runtime — 16 November 2026 (published: server restarted, edge 5dcdb280)
 
 - Copy: user-visible text speaks of "server" and "dispositivo", never the owner's computer or personal details.
 - Gateway hardening:
@@ -28,11 +28,12 @@
   - tests: `tests/web-chunks.test.js`.
 - Checks: UI 39/39 (15/15 resolutions), visual web 24/24 and core 90/90, `npm test` 1341 pass with 0 fail.
 - Server restarted after a8950a8 (ready in 53 s); readyz 200; public 404s are neutral.
-- Next steps:
-  1. Commit, then the web build.
-  2. Coordinated Server restart (`maintenance.flag`).
-  3. Edge re-sync and promotion.
-  4. Live verification.
+- Published:
+  - the Server serves `index-Baqub-eQ.js`;
+  - edge 5dcdb280 is verified live (Online, 0 console errors);
+  - the desktop UI was reopened on the new Core runtime.
+- Next step: the shared versioned core and the reactive core, with the `?nxs-qa-time` hook in
+  `Core.tsx`/`core-render.ts`.
 
 ## Automatic visual regression (15 November 2026, source only)
 
