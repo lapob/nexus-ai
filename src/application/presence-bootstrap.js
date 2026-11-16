@@ -225,16 +225,25 @@ async function bootstrapPresence({ env = process.env } = {}) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     const closed = !processLockState(uiLockPath).running;
-    if (closed) manager?.setApplicationVisible?.(false);
+    if (closed) {
+      manager?.setApplicationVisible?.(false);
+      if (bridgeOnly) destroyTray();
+    }
     return { closed };
+  };
+  // Come Desktop Bridge l'icona segue la UI: c'è solo mentre NexusNXS è aperta.
+  // Chiusa l'app (X, tray o Control) sparisce anche dal tray; il ponte resta
+  // invisibile in background per NexusNXS Control e il ripristino del server.
+  const destroyTray = () => {
+    if (!tray) return;
+    try { tray.destroy?.(); } catch { /* Icona già rimossa dalla shell. */ }
+    tray = null;
+    logger.info('Icona tray rimossa: NexusNXS chiusa.');
   };
   const quitDesktop = async () => {
     await closeFullUi();
-    // Come Desktop Bridge questo processo serve a NexusNXS Control (app del PC, ripristino del server):
-    // «Esci» chiude l'app e toglie l'icona, ma il ponte resta attivo in background fino al prossimo accesso.
     if (bridgeOnly) {
-      tray?.destroy?.();
-      tray = null;
+      destroyTray();
       return;
     }
     app.quit();
@@ -385,17 +394,18 @@ async function bootstrapPresence({ env = process.env } = {}) {
     const italian = /^it(?:-|$)/i.test(String(app.getLocale?.() || ''));
     tray = new Tray(iconPath);
     tray.setToolTip('NexusNXS');
+    // In modalità bridge «Riduci al tray» non ha senso: chiudere la UI toglie anche l'icona.
     refreshTrayMenu = () => tray?.setContextMenu(Menu.buildFromTemplate([
       { label: italian ? 'Apri NexusNXS' : 'Open NexusNXS', click: activateFullUi },
-      { label: italian ? 'Riduci al tray' : 'Minimize to tray', click: closeFullUi },
+      ...(bridgeOnly ? [] : [{ label: italian ? 'Riduci al tray' : 'Minimize to tray', click: closeFullUi }]),
       { label: italian ? 'Domanda rapida' : 'Quick question', accelerator: 'CommandOrControl+Shift+Space', click: () => quickBar?.toggle() },
       { type: 'separator' },
-
       { label: italian ? 'Esci da NexusNXS' : 'Quit NexusNXS', click: quitDesktop }
     ]));
     refreshTrayMenu();
     tray.on('right-click', refreshTrayMenu);
     tray.on('click', activateFullUi);
+    logger.info('Icona tray mostrata.');
   };
   if (!bridgeOnly) ensureTray();
   // Barra rapida sopra qualsiasi programma: la domanda passa alla UI con un file monouso e la UI la invia.
@@ -415,6 +425,7 @@ async function bootstrapPresence({ env = process.env } = {}) {
     if (uiWasRunning && !state.running) manager.updateState?.(backgroundActivity);
     uiWasRunning = state.running;
     if (state.running) ensureTray();
+    else if (bridgeOnly) destroyTray();
     manager.setApplicationVisible?.(state.running);
   };
   syncVisibility();

@@ -3623,6 +3623,19 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
     - chiudi/apri Console, apri/chiudi Terminale con la Console aperta, chiudi Console: tutti confermati in 1,3–2,9 s;
     - nessuna finestra residua.
 - Da fare: un tocco reale dal telefono su Terminale e Console quando l'utente usa Control.
+## Tray NexusNXS: l'icona segue l'app (16 novembre 2026)
+
+- Problema: chiudendo NexusNXS (X, tray o Control) l'icona restava nel tray perché il Desktop Bridge la creava all'apertura della UI e non la toglieva più.
+- Correzione in `presence-bootstrap` (solo modalità bridge):
+  - l'icona esiste solo mentre la UI è aperta: chiusa la UI la rimuove `closeFullUi`, e `syncVisibility` la rimuove anche dopo la X;
+  - tolta la voce «Riduci al tray», ormai equivalente a chiudere.
+  - Il ponte resta invisibile in background per Control e per il ripristino del server, e il server dei modelli non viene toccato.
+  - Il log presence registra quando l'icona viene mostrata e quando viene rimossa.
+- Operazione: riavviato solo il task «NexusNXS Desktop Bridge»; il server (S4U) è rimasto attivo con lo stesso PID.
+- Verifiche:
+  - test presence 38/38; `npm test` 1337 pass, 0 fail;
+  - dal vivo: apri/chiudi da bridge (Control) e chiusura con la X della finestra; ogni volta l'icona viene mostrata e poi rimossa.
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
