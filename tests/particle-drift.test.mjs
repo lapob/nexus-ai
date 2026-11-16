@@ -118,3 +118,22 @@ test('fast strokes affect grains between samples, not distant grains', () => {
   assert.equal(strokeDistance(50, 200, 0, 0, 100, 0), 200);
   assert.equal(strokeDistance(3, 4, 0, 0, 0, 0), 5);
 });
+
+test('the site breathes with the shared, versioned NexusNXS core (vendored copy is intact and current)', async () => {
+  const { createHash } = await import('node:crypto');
+  const { existsSync, readFileSync } = await import('node:fs');
+  const vendored = readFileSync(new URL('../app/components/nexus-core.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const [, version, digest] = /^\/\/ Generated[^\n]*\n\/\/ nexus-core (\d+\.\d+\.\d+) sha256:([0-9a-f]{64})\n/.exec(vendored) ?? [];
+  assert.ok(version && digest, 'versioned header');
+  const body = vendored.slice(vendored.indexOf('\n', vendored.indexOf('sha256:')) + 1);
+  assert.equal(createHash('sha256').update(body).digest('hex'), digest, 'vendored core edited by hand');
+  assert.match(body, new RegExp(`NEXUS_CORE_VERSION = '${version.replace(/\./g, '\\.')}'`));
+  const canonical = new URL('../../.AI/web/src/nexus-core.ts', import.meta.url);
+  if (existsSync(canonical)) assert.equal(body, readFileSync(canonical, 'utf8').replace(/\r\n/g, '\n'), 'run node scripts/sync-nexus-core.mjs');
+  const { qaTime } = await import('../app/components/nexus-core.ts');
+  assert.equal(qaTime('?nxs-qa-time=2'), 2);
+  assert.equal(qaTime('?nxs-still'), 0);
+  assert.ok(coreBreath(CORE_BREATH_PERIOD * .6, 0) > .99);
+  assert.equal(typeof breatheCorePoint, 'function');
+  assert.ok(coreZoom(0) > .9);
+});

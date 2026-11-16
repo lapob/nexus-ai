@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { advanceSand, breatheCorePoint, chapterChoreo, coreBreath, coreZoom, horizonPoint, streamPoint, strokeDistance, vortexFlight } from "./particle-drift";
+import { qaTime } from "./nexus-core";
 
 type MotionTier = "lite" | "balanced" | "ultra";
 
@@ -98,10 +99,11 @@ export function SiteMotionRuntime() {
     // Visual regression: ?nxs-still[=seconds] / ?nxs-qa-time=<seconds> (or html[data-nxs-still])
     // renders one fixed, deterministic state: seeded field, entrance complete, clock frozen,
     // CSS motion off; the canvas gets data-qa="ready" once that frame is painted.
-    const query = new URLSearchParams(window.location.search);
-    const stillValue = query.get("nxs-qa-time") ?? query.get("nxs-still") ?? root.dataset.nxsStill;
-    const still = stillValue != null;
-    const stillTime = Math.max(0, Number(stillValue) || 0);
+    // Same hook, same parsing as the AI app (shared core `qaTime`).
+    const datasetStill = root.dataset.nxsStill;
+    const qa = qaTime(window.location.search) ?? (datasetStill != null ? qaTime(`?nxs-still=${encodeURIComponent(datasetStill)}`) ?? 0 : null);
+    const still = qa != null;
+    const stillTime = qa ?? 0;
     if (still) root.classList.add("nxs-still");
     const calm = () => still || reducedMotion.matches;
     let scrollFrame = 0;
