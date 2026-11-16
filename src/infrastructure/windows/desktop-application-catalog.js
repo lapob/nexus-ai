@@ -13,17 +13,83 @@ const SUPREMO_WINDOW_ACTIONS = new Set(['status', 'open', 'close']);
 const SUPREMO_OPEN_TASK = 'NexusNXS Open Supremo';
 const SUPREMO_CLOSE_TASK = 'NexusNXS Close Supremo';
 let supremoRequestedVisible = false;
+/** Titolo fisso della finestra dedicata (scripts/open-server-console.ps1): distingue la console dal Terminale. */
+const SERVER_CONSOLE_TITLE = 'NexusNXS Server Console';
 const FOREGROUND_WINDOW_SCRIPT = String.raw`
 $ErrorActionPreference='Stop'
-$signature='[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);'
-Add-Type -MemberDefinition $signature -Name ForegroundWindow -Namespace NexusNXS -ErrorAction SilentlyContinue
-$handle=[NexusNXS.ForegroundWindow]::GetForegroundWindow()
+$signature='[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId); [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);'
+Add-Type -MemberDefinition $signature -Name ForegroundWindowText -Namespace NexusNXS -ErrorAction SilentlyContinue
+$handle=[NexusNXS.ForegroundWindowText]::GetForegroundWindow()
 $processIdValue=[uint32]0
-if ($handle -eq [IntPtr]::Zero) { @{process=''}|ConvertTo-Json -Compress; exit 0 }
-[void][NexusNXS.ForegroundWindow]::GetWindowThreadProcessId($handle,[ref]$processIdValue)
+if ($handle -eq [IntPtr]::Zero) { @{process='';title=''}|ConvertTo-Json -Compress; exit 0 }
+[void][NexusNXS.ForegroundWindowText]::GetWindowThreadProcessId($handle,[ref]$processIdValue)
+$text=New-Object System.Text.StringBuilder 256
+[void][NexusNXS.ForegroundWindowText]::GetWindowText($handle,$text,256)
 $process=Get-Process -Id $processIdValue -ErrorAction SilentlyContinue
-@{process=if($process){$process.ProcessName}else{''}}|ConvertTo-Json -Compress
+@{process=if($process){$process.ProcessName}else{''};title=$text.ToString()}|ConvertTo-Json -Compress
 `;
+// Finestre di primo livello: elenco dei processi con finestra (la console dedicata non conta come Terminale),
+// chiusura ordinata (WM_CLOSE) delle sole finestre console o delle sole finestre Terminale, focus della console.
+const TOP_WINDOWS_SCRIPT = String.raw`
+$ErrorActionPreference='Stop'
+function Get-TopWindows {
+  Add-Type -Namespace NexusNXS -Name TopWindows -ErrorAction SilentlyContinue -MemberDefinition @'
+[DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback, IntPtr lParam);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
+[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
+[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
+public static System.Collections.Generic.List<string> List() {
+  var rows = new System.Collections.Generic.List<string>();
+  EnumWindows((hWnd, lParam) => {
+    if (!IsWindowVisible(hWnd)) return true;
+    var text = new System.Text.StringBuilder(256);
+    GetWindowText(hWnd, text, text.Capacity);
+    if (text.Length == 0) return true;
+    uint processId; GetWindowThreadProcessId(hWnd, out processId);
+    rows.Add(hWnd.ToInt64() + "|" + processId + "|" + text);
+    return true;
+  }, IntPtr.Zero);
+  return rows;
+}
+'@
+  $names = @{}
+  Get-Process -ErrorAction SilentlyContinue | ForEach-Object { $names[[uint32]$_.Id] = $_.ProcessName }
+  foreach ($row in [NexusNXS.TopWindows]::List()) {
+    $parts = $row -split '\|', 3
+    [pscustomobject]@{ Handle = [IntPtr][long]$parts[0]; Name = [string]$names[[uint32]$parts[1]]; Console = ($parts[2] -eq $title) }
+  }
+}
+if ($action -eq 'list') {
+  $visible = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.ProcessName -ne 'WindowsTerminal' } | Select-Object -ExpandProperty ProcessName)
+  if (Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue) {
+    if (@(Get-TopWindows | Where-Object { $_.Name -eq 'WindowsTerminal' -and -not $_.Console }).Count) { $visible += 'WindowsTerminal' }
+  }
+  ConvertTo-Json -Compress -InputObject @($visible)
+  exit 0
+}
+$windows = @(Get-TopWindows)
+if ($action -eq 'focus-console') {
+  $target = $windows | Where-Object Console | Select-Object -First 1
+  if ($target) {
+    # Un tasto Alt sintetico autorizza il cambio di primo piano richiesto da un processo in background.
+    [NexusNXS.TopWindows]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [NexusNXS.TopWindows]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+    [void][NexusNXS.TopWindows]::ShowWindow($target.Handle, 9)
+    [void][NexusNXS.TopWindows]::SetForegroundWindow($target.Handle)
+  }
+  @{ found = [bool]$target } | ConvertTo-Json -Compress
+  exit 0
+}
+$targets = if ($action -eq 'close-console') { $windows | Where-Object Console } else { $windows | Where-Object { $_.Name -eq 'WindowsTerminal' -and -not $_.Console } }
+$count = 0
+foreach ($target in @($targets)) { if ([NexusNXS.TopWindows]::PostMessage($target.Handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)) { $count += 1 } }
+@{ closed = $count } | ConvertTo-Json -Compress
+`;
+const TOP_WINDOW_ACTIONS = new Set(['list', 'focus-console', 'close-console', 'close-terminal']);
 const SUPREMO_WINDOW_SCRIPT = String.raw`
 $ErrorActionPreference='Stop'
 $signature='[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd,int nCmdShow); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);'
@@ -59,7 +125,7 @@ const APPLICATION_BY_ID = new Map(DESKTOP_APPLICATIONS.map((entry) => [entry.id,
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 const CONSOLE_PROCESSES = new Set(['pwsh.exe', 'powershell.exe']);
 
-function serverConsoleOpener() { return path.join(PROJECT_ROOT, 'scripts', 'open-server-console.ps1'); }
+function serverConsoleScript() { return path.join(PROJECT_ROOT, 'scripts', 'server-console.ps1'); }
 
 function serverConsolePidPath(env = process.env) {
   const root = String(env.NEXUS_SHARED_DATA_ROOT || '');
@@ -114,8 +180,46 @@ function executableCandidates(id, env = process.env) {
   return [];
 }
 
-function resolveExecutable(id, { env = process.env, exists = fs.existsSync } = {}) {
-  if (id === 'server-console' && !exists(serverConsoleOpener())) return '';
+/**
+ * Esiste? Gli alias d'esecuzione delle app (WindowsApps\wt.exe, notepad.exe) sono reparse point a 0 byte:
+ * fs.existsSync li segue, riceve EACCES e risponde false. Senza lstat il Terminale ripiegava su un pwsh
+ * lanciato senza console, che si chiudeva subito senza mostrare nulla.
+ */
+function pathExists(candidate) {
+  if (fs.existsSync(candidate)) return true;
+  try { fs.lstatSync(candidate); return true; } catch { return false; }
+}
+
+async function controlTopWindows(action, { env = process.env, execute = execFileAsync } = {}) {
+  if (!TOP_WINDOW_ACTIONS.has(action)) throw Object.assign(new Error('Azione finestra non consentita.'), { code: 'DESKTOP_APP_NOT_ALLOWED' });
+  const powershell = path.join(String(env.WINDIR || 'C:\\Windows'), 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  const command = `$action='${action}'\n$title='${SERVER_CONSOLE_TITLE}'\n${TOP_WINDOWS_SCRIPT}`;
+  const { stdout = '' } = await execute(powershell, [
+    '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command
+  ], { windowsHide: true, timeout: 6_000, encoding: 'utf8', maxBuffer: 256 * 1024 });
+  return String(stdout).trim().split(/\r?\n/).filter(Boolean).at(-1) || '';
+}
+
+/** La console è aperta se il PID che ha scritto appartiene ancora a un PowerShell (niente PID riciclati). */
+async function serverConsoleProcess({ env = process.env, readFile, listProcesses = execFileAsync } = {}) {
+  const pid = readServerConsolePid(env, readFile);
+  if (!pid) return 0;
+  try {
+    const { stdout = '' } = await listProcesses('tasklist.exe', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
+      windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 64 * 1024
+    });
+    return CONSOLE_PROCESSES.has(parseTaskListPids(stdout).get(pid) || '') ? pid : 0;
+  } catch { return 0; }
+}
+
+function resolveExecutable(id, { env = process.env, exists = pathExists } = {}) {
+  if (id === 'server-console') {
+    // Serve lo script della console con PowerShell 7; la finestra dedicata usa Windows Terminal se presente.
+    const pwsh = executableCandidates(id, env)[0];
+    if (!exists(serverConsoleScript()) || !exists(pwsh)) return '';
+    const terminal = path.join(String(env.LOCALAPPDATA || ''), 'Microsoft', 'WindowsApps', 'wt.exe');
+    return env.LOCALAPPDATA && exists(terminal) ? terminal : pwsh;
+  }
   return executableCandidates(id, env).find((candidate) => candidate && exists(candidate)) || '';
 }
 
@@ -210,13 +314,9 @@ function parseVisibleProcessNames(value) {
     .map((name) => name.endsWith('.exe') ? name : `${name}.exe`));
 }
 
+/** Processi con una finestra visibile; Windows Terminal conta solo con una finestra diversa dalla console del server. */
 async function visibleWindowProcessNames({ env = process.env, execute = execFileAsync } = {}) {
-  const powershell = path.join(String(env.WINDIR || 'C:\\Windows'), 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-  const command = "@(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -ExpandProperty ProcessName) | ConvertTo-Json -Compress";
-  const { stdout = '' } = await execute(powershell, [
-    '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command
-  ], { windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 256 * 1024 });
-  return parseVisibleProcessNames(stdout);
+  return parseVisibleProcessNames(await controlTopWindows('list', { env, execute }));
 }
 
 async function foregroundDesktopApplication({ platform = process.platform, env = process.env, execute = execFileAsync } = {}) {
@@ -227,7 +327,9 @@ async function foregroundDesktopApplication({ platform = process.platform, env =
       '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', FOREGROUND_WINDOW_SCRIPT
     ], { windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 64 * 1024 });
     const line = String(stdout).trim().split(/\r?\n/).filter(Boolean).at(-1) || '{}';
-    const processName = String(JSON.parse(line)?.process || '').trim().toLowerCase();
+    const foreground = JSON.parse(line) || {};
+    if (String(foreground.title || '') === SERVER_CONSOLE_TITLE) return Object.freeze({ id: 'server-console', label: 'Console server' });
+    const processName = String(foreground.process || '').trim().toLowerCase();
     if (!processName) return null;
     const executable = processName.endsWith('.exe') ? processName : `${processName}.exe`;
     const application = DESKTOP_APPLICATIONS.find((entry) => entry.processes.some((name) => name.toLowerCase() === executable));
@@ -275,7 +377,43 @@ async function desktopApplicationStatus({ platform = process.platform, listProce
   }));
 }
 
-async function openDesktopApplication(id, { platform = process.platform, env = process.env, exists, spawnProcess = spawn, supremoWindow = controlSupremoWindow, supremoOpen = openSupremoPrivileged } = {}) {
+/** Ambiente della console: le variabili del task portatile servono al server e al bridge, non alla finestra. */
+function consoleEnvironment(env) {
+  const clean = { ...env };
+  for (const name of ['NEXUS_DESKTOP_BRIDGE_ONLY', 'NEXUS_WINDOWS_NONINTERACTIVE', 'NO_COLOR']) delete clean[name];
+  return clean;
+}
+
+/**
+ * Argomenti di avvio. Un programma console lanciato `detached` (DETACHED_PROCESS) non riceve alcuna finestra:
+ * pwsh e powershell passano quindi da `cmd /c start`, che crea una console nuova e visibile.
+ */
+function launchPlan(id, executable, env) {
+  const fileName = path.basename(executable).toLowerCase();
+  const consoleHost = CONSOLE_PROCESSES.has(fileName);
+  const windowsTerminal = fileName === 'wt.exe';
+  let args = id === 'brave' ? ['--new-window'] : [];
+  if (id === 'server-console') {
+    const pwsh = executableCandidates('server-console', env)[0];
+    const consoleArgs = [pwsh, '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(PROJECT_ROOT, 'scripts', 'server-console.ps1'), '-Color'];
+    args = windowsTerminal
+      ? ['-w', 'new', '--size', '132,44', 'new-tab', '--title', SERVER_CONSOLE_TITLE, '--suppressApplicationTitle', '--tabColor', '#0E111A', ...consoleArgs]
+      : consoleArgs.slice(1);
+  }
+  if (!consoleHost) return { file: executable, args, env: id === 'server-console' ? consoleEnvironment(env) : env };
+  const quote = (value) => /[\s"]/.test(value) ? `"${String(value).replace(/"/g, '\\"')}"` : value;
+  const comspec = path.join(String(env.WINDIR || 'C:\\Windows'), 'System32', 'cmd.exe');
+  const title = id === 'server-console' ? SERVER_CONSOLE_TITLE : 'Terminale';
+  return {
+    file: comspec,
+    // Il titolo esplicito impedisce a start di scambiare l'eseguibile quotato per il titolo della finestra.
+    args: ['/d', '/s', '/c', `"start "${title}" "${executable}"${args.length ? ` ${args.map(quote).join(' ')}` : ''}"`],
+    env: id === 'server-console' ? consoleEnvironment(env) : env,
+    verbatim: true
+  };
+}
+
+async function openDesktopApplication(id, { platform = process.platform, env = process.env, exists, spawnProcess = spawn, supremoWindow = controlSupremoWindow, supremoOpen = openSupremoPrivileged, topWindows = controlTopWindows, consoleProcess = serverConsoleProcess, readFile } = {}) {
   const application = APPLICATION_BY_ID.get(String(id || ''));
   if (!application) throw Object.assign(new Error('Applicazione non consentita.'), { code: 'DESKTOP_APP_NOT_ALLOWED' });
   if (platform !== 'win32') throw Object.assign(new Error('Applicazione disponibile solo su Windows.'), { code: 'DESKTOP_APP_UNSUPPORTED' });
@@ -296,14 +434,18 @@ async function openDesktopApplication(id, { platform = process.platform, env = p
   }
   const executable = resolveExecutable(application.id, { env, exists });
   if (!executable) throw Object.assign(new Error('Applicazione non installata.'), { code: 'DESKTOP_APP_UNAVAILABLE' });
-  const serverConsole = application.id === 'server-console';
-  // Console: l'opener (nascosto) apre la finestra dedicata in primo piano o riporta davanti quella già aperta.
-  const args = application.id === 'brave' ? ['--new-window']
-    : serverConsole ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', serverConsoleOpener(), '-Normal'] : [];
+  if (application.id === 'server-console' && await consoleProcess({ env, readFile })) {
+    // Già aperta: una sola istanza, riportata in primo piano.
+    try { await topWindows('focus-console', { env }); } catch {}
+    return Object.freeze({ id: application.id, launched: false, focused: true });
+  }
+  const plan = launchPlan(application.id, executable, env);
   await new Promise((resolve, reject) => {
-    // windowsHide viene usato per i processi tecnici, non per una UI richiesta
-    // esplicitamente: su Chromium può creare un processo senza finestra visibile.
-    const child = spawnProcess(executable, args, { detached: true, stdio: 'ignore', windowsHide: serverConsole });
+    // windowsHide solo per il cmd di passaggio: su Chromium crea un processo senza finestra visibile.
+    const child = spawnProcess(plan.file, plan.args, {
+      detached: true, stdio: 'ignore', windowsHide: Boolean(plan.verbatim), env: plan.env,
+      ...(plan.verbatim ? { windowsVerbatimArguments: true } : {})
+    });
     child.once('spawn', resolve);
     child.once('error', reject);
     child.unref?.();
@@ -312,7 +454,7 @@ async function openDesktopApplication(id, { platform = process.platform, env = p
   return Object.freeze({ id: application.id, launched: true });
 }
 
-async function closeDesktopApplication(id, { platform = process.platform, env = process.env, terminateProcess = execFileAsync, listProcesses = execFileAsync, supremoClose = closeSupremoPrivileged, readFile } = {}) {
+async function closeDesktopApplication(id, { platform = process.platform, env = process.env, terminateProcess = execFileAsync, listProcesses = execFileAsync, supremoClose = closeSupremoPrivileged, readFile, topWindows = controlTopWindows, consoleProcess = serverConsoleProcess, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
   const application = APPLICATION_BY_ID.get(String(id || ''));
   if (!application) throw Object.assign(new Error('Applicazione non consentita.'), { code: 'DESKTOP_APP_NOT_ALLOWED' });
   if (platform !== 'win32') throw Object.assign(new Error('Applicazione disponibile solo su Windows.'), { code: 'DESKTOP_APP_UNSUPPORTED' });
@@ -337,20 +479,27 @@ async function closeDesktopApplication(id, { platform = process.platform, env = 
     return Object.freeze({ id: application.id, closed: true, alreadyClosed: false });
   }
   if (application.id === 'server-console') {
-    // Solo il PID scritto dalla console, e solo se è ancora un PowerShell: mai il server né altri terminali.
-    const pid = readServerConsolePid(env, readFile);
-    let image = '';
-    if (pid) {
-      try {
-        const { stdout = '' } = await listProcesses('tasklist.exe', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
-          windowsHide: true, timeout: 2_000, encoding: 'utf8', maxBuffer: 64 * 1024
-        });
-        image = parseTaskListPids(stdout).get(pid) || '';
-      } catch {}
+    // Prima la finestra (WM_CLOSE: Terminal chiude la scheda e la console esce), poi, solo se serve, il PID
+    // scritto dalla console e solo se è ancora un PowerShell: mai il server né altri terminali. Uccidere
+    // soltanto il PID lasciava aperta in Terminal una scheda morta con lo stesso titolo.
+    const pid = await consoleProcess({ env, readFile, listProcesses });
+    if (!pid) {
+      try { await topWindows('close-console', { env }); } catch {}
+      return Object.freeze({ id: application.id, closed: false, alreadyClosed: true });
     }
-    if (!CONSOLE_PROCESSES.has(image)) return Object.freeze({ id: application.id, closed: false, alreadyClosed: true });
-    await terminateProcess('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, timeout: 5_000, encoding: 'utf8' });
+    try { await topWindows('close-console', { env }); } catch {}
+    for (let attempt = 0; attempt < 20 && await consoleProcess({ env, readFile, listProcesses }); attempt += 1) await wait(150);
+    if (await consoleProcess({ env, readFile, listProcesses })) {
+      await terminateProcess('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, timeout: 5_000, encoding: 'utf8' });
+      try { await topWindows('close-console', { env }); } catch {}
+    }
     return Object.freeze({ id: application.id, closed: true, alreadyClosed: false });
+  }
+  if (application.id === 'terminal' && await consoleProcess({ env, readFile, listProcesses })) {
+    // Windows Terminal è un solo processo per tutte le finestre: con la console del server aperta si chiudono
+    // soltanto le altre finestre, mai il processo (che chiuderebbe anche la console).
+    const state = JSON.parse(await topWindows('close-terminal', { env }) || '{}');
+    return Object.freeze({ id: application.id, closed: Number(state.closed) > 0, alreadyClosed: !(Number(state.closed) > 0) });
   }
   let matched = false;
   const processNames = [...new Set(application.processes.map((name) => name.toLowerCase()))];
@@ -380,7 +529,12 @@ async function closeDesktopApplication(id, { platform = process.platform, env = 
 
 module.exports = {
   DESKTOP_APPLICATIONS,
+  SERVER_CONSOLE_TITLE,
   closeDesktopApplication,
+  controlTopWindows,
+  launchPlan,
+  pathExists,
+  serverConsoleProcess,
   closeSupremoPrivileged,
   controlSupremoWindow,
   desktopApplicationStatus,

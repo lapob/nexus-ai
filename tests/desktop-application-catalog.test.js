@@ -15,6 +15,7 @@ const {
   foregroundDesktopApplication,
   parseVisibleProcessNames,
   parseTaskList,
+  launchPlan,
   resolveExecutable
 } = require('../src/infrastructure/windows/desktop-application-catalog');
 
@@ -239,32 +240,94 @@ test('console del server: aperta solo dal PID scritto da lei, apertura in primo 
   assert.equal((await status('"notepad.exe","4242","Console","1","9.000 K"')).open, false);
   assert.equal((await status('"pwsh.exe","4242","Console","1","90.000 K"', '')).open, false);
 
+  // Apertura: finestra dedicata in Windows Terminal, lanciata direttamente (niente opener staccato e invisibile),
+  // senza le variabili del task portatile.
   const launched = [];
+  const spawnProcess = (file, args, options) => {
+    launched.push({ file, args, options });
+    return { once: (name, done) => { if (name === 'spawn') queueMicrotask(done); }, unref() {} };
+  };
+  const terminalEnv = { ...env, LOCALAPPDATA: 'C:\\Local', NEXUS_DESKTOP_BRIDGE_ONLY: '1', NEXUS_WINDOWS_NONINTERACTIVE: '0' };
   await openDesktopApplication('server-console', {
-    platform: 'win32', env, exists: () => true,
-    spawnProcess: (file, args, options) => {
-      launched.push({ file, args, options });
-      return { once: (name, done) => { if (name === 'spawn') queueMicrotask(done); }, unref() {} };
-    }
+    platform: 'win32', env: terminalEnv, exists: () => true, spawnProcess, consoleProcess: async () => 0
   });
-  assert.equal(launched[0].file, 'C:\\Programs\\PowerShell\\7\\pwsh.exe');
-  assert.match(launched[0].args.join(' '), /-File \S+open-server-console\.ps1 -Normal$/);
-  assert.equal(launched[0].options.windowsHide, true);
+  assert.equal(launched[0].file, 'C:\\Local\\Microsoft\\WindowsApps\\wt.exe');
+  assert.match(launched[0].args.join(' '), /--title NexusNXS Server Console .*C:\\Programs\\PowerShell\\7\\pwsh\.exe .*-File \S+server-console\.ps1 -Color$/);
+  assert.equal(launched[0].options.detached, true);
+  assert.equal(launched[0].options.windowsHide, false);
+  assert.equal(launched[0].options.env.NEXUS_DESKTOP_BRIDGE_ONLY, undefined);
+  assert.equal(launched[0].options.env.NEXUS_WINDOWS_NONINTERACTIVE, undefined);
+  // Senza Windows Terminal: PowerShell 7 in una console nuova e visibile tramite cmd /c start.
+  await openDesktopApplication('server-console', {
+    platform: 'win32', env: terminalEnv, exists: (file) => !file.endsWith('wt.exe'), spawnProcess, consoleProcess: async () => 0
+  });
+  assert.equal(launched[1].file, 'C:\\Windows\\System32\\cmd.exe');
+  assert.match(launched[1].args.at(-1), /^"start "NexusNXS Server Console" "C:\\Programs\\PowerShell\\7\\pwsh\.exe" .*server-console\.ps1 -Color"$/);
+  assert.equal(launched[1].options.windowsVerbatimArguments, true);
+  // Già aperta: nessuna seconda istanza, la finestra torna in primo piano.
+  const focus = [];
+  const focused = await openDesktopApplication('server-console', {
+    platform: 'win32', env: terminalEnv, exists: () => true, spawnProcess,
+    consoleProcess: async () => 4242, topWindows: async (action) => { focus.push(action); return '{"found":true}'; }
+  });
+  assert.equal(focused.focused, true);
+  assert.deepEqual(focus, ['focus-console']);
+  assert.equal(launched.length, 2);
 
+  // Chiusura: prima la finestra (WM_CLOSE), il PID forzato solo se la console non esce.
+  const windows = [];
   const calls = [];
+  let alive = true;
   const closed = await closeDesktopApplication('server-console', {
-    platform: 'win32', env, readFile: () => '4242',
-    listProcesses: async (file, args) => { assert.deepEqual(args.slice(0, 2), ['/FI', 'PID eq 4242']); return { stdout: '"pwsh.exe","4242","Console","1","90.000 K"' }; },
+    platform: 'win32', env, wait: async () => {},
+    consoleProcess: async () => alive ? 4242 : 0,
+    topWindows: async (action) => { windows.push(action); alive = false; return '{"closed":1}'; },
     terminateProcess: async (file, args) => calls.push([file, args])
   });
   assert.equal(closed.closed, true);
+  assert.deepEqual(windows, ['close-console']);
+  assert.deepEqual(calls, []);
+  const forced = await closeDesktopApplication('server-console', {
+    platform: 'win32', env, wait: async () => {},
+    consoleProcess: async () => 4242,
+    topWindows: async () => '{"closed":0}',
+    terminateProcess: async (file, args) => calls.push([file, args])
+  });
+  assert.equal(forced.closed, true);
   assert.deepEqual(calls, [['taskkill.exe', ['/PID', '4242', '/T', '/F']]]);
   const refused = await closeDesktopApplication('server-console', {
     platform: 'win32', env, readFile: () => '4242',
-    listProcesses: async () => ({ stdout: '"electron.exe","4242","Console","1","90.000 K"' }),
+    listProcesses: async (file, args) => { assert.deepEqual(args.slice(0, 2), ['/FI', 'PID eq 4242']); return { stdout: '"electron.exe","4242","Console","1","90.000 K"' }; },
+    topWindows: async () => '{"closed":0}',
     terminateProcess: async () => { throw new Error('non deve terminare un processo non console'); }
   });
   assert.equal(refused.alreadyClosed, true);
+});
+
+test('Terminale: alias WindowsApps riconosciuto, fallback console visibile, chiusura che risparmia la console del server', async () => {
+  const env = { LOCALAPPDATA: 'C:\\Local', ProgramFiles: 'C:\\Programs', WINDIR: 'C:\\Windows' };
+  // L'alias wt.exe è un reparse point: deve contare come installato.
+  assert.equal(resolveExecutable('terminal', { env, exists: () => true }), 'C:\\Local\\Microsoft\\WindowsApps\\wt.exe');
+  const plan = launchPlan('terminal', 'C:\\Programs\\PowerShell\\7\\pwsh.exe', env);
+  assert.equal(plan.file, 'C:\\Windows\\System32\\cmd.exe');
+  assert.deepEqual(plan.args.slice(0, 3), ['/d', '/s', '/c']);
+  assert.equal(plan.args[3], '"start "Terminale" "C:\\Programs\\PowerShell\\7\\pwsh.exe""');
+  assert.deepEqual(launchPlan('terminal', 'C:\\Local\\Microsoft\\WindowsApps\\wt.exe', env).args, []);
+
+  const windows = [];
+  const closed = await closeDesktopApplication('terminal', {
+    platform: 'win32', env, consoleProcess: async () => 4242,
+    topWindows: async (action) => { windows.push(action); return '{"closed":2}'; },
+    terminateProcess: async () => { throw new Error('con la console aperta non si termina Windows Terminal'); }
+  });
+  assert.deepEqual(windows, ['close-terminal']);
+  assert.equal(closed.closed, true);
+  const kills = [];
+  await closeDesktopApplication('terminal', {
+    platform: 'win32', env, consoleProcess: async () => 0,
+    terminateProcess: async (file, args) => { kills.push(args[1]); }
+  });
+  assert.deepEqual(kills, ['windowsterminal.exe', 'wt.exe']);
 });
 
 test('i launcher giochi sono rimossi: nessun eseguibile fuori catalogo e nessun comando remoto', () => {

@@ -27,6 +27,8 @@ const UI_LOCK = 'desktop-ui.lock';
 const AMBIENT_UI_LOCK = 'ambient-voice-ui.lock';
 const CLAUDE_WINDOWS_APP_ID = 'Claude_pzs8sxrjxfjjc!Claude';
 const execFileAsync = promisify(execFile);
+/** Attesa massima della conferma di apertura/chiusura di un'app (entro il timeout di 12 s del bridge). */
+const APPLICATION_TRANSITION_TIMEOUT_MS = 8_000;
 
 // #region 01 — Contratto presenza
 
@@ -228,6 +230,13 @@ async function bootstrapPresence({ env = process.env } = {}) {
   };
   const quitDesktop = async () => {
     await closeFullUi();
+    // Come Desktop Bridge questo processo serve a NexusNXS Control (app del PC, ripristino del server):
+    // «Esci» chiude l'app e toglie l'icona, ma il ponte resta attivo in background fino al prossimo accesso.
+    if (bridgeOnly) {
+      tray?.destroy?.();
+      tray = null;
+      return;
+    }
     app.quit();
   };
   const shutdown = async () => {
@@ -332,24 +341,23 @@ async function bootstrapPresence({ env = process.env } = {}) {
         if (claudeOpen) throw Object.assign(new Error('Claude non si e chiusa in tempo.'), { code: 'CLAUDE_STOP_TIMEOUT' });
         return;
       }
-      if (command.action === 'open-application') {
-        await openDesktopApplication(command.applicationId, { env });
-        const deadline = Date.now() + 3_000;
+      if (command.action === 'open-application' || command.action === 'close-application') {
+        // Conferma sullo stato reale: prima un avvio fallito tornava a Control come successo dopo 3 s.
+        const expectedOpen = command.action === 'open-application';
+        if (expectedOpen) await openDesktopApplication(command.applicationId, { env });
+        else await closeDesktopApplication(command.applicationId, { env });
+        const deadline = Date.now() + APPLICATION_TRANSITION_TIMEOUT_MS;
+        let confirmed = false;
         do {
           applications = await desktopApplicationStatus({ env });
-          if (applications.some((entry) => entry.id === command.applicationId && entry.open)) break;
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          confirmed = applications.some((entry) => entry.id === command.applicationId && entry.open === expectedOpen);
+          if (confirmed) break;
+          await new Promise((resolve) => setTimeout(resolve, 150));
         } while (Date.now() < deadline);
-        return;
-      }
-      if (command.action === 'close-application') {
-        await closeDesktopApplication(command.applicationId, { env });
-        const deadline = Date.now() + 3_000;
-        do {
-          applications = await desktopApplicationStatus({ env });
-          if (applications.some((entry) => entry.id === command.applicationId && !entry.open)) break;
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        } while (Date.now() < deadline);
+        if (!confirmed) {
+          throw Object.assign(new Error(expectedOpen ? 'Applicazione non avviata in tempo.' : 'Applicazione non chiusa in tempo.'),
+            { code: expectedOpen ? 'DESKTOP_APP_START_TIMEOUT' : 'DESKTOP_APP_STOP_TIMEOUT' });
+        }
         return;
       }
       throw Object.assign(new Error('Azione Presence non consentita.'), { code: 'PRESENCE_ACTION_NOT_ALLOWED' });

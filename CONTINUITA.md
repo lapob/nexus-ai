@@ -3594,6 +3594,35 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 - Earlier the same day: the leftover `.AI-release-0342` folder was deleted.
 - Next: installed desktops update themselves to 0.3.43. Also observe the first real update, with its toast and the
   boot-health check.
+## Control: Terminale e Console server riparati (16 novembre 2026)
+
+- Cause osservate sul PC:
+  - Terminale: Node non vede l'alias `WindowsApps\wt.exe`, un reparse point che risponde EACCES a `existsSync`.
+    - Il catalogo ripiegava su `pwsh.exe` lanciato staccato e senza console, che usciva subito senza finestra.
+    - Il bridge rispondeva comunque OK dopo 3 s.
+  - Console server: l'opener lanciato staccato usciva senza aprire nulla.
+    - La chiusura uccideva solo il PID e lasciava in Terminal una scheda morta con lo stesso titolo.
+    - Chiudere il Terminale (`taskkill WindowsTerminal.exe`) chiudeva anche la Console.
+  - Tray: «Esci da NexusNXS» terminava il Desktop Bridge.
+    - Control perdeva così le app del PC e il ripristino del server fino all'accesso successivo.
+- Correzioni:
+  - `desktop-application-catalog`:
+    - `pathExists` (lstat) riconosce gli alias delle app;
+    - pwsh/powershell di riserva partono via `cmd /c start`, in una console visibile;
+    - la Console si apre direttamente con `wt` (titolo fisso, ambiente pulito), oppure torna in primo piano se è già aperta;
+    - la Console si chiude con WM_CLOSE sulla sua finestra; il PID forzato resta come riserva;
+    - con la Console aperta, Terminale chiude solo le altre finestre di Windows Terminal;
+    - il primo piano riconosce la Console dal titolo.
+  - `presence-bootstrap`:
+    - apertura e chiusura confermate sullo stato reale entro 8 s, altrimenti un errore esplicito a Control;
+    - in modalità bridge «Esci» chiude l'app e l'icona, ma il ponte resta attivo.
+  - Control 1.29.1 (versionCode 58): tocco sulla Console = apri/chiudi, come per le altre app. Installato via ADB.
+- Verifiche:
+  - test: catalogo, contratto, headless, bridge, lifecycle e gateway 142/142; `npm test` 1337 pass, 0 fail;
+  - dal vivo, sul bridge riavviato (solo il task Desktop Bridge, il server non è stato toccato):
+    - chiudi/apri Console, apri/chiudi Terminale con la Console aperta, chiudi Console: tutti confermati in 1,3–2,9 s;
+    - nessuna finestra residua.
+- Da fare: un tocco reale dal telefono su Terminale e Console quando l'utente usa Control.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
