@@ -19,6 +19,8 @@ export default defineConfig({
     target: 'chrome142',
     cssCodeSplit: false,
     assetsInlineLimit: 0,
-    modulePreload: { polyfill: false }
+    // Nessun <link modulepreload>: un solo script all'avvio (check-startup-budget). I piccoli chunk condivisi
+    // (react, jsx-runtime) arrivano dal disco tramite nexus://app in pochi millisecondi.
+    modulePreload: false
   }
 });
