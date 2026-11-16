@@ -6,6 +6,7 @@
  * La riduzione del movimento passa da MotionConfig (reducedMotion="user") e dal layer CSS `motion`.
  */
 import type { Transition } from 'framer-motion';
+import { loadChunk } from './chunks';
 
 const EMPHASIZED = [0.2, 0, 0, 1] as const;
 const ACCELERATE = [0.4, 0, 1, 1] as const;
@@ -14,7 +15,7 @@ const ACCELERATE = [0.4, 0, 1, 1] as const;
 export const SPRING: Transition = { type: 'spring', stiffness: 420, damping: 36, mass: 0.8 };
 
 /** Feature di animazione caricate dopo il primo frame (vedi LazyMotion in App). */
-export const loadMotionFeatures = () => import('./motion-features').then((module) => module.default);
+export const loadMotionFeatures = loadChunk(() => import('./motion-features').then((module) => module.default));
 
 /** Fogli e dialoghi: salgono leggermente e si assestano; escono accelerando, più brevi. */
 export const SHEET = {

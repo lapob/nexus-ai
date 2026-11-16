@@ -18,24 +18,25 @@ import { Icon, type IconName } from './Icon';
 import { CATEGORIES, SLASH_COMMANDS, greeting, matchSlash, mixedSuggestions, needsInput, sample, type SlashCommand } from './prompts';
 import { createPlayer, isNoiseTranscript, listMicrophones, listenForBargeIn, preferredMicrophone, setPreferredMicrophone, speakableText, startRecording, type Recording } from './voice';
 import { Tooltips } from './Tooltips';
+import { loadChunk } from './chunks';
 // Solo desktop: caricati a parte, così la web app non ne paga il peso all'avvio.
-const WindowControls = lazy(() => import('./WindowControls').then((module) => ({ default: module.WindowControls })));
+const WindowControls = lazy(loadChunk(() => import('./WindowControls').then((module) => ({ default: module.WindowControls }))));
 import { confirmDialog, currentConfirm, subscribeConfirm } from './confirm';
 import { useSwipeGestures } from './gestures';
 import { mergeStep } from './steps';
 import { activeConversation, appendMessage, assignProject, createProject, clearAll, deleteConversation, forkConversation, getState, groupConversations, newConversation, openProject, projectContext, projectFor, renameConversation, setState, togglePin, uid, updateConversation, useStore, type Conversation, type Message } from './store';
 import { ProjectNav, ProjectSheet } from './Projects';
 // Fuori dal primo caricamento: il pannello documenti si apre su richiesta, la scheda di aggiornamento esiste solo sul desktop.
-const Panel = lazy(() => import('./Panel').then((module) => ({ default: module.Panel })));
-const UpdateCard = lazy(() => import('./UpdateCard').then((module) => ({ default: module.UpdateCard })));
+const Panel = lazy(loadChunk(() => import('./Panel').then((module) => ({ default: module.Panel }))));
+const UpdateCard = lazy(loadChunk(() => import('./UpdateCard').then((module) => ({ default: module.UpdateCard }))));
 import { closePanel, openPanel, usePanel } from './panelStore';
 
 // Centro di controllo solo desktop (protocollo nexus://, script-src 'self'): caricato alla prima apertura, fuori dal bundle iniziale.
-const ControlCenter = lazy(() => import('./ControlCenter').then((module) => ({ default: module.ControlCenter })));
+const ControlCenter = lazy(loadChunk(() => import('./ControlCenter').then((module) => ({ default: module.ControlCenter }))));
 // Il selettore serve solo nelle preferenze: resta fuori dal bundle di avvio.
-const Select = lazy(() => import('./Select').then((module) => ({ default: module.Select })));
+const Select = lazy(loadChunk(() => import('./Select').then((module) => ({ default: module.Select }))));
 // Conferme: il dialogo si carica alla prima richiesta (montato alla radice: overlay fisso sopra ogni foglio).
-const ConfirmDialog = lazy(() => import('./ConfirmDialog').then((module) => ({ default: module.ConfirmDialog })));
+const ConfirmDialog = lazy(loadChunk(() => import('./ConfirmDialog').then((module) => ({ default: module.ConfirmDialog }))));
 function Confirmations() {
   const request = useSyncExternalStore(subscribeConfirm, currentConfirm, () => null);
   // Desktop: consensi e conferme del processo principale. «shown» avvisa che il dialogo è visibile

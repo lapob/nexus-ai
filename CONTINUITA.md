@@ -21,6 +21,13 @@
   - typecheck;
   - `npm test`: 1339 pass, 0 fail.
 - Cleanup: the regenerable Android build was removed via `cleanup-workstation.ps1`.
+- Release-safe chunks (`web/src/chunks.ts`):
+  - a tab left open across a publication that cannot fetch a chunk of the removed build reloads once per
+    build;
+  - no reload when offline or when sessionStorage is unavailable;
+  - tests: `tests/web-chunks.test.js`.
+- Checks: UI 39/39 (15/15 resolutions), visual web 24/24 and core 90/90, `npm test` 1341 pass with 0 fail.
+- Server restarted after a8950a8 (ready in 53 s); readyz 200; public 404s are neutral.
 - Next steps:
   1. Commit, then the web build.
   2. Coordinated Server restart (`maintenance.flag`).
