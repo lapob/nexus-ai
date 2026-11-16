@@ -133,7 +133,7 @@ export function stopProcess(child) {
 // #endregion
 // #region 05 — Cattura del solo Core (alpha = luce delle particelle)
 
-const ISOLATE_CSS = `*,*::before,*::after{visibility:hidden!important;background:transparent!important;box-shadow:none!important;text-shadow:none!important;caret-color:transparent!important}
+export const ISOLATE_CSS = `*,*::before,*::after{visibility:hidden!important;background:transparent!important;box-shadow:none!important;text-shadow:none!important;caret-color:transparent!important}
 html,body{background:transparent!important}canvas.core,canvas[data-qa-core]{visibility:visible!important}`;
 
 /**

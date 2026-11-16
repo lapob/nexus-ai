@@ -13,7 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { advanceTo, captureCoreAlpha, closeNetwork, FROZEN_EPOCH, freezeTime, launch, loadPlaywright, settle, startVitePreview } from './lib/browser.mjs';
+import { advanceTo, captureCoreAlpha, closeNetwork, FROZEN_EPOCH, freezeTime, ISOLATE_CSS, launch, loadPlaywright, settle, startVitePreview } from './lib/browser.mjs';
 
 const require = createRequire(import.meta.url);
 const { createSuite } = require('./lib/baselines.js');
@@ -168,7 +168,39 @@ async function runCoreSuite(browsers, origin) {
       console.log(`✖ core ${prefix}: ${error.message.split('\n')[0]}`);
     } finally { await context.close(); }
   }
+  if (matches('qa-time')) await checkQaTime(suite, browsers[0][1], origin);
   return suite.finish({ backends: browsers.map(([id, browser]) => `${id} ${browser.version()}`).join(', ') });
+}
+
+/**
+ * Aggancio `?nxs-qa-time` (nexus-core): con l'orologio vero, nel worker, il nucleo disegna un solo istante. Due
+ * catture a 700 ms di distanza devono essere identiche; il canvas dichiara versione del nucleo e `data-qa="ready"`.
+ */
+async function checkQaTime(suite, browser, origin) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, reducedMotion: 'no-preference' });
+  const page = await context.newPage();
+  const problems = [];
+  page.on('pageerror', (error) => problems.push(`errore pagina: ${error}`));
+  try {
+    await closeNetwork(context, origin, MOCKS);
+    await page.goto(`${origin}/?nxs-qa-time=9`, { waitUntil: 'load' });
+    await page.waitForSelector('canvas.core[data-qa="ready"]', { timeout: 20_000 });
+    const version = await page.$eval('canvas.core', (canvas) => canvas.dataset.coreVersion || '');
+    if (!/^\d+\.\d+\.\d+$/.test(version)) problems.push(`versione del nucleo assente (${version || 'vuota'})`);
+    // Solo il nucleo (il resto della pagina è nascosto): hover e stato della UI non entrano nel confronto.
+    await page.addStyleTag({ content: ISOLATE_CSS });
+    await page.waitForTimeout(1500);
+    const capture = () => page.screenshot({ omitBackground: true, animations: 'disabled', caret: 'hide' });
+    await page.mouse.move(720, 450);
+    await page.waitForTimeout(300);
+    const first = await capture();
+    await page.mouse.move(200, 200);
+    await page.waitForTimeout(700);
+    const second = await capture();
+    if (!first.equals(second)) problems.push('istante QA non fermo: due catture diverse');
+  } catch (error) { problems.push(error.message.split('\n')[0]); } finally { await context.close(); }
+  suite.assert('qa-time-fermo', problems);
+  console.log(`${problems.length ? '✖' : '✔'} core qa-time fermo${problems.length ? `\n    ${problems.join('\n    ')}` : ''}`);
 }
 
 // #endregion

@@ -51,7 +51,7 @@ test('i contratti visuali condividono identità e palette generata tra i client'
   const palette = interactionStatePalette();
   const gateway = fs.readFileSync(path.join(root, 'src/remote/remote-session-gateway.js'), 'utf8');
   const generatedAndroid = fs.readFileSync(path.join(root, 'android/shared-motion/src/main/java/local/nexus/motion/NexusInteractionStates.java'), 'utf8');
-  const unified = fs.readFileSync(path.join(root, 'web/src/core-render.ts'), 'utf8');
+  const unified = fs.readFileSync(path.join(root, 'web/src/nexus-core.ts'), 'utf8');
   assert.match(gateway, /loadPublicWebApp\(\)/);
   // Web e desktop condividono lo stesso nucleo: gli stati della UI unica sono un sottoinsieme del contratto.
   for (const state of ['idle', 'listening', 'thinking', 'responding', 'speaking', 'error']) assert.match(unified, new RegExp(`'${state}'`));

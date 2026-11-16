@@ -182,9 +182,16 @@ export function speakableText(markdown: string): string {
 
 export interface Playback { stop: () => void; done: Promise<void> }
 
-/** Riproduce i segmenti man mano che arrivano, senza pause udibili tra l'uno e l'altro. */
-export function createPlayer(): { enqueue: (wav: ArrayBuffer) => Promise<void>; finish: () => Promise<void>; stop: () => void } {
+/**
+ * Riproduce i segmenti man mano che arrivano, senza pause udibili tra l'uno e l'altro. `level()` è l'intensità
+ * della voce in uscita (0..1), letta dal nucleo mentre l'entità parla.
+ */
+export function createPlayer(): { enqueue: (wav: ArrayBuffer) => Promise<void>; finish: () => Promise<void>; stop: () => void; level: () => number } {
   const context = new AudioContext();
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 512;
+  analyser.connect(context.destination);
+  const samples = new Float32Array(analyser.fftSize);
   let cursor = 0;
   const sources = new Set<AudioBufferSourceNode>();
   let stopped = false;
@@ -195,7 +202,7 @@ export function createPlayer(): { enqueue: (wav: ArrayBuffer) => Promise<void>; 
       if (stopped) return;
       const source = context.createBufferSource();
       source.buffer = buffer;
-      source.connect(context.destination);
+      source.connect(analyser);
       cursor = Math.max(cursor, context.currentTime + 0.03);
       source.start(cursor);
       cursor += buffer.duration;
@@ -206,6 +213,13 @@ export function createPlayer(): { enqueue: (wav: ArrayBuffer) => Promise<void>; 
       const wait = () => { if (stopped || (sources.size === 0 && context.currentTime >= cursor)) { void context.close(); resolve(); } else window.setTimeout(wait, 120); };
       wait();
     }),
-    stop: () => { stopped = true; for (const source of sources) { try { source.stop(); } catch { /* già terminato */ } } sources.clear(); void context.close(); }
+    stop: () => { stopped = true; for (const source of sources) { try { source.stop(); } catch { /* già terminato */ } } sources.clear(); void context.close(); },
+    level: () => {
+      if (stopped || context.state !== 'running') return 0;
+      analyser.getFloatTimeDomainData(samples);
+      let sum = 0;
+      for (const value of samples) sum += value * value;
+      return Math.min(1, Math.sqrt(sum / samples.length) * 4);
+    }
   };
 }

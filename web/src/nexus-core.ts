@@ -1,0 +1,124 @@
+/**
+ * @module web/nexus-core
+ * @description Nucleo NexusNXS condiviso e versionato: la matematica pura del respiro (scomposizione a onda,
+ * fioritura, collasso, zoom), le energie degli stati, la reazione al puntatore e allo stato del server, l'aggancio
+ * deterministico `?nxs-qa-time`. Nessuna dipendenza, nessun DOM: lo usano la web app, il desktop e il sito, che ne
+ * tiene una copia generata (`.SITE/scripts/sync-nexus-core.mjs`) verificata per versione e impronta.
+ * Il tempo qui è "ambiente" (0,8× il tempo reale): `ambientTime` converte i secondi reali.
+ */
+
+// #region 01 — Versione e costanti
+
+/** Cambia a ogni modifica visibile della forma o del movimento (semver: major = forma diversa). */
+export const NEXUS_CORE_VERSION = '1.1.0';
+
+/** Un respiro in tempo ambiente: 11 unità = 13,75 s reali. */
+export const CORE_BREATH_PERIOD = 11;
+/** Velocità del tempo ambiente rispetto al tempo reale. */
+export const CORE_BREATH_RATE = 0.8;
+
+export type CoreState = 'idle' | 'listening' | 'thinking' | 'responding' | 'speaking' | 'error';
+/** Energia di ogni stato: il nucleo la raggiunge per interpolazione, mai a salti. */
+export const CORE_ENERGY: Readonly<Record<CoreState, number>> = { idle: 0.15, listening: 0.4, thinking: 0.6, responding: 1, speaking: 0.85, error: 0.35 };
+
+export const ambientTime = (seconds: number) => seconds * CORE_BREATH_RATE;
+
+// #endregion
+// #region 02 — Respiro
+
+const smoother = (t: number) => {
+  const x = Math.min(1, Math.max(0, t));
+  return x * x * x * (x * (x * 6 - 15) + 10);
+};
+
+/**
+ * 0 = forma composta; verso +1 fiorisce (si disperde e si avvicina), verso −1 collassa in un cuore denso.
+ * I cicli alternano fioritura e collasso; `stagger` sfasa ogni grano, così la forma si scompone a onda.
+ * Vale 0 con pendenza nulla a ogni confine di ciclo (C²): l'alternanza non salta mai.
+ */
+export function coreBreath(ambient: number, stagger: number) {
+  const cycle = ambient / CORE_BREATH_PERIOD - stagger;
+  const index = Math.floor(cycle);
+  const phase = cycle - index;
+  // Composto → si scioglie (22%) → deriva libero → si ricompone piano (30%) → composto.
+  const scatter = smoother((phase - 0.34) / 0.22) * (1 - smoother((phase - 0.66) / 0.3));
+  return (index & 1) === 0 ? scatter : -scatter;
+}
+
+/**
+ * Sposta un punto della forma (spazio unitario) lungo il respiro `b`: in fioritura i grani si espandono su un
+ * flusso coerente (fumo, non tremolio), in collasso spiraleggiano verso il cuore. Scrive in `out`.
+ */
+export function breatheCorePoint(out: { x: number; y: number; z: number }, x: number, y: number, z: number, b: number, phase: number, depth: number, ambient: number) {
+  const s = Math.abs(b);
+  if (s < 1e-4) { out.x = x; out.y = y; out.z = z; return out; }
+  const flow = Math.sin(x * 4.1 + ambient * 0.21 + phase) * 1.7 + Math.cos(y * 3.3 - ambient * 0.17) * 1.7;
+  const fx = Math.cos(flow), fy = Math.sin(flow);
+  if (b > 0) {
+    const grow = 1 + 0.44 * s * (0.6 + 0.4 * depth);
+    const c = Math.cos(0.38 * s), n = Math.sin(0.38 * s);
+    out.x = (x * c - y * n) * grow + fx * 0.13 * s;
+    out.y = (x * n + y * c) * grow + fy * 0.13 * s;
+    out.z = z * grow + Math.sin(flow * 1.3 + phase) * 0.1 * s;
+  } else {
+    const shrink = 1 - 0.58 * s * (0.55 + 0.45 * depth);
+    const c = Math.cos(-1.05 * s), n = Math.sin(-1.05 * s);
+    out.x = (x * c - y * n) * shrink + fx * 0.035 * s;
+    out.y = (x * n + y * c) * shrink + fy * 0.035 * s;
+    out.z = z * shrink;
+  }
+  return out;
+}
+
+/** Zoom dell'intero nucleo, leggermente in anticipo sui grani, con un'inspirazione morbida. */
+export function coreZoom(ambient: number) {
+  return 1 + 0.1 * coreBreath(ambient, -0.03) + 0.018 * Math.sin((ambient * Math.PI * 2) / (CORE_BREATH_PERIOD / 3));
+}
+
+// #endregion
+// #region 03 — Reazione: puntatore e stato del server
+
+/** Tempo (s) in cui l'influenza del puntatore svanisce dopo l'ultimo movimento; la posizione resta. */
+export const POINTER_FADE = 1.2;
+/** Inclinazione massima (radianti) del nucleo verso il puntatore. */
+export const POINTER_TILT = 0.22;
+
+/** Influenza del puntatore `since` secondi dopo l'ultimo movimento: 1 → 0, morbida, nulla oltre POINTER_FADE. */
+export function pointerInfluence(since: number) {
+  if (!(since >= 0)) return 0;
+  return 1 - smoother(since / POINTER_FADE);
+}
+
+/** Inclinazione [attorno a Y, attorno a X] verso il puntatore (NDC del canvas, già limitato a ±1). */
+export function pointerTilt(x: number, y: number, influence: number): [number, number] {
+  const clamp = (value: number) => Math.max(-1, Math.min(1, value));
+  return [clamp(x) * POINTER_TILT * influence, -clamp(y) * POINTER_TILT * influence];
+}
+
+/** Colore del nucleo: ciano vivo con il server raggiungibile, ardesia più spenta quando non risponde. */
+export const CORE_TINT_ONLINE: readonly [number, number, number] = [0.29, 0.9, 0.91];
+export const CORE_TINT_OFFLINE: readonly [number, number, number] = [0.46, 0.55, 0.64];
+
+/** `offline` 0..1 (interpolato dall'host): tinta e luminosità del nucleo. */
+export function coreMood(offline: number) {
+  const k = Math.max(0, Math.min(1, offline));
+  const tint = CORE_TINT_ONLINE.map((value, index) => value + (CORE_TINT_OFFLINE[index] - value) * k) as [number, number, number];
+  return { tint, glow: 1 - 0.42 * k, energyCap: 1 - 0.55 * k };
+}
+
+// #endregion
+// #region 04 — Aggancio deterministico per la regressione visiva
+
+/**
+ * `?nxs-qa-time=<secondi reali>` (alias `?nxs-still`): il nucleo disegna un solo istante fisso, con energia già
+ * assestata e nessuna reazione al puntatore. `null` se l'aggancio non c'è o non è un numero finito ≥ 0.
+ */
+export function qaTime(search: string): number | null {
+  const query = new URLSearchParams(search);
+  const raw = query.get('nxs-qa-time') ?? query.get('nxs-still');
+  if (raw === null) return null;
+  const value = raw === '' ? 0 : Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+// #endregion

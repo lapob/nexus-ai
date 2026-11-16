@@ -1,3 +1,34 @@
+## Shared versioned core, reactive core, `?nxs-qa-time` — 16 November 2026 (publishing)
+
+- `web/src/nexus-core.ts` (`NEXUS_CORE_VERSION` 1.1.0, no dependencies) is the single source for:
+  - breath, zoom and bloom/collapse;
+  - state energies;
+  - pointer reaction (`pointerInfluence`, `pointerTilt`);
+  - server mood (`coreMood`);
+  - `qaTime`.
+- Real-time adapter: `core-breath.ts`, verified to match the previous formulas exactly (< 1e-12).
+- The site vendors it via `.SITE/scripts/sync-nexus-core.mjs`, with version and sha256 in the header. A site test
+  checks integrity and equality with the canonical module. `particle-drift.ts` re-exports it and
+  `SiteMotionRuntime` uses its `qaTime`.
+- Reactive core:
+  - the core tilts towards the pointer and grains near the hand brighten, fading in 1.2 s (WebGPU and Canvas
+    2D, shared formulas);
+  - with the server offline it turns colder and dimmer (energy capped);
+  - it breathes with the synthesised voice while speaking (`createPlayer().level`) and with the microphone
+    only while listening;
+  - fixed in passing: a stale mic level could stay on after recording.
+- `?nxs-qa-time=<s>`:
+  - one fixed frame in the worker too, with `data-qa="ready"` and `data-core-version`;
+  - a new core-suite check (`qa-time-fermo`) captures twice with the real clock and gets identical frames.
+- Probe (real clock, Canvas 2D): the pointer changes the frame; going offline lowers mean light from 0.137 to
+  0.079 and turns the hue colder; 0 page errors.
+- Checks:
+  - typecheck;
+  - `npm test`: 1345 pass, 0 fail;
+  - UI 39/39;
+  - visual web 24/24 and core 91/91, existing baselines unchanged;
+  - startup budget: 364 kB.
+
 ## Neutral copy, guest hardening, desktop runtime — 16 November 2026 (published: server restarted, edge 5dcdb280)
 
 - Copy: user-visible text speaks of "server" and "dispositivo", never the owner's computer or personal details.

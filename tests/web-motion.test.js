@@ -63,5 +63,5 @@ test('il nucleo non è chiuso in un box: canvas ampio e particelle che sfumano a
   assert.match(core, /smoothstep\(\.56,\.97,length\(/);
   assert.match(core, /ed=min\(c-u\.clip\.xy,u\.clip\.zw-c\)\/u\.feather\.xy/);
   assert.match(core, /smooth\(0\.56, 0\.97, Math\.hypot\(/);
-  assert.match(core, /size: 64, usage/);
+  assert.match(core, /size: 80, usage/);
 });

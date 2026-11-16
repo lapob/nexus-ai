@@ -6,9 +6,11 @@
  * Nessun accesso al DOM: dimensioni, area visibile, movimento ridotto e visibilità arrivano dall'host (Core.tsx).
  */
 import { breatheCorePoint, coreBreath, coreZoom, CORE_BREATH_WGSL } from './core-breath';
+import { CORE_ENERGY, coreMood, pointerInfluence, pointerTilt, POINTER_TILT } from './nexus-core';
 
-export type CoreState = 'idle' | 'listening' | 'thinking' | 'responding' | 'speaking' | 'error';
-export const ENERGY: Record<CoreState, number> = { idle: 0.15, listening: 0.4, thinking: 0.6, responding: 1, speaking: 0.85, error: 0.35 };
+export type { CoreState } from './nexus-core';
+/** Energie degli stati: dal modulo condiviso `nexus-core` (stesse del sito e di Control). */
+export const ENERGY = CORE_ENERGY;
 
 // Tre popolazioni: guscio sferico, due anelli orbitali "HUD" a segmenti, nucleo interno.
 const SPHERE = 5_200;
@@ -31,9 +33,11 @@ export const FEATHER = 64;
 // Frammento: punto nitido con bordo antialias più un alone leggero, mai una macchia.
 // Dissolvenza: oltre ~0,6 del canvas (cerchio) e a FEATHER px dai bordi visibili (u.clip, in NDC)
 // la particella perde luce e dimensione fino a sparire nel vuoto; mai un taglio netto.
+// Reazione (u.pointer): xy = puntatore in NDC, z = influenza che svanisce dopo l'ultimo movimento, w = luce
+// (più bassa con il server non raggiungibile). Il nucleo s'inclina verso il puntatore e i grani vicini si accendono.
 // (I commenti stanno fuori dalla stringa: il testo WGSL entra intero nel bundle.)
 const SHADER = /* wgsl */ `
-struct U{time:f32,energy:f32,aspect:f32,scale:f32,tint:vec4f,clip:vec4f,feather:vec4f};
+struct U{time:f32,energy:f32,aspect:f32,scale:f32,tint:vec4f,clip:vec4f,feather:vec4f,pointer:vec4f};
 @group(0)@binding(0)var<uniform>u:U;
 ${CORE_BREATH_WGSL}
 struct Out{@builtin(position)position:vec4f,@location(0)local:vec2f,@location(1)glow:f32,@location(2)white:f32};
@@ -89,6 +93,8 @@ sb=1.3;
 let b=u.tint.w*cb(u.time,e0*.16+g);
 p=bp(p,b,hash(i+3.),u.time)*mix(1.,cz(u.time),u.tint.w);
 br*=1.-.26*abs(b);
+let ta=clamp(u.pointer.xy,vec2f(-1.),vec2f(1.))*${POINTER_TILT}*u.pointer.z;
+p=rotX(rotY(p,ta.x),-ta.y);
 p=rotX(p,.35);
 let dp=1./(2.2-p.z);
 let cs=array<vec2f,4>(vec2f(-1.,-1.),vec2f(1.,-1.),vec2f(-1.,1.),vec2f(1.,1.));
@@ -100,7 +106,8 @@ let size=(.0035+.006*hash(i+7.))*(1.+u.energy*.6)*u.scale*sb*${(1 / SPREAD).toFi
 var out:Out;
 out.position=select(vec4f(c+cn*vec2f(size/u.aspect,size),0.,1.),vec4f(0.,0.,2.,1.),fd<.002);
 out.local=cn;
-out.glow=(.35+.65*(p.z*.5+.5))*(.55+.45*u.energy)*br*fd;
+let hd=length((c-u.pointer.xy)*vec2f(u.aspect,1.));
+out.glow=(.35+.65*(p.z*.5+.5))*(.55+.45*u.energy)*br*fd*u.pointer.w*(1.+.55*u.pointer.z*exp(-hd*hd*18.));
 out.white=white;
 return out;
 }
@@ -117,7 +124,9 @@ return vec4f(co*fo*ip.glow,fo*ip.glow);
 /** Area visibile del canvas in NDC [sinistra, basso, destra, alto] e sfumatura in NDC [x, y]. */
 export type Clip = { rect: [number, number, number, number]; feather: [number, number] };
 type Surface = HTMLCanvasElement | OffscreenCanvas;
-type Renderer = { frame: (time: number, energy: number, breath: number, clip: Clip) => void; resize: (width: number, height: number) => void; destroy: () => void };
+/** Reazione del nucleo in un fotogramma: puntatore (NDC), sua influenza, tinta e luce secondo lo stato del server. */
+type Reaction = { x: number; y: number; influence: number; tint: [number, number, number]; glow: number };
+type Renderer = { frame: (time: number, energy: number, breath: number, clip: Clip, react: Reaction) => void; resize: (width: number, height: number) => void; destroy: () => void };
 
 // Tipi WebGPU minimi e locali: niente dipendenza @webgpu/types da installare.
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -125,7 +134,7 @@ type GpuAny = any;
 const BUFFER_UNIFORM = 0x40;
 const BUFFER_COPY_DST = 0x08;
 
-async function webgpuRenderer(canvas: Surface, tint: [number, number, number]): Promise<Renderer | null> {
+async function webgpuRenderer(canvas: Surface): Promise<Renderer | null> {
   const gpu: GpuAny = (navigator as unknown as { gpu?: GpuAny }).gpu;
   if (!gpu) return null;
   const adapter: GpuAny = await gpu.requestAdapter({ powerPreference: 'low-power' }).catch(() => null);
@@ -143,17 +152,19 @@ async function webgpuRenderer(canvas: Surface, tint: [number, number, number]): 
     fragment: { module, entryPoint: 'fs', targets: [{ format, blend: { color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' } } }] },
     primitive: { topology: 'triangle-strip' }
   });
-  const uniforms = device.createBuffer({ size: 64, usage: BUFFER_UNIFORM | BUFFER_COPY_DST });
+  const uniforms = device.createBuffer({ size: 80, usage: BUFFER_UNIFORM | BUFFER_COPY_DST });
   const bindGroup = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: uniforms } }] });
-  const data = new Float32Array(16);
+  const data = new Float32Array(20);
   let aspect = 1;
   let lost = false;
   device.lost.then(() => { lost = true; });
   return {
     resize: (width, height) => { aspect = width / Math.max(1, height); },
-    frame: (time, energy, breath, clip) => {
+    frame: (time, energy, breath, clip, react) => {
       if (lost) return;
-      data.set([time, energy, aspect, Math.min(1, aspect < 1 ? aspect * 1.25 : 1), tint[0], tint[1], tint[2], breath, ...clip.rect, ...clip.feather, 0, 0]);
+      const { tint } = react;
+      data.set([time, energy, aspect, Math.min(1, aspect < 1 ? aspect * 1.25 : 1), tint[0], tint[1], tint[2], breath, ...clip.rect, ...clip.feather, 0, 0,
+        react.x, react.y, react.influence, react.glow]);
       device.queue.writeBuffer(uniforms, 0, data);
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({ colorAttachments: [{ view: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }] });
@@ -167,16 +178,20 @@ async function webgpuRenderer(canvas: Surface, tint: [number, number, number]): 
   };
 }
 
-function canvasRenderer(canvas: Surface, tint: [number, number, number], density: () => number): Renderer | null {
+function canvasRenderer(canvas: Surface, density: () => number): Renderer | null {
   const context = (canvas as HTMLCanvasElement).getContext('2d') as CanvasRenderingContext2D | null;
   if (!context) return null;
-  const color = `rgb(${tint.map((value) => Math.round(value * 255)).join(' ')})`;
   let width = 1; let height = 1;
   const point = { x: 0, y: 0, z: 0 };
   const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   return {
     resize: (w, h) => { width = w; height = h; },
-    frame: (time, energy, breath, clip) => {
+    frame: (time, energy, breath, clip, react) => {
+      const color = `rgb(${react.tint.map((value) => Math.round(value * 255)).join(' ')})`;
+      // Stessa inclinazione verso il puntatore e stessa accensione locale dello shader.
+      const [tiltY, tiltX] = pointerTilt(react.x, react.y, react.influence);
+      const cy = Math.cos(tiltY), sy0 = Math.sin(tiltY), cx = Math.cos(tiltX), sx0 = Math.sin(tiltX);
+      const pointerX = (react.x + 1) * width / 2, pointerY = (1 - react.y) * height / 2;
       context.clearRect(0, 0, width, height);
       context.fillStyle = color;
       context.globalCompositeOperation = 'lighter';
@@ -198,6 +213,11 @@ function canvasRenderer(canvas: Surface, tint: [number, number, number], density
         // Stesso respiro del percorso WebGPU: scomposizione a onda dall'alto verso il basso.
         const b = breath * coreBreath(time, seed * 0.16 + 0.04 + (1 - y) * 0.07);
         const p = breatheCorePoint(point, Math.cos(theta) * ring, y, Math.sin(theta) * ring, b, seed, time);
+        if (react.influence > 0) {
+          const x1 = cy * p.x + sy0 * p.z, z1 = -sy0 * p.x + cy * p.z;
+          const y2 = cx * p.y - sx0 * z1;
+          p.z = sx0 * p.y + cx * z1; p.x = x1; p.y = y2;
+        }
         const wave = 1 + 0.06 * Math.sin(time * (0.6 + energy * 1.4) + i + y * 4) * (0.4 + energy);
         const depth = 1 / (2.2 - p.z);
         // Stessa resa del percorso WebGPU: particelle vicine più grandi e luminose.
@@ -206,7 +226,9 @@ function canvasRenderer(canvas: Surface, tint: [number, number, number], density
         const f = fade(sx, sy);
         if (f < 0.002) continue;
         const size = (1.2 + 2.4 * front) * dpr * (0.8 + 0.4 * energy) * (0.35 + 0.65 * f);
-        context.globalAlpha = Math.min(1, (0.35 + 0.65 * front) * (0.6 + 0.4 * energy) * (1 - 0.26 * Math.abs(b)) * f);
+        const near = react.influence > 0 ? Math.hypot((sx - pointerX) / (height / 2), (sy - pointerY) / (height / 2)) : 9;
+        const lift = react.glow * (1 + 0.55 * react.influence * Math.exp(-near * near * 18));
+        context.globalAlpha = Math.min(1, (0.35 + 0.65 * front) * (0.6 + 0.4 * energy) * (1 - 0.26 * Math.abs(b)) * f * lift);
         context.fillRect(sx - size / 2, sy - size / 2, size, size);
       }
       // Anelli orbitali a segmenti, come nel percorso WebGPU.
@@ -215,7 +237,7 @@ function canvasRenderer(canvas: Surface, tint: [number, number, number], density
       for (const [index, [scale, tilt, dash]] of ([[1.42, 0.42, 9], [1.56, -0.55, 14]] as const).entries()) {
         const direction = index ? -1 : 1;
         const circumference = Math.PI * 2 * radius * scale;
-        context.globalAlpha = 0.35 + 0.35 * energy;
+        context.globalAlpha = (0.35 + 0.35 * energy) * react.glow;
         context.setLineDash([circumference / dash * 0.5, circumference / dash * 0.5]);
         context.lineDashOffset = -direction * time * 40 * (0.3 + energy);
         context.beginPath();
@@ -236,18 +258,24 @@ export type CoreInput =
   | { type: 'energy'; target: number }
   | { type: 'reduced'; reduced: boolean }
   | { type: 'visible'; visible: boolean }
+  | { type: 'pointer'; x: number; y: number }
+  | { type: 'mood'; offline: boolean }
   | { type: 'stats' };
-/** Notizie dal motore all'host: backend scelto, qualità adattiva, intervalli tra fotogrammi (misure). */
-export type CoreOutput = { type: 'info'; backend?: string; quality?: string } | { type: 'stats'; intervals: number[] };
+/** Notizie dal motore all'host: backend scelto, qualità adattiva, istante QA disegnato, intervalli tra fotogrammi. */
+export type CoreOutput = { type: 'info'; backend?: string; quality?: string; qa?: 'ready' } | { type: 'stats'; intervals: number[] };
 
 /**
  * Avvia il motore su `canvas`. `startedAt` è un tempo assoluto (timeOrigin + now) condiviso con l'host,
  * così il respiro del nucleo e quello della UI (--core-breath) restano allineati anche tra thread.
+ * `still` (secondi reali, da `?nxs-qa-time`): un solo istante fisso, energia assestata, nessuna reazione al puntatore.
  */
-export function startCoreEngine(canvas: Surface, startedAt: number, energy0: number, reduced0: boolean, emit: (message: CoreOutput) => void) {
+export function startCoreEngine(canvas: Surface, startedAt: number, energy0: number, reduced0: boolean, emit: (message: CoreOutput) => void, still: number | null = null) {
   const now = () => performance.timeOrigin + performance.now();
-  const tint: [number, number, number] = [0.29, 0.9, 0.91];
   let renderer: Renderer | null = null;
+  // Puntatore: ultima posizione nota (resta) e istante dell'ultimo movimento (l'influenza svanisce da lì).
+  const pointer = { x: 0, y: 0, at: -Infinity };
+  let offlineTarget = 0, offline = 0, lastMood = 0;
+  const react: Reaction = { x: 0, y: 0, influence: 0, tint: coreMood(0).tint, glow: 1 };
   let backend = 'webgpu';
   let disposed = false;
   let frame = 0;
@@ -290,24 +318,37 @@ export function startCoreEngine(canvas: Surface, startedAt: number, energy0: num
     if (Math.abs(next - quality) > 0.01) { quality = next; apply(); }
   };
   let tick = 0;
+  // Fermo: movimento ridotto o istante QA. Il loop non gira, ogni cambiamento ridisegna un fotogramma.
+  const halted = () => reduced || still !== null;
+  let qaAnnounced = false;
   const loop = (at: number) => {
     if (disposed || !renderer) return;
     adapt(at);
-    energy += (target - energy) * 0.04;
-    const time = reduced ? 0 : (now() - startedAt) / 1000;
+    const clock = now();
+    // Stato del server: transizione a tempo (~0,6 s), istantanea quando il nucleo è fermo.
+    const moodStep = halted() || !lastMood ? 1 : 1 - Math.exp(-Math.min(0.25, (clock - lastMood) / 1000) * 3.5);
+    lastMood = clock;
+    offline += (offlineTarget - offline) * moodStep;
+    const mood = coreMood(offline);
+    energy = still !== null ? target : energy + (target - energy) * 0.04;
+    const time = still ?? (reduced ? 0 : (clock - startedAt) / 1000);
     // Il respiro entra piano (~3 s) dopo l'avvio; con movimento ridotto il nucleo resta composto.
     const ramp = reduced ? 0 : Math.min(1, Math.max(0, (time - 1.2) / 3));
     const breath = ramp * ramp * (3 - 2 * ramp);
+    react.x = pointer.x; react.y = pointer.y;
+    react.influence = halted() ? 0 : pointerInfluence((clock - pointer.at) / 1000);
+    react.tint = mood.tint; react.glow = mood.glow;
     // Il nucleo respira sempre: fotogrammi pieni (60/120/144/240 Hz). Solo con la GPU
     // impegnata (es. dal modello) si dimezza il ritmo, mai la nitidezza.
     tick += 1;
-    if (!(throttle && tick % 2 === 1 && !reduced)) renderer.frame(time, energy, breath, clip);
-    if (!reduced && visible) frame = requestAnimationFrame(loop);
+    if (!(throttle && tick % 2 === 1 && !halted())) renderer.frame(time, Math.min(energy, mood.energyCap), breath, clip, react);
+    if (still !== null && !qaAnnounced) { qaAnnounced = true; emit({ type: 'info', qa: 'ready' }); }
+    if (!halted() && visible) frame = requestAnimationFrame(loop);
   };
   const wake = () => { cancelAnimationFrame(frame); last = 0; previous = 0; if (visible) frame = requestAnimationFrame(loop); };
   (async () => {
-    renderer = await webgpuRenderer(canvas, tint).catch(() => null);
-    if (!renderer) { backend = 'canvas'; renderer = canvasRenderer(canvas, tint, () => size.dpr); }
+    renderer = await webgpuRenderer(canvas).catch(() => null);
+    if (!renderer) { backend = 'canvas'; renderer = canvasRenderer(canvas, () => size.dpr); }
     if (disposed || !renderer) { renderer?.destroy(); return; }
     emit({ type: 'info', backend });
     apply();
@@ -316,12 +357,14 @@ export function startCoreEngine(canvas: Surface, startedAt: number, energy0: num
   return {
     send(message: CoreInput) {
       switch (message.type) {
-        case 'size': size = message; apply(); if (reduced) wake(); break;
-        case 'clip': clip = message.clip; break;
-        // Con movimento ridotto il loop è fermo: un cambio di stato ridisegna un frame.
-        case 'energy': target = message.target; if (reduced) { energy = target; wake(); } break;
+        case 'size': size = message; apply(); if (halted()) wake(); break;
+        case 'clip': clip = message.clip; if (halted()) wake(); break;
+        // A nucleo fermo un cambio di stato ridisegna un frame.
+        case 'energy': target = message.target; if (halted()) { energy = target; wake(); } break;
         case 'reduced': reduced = message.reduced; wake(); break;
         case 'visible': visible = message.visible; wake(); break;
+        case 'pointer': if (!halted()) { pointer.x = message.x; pointer.y = message.y; pointer.at = now(); } break;
+        case 'mood': offlineTarget = message.offline ? 1 : 0; if (halted()) wake(); break;
         case 'stats': emit({ type: 'stats', intervals: intervals.splice(0) }); break;
       }
     },

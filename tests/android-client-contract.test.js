@@ -255,7 +255,7 @@ test('Control respira come il nucleo web/desktop, a tempo e non a frame', () => 
   const activity = controlSources();
   const breath = read('android/shared-motion/src/main/java/local/nexus/motion/NexusCoreBreath.java');
   const motion = read('android/shared-motion/src/main/java/local/nexus/motion/NexusMotion.java');
-  const web = read('web/src/core-breath.ts');
+  const web = read('web/src/nexus-core.ts');
   const period = web.match(/CORE_BREATH_PERIOD = ([\d.]+)/)[1];
   const rate = web.match(/CORE_BREATH_RATE = ([\d.]+)/)[1];
   assert.match(breath, new RegExp(`PERIOD = ${period}f`), 'stesso periodo del respiro web');
@@ -354,7 +354,7 @@ test('Control 1.28: salute del runtime, accessibilità e nucleo allineato al cor
   }
   assert.doesNotMatch(controlFile('OfflineGate.java'), /Color\.rgb\(92, 112, 114\)/, 'testo del varco sotto il contrasto AA');
   const core = controlFile('ui', 'ControlCoreView.java');
-  const web = read('web/src/core-render.ts');
+  const web = read('web/src/nexus-core.ts');
   for (const [state, value] of Object.entries({ IDLE: 0.15, LISTENING: 0.4, THINKING: 0.6, RESPONDING: 1, SPEAKING: 0.85, ERROR: 0.35 })) {
     assert.match(web, new RegExp(`${state.toLowerCase()}: ${value}`), `energia web ${state}`);
     assert.match(core, new RegExp(`ENERGY_${state} = ${String(value).replace(/^0/, '')}f`), `energia Control ${state}`);

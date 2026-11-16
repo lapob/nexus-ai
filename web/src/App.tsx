@@ -202,7 +202,10 @@ export function App() {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const micLevel = useRef(0);
-  const player = useRef<{ stop: () => void; abort: AbortController } | null>(null);
+  const player = useRef<{ stop: () => void; abort: AbortController; level: () => number } | null>(null);
+  // Voce letta dal nucleo: il microfono solo mentre ascolta (l'ultimo livello non resta acceso), la sintesi mentre parla.
+  const listeningRef = useRef(false);
+  const voiceLevel = useMemo(() => ({ get current() { return Math.max(listeningRef.current ? micLevel.current : 0, player.current?.level() ?? 0); } }), []);
 
   useEffect(() => { void platform.capabilities().then(setCaps); }, []);
 
@@ -222,6 +225,7 @@ export function App() {
   }, []);
   useEffect(() => { if (conversation && !generating && conversation.messages.length) platform.saveConversation(conversation); }, [conversation, generating]);
 
+  listeningRef.current = Boolean(recording);
   const coreState: CoreState = recording ? 'listening'
     : transcribing ? 'thinking'
       : generating ? (phase && !conversation?.messages.at(-1)?.content ? 'thinking' : 'responding')
@@ -243,7 +247,7 @@ export function App() {
     if (!text) return;
     const abort = new AbortController();
     const audio = createPlayer();
-    player.current = { stop: audio.stop, abort };
+    player.current = { stop: audio.stop, abort, level: audio.level };
     setSpeakingId(id);
     try {
       await platform.synthesize(text, { signal: abort.signal, onSegment: (wav) => audio.enqueue(wav) });
@@ -621,7 +625,7 @@ export function App() {
             {typeof desktopBridge?.windowAction === 'function' && <Suspense fallback={<span className="window-controls" aria-hidden="true" data-placeholder="true" />}><WindowControls /></Suspense>}
           </header>
 
-          <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={micLevel} /><div className="core-hud" aria-hidden="true" data-core-breath=""><i /><i /><i /></div></div>
+          <div ref={coreLayerRef} className={`core-layer ${empty || live ? 'hero' : 'ambient'}`} data-state={coreState}><Core state={coreState} className="core" level={voiceLevel} offline={offline} /><div className="core-hud" aria-hidden="true" data-core-breath=""><i /><i /><i /></div></div>
           {dragging && <div className="dropzone" aria-hidden="true"><span className="glass"><Icon name="paperclip" />{Number.isFinite(limitsFor(platform.kind).maxCount) ? 'Rilascia per allegare (max 2 file, 1,5 MB)' : 'Rilascia per allegare'}</span></div>}
 
           <div className="scroll" ref={scrollRef}

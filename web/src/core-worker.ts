@@ -6,13 +6,13 @@
  */
 import { startCoreEngine, type CoreInput, type CoreOutput } from './core-render';
 
-type Init = { type: 'init'; canvas: OffscreenCanvas; startedAt: number; energy: number; reduced: boolean };
+type Init = { type: 'init'; canvas: OffscreenCanvas; startedAt: number; energy: number; reduced: boolean; still: number | null };
 const scope = self as unknown as { postMessage: (message: CoreOutput | { type: 'loaded' }) => void; onmessage: ((event: MessageEvent<Init | CoreInput>) => void) | null };
 let engine: ReturnType<typeof startCoreEngine> | null = null;
 
 scope.onmessage = (event) => {
   const message = event.data;
-  if (message.type === 'init') engine = startCoreEngine(message.canvas, message.startedAt, message.energy, message.reduced, (output) => scope.postMessage(output));
+  if (message.type === 'init') engine = startCoreEngine(message.canvas, message.startedAt, message.energy, message.reduced, (output) => scope.postMessage(output), message.still);
   else engine?.send(message);
 };
 // Il modulo è stato scaricato e valutato: solo ora l'host trasferisce il canvas (il trasferimento è irreversibile).

@@ -8,15 +8,22 @@
 import { useEffect, useRef } from 'react';
 import { coreBreath } from './core-breath';
 import { ENERGY, FEATHER, startCoreEngine, type Clip, type CoreInput, type CoreOutput, type CoreState } from './core-render';
+import { NEXUS_CORE_VERSION, qaTime } from './nexus-core';
 
 export type { CoreState } from './core-render';
 
-/** Il nucleo si adatta allo stato con un'energia interpolata, mai con salti. */
-export function Core({ state, className, level }: { state: CoreState; className?: string; level?: { current: number } }) {
+/**
+ * Il nucleo reagisce allo stato reale: energia dello stato (ascolto, pensiero, risposta, voce) interpolata, livello
+ * della voce (`level`: microfono in ascolto, sintesi mentre parla), puntatore (s'inclina e si accende vicino alla
+ * mano, poi torna composto) e stato del server (`offline`: più spento e freddo finché non risponde).
+ */
+export function Core({ state, className, level, offline = false }: { state: CoreState; className?: string; level?: { current: number }; offline?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const base = useRef(ENERGY[state]);
   base.current = ENERGY[state];
-  // In ascolto l'entità respira con la voce dell'utente.
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
+  // L'entità respira con la voce: quella dell'utente in ascolto, la propria mentre parla.
   const target = { get current() { return Math.min(1, base.current + (level?.current ?? 0) * 0.6); } };
 
   useEffect(() => {
@@ -26,6 +33,10 @@ export function Core({ state, className, level }: { state: CoreState; className?
     let frame = 0;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     const startedAt = performance.timeOrigin + performance.now();
+    // Regressione visiva: `?nxs-qa-time=<s>` disegna un solo istante fisso (stesso aggancio del sito).
+    const still = qaTime(window.location.search);
+    const halted = () => reduced.matches || still !== null;
+    canvas.dataset.coreVersion = NEXUS_CORE_VERSION;
     let send: (message: CoreInput) => void = () => {};
     let worker: Worker | null = null;
     let engine: ReturnType<typeof startCoreEngine> | null = null;
@@ -34,6 +45,7 @@ export function Core({ state, className, level }: { state: CoreState; className?
       if (message.type === 'info') {
         if (message.backend) canvas.dataset.backend = message.backend;
         if (message.quality) canvas.dataset.quality = message.quality;
+        if (message.qa) canvas.dataset.qa = message.qa;
       } else pendingStats.shift()?.(message.intervals);
     };
 
@@ -79,7 +91,8 @@ export function Core({ state, className, level }: { state: CoreState; className?
       tick += 1;
       const value = target.current;
       if (Math.abs(value - lastTarget) > 0.002) { lastTarget = value; send({ type: 'energy', target: value }); }
-      const time = reduced.matches ? 0 : (performance.timeOrigin + performance.now() - startedAt) / 1000;
+      if (pointerMoved) { pointerMoved = false; sendPointer(); }
+      const time = still ?? (reduced.matches ? 0 : (performance.timeOrigin + performance.now() - startedAt) / 1000);
       const ramp = reduced.matches ? 0 : Math.min(1, Math.max(0, (time - 1.2) / 3));
       const pulse = (ramp * ramp * (3 - 2 * ramp) * coreBreath(time, 0)).toFixed(3);
       canvas.dataset.breath = pulse;
@@ -88,10 +101,24 @@ export function Core({ state, className, level }: { state: CoreState; className?
       // un elemento appena montato si aggancia in una frazione di secondo, mentre il respiro è ancora vicino a dove era.
       if (tick % 10 === 1) { measureClip(); breathing = document.querySelectorAll<HTMLElement>('[data-core-breath]'); lastPulse = ''; }
       if (pulse !== lastPulse) { lastPulse = pulse; breathing.forEach((element) => element.style.setProperty('--core-breath', pulse)); }
-      if (!reduced.matches && document.visibilityState === 'visible') frame = requestAnimationFrame(loop);
+      if (!halted() && document.visibilityState === 'visible') frame = requestAnimationFrame(loop);
     };
+    // Puntatore: coordinate lette all'evento, inviate al motore una volta per fotogramma in NDC del canvas.
+    let pointerX = 0, pointerY = 0, pointerMoved = false;
+    const sendPointer = () => {
+      const box = canvas.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      send({ type: 'pointer', x: (pointerX - box.left) / box.width * 2 - 1, y: 1 - (pointerY - box.top) / box.height * 2 });
+    };
+    const onPointer = (event: PointerEvent) => { if (halted()) return; pointerX = event.clientX; pointerY = event.clientY; pointerMoved = true; };
+    window.addEventListener('pointermove', onPointer, { passive: true });
+    window.addEventListener('pointerdown', onPointer, { passive: true });
+    let lastOffline: boolean | null = null;
+    const syncMood = () => { if (offlineRef.current !== lastOffline) { lastOffline = offlineRef.current; send({ type: 'mood', offline: lastOffline }); } };
     const wake = () => {
       cancelAnimationFrame(frame);
+      lastOffline = null;
+      syncMood();
       send({ type: 'reduced', reduced: reduced.matches });
       send({ type: 'visible', visible: document.visibilityState === 'visible' });
       if (document.visibilityState === 'visible') frame = requestAnimationFrame(loop);
@@ -107,7 +134,7 @@ export function Core({ state, className, level }: { state: CoreState; className?
     };
     const mainThread = () => {
       if (disposed) return;
-      engine = startCoreEngine(canvas, startedAt, target.current, reduced.matches, receive);
+      engine = startCoreEngine(canvas, startedAt, target.current, reduced.matches, receive, still);
       canvas.dataset.thread = 'main';
       begin((message) => engine?.send(message));
     };
@@ -125,7 +152,7 @@ export function Core({ state, className, level }: { state: CoreState; className?
           if (loaded || disposed) return;
           loaded = true;
           const offscreen = canvas.transferControlToOffscreen();
-          spawned.postMessage({ type: 'init', canvas: offscreen, startedAt, energy: target.current, reduced: reduced.matches }, [offscreen]);
+          spawned.postMessage({ type: 'init', canvas: offscreen, startedAt, energy: target.current, reduced: reduced.matches, still }, [offscreen]);
           canvas.dataset.thread = 'worker';
           begin((input) => spawned.postMessage(input));
         });
@@ -135,8 +162,8 @@ export function Core({ state, className, level }: { state: CoreState; className?
     // Misure (scripts/measure-*-motion): intervalli tra i fotogrammi del nucleo, nel thread dove disegna davvero.
     const stats = () => { pendingStats.push((intervals) => canvas.dispatchEvent(new CustomEvent('nxs-core-stats', { detail: intervals }))); send({ type: 'stats' }); };
     canvas.addEventListener('nxs-core-stats-request', stats);
-    // Con movimento ridotto il loop è fermo: un cambio di stato ridisegna un frame.
-    const redraw = () => { lastTarget = -1; if (reduced.matches) loop(); };
+    // A nucleo fermo il loop non gira: un cambio di stato o di server ridisegna un frame.
+    const redraw = () => { lastTarget = -1; syncMood(); if (halted()) loop(); };
     document.addEventListener('visibilitychange', wake);
     reduced.addEventListener('change', wake);
     canvas.addEventListener('nxs-core-state', redraw);
@@ -156,6 +183,8 @@ export function Core({ state, className, level }: { state: CoreState; className?
     return () => {
       density?.removeEventListener('change', onDensity);
       layer?.removeEventListener('transitionend', settle);
+      window.removeEventListener('pointermove', onPointer);
+      window.removeEventListener('pointerdown', onPointer);
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
@@ -168,7 +197,7 @@ export function Core({ state, className, level }: { state: CoreState; className?
     };
   }, []);
 
-  useEffect(() => { canvasRef.current?.dispatchEvent(new Event('nxs-core-state')); }, [state]);
+  useEffect(() => { canvasRef.current?.dispatchEvent(new Event('nxs-core-state')); }, [state, offline]);
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" data-state={state} />;
 }

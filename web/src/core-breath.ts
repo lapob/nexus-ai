@@ -1,66 +1,26 @@
 /**
  * @module web/core-breath
- * @description Respiro del nucleo (stesso linguaggio di movimento del sito): il nucleo si
- * scompone e si ricompone a onda, fiorendo verso l'esterno (zoom in) e collassando in un
- * cuore denso (zoom out). Funzione pura del tempo: identica a 30/60/120/144 Hz.
- * La versione WGSL qui sotto è la traduzione esatta delle funzioni JavaScript.
+ * @description Respiro del nucleo in secondi reali, per il motore dell'app: adatta il modulo condiviso
+ * `nexus-core` (tempo ambiente) e ne porta la traduzione WGSL esatta. Funzione pura del tempo: identica a
+ * 30/60/120/144 Hz.
  */
+import { ambientTime, breatheCorePoint as breatheShared, coreBreath as breathShared, coreZoom as zoomShared, CORE_BREATH_PERIOD, CORE_BREATH_RATE } from './nexus-core.ts';
 
-/** Un respiro in tempo "ambiente" (0.8× il tempo reale): ≈13,75 s. */
-export const CORE_BREATH_PERIOD = 11;
-export const CORE_BREATH_RATE = 0.8;
+// Estensione esplicita: i test Node eseguono questo file direttamente (type stripping, nessun bundler).
+export { CORE_BREATH_PERIOD, CORE_BREATH_RATE } from './nexus-core.ts';
 
-const smoother = (t: number) => {
-  const x = Math.min(1, Math.max(0, t));
-  return x * x * x * (x * (x * 6 - 15) + 10);
-};
+/** Respiro a `time` secondi reali (vedi `coreBreath` del modulo condiviso). */
+export const coreBreath = (time: number, stagger: number) => breathShared(ambientTime(time), stagger);
+
+/** Un grano con il proprio `seed` 0..1: fase e profondità derivano dallo stesso seme, come nello shader. */
+export const breatheCorePoint = (out: { x: number; y: number; z: number }, x: number, y: number, z: number, b: number, seed: number, time: number) =>
+  breatheShared(out, x, y, z, b, seed * 6.2831853, seed, ambientTime(time));
+
+export const coreZoom = (time: number) => zoomShared(ambientTime(time));
 
 /**
- * 0 = forma composta; verso +1 fiorisce (si disperde e si avvicina), verso −1 collassa.
- * I cicli alternano fioritura e collasso; `stagger` sfasa ogni particella. Vale 0 con
- * pendenza nulla a ogni confine di ciclo, quindi l'alternanza non salta mai.
- */
-export function coreBreath(time: number, stagger: number) {
-  const cycle = (time * CORE_BREATH_RATE) / CORE_BREATH_PERIOD - stagger;
-  const index = Math.floor(cycle);
-  const phase = cycle - index;
-  const scatter = smoother((phase - 0.34) / 0.22) * (1 - smoother((phase - 0.66) / 0.3));
-  return (index & 1) === 0 ? scatter : -scatter;
-}
-
-/** Sposta un punto (spazio unitario) lungo il respiro `b`: flusso coerente, mai rumore. */
-export function breatheCorePoint(out: { x: number; y: number; z: number }, x: number, y: number, z: number, b: number, seed: number, time: number) {
-  const s = Math.abs(b);
-  if (s < 1e-4) { out.x = x; out.y = y; out.z = z; return out; }
-  const t = time * CORE_BREATH_RATE;
-  const flow = Math.sin(x * 4.1 + t * 0.21 + seed * 6.2831853) * 1.7 + Math.cos(y * 3.3 - t * 0.17) * 1.7;
-  const fx = Math.cos(flow), fy = Math.sin(flow);
-  if (b > 0) {
-    const grow = 1 + 0.44 * s * (0.6 + 0.4 * seed);
-    const c = Math.cos(0.38 * s), n = Math.sin(0.38 * s);
-    out.x = (x * c - y * n) * grow + fx * 0.13 * s;
-    out.y = (x * n + y * c) * grow + fy * 0.13 * s;
-    out.z = z * grow + Math.sin(flow * 1.3 + seed * 6.2831853) * 0.1 * s;
-  } else {
-    const shrink = 1 - 0.58 * s * (0.55 + 0.45 * seed);
-    const c = Math.cos(-1.05 * s), n = Math.sin(-1.05 * s);
-    out.x = (x * c - y * n) * shrink + fx * 0.035 * s;
-    out.y = (x * n + y * c) * shrink + fy * 0.035 * s;
-    out.z = z * shrink;
-  }
-  return out;
-}
-
-/** Zoom dell'intero nucleo, leggermente in anticipo sui grani, con un'inspirazione morbida. */
-export function coreZoom(time: number) {
-  const t = time * CORE_BREATH_RATE;
-  return 1 + 0.1 * coreBreath(time, -0.03) + 0.018 * Math.sin((t * Math.PI * 2) / (CORE_BREATH_PERIOD / 3));
-}
-
-/**
- * Traduzione WGSL di coreBreath (cb) / breatheCorePoint (bp) / coreZoom (cz), stesse costanti.
- * Scritta compatta di proposito: il testo dello shader non passa dal minificatore e
- * conta nel budget d'avvio del bundle.
+ * Traduzione WGSL di coreBreath (cb) / breatheCorePoint (bp) / coreZoom (cz), stesse costanti, tempo reale.
+ * Scritta compatta di proposito: il testo dello shader non passa dal minificatore e conta nel budget d'avvio.
  */
 export const CORE_BREATH_WGSL = /* wgsl */ `
 fn sm(t:f32)->f32{let x=clamp(t,0.,1.);return x*x*x*(x*(x*6.-15.)+10.);}
