@@ -19,14 +19,21 @@ const sum = (predicate) => files.filter(predicate).reduce((total, file) => total
 const find = (relative) => files.find((file) => file.relative === relative)?.bytes ?? 0;
 const kib = (bytes) => Math.round(bytes / 102.4) / 10;
 
+// ai-assets/ è la build della web app AI (ai.nexusnxs.com), copiata da sync-ai-shell e mai caricata dal sito:
+// ha un budget proprio, separato da quello di una navigazione sul sito.
+const site = (file) => !file.relative.startsWith("ai-assets/");
+const ai = (file) => file.relative.startsWith("ai-assets/");
+const aiEntry = files.filter((file) => ai(file) && /^ai-assets\/index-[A-Za-z0-9_-]+\.js$/.test(file.relative));
 const checks = [
-  { label: "JavaScript client", actual: sum((file) => file.relative.endsWith(".js")), maximum: 525 * 1024 },
+  { label: "JavaScript client", actual: sum((file) => site(file) && file.relative.endsWith(".js")), maximum: 525 * 1024 },
+  { label: "AI: modulo d'ingresso", actual: aiEntry.length === 1 ? aiEntry[0].bytes : 0, maximum: 380 * 1024 },
+  { label: "AI: JavaScript totale", actual: sum((file) => ai(file) && file.relative.endsWith(".js")), maximum: 520 * 1024 },
   // nexus-operational.css appartiene alla pagina statica di fallback e non
   // viene caricato insieme al bundle applicativo: sommarli falserebbe il peso
   // di una singola navigazione reale.
   // Il Continuum e il footer astrale aggiungono meno di 2 KiB senza aumentare
   // JavaScript o immagini: la nuova soglia resta stretta e verificabile.
-  { label: "CSS applicazione", actual: sum((file) => file.relative.endsWith(".css") && file.relative !== "nexus-operational.css"), maximum: 100 * 1024 },
+  { label: "CSS applicazione", actual: sum((file) => site(file) && file.relative.endsWith(".css") && file.relative !== "nexus-operational.css"), maximum: 100 * 1024 },
   { label: "CSS fallback operativo", actual: find("nexus-operational.css"), maximum: 12 * 1024 },
   { label: "Font condiviso Inter", actual: find("fonts/inter-latin.woff2"), maximum: 50 * 1024 },
   { label: "Cattura desktop", actual: find("products/desktop-home.png"), maximum: 190 * 1024 },

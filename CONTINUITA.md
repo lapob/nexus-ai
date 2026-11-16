@@ -1,3 +1,26 @@
+# AI web app code-splitting on the edge — 16 November 2026 (release in progress)
+
+- The AI app (`.AI` 0f11de2) now ships CSS inline and its entry module and chunks from `/assets`.
+  - CSP: `'strict-dynamic'`.
+  - Entry: 360 kB, cached between visits.
+  - On demand: Control Center, motion features, panel, update card, select, confirm.
+- `sync-ai-shell` copies that build into `public/ai-assets` (old builds removed).
+- `worker/index.ts` serves `/assets/<name>` for ai.nexusnxs.com from that copy, with immutable cache; unknown names still go to the PC.
+  - Shell and code always match, even when the PC runs another build or is offline.
+- The AI CSP on the edge adds `'strict-dynamic'`.
+- Performance budget: the site's checks exclude `ai-assets/`; the AI app has its own budgets.
+  - Entry < 380 KiB (352.4 KiB).
+  - Total JS < 520 KiB (470.4 KiB).
+- `ai-assets/` is excluded from ESLint.
+- Tests:
+  - 50/50, including a new edge-asset test (no path escape, fallback to the PC);
+  - e2e 40/40: `ai-startup` now loads the entry and chunks through the real worker with the PC offline.
+- PC side:
+  - coordinated restart with `maintenance.flag` done (ready in 106 s);
+  - gateway serves `index-BvP2i18n.js`;
+  - `readyz` returns ready.
+- Next: `release:prepare` and `release:promote`.
+
 # Visual regression: `?nxs-qa-time` now repeatable and the default — 16 November 2026 (source only, no deploy)
 
 - Closes the OPEN point below. There were two real-time causes in the script, not in the site:

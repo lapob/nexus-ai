@@ -385,7 +385,8 @@ test("serves one canonical UI independently of the tunnel while readiness remain
   const html = await navigation.text();
   assert.match(html, /<title>NexusNXS AI<\/title>/);
   assert.match(html, /<div id="root"><\/div>/);
-  assert.match(html, /<script nonce="[^"]+" type="module">/);
+  assert.match(html, /<script nonce="[^"]+" type="module" src="\/assets\/index-[A-Za-z0-9_-]+\.js"><\/script>/);
+  assert.match(navigation.headers.get("content-security-policy") ?? "", /script-src 'nonce-[^']+' 'strict-dynamic'/);
   assert.match(navigation.headers.get("permissions-policy") ?? "", /microphone=\(self\)/);
   assert.doesNotMatch(html, /Cloudflare|1033|workstation|tunnel/i);
 
@@ -395,6 +396,29 @@ test("serves one canonical UI independently of the tunnel while readiness remain
   });
   assert.equal(health.status, 503);
   assert.deepEqual(await health.json(), { status: "offline", retryAfter: 8 });
+});
+
+test("the shell's own /assets build is served by the edge; unknown builds still reach the PC", async () => {
+  const requested = [];
+  const forwarded = [];
+  const env = {
+    ASSETS: { fetch: async request => { const path = new URL(request.url).pathname; requested.push(path);
+      return path === "/ai-assets/index-abc.js" ? new Response("export {}", { headers: { "content-type": "text/javascript" } }) : new Response("Not found", { status: 404 }); } },
+    AI_UPSTREAM: { fetch: async request => { forwarded.push(new URL(request.url).pathname); return new Response("upstream", { status: 200 }); } },
+  };
+  for (const method of ["GET", "HEAD"]) {
+    const own = await fetchWorker("https://ai.nexusnxs.com/assets/index-abc.js", { method, headers: { accept: "*/*" }, env });
+    assert.equal(own.status, 200);
+    assert.equal(own.headers.get("cache-control"), "public, max-age=31536000, immutable");
+    assert.match(own.headers.get("content-type") ?? "", /javascript/);
+  }
+  assert.deepEqual(forwarded, []);
+  const other = await fetchWorker("https://ai.nexusnxs.com/assets/index-zzz.js", { headers: { accept: "*/*" }, env });
+  assert.equal(await other.text(), "upstream");
+  assert.deepEqual(forwarded, ["/assets/index-zzz.js"]);
+  // Never a path outside the copied build.
+  await fetchWorker("https://ai.nexusnxs.com/assets/..%2Fsecret.js", { headers: { accept: "*/*" }, env });
+  assert.ok(requested.every(path => /^\/ai-assets\/[A-Za-z0-9._-]+$/.test(path)), requested.join(","));
 });
 
 test("offline installation artifacts stay available without forwarding credentials to the AI tunnel", async () => {

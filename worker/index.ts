@@ -180,7 +180,8 @@ function contentSecurityPolicy(nonce: string): string {
 }
 
 function aiUiContentSecurityPolicy(nonce: string): string {
-  return `default-src 'none'; script-src 'nonce-${nonce}'; script-src-attr 'none'; style-src 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; frame-src https://nexusnxs.com/sandbox/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  // 'strict-dynamic': the nonced entry module may load its own /assets chunks (static imports and import()).
+  return `default-src 'none'; script-src 'nonce-${nonce}' 'strict-dynamic'; script-src-attr 'none'; style-src 'nonce-${nonce}'; style-src-attr 'none'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; frame-src https://nexusnxs.com/sandbox/; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
 }
 
 function aiOfflineHtml(nonce: string): string {
@@ -251,6 +252,18 @@ async function proxyAi(request: Request, env: Env, nonce: string): Promise<Respo
   }
   if (request.method === "GET" && (url.pathname === "/nexus-icon.png" || url.pathname === "/inter-latin.woff2")) {
     return secureAiResponse(await aiAsset(request, env, url.pathname), env.CF_VERSION_METADATA?.id);
+  }
+  // The shell's own build (entry module, chunks, fonts) is copied to /ai-assets by sync-ai-shell: served from
+  // the edge so shell and code always match, even when the PC runs another build or is offline.
+  // Unknown names (another build) still go to the PC.
+  const shellAsset = /^\/assets\/([A-Za-z0-9._-]+\.(?:js|css|woff2|png))$/.exec(url.pathname)?.[1];
+  if (shellAsset && (request.method === "GET" || request.method === "HEAD")) {
+    const local = await aiAsset(request, env, `/ai-assets/${shellAsset}`);
+    if (local.ok) {
+      const response = secureAiResponse(local, env.CF_VERSION_METADATA?.id);
+      response.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      return response;
+    }
   }
   try {
     const response = env.AI_UPSTREAM ? await env.AI_UPSTREAM.fetch(request) : await fetch(request);

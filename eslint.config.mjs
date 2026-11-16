@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     ".vinext/**",
     ".wrangler/**",
     "dist/**",
+    // Build della web app AI copiata da scripts/sync-ai-shell.mjs (minificata, generata dal sorgente .AI).
+    "public/ai-assets/**",
     "outputs/**",
     "out/**",
     "build/**",

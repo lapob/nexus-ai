@@ -1,6 +1,6 @@
 // Keep the edge fallback identical to the public AI shell, without user data.
 import { createRequire } from 'node:module';
-import { writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
@@ -14,4 +14,15 @@ await writeFile(new URL('../worker/public-ai-shell.ts', import.meta.url), '// Ge
   + `export const publicAiShell = ${JSON.stringify(PUBLIC_AI_HTML)};\n`
   + `export const publicAiManifest = ${JSON.stringify(PUBLIC_AI_MANIFEST)};\n`
   + `export const publicAiServiceWorker = ${JSON.stringify(PUBLIC_AI_SERVICE_WORKER)};\n`);
-console.log('Public AI edge shell synchronized.');
+// The shell loads its entry module and on-demand chunks from /assets (hashed names). The edge keeps its own
+// copy of exactly that build, so the shell never asks the PC for files of a different build and keeps
+// working (fonts, entry, chunks) while the PC is offline. Old builds are removed, never accumulated.
+const webAssets = resolve(sourceRoot, 'web-dist/assets');
+const edgeAssets = new URL('../public/ai-assets/', import.meta.url);
+await rm(edgeAssets, { recursive: true, force: true });
+await mkdir(edgeAssets, { recursive: true });
+const files = (await readdir(webAssets)).filter(name => /^[A-Za-z0-9._-]+\.(?:js|css|woff2|png)$/.test(name));
+const entry = /src="\/assets\/([A-Za-z0-9._-]+\.js)"/.exec(PUBLIC_AI_HTML)?.[1];
+if (!entry || !files.includes(entry)) throw new Error('AI entry module missing from web-dist/assets');
+for (const name of files) await copyFile(resolve(webAssets, name), new URL(name, edgeAssets));
+console.log(`Public AI edge shell synchronized (${files.length} assets, entry ${entry}).`);
