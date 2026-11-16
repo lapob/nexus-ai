@@ -212,7 +212,7 @@ export function App() {
     if (!paired) return;
     void platform.loadConversations().then((loaded) => {
       if (loaded) setState((state) => ({ ...state, conversations: loaded.sort((a, b) => b.updatedAt - a.updatedAt), activeId: loaded.some((item) => item.id === state.activeId) ? state.activeId : null }));
-    }).catch(() => notify(platform.kind === 'paired' ? 'Conversazioni del PC non raggiungibili.' : 'Cronologia locale non disponibile.'));
+    }).catch(() => notify(platform.kind === 'paired' ? 'Conversazioni non raggiungibili: il server non risponde.' : 'Cronologia locale non disponibile.'));
   }, [paired]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const expired = () => setPaired(false);
@@ -272,7 +272,7 @@ export function App() {
     const text = raw.trim() || (attachments.length ? 'Analizza gli allegati.' : '');
     if (!text || getState().generating) return null;
     // Offline nessun invio: il testo resta nel composer e si invia quando il PC torna raggiungibile.
-    if (offlineRef.current) { notify('Offline: il PC non è raggiungibile. Il messaggio resta qui, riprovo da solo.'); return null; }
+    if (offlineRef.current) { notify('Server non raggiungibile: il messaggio resta qui e lo invio appena torna disponibile.'); return null; }
     stopSpeaking();
     const conversationId = activeConversation()?.id ?? newConversation();
     const history = (activeConversation()?.messages ?? []).filter((message) => !message.error).map(({ role, content }) => ({ role, content }));
@@ -767,7 +767,7 @@ export function App() {
               </li>
             ))}</ul>}
             <textarea ref={inputRef} value={draft} rows={1} maxLength={platform.kind === 'desktop' ? 48_000 : 12_000}
-              placeholder={offline ? 'Offline · il PC non è raggiungibile, riprovo da solo…' : recording ? 'Ti ascolto… parla, mi fermo quando fai una pausa' : transcribing ? 'Trascrivo…' : 'Scrivi a NexusNXS…   / per i comandi'} aria-label="Messaggio"
+              placeholder={offline ? 'Server non raggiungibile · riprovo da solo…' : recording ? 'Ti ascolto… parla, mi fermo quando fai una pausa' : transcribing ? 'Trascrivo…' : 'Scrivi a NexusNXS…   / per i comandi'} aria-label="Messaggio"
               onChange={(event) => { setDraft(event.target.value); setSlashIndex(0); }} onKeyDown={onComposerKey} autoFocus readOnly={Boolean(recording) || transcribing}
               onPaste={(event) => { const files = [...event.clipboardData.files]; if (files.length && caps.attachments && platform.acceptsDroppedFiles) { event.preventDefault(); void addFiles(files); } }} />
             <div className="composer-bar">
@@ -794,7 +794,7 @@ export function App() {
               )}
               {generating
                 ? <button type="button" className="send stop" aria-label="Interrompi" onClick={stop}><Icon name="stop" /></button>
-                : <button type="submit" className="send" aria-label={offline ? 'Invio non disponibile: offline' : 'Invia'} title={offline ? 'Offline: il PC non è raggiungibile' : undefined} disabled={offline || (!draft.trim() && !pending.length) || Boolean(recording) || transcribing}><Icon name="arrow" /></button>}
+                : <button type="submit" className="send" aria-label={offline ? 'Invio non disponibile: offline' : 'Invia'} title={offline ? 'Server non raggiungibile' : undefined} disabled={offline || (!draft.trim() && !pending.length) || Boolean(recording) || transcribing}><Icon name="arrow" /></button>}
             </div>
           </form>
           )}
@@ -828,7 +828,7 @@ export function App() {
           {shortcutsOpen && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
           {settingsOpen && <Settings preferences={preferences} onClose={() => setSettingsOpen(false)} onCleared={() => notify('Dati locali e risposte di ripresa cancellati.')} />}
           {controlOpen && desktopBridge && <Suspense key="control" fallback={null}><ControlCenter initialTab={controlOpen === 'memory' ? 'memory' : undefined} onClose={() => setControlOpen(false)} notify={notify} /></Suspense>}
-          {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Collegato al tuo PC.'); }} />}
+          {!paired && <PairingScreen onPaired={() => { setPaired(true); notify('Dispositivo collegato.'); }} />}
         </AnimatePresence>
 
         <GpuWarmup />
@@ -1193,8 +1193,8 @@ function PairingScreen({ onPaired }: { onPaired: () => void }) {
     <div className="overlay" role="presentation">
       <m.form className="sheet glass" role="dialog" aria-modal="true" aria-labelledby="pair-title" onSubmit={(event) => { event.preventDefault(); void pair(code, name); }}
         initial={SHEET.initial} animate={SHEET.animate} transition={SHEET.transition}>
-        <header><h2 id="pair-title">Collega questo dispositivo al PC</h2></header>
-        <p className="muted">Inserisci il codice mostrato sul PC in Centro di controllo → Telefono. Il collegamento è privato e revocabile.</p>
+        <header><h2 id="pair-title">Collega questo dispositivo</h2></header>
+        <p className="muted">Inserisci il codice di associazione mostrato nell’app desktop, in Centro di controllo → Telefono. Il collegamento è privato e revocabile.</p>
         <label htmlFor="pair-code">Codice</label>
         <input id="pair-code" className="field" inputMode="numeric" autoComplete="one-time-code" maxLength={12} value={code} onChange={(event) => setCode(event.target.value)} required />
         <label htmlFor="pair-name">Nome del dispositivo</label>
@@ -1267,7 +1267,7 @@ const STATUS_LABEL: Record<ServiceStatus, string> = { ready: 'Online', preparing
 function ProfileMenu({ status, compactRail = false, onSettings, onControl, onShortcuts }: { status: ServiceStatus; compactRail?: boolean; onSettings: () => void; onControl?: () => void; onShortcuts: () => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const who = platform.kind === 'desktop' ? 'Questo PC' : platform.kind === 'paired' ? 'Collegato al PC' : 'Ospite';
+  const who = platform.kind === 'desktop' ? 'Questo dispositivo' : platform.kind === 'paired' ? 'Dispositivo collegato' : 'Ospite';
   useEffect(() => {
     if (!open) return;
     const away = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };

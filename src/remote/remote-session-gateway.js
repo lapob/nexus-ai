@@ -142,6 +142,15 @@ function requestFailure(message, code, status = 400) {
   return Object.assign(new Error(message), { code, status });
 }
 
+const GUEST_UNAVAILABLE = 'Il servizio non ha potuto completare la richiesta. Riprova tra poco.';
+/** Errore pensato per l'ospite: codice GUEST_* oppure richiesta rifiutata (4xx) con codice esplicito. */
+function guestSafeError(error) {
+  if (!error?.message) return false;
+  const code = String(error.code || '');
+  if (code.startsWith('GUEST_')) return true;
+  return Boolean(code) && Number.isInteger(error.status) && error.status >= 400 && error.status <= 499;
+}
+
 function privateVoiceWaveInfo(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 44 || buffer.length > MAX_PRIVATE_VOICE_BYTES
     || buffer.subarray(0, 4).toString('ascii') !== 'RIFF'
@@ -1142,8 +1151,11 @@ class RemoteSessionGateway {
 
   guestError(response, error) {
     if (response.destroyed || response.writableEnded) return;
+    // All'ospite arrivano solo errori scritti per lui (codice GUEST_* o richiesta non valida con codice 4xx):
+    // un guasto interno (runtime, rete locale, fornitore) non deve mai mostrare indirizzi, nomi o dettagli.
+    if (!guestSafeError(error)) return this.json(response, 503, { error: GUEST_UNAVAILABLE });
     const status = Number(error?.status) || (['GUEST_QUEUE_FULL', 'GUEST_QUEUE_TIMEOUT', 'GUEST_BUSY', 'GUEST_RATE_LIMITED', 'GUEST_DAILY_LIMIT'].includes(error?.code) ? 429 : 400);
-    return this.json(response, status, { error: error?.message || 'La richiesta non è valida.' });
+    return this.json(response, status, { error: error.message, ...(error.code ? { code: error.code } : {}) });
   }
 
   deviceCapabilities(device) {
@@ -2412,7 +2424,7 @@ class RemoteSessionGateway {
           const result = await prepared.execution.promise;
           if (!terminal) send({ type: 'complete', ...result, cursor: result.message.length });
         } catch (error) {
-          if (!terminal && !response.destroyed) send({ type: 'error', error: error?.message || 'La risposta non è stata completata.', cursor: lastCursor, resumable: false });
+          if (!terminal && !response.destroyed) send({ type: 'error', error: guestSafeError(error) ? error.message : 'La risposta non è stata completata.', cursor: lastCursor, resumable: false });
         } finally { clearInterval(heartbeat); detach(); if (!response.destroyed) response.end(); }
         return;
       }
@@ -2531,7 +2543,10 @@ class RemoteSessionGateway {
       const device = this.authenticate(request);
       if (!device) {
         this.securityEvents.append('authentication.denied', { severity: 'warning', address: requestAddress(request), detail: url.pathname });
-        return this.json(response, 401, { error: 'Dispositivo non associato.' });
+        // Dall'ingresso pubblico un percorso fuori da /api è semplicemente inesistente: nessun indizio su
+        // associazioni o percorsi privati. Il testo del 401 resta neutro (lo stato guida il client).
+        if (publicIngress && !url.pathname.startsWith('/api/')) return this.json(response, 404, { error: 'Risorsa non disponibile.' });
+        return this.json(response, 401, { error: 'Accesso non autorizzato.' });
       }
       this.trackDeviceRequest(request, response, device);
       if (publicIngress && device.scope !== 'chat') {
@@ -3264,4 +3279,4 @@ class RemoteSessionGateway {
 
 // #endregion
 
-module.exports = { PUBLIC_AI_HTML, PUBLIC_AI_BUILT, PUBLIC_AI_MANIFEST, PUBLIC_AI_SERVICE_WORKER, RemoteSessionGateway, systemSnapshot, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, normalizeSyncedPreferences, guestAttachments, deviceAttachments, authenticatedRouteLimit, slidingWindowAllowed, parseDeviceIdentityEnrollment, verifyDevicePublicKeySignature, privateVoiceWaveInfo, DEFAULT_PORT };
+module.exports = { PUBLIC_AI_HTML, PUBLIC_AI_BUILT, PUBLIC_AI_MANIFEST, PUBLIC_AI_SERVICE_WORKER, RemoteSessionGateway, guestSafeError, systemSnapshot, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, normalizeSyncedPreferences, guestAttachments, deviceAttachments, authenticatedRouteLimit, slidingWindowAllowed, parseDeviceIdentityEnrollment, verifyDevicePublicKeySignature, privateVoiceWaveInfo, DEFAULT_PORT };

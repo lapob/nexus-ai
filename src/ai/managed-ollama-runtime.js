@@ -60,6 +60,20 @@ function selectManagedRuntimePort(pid = process.pid, {
   return 11_435;
 }
 
+/**
+ * La UI desktop separata non avvia un secondo runtime: riusa quello del Core vivo indicato dal lock
+ * locale, sulla porta che il Core deriva dal proprio PID. Solo loopback; '' se il Core non c'è.
+ */
+function coreRuntimeBaseUrl(descriptor, {
+  isAlive = () => false,
+  selectPort = selectManagedRuntimePort,
+  selfPid = process.pid
+} = {}) {
+  const pid = Number(descriptor?.pid);
+  if (!Number.isInteger(pid) || pid <= 0 || pid === selfPid || !isAlive(pid)) return '';
+  return `http://127.0.0.1:${selectPort(pid)}`;
+}
+
 function sanitizedRuntimeEnvironment(source = process.env) {
   const safe = {};
   for (const key of RUNTIME_ENV_KEYS) {
@@ -423,6 +437,7 @@ class ManagedOllamaRuntime {
 module.exports = {
   ManagedOllamaRuntime,
   assertRuntimeAdmission,
+  coreRuntimeBaseUrl,
   managedRuntimeSecurityUsage,
   parseExcludedTcpPortRanges,
   sanitizedRuntimeEnvironment,

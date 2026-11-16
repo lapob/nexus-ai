@@ -1,3 +1,32 @@
+## Neutral copy, guest hardening, desktop runtime — 16 November 2026 (in progress)
+
+- Copy: user-visible text speaks of "server" and "dispositivo", never the owner's computer or personal details.
+- Gateway hardening:
+  - guests receive only messages written for them (`guestSafeError`), otherwise a generic 503 or a stream
+    error;
+  - unauthenticated public non-API paths return 404, API paths return 401 with a neutral text.
+- Desktop "Offline" fixed:
+  - cause: the separate desktop UI (`NEXUS_MANAGED_OLLAMA=0`) looked for the runtime on the default port,
+    where nothing listens;
+  - fix: `coreRuntimeBaseUrl` now derives the Core runtime from the live `headless-server.lock` (loopback
+    only, endpoint locked);
+  - verified live: the reopened UI connects to the Core runtime;
+  - limitation: a UI left open across a Server restart keeps the previous port until it is reopened.
+- Security:
+  - `security:gate`, ASVS map, `security:regression`, hygiene, private-knowledge lint and `audit:tooling`
+    are green;
+  - site: the dev-only minimatch advisory (typescript-eslint) is fixed with an override to 11.0.4; audit
+    shows 0 findings and lint passes.
+- Checks:
+  - typecheck;
+  - `npm test`: 1339 pass, 0 fail.
+- Cleanup: the regenerable Android build was removed via `cleanup-workstation.ps1`.
+- Next steps:
+  1. Commit, then the web build.
+  2. Coordinated Server restart (`maintenance.flag`).
+  3. Edge re-sync and promotion.
+  4. Live verification.
+
 ## Automatic visual regression (15 November 2026, source only)
 
 - Follow-up:

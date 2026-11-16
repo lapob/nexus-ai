@@ -42,7 +42,7 @@ const { AIProviderRegistry } = require('../ai/ai-provider-registry');
 const { AIRuntime } = require('../ai/ai-runtime');
 const { OllamaProvider } = require('../ai/providers/ollama-provider');
 const { NexusServiceProvider } = require('../ai/providers/nexus-service-provider');
-const { ManagedOllamaRuntime, assertRuntimeAdmission, managedRuntimeSecurityUsage, selectManagedRuntimePort } = require('../ai/managed-ollama-runtime');
+const { ManagedOllamaRuntime, assertRuntimeAdmission, coreRuntimeBaseUrl, managedRuntimeSecurityUsage, selectManagedRuntimePort } = require('../ai/managed-ollama-runtime');
 const { detectHardware, runtimeTuning } = require('../ai/hardware-profile');
 const {
   MODEL_PROFILES,
@@ -119,11 +119,17 @@ function bootstrapElectron({ env = process.env } = {}) {
   // posseduto dall'app. Il range resta esclusivamente loopback.
   const managedPort = selectManagedRuntimePort(process.pid);
   const managedBaseUrl = `http://127.0.0.1:${managedPort}`;
+  // UI desktop accanto al Server (NEXUS_MANAGED_OLLAMA=0): riusa il runtime del Core invece di
+  // cercarne uno sulla porta standard, dove non c'è nulla e l'app risulterebbe sempre offline.
+  const coreRuntimeUrl = !publicClientMode && !headlessMode && !managedRuntimeEnabled
+    && !String(env.NEXUS_OLLAMA_BASE_URL || '').trim()
+    ? coreRuntimeBaseUrl(readLock(path.join(sharedDataRoot, 'headless-server.lock')), { isAlive: isProcessAlive })
+    : '';
   const runtimeEnvironment = publicClientMode
     ? { ...env, NEXUS_AI_PROVIDER: 'nexus-service', NEXUS_SERVICE_URL: serviceUrl, NEXUS_SERVICE_FALLBACK_URLS: serviceFallbackUrls, NEXUS_AI_CHAT_MODEL: 'automatic', NEXUS_AI_FAST_MODEL: 'automatic', NEXUS_AI_EMBEDDING_MODEL: '' }
     : managedRuntimeEnabled
       ? { ...env, NEXUS_OLLAMA_BASE_URL: managedBaseUrl, NEXUS_OLLAMA_ALLOW_LAN: '0' }
-      : env;
+      : coreRuntimeUrl ? { ...env, NEXUS_OLLAMA_BASE_URL: coreRuntimeUrl, NEXUS_OLLAMA_ALLOW_LAN: '0' } : env;
   const runtimeConfig = loadRuntimeConfig(runtimeEnvironment);
   const logger = createLogger({
     level: runtimeConfig.logging.level,
@@ -774,7 +780,7 @@ function bootstrapElectron({ env = process.env } = {}) {
         vaultPath: vaultLocation.vaultPath,
         vaultLocation,
         runtimeConfig,
-        runtimeEndpointLocked: publicClientMode || managedRuntimeEnabled || Boolean(env.NEXUS_OLLAMA_BASE_URL),
+        runtimeEndpointLocked: publicClientMode || managedRuntimeEnabled || Boolean(runtimeEnvironment.NEXUS_OLLAMA_BASE_URL),
         distributionMode: publicClientMode ? 'public' : serverMode ? 'server' : 'developer',
         logger,
         getIndex: () => index,

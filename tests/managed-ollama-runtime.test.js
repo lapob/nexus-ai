@@ -8,6 +8,7 @@ const vm = require('node:vm');
 const {
   ManagedOllamaRuntime,
   assertRuntimeAdmission,
+  coreRuntimeBaseUrl,
   managedRuntimeSecurityUsage,
   parseExcludedTcpPortRanges,
   selectManagedRuntimePort
@@ -160,6 +161,20 @@ test('il launcher riusa la porta effettiva del Core anche con PID grande e riser
       : name.endsWith('managed-ollama-runtime') ? { selectManagedRuntimePort: select } : require(name)
   });
   assert.equal(actual, 'http://127.0.0.1:14351');
+});
+
+test('la UI desktop riusa il runtime del Core vivo, mai il proprio PID o un lock orfano', () => {
+  const selectPort = (pid) => 12_000 + (pid % 8_000);
+  const alive = new Set([2112]);
+  const options = { isAlive: (pid) => alive.has(pid), selectPort, selfPid: 4242 };
+  assert.equal(coreRuntimeBaseUrl({ pid: 2112 }, options), 'http://127.0.0.1:14112');
+  assert.equal(coreRuntimeBaseUrl({ pid: 9999 }, options), '');
+  assert.equal(coreRuntimeBaseUrl({ pid: 4242 }, { ...options, isAlive: () => true }), '');
+  assert.equal(coreRuntimeBaseUrl(null, options), '');
+  assert.equal(coreRuntimeBaseUrl({ pid: '2112; rm' }, options), '');
+  const bootstrap = fs.readFileSync(path.join(__dirname, '../src/application/bootstrap.js'), 'utf8');
+  assert.match(bootstrap, /coreRuntimeUrl \? \{ \.\.\.env, NEXUS_OLLAMA_BASE_URL: coreRuntimeUrl, NEXUS_OLLAMA_ALLOW_LAN: '0' \}/);
+  assert.match(bootstrap, /runtimeEndpointLocked: [^\n]*runtimeEnvironment\.NEXUS_OLLAMA_BASE_URL/);
 });
 
 test('sceglie una porta runtime fuori dagli intervalli riservati da Windows', () => {

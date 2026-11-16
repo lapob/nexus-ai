@@ -136,7 +136,7 @@ export async function consumeStream(body: ReadableStream<BufferSource>, onEvent:
     }
     handle(buffer);
   } finally { reader.releaseLock(); }
-  if (!terminal) onEvent({ type: 'error', error: 'Connessione con il PC interrotta. La risposta comparirà nella cronologia.' });
+  if (!terminal) onEvent({ type: 'error', error: 'Connessione con il server interrotta. La risposta comparirà nella cronologia.' });
 }
 
 // #endregion

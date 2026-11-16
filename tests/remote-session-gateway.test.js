@@ -6,7 +6,16 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
-const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed, PUBLIC_AI_BUILT } = require('../src/remote/remote-session-gateway');
+const { RemoteSessionGateway, tokenHash, readState, privateAddresses, cleanPublicUrl, requestAddress, isLoopbackRequest, pseudonymousAccessId, isTailscalePeer, isTrustedConsoleBootstrap, guestAttachments, authenticatedRouteLimit, slidingWindowAllowed, PUBLIC_AI_BUILT, guestSafeError } = require('../src/remote/remote-session-gateway');
+
+test('ospiti: solo errori scritti per loro, mai dettagli interni del servizio', () => {
+  assert.equal(guestSafeError(Object.assign(new Error('Limite giornaliero raggiunto.'), { code: 'GUEST_DAILY_LIMIT' })), true);
+  assert.equal(guestSafeError(Object.assign(new Error('Allegato troppo grande.'), { code: 'ATTACHMENT_TOO_LARGE', status: 413 })), true);
+  assert.equal(guestSafeError(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:11435'), { code: 'ECONNREFUSED' })), false);
+  assert.equal(guestSafeError(Object.assign(new Error('model runtime crashed'), { status: 500, code: 'PROVIDER' })), false);
+  assert.equal(guestSafeError(new Error('qualsiasi errore interno')), false);
+  assert.equal(guestSafeError(null), false);
+});
 
 
 test('l osservabilità privata riconosce soltanto loopback e pseudonimizza gli accessi', () => {
@@ -1827,6 +1836,15 @@ test('Funnel espone il listener Remote AI ma non la Console operativa', async ()
       assert.match(entryResponse.headers.get('content-type'), /javascript/);
     }
     assert.equal((await fetch(`${baseUrl}/next/`, { redirect: 'manual' })).headers.get('location'), '/');
+    // Fuori da /api l'ingresso pubblico non rivela associazioni né percorsi privati.
+    for (const pathname of ['/robots.txt', '/.well-known/security.txt', '/wp-admin']) {
+      const unknown = await fetch(`${baseUrl}${pathname}`);
+      assert.equal(unknown.status, 404, pathname);
+      assert.doesNotMatch(await unknown.text(), /associat|dispositivo|token/i);
+    }
+    const unauthorized = await fetch(`${baseUrl}/api/conversations`);
+    assert.equal(unauthorized.status, 401);
+    assert.deepEqual(await unauthorized.json(), { error: 'Accesso non autorizzato.' });
     const publicStatus = await (await fetch(`${baseUrl}/api/status`)).json();
     assert.deepEqual(publicStatus, { product: 'NexusNXS', anonymousAvailable: true, imageGeneration: false });
     const privateStatus = await (await fetch(`${privateUrl}/api/status`)).json();

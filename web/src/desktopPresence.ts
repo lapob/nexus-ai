@@ -83,7 +83,7 @@ export function useDesktopPresence({ state, live, onWake, notify }: { state: Cor
     const offWake = desktopBridge.onWakeWordActivation?.(() => { if (!liveRef.current && wakeWordEnabled()) wake.current(); }) as (() => void) | undefined;
     const offProactive = desktopBridge.onProactiveEvent?.((event: { type: string; metadata?: Record<string, string> }) => {
       const metadata = event?.metadata ?? {};
-      say.current(typeof metadata.summary === 'string' ? metadata.summary : PROACTIVE_LABELS[event?.type]?.(metadata) ?? 'Stato del PC aggiornato');
+      say.current(typeof metadata.summary === 'string' ? metadata.summary : PROACTIVE_LABELS[event?.type]?.(metadata) ?? 'Stato del sistema aggiornato');
     }) as (() => void) | undefined;
     return () => { offWake?.(); offProactive?.(); };
   }, []);
