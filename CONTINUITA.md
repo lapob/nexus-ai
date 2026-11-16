@@ -3574,6 +3574,26 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
 - Log: scratchpad `release-0343.log` (local only).
 - Expected check: `/updates/preview` serves 0.3.43, signed and verified.
 - Done before the release: the leftover `.AI-release-0342` folder (0.26 GB, no file in use) was deleted.
+## Release 0.3.43 published (16 November 2026)
+
+- Release run:
+  - `release:public:preview` from the clean `.AI` checkout on `a1c8fba`;
+  - npm test 1338 tests, 1336 pass, 0 fail;
+  - installer built and verified, SBOM with 331 components.
+- Manifest refresh (5 artefacts), `release:verify-bundle` PASS, `founder:package` OK.
+- `publish-github-preview` → v0.3.43-preview.1: 9 assets, each verified on GitHub.
+- Site:
+  - sync-ai-shell had nothing to change, and sync-public-release reported Windows 0.3.43;
+  - commit `a8f9c15`, then `release:prepare` produced the candidate (downloads 0.3.43);
+  - `release:promote` → production `a9feafc9`: 13 routes, navbar, headers and AI health verified;
+  - `website` pushed.
+- Live feed:
+  - `verifyRemoteReleaseFeed` on nexusnxs.com/updates/preview returns 0.3.43, channel preview, 5 artefacts;
+  - the signature verifies with the app's Preview key (`nxs-preview-1`).
+- Coordinated restart with `maintenance.flag`: ready in 24 s, `qwen3:14b` in VRAM (13.4 GB).
+- Earlier the same day: the leftover `.AI-release-0342` folder was deleted.
+- Next: installed desktops update themselves to 0.3.43. Also observe the first real update, with its toast and the
+  boot-health check.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
