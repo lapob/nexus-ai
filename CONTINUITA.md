@@ -1,4 +1,23 @@
-# AI web app code-splitting on the edge — 16 November 2026 (release in progress)
+# Edge shell resync, release-safe chunks, dev audit fixed — 16 November 2026 (release in progress)
+
+- AI source:
+  - a8950a8: neutral copy, guest error filtering, public 404s;
+  - 49cfa82: chunks reload once per build when a deploy removed them.
+- The server now serves `index-Baqub-eQ.js`.
+- `sync-ai-shell` was re-run: 27 assets, previous build removed. Its comment now says "server".
+- The minimatch advisory (dev-only, via typescript-eslint) is fixed with an override:
+  `@typescript-eslint/typescript-estree` → minimatch 11.0.4. `npm audit` shows 0 findings and lint passes.
+- `verify:release` is green:
+  - unit 50/50;
+  - e2e 40/40;
+  - audit and OSV;
+  - Cloudflare dry-run.
+- Next steps:
+  1. `release:prepare`.
+  2. `release:promote`.
+  3. Live check.
+
+# AI web app code-splitting on the edge — 16 November 2026 (released, 856c6536)
 
 - The AI app (`.AI` 0f11de2) now ships CSS inline and its entry module and chunks from `/assets`.
   - CSP: `'strict-dynamic'`.

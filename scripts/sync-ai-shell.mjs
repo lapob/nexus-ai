@@ -15,8 +15,9 @@ await writeFile(new URL('../worker/public-ai-shell.ts', import.meta.url), '// Ge
   + `export const publicAiManifest = ${JSON.stringify(PUBLIC_AI_MANIFEST)};\n`
   + `export const publicAiServiceWorker = ${JSON.stringify(PUBLIC_AI_SERVICE_WORKER)};\n`);
 // The shell loads its entry module and on-demand chunks from /assets (hashed names). The edge keeps its own
-// copy of exactly that build, so the shell never asks the PC for files of a different build and keeps
-// working (fonts, entry, chunks) while the PC is offline. Old builds are removed, never accumulated.
+// copy of exactly that build, so the shell never asks the server for files of a different build and keeps
+// working (fonts, entry, chunks) while the server is offline. Old builds are removed, never accumulated:
+// a tab still on the previous build reloads once when a chunk is missing (web/src/chunks.ts in the AI source).
 const webAssets = resolve(sourceRoot, 'web-dist/assets');
 const edgeAssets = new URL('../public/ai-assets/', import.meta.url);
 await rm(edgeAssets, { recursive: true, force: true });
