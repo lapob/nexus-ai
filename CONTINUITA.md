@@ -3636,6 +3636,21 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
   - test presence 38/38; `npm test` 1337 pass, 0 fail;
   - dal vivo: apri/chiudi da bridge (Control) e chiusura con la X della finestra; ogni volta l'icona viene mostrata e poi rimossa.
 
+## Accessibilità axe al massimo livello (16 novembre 2026)
+
+- `check:ui` ora fa girare axe con tag wcag2a/aa, wcag21a/aa, wcag22aa e best-practice, e fallisce su qualunque gravità (prima: solo gravi o critiche).
+- Corretti i quattro avvisi emersi:
+  - heading-order: il Markdown normalizza i titoli di ogni risposta (il più alto diventa h2, nessun salto di livello);
+  - target-size: le citazioni [n] sono a 6 px di distanza (centri ≥ 24 px, eccezione di spaziatura di WCAG 2.5.8);
+  - landmark-unique: il piano di lavoro è un `role="group"`, non più una `section` regione ripetuta;
+  - region / modale: il menu `Select` resta nel DOM dentro il dialogo `aria-modal` e si disegna nel livello superiore con l'API Popover.
+    - Senza Popover usa ancora il portale nel body.
+    - Prima era fuori dal dialogo modale, irraggiungibile per VoiceOver.
+- Verifiche:
+  - `check:ui` 39/39 scenari e 15/15 risoluzioni, zero violazioni axe;
+  - typecheck ok; `npm test` 1337 pass, 0 fail;
+  - `qa:visual` web 24/24 e core 90/90.
+
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.

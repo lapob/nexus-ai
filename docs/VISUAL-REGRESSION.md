@@ -102,7 +102,11 @@ Le baseline approvate sono versionate in `qa-artifacts/visual-baselines/<suite>/
   sessione web/desktop, arriverà con il prossimo blocco del core.
   - Quando ci sarà, `canvas.dataset.qa === 'ready'` segnala il fotogramma pronto, e si potrà provare anche il
     percorso worker.
-  - Il sito ha già `?nxs-still`; il test del sito usa l'orologio fermo, che è compatibile con quella modalità.
+  - Il sito lo ha già (alias di `?nxs-still`), e dal 16 novembre 2026 il suo test lo usa per impostazione predefinita
+    insieme all'orologio fermo.
+    - Prima dello scroll si caricano e decodificano le immagini pigre; lo scroll emette subito l'evento `scroll`.
+    - Così cinque esecuzioni consecutive sono identiche al pixel.
+    - `--clock-only` torna al solo orologio, che lascia qualche granello (fino a ~70 px).
 - **Esito**: due esecuzioni consecutive danno 0,000% di differenza su tutte le catture web, core e sito.
 
 ## Soglie

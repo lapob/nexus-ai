@@ -518,8 +518,8 @@ for (const scenario of only.length ? scenarios.filter((item) => only.includes(it
     if (axeSource) {
       await page.addScriptTag({ content: axeSource });
       axe = await page.evaluate(async () => {
-        const result = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa'] } });
-        return result.violations.filter((item) => ['serious', 'critical'].includes(item.impact)).map((item) => `${item.id}(${item.nodes.length})`);
+        const result = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'] } });
+        return result.violations.map((item) => `${item.id}[${item.impact}](${item.nodes.length}: ${item.nodes.slice(0, 2).map((node) => node.target.join(' ')).join(' | ')})`);
       });
     }
     await page.screenshot({ path: path.join(out, `${scenario.name}.png`) });

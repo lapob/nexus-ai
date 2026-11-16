@@ -4,7 +4,7 @@
  * posizionato in un portale con flip e clamp al viewport (mai tagliato, mai sopra ai bordi),
  * tastiera completa (frecce, Home/Fine, Invio/Spazio, Esc, Tab, ricerca per iniziali) e ARIA listbox.
  */
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 
@@ -18,6 +18,10 @@ interface Props {
   ariaLabel?: string;
   className?: string;
 }
+
+/** API Popover disponibile (Chromium 114+, Safari 17+, Firefox 125+): altrimenti portale nel body come prima. */
+const TOP_LAYER = typeof HTMLElement !== 'undefined' && 'showPopover' in HTMLElement.prototype;
+const mountPanel = (panel: ReactElement) => (TOP_LAYER ? panel : createPortal(panel, document.body));
 
 const GAP = 6;
 const MARGIN = 10;
@@ -74,6 +78,14 @@ export function Select({ id, value, options, onChange, ariaLabel, className = ''
   };
 
   useLayoutEffect(() => { if (open) measure(); }, [open, measure]);
+  // Livello superiore: il pannello resta nel DOM accanto al selettore (dentro il dialogo modale, raggiungibile dai
+  // lettori di schermo e dentro un landmark) ma si disegna sopra tutto, senza tagli da overflow né blocchi di
+  // contenimento creati da backdrop-filter/transform degli antenati.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!TOP_LAYER || !open || !place || !list || list.matches(':popover-open')) return;
+    try { list.showPopover(); } catch { /* Già aperto o staccato: nessun effetto. */ }
+  }, [open, place]);
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => {
@@ -139,9 +151,10 @@ export function Select({ id, value, options, onChange, ariaLabel, className = ''
         <span className="select-value">{current?.label ?? ''}</span>
         <span className="select-chevron" aria-hidden="true"><Icon name="chevron" size={16} /></span>
       </button>
-      {open && place && createPortal(
+      {open && place && mountPanel(
         <ul
           ref={listRef} id={listId} role="listbox" className="select-panel glass" tabIndex={-1}
+          {...(TOP_LAYER ? { popover: 'manual' } : {})}
           data-side={place.above ? 'top' : 'bottom'} data-closing={closing}
           style={{ left: place.left, top: place.top, bottom: place.bottom, width: place.width, maxHeight: place.maxHeight }}
           onPointerDown={(event) => event.preventDefault()}
@@ -158,8 +171,7 @@ export function Select({ id, value, options, onChange, ariaLabel, className = ''
               <span className="select-check" aria-hidden="true"><Icon name="check" size={15} /></span>
             </li>
           ))}
-        </ul>,
-        document.body
+        </ul>
       )}
     </>
   );

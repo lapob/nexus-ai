@@ -899,7 +899,8 @@ function PlanCard({ plan, live }: { plan: PlanStep[]; live: boolean }) {
   const expanded = open ?? (live || !complete);
   const label = complete ? `Piano completato · ${plan.length} passi` : `Piano · ${done}/${plan.length}`;
   return (
-    <section className="plan-card" data-live={live} data-complete={complete} aria-label="Piano di lavoro">
+    // Gruppo, non landmark: ogni risposta può avere il suo piano e più regioni omonime confondono la navigazione (axe landmark-unique).
+    <div role="group" className="plan-card" data-live={live} data-complete={complete} aria-label="Piano di lavoro">
       <button type="button" className="plan-head" aria-expanded={expanded} onClick={() => setOpen(!expanded)}>
         <Icon name={complete ? 'check' : 'sparkles'} size={15} />
         <span>{label}</span>
@@ -919,7 +920,7 @@ function PlanCard({ plan, live }: { plan: PlanStep[]; live: boolean }) {
           ))}
         </ol>
       </div>
-    </section>
+    </div>
   );
 }
 

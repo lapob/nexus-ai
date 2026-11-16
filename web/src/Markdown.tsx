@@ -96,6 +96,18 @@ export function parseBlocks(source: string): Block[] {
     paragraph.push(line);
   }
   flush();
+  // Gerarchia accessibile: il titolo più alto della risposta diventa h2 e nessun livello viene saltato
+  // (un «###» isolato non produce più un h4 orfano sotto l'h1 della pagina, WCAG 1.3.1 / axe heading-order).
+  const headings = blocks.filter((block): block is Extract<Block, { kind: 'heading' }> => block.kind === 'heading');
+  if (headings.length) {
+    const top = Math.min(...headings.map((block) => block.level));
+    let previous = 1;
+    for (const block of headings) {
+      const level = Math.min(4, Math.max(2, block.level - top + 2), previous + 1) as 2 | 3 | 4;
+      block.level = level;
+      previous = level;
+    }
+  }
   return blocks;
 }
 

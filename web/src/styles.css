@@ -375,7 +375,8 @@
   .sources .index { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; font-size: .72rem; color: var(--ink); background: var(--cyan); }
   .sources small { color: var(--mist); font-size: .74rem; }
   /* Citazioni in linea [n]: piccole pastiglie numerate che aprono la fonte (con titolo nel tooltip). */
-  .cites { display: inline-flex; gap: 3px; margin-left: 3px; vertical-align: .12em; }
+  /* gap 6px: centri a ≥ 24px, eccezione di spaziatura di WCAG 2.5.8 senza ingrandire le pastiglie nel testo. */
+  .cites { display: inline-flex; gap: 6px; margin-left: 3px; vertical-align: .12em; }
   .cite { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; font-size: .68rem; font-weight: 600; line-height: 1; text-decoration: none;
     color: var(--cyan); background: color-mix(in oklch, var(--cyan) 13%, transparent); border: 1px solid color-mix(in oklch, var(--cyan) 26%, transparent); transition: background .15s, color .15s, translate .15s; }
   .cite { position: relative; }
@@ -499,7 +500,8 @@
   .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .select-chevron { display: grid; flex: none; color: var(--mist); transition: rotate .28s var(--ease-emphasized), color .18s; }
   .select-trigger[data-open='true'] .select-chevron { rotate: 180deg; color: var(--cyan); }
-  .select-panel { position: fixed; z-index: 1000; list-style: none; margin: 0; padding: 6px; border-radius: 16px; overflow-y: auto; overscroll-behavior: contain;
+  /* inset/color annullano i valori UA di [popover] (inset: 0, CanvasText): restano left/top in linea dal posizionatore. */
+  .select-panel { position: fixed; inset: auto; color: inherit; z-index: 1000; list-style: none; margin: 0; padding: 6px; border-radius: 16px; overflow-y: auto; overscroll-behavior: contain;
     scrollbar-width: thin; scrollbar-color: color-mix(in oklch, var(--hairline) 60%, transparent) transparent;
     background: color-mix(in oklch, var(--surface) 97%, var(--cyan) 3%); box-shadow: 0 24px 64px -18px #000, 0 2px 8px -2px #0008, 0 0 0 1px color-mix(in oklch, var(--cyan) 9%, transparent) inset;
     transform-origin: top center; animation: select-in .2s var(--ease-emphasized) both; }
