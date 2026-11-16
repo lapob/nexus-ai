@@ -3561,6 +3561,19 @@ Real human voice, STT accuracy and echo tests remain deferred; synthetic TTS doe
     code and the console has written its PID at logon.
 - Procedure: the server is stopped through the manager (`stop`), then Windows shuts down.
   - At the next start the "NexusNXS Server" task starts the server; the owner-stop flag expires at the PC restart.
+## Release 0.3.43 resumed (16 November 2026)
+
+- Operation: `release:public:preview` run directly from the `.AI` checkout on `main`.
+  - At the start the checkout is clean and no other session is working, so no worktree is needed.
+  - `NEXUS_SERVICE_URL=https://ai.nexusnxs.com`, with `.toolchains` and git on PATH.
+- Then:
+  - manifest refresh, verify-bundle, founder:package;
+  - push and `publish-github-preview` → v0.3.43-preview.1;
+  - coordinated restart with `maintenance.flag`;
+  - site: sync, prepare and promote.
+- Log: scratchpad `release-0343.log` (local only).
+- Expected check: `/updates/preview` serves 0.3.43, signed and verified.
+- Done before the release: the leftover `.AI-release-0342` folder (0.26 GB, no file in use) was deleted.
 ## Resume
 
 Read AGENTS.md, this file, docs/STABILIZATION-STATUS.md and docs/ROADMAP.md; on the workstation read the parent operational checkpoint and RIPRESA.md. Inspect Git, process state, release hashes and logs before repeating an interrupted operation. Keep local inference as default and cloud disabled. Do not restart or shut down the PC without current explicit authorization.
