@@ -152,6 +152,16 @@ test('il richiamo vocale usa una UI nascosta temporanea e lascia visibile soltan
   assert.match(lifecycle, /handledWithoutWindow/);
 });
 
+test('avvio a freddo della UI: attesa di 10 s, sotto il limite di 12 s delle azioni del bridge', () => {
+  const presence = fs.readFileSync(path.join(root, 'src', 'application', 'presence-bootstrap.js'), 'utf8');
+  const headless = fs.readFileSync(path.join(root, 'src', 'application', 'headless-desktop-control.js'), 'utf8');
+  const bridge = fs.readFileSync(path.join(root, 'src', 'remote', 'local-presence-bridge.js'), 'utf8');
+  const wait = Number(presence.match(/waitForFullUi = async \(\{ timeoutMs = ([\d_]+)/)[1].replace(/_/g, ''));
+  const action = Number(bridge.match(/const ACTION_TIMEOUT_MS = ([\d_]+)/)[1].replace(/_/g, ''));
+  assert.ok(wait >= 8_000 && wait < action, `attesa ${wait} ms, limite azione ${action} ms`);
+  assert.match(headless, /desktopState\(uiLockPath\)\.running, \{ timeoutMs: 10_000 \}/);
+});
+
 test('la Presence apre la UI on-demand e ne segue la visibilità', () => {
   const source = fs.readFileSync(path.join(root, 'src', 'application', 'bootstrap.js'), 'utf8');
   const presence = fs.readFileSync(path.join(root, 'src', 'application', 'presence-bootstrap.js'), 'utf8');

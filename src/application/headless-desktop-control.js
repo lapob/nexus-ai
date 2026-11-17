@@ -109,7 +109,8 @@ function createHeadlessDesktopControl({
     }
     if (action === 'open-full-app') {
       await launchDesktop({ appRoot, env });
-      if (!await waitFor(() => desktopState(uiLockPath).running)) {
+      // Stessa attesa della Presence: l'avvio a freddo supera i 4 s predefiniti.
+      if (!await waitFor(() => desktopState(uiLockPath).running, { timeoutMs: 10_000 })) {
         throw controlError('Interfaccia NexusNXS non avviata in tempo.', 'PRESENCE_UI_START_TIMEOUT');
       }
       return directStatus();

@@ -194,7 +194,9 @@ async function bootstrapPresence({ env = process.env } = {}) {
       return { launched: false, error };
     }
   };
-  const waitForFullUi = async ({ timeoutMs = 3_000, intervalMs = 50, ambient = false } = {}) => {
+  // Avvio a freddo dopo l'accensione: la UI impiega 4-5 s (disco e cache Chromium freddi). 10 s restano sotto il
+  // limite di 12 s di un'azione del bridge, così Control non riceve un falso "non avviata in tempo".
+  const waitForFullUi = async ({ timeoutMs = 10_000, intervalMs = 50, ambient = false } = {}) => {
     const lockPath = path.join(sharedDataRoot, ambient ? AMBIENT_UI_LOCK : UI_LOCK);
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {

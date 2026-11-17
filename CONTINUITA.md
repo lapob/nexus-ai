@@ -1,3 +1,30 @@
+## Full check-up after the PC restart — 17 November 2026
+
+- Server: readyz is 200 both private and public after the reboot. The Core runtime is on the port derived from
+  the Core PID.
+- Desktop: the UI starts and connects to the Core runtime (logs and connections). It has not been inspected
+  visually: desktop control is unavailable in this session.
+- Bug fixed — cold start of the UI:
+  - after boot the first opening takes 4-5 s, but the Presence waited 3 s (the headless fallback 4 s), so
+    Control got a false "Interfaccia NexusNXS non avviata in tempo" while the window was opening;
+  - both waits are now 10 s, below the 12 s bridge action limit;
+  - test in `system-presence-lifecycle.test.js`.
+- Core reactions:
+  - WebGPU (system Chrome, real clock): the pointer changes the frame; offline lowers mean light from 1.07
+    to 0.60 and cools the hue;
+  - Canvas 2D: same behaviour (0.137 → 0.079);
+  - 0 page errors.
+- Synthesised voice: real Web Audio in Chromium; `createPlayer().level()` is 0 before playback, follows the
+  envelope during it (0.03–1.0) and is 0 after stop.
+- Control:
+  - the phone is visible over mDNS, but `adb connect` is refused because wireless debugging needs re-pairing
+    by the owner (no PIN entered);
+  - emulator (swiftshader): 3/3 identical to the baselines (portrait, font 130%, landscape), offline state
+    only, since the emulator is not paired;
+  - the emulator closed afterwards (processes stopped, adb stopped). An emulator started from a tool command
+    that then ends can be killed with it, so start and test it in the same command.
+- Firefox/WebKit: not tested. The Playwright builds are not installed and a download needs the owner's OK.
+
 ## Shared versioned core, reactive core, `?nxs-qa-time` — 16 November 2026 (published: Server restarted, edge 109c26b5)
 
 - Live check: core 1.1.0 (WebGPU, worker), Online, 0 console errors.
